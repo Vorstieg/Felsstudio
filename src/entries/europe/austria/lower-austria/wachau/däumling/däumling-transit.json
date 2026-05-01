@@ -1,0 +1,11 @@
+{
+	"type": "Feature",
+	"properties": {
+		"name": "Dürnstein/Wachau Parkplatz P2",
+		"type": "bus"
+	},
+	"geometry": {
+		"coordinates": [15.523831633693868, 48.39302614587967],
+		"type": "Point"
+	}
+}

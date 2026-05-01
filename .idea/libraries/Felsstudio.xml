@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="Felsstudio">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/DJI_0075_export.zip!/" />
+      <root url="jar://$PROJECT_DIR$/DJI_0071_export.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

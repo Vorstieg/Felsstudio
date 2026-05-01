@@ -1,0 +1,115 @@
+@import 'tailwindcss';
+
+@plugin "@tailwindcss/typography";
+
+@theme {
+	/* Warm Neutral Palette */
+	--color-paper: #ffffff;
+	--color-warm-white: #f6f5f4;
+	--color-warm-dark: #31302e;
+
+	--color-warm-gray-500: #615d59;
+	--color-warm-gray-300: #a39e98;
+	--color-warm-gray-100: rgba(0, 0, 0, 0.05);
+
+	--color-near-black: #111111;
+
+	/* Brand & Semantic */
+	--color-creator-blue: #0075de;
+	--color-creator-blue-active: #005bab;
+
+	--color-workspace-crag: #ff64c8;
+	--color-workspace-topo-3d: #391c57;
+	--color-workspace-topo-2d: #2a9d99;
+
+	/* Sharp, tight shadows for a dense UI */
+	--shadow-panel: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+	--shadow-modal: 0 12px 32px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08);
+
+	--font-sans:
+		'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+		'Helvetica Neue', Arial, sans-serif;
+}
+
+@layer base {
+	body {
+		@apply bg-warm-white text-near-black font-sans text-[13px] antialiased;
+	}
+
+	button,
+	[role='button'] {
+		@apply cursor-pointer;
+	}
+
+	/* Hardcore Whisper Borders */
+	*,
+	::after,
+	::before {
+		border-color: rgba(0, 0, 0, 0.15);
+	}
+
+	/* Custom Scrollbar (Hyper Minimal) */
+	.custom-scrollbar::-webkit-scrollbar {
+		width: 3px;
+		height: 3px;
+	}
+	.custom-scrollbar::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	.custom-scrollbar::-webkit-scrollbar-thumb {
+		@apply rounded-none bg-black/20;
+	}
+	.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+		@apply bg-black/40;
+	}
+}
+
+@layer components {
+	/* Hyper-Dense Typography */
+	.text-display-title {
+		@apply text-near-black text-[32px] leading-none font-black tracking-tight;
+	}
+	.text-section-title {
+		@apply text-near-black text-[15px] font-bold tracking-tight;
+	}
+	.text-ui-label {
+		@apply text-warm-gray-500 text-[10px] font-bold tracking-[0.05em] uppercase;
+	}
+	.text-body-text {
+		@apply text-near-black text-[12px] font-medium tracking-normal;
+	}
+	.text-micro-data {
+		@apply text-warm-gray-500 text-[10px] font-medium tracking-normal;
+	}
+
+	/* Legacy but updated */
+	.label-studio {
+		@apply text-warm-gray-500 mb-1 block text-[10px] font-bold tracking-widest uppercase;
+	}
+
+	/* Aggressive Component Classes (Sharp corners, dense paddings) */
+	.panel {
+		@apply shadow-panel rounded-sm border border-black/15 bg-white;
+	}
+	.panel-inner {
+		@apply rounded-sm border border-black/10 bg-white shadow-sm;
+	}
+
+	.btn-primary {
+		@apply bg-near-black flex cursor-pointer items-center justify-center rounded-sm px-3 py-1.5 text-[12px] font-medium text-white shadow-sm transition-none hover:bg-black active:scale-[0.98];
+	}
+	.btn-pill {
+		@apply bg-creator-blue hover:bg-creator-blue-active flex cursor-pointer items-center justify-center rounded-sm px-4 py-2 text-[12px] font-bold text-white shadow-sm transition-none active:scale-[0.98];
+	}
+
+	.input-studio {
+		@apply focus:ring-creator-blue focus:border-creator-blue text-near-black rounded-sm border border-black/15 bg-transparent px-2 py-1.5 text-[12px] font-medium transition-none outline-none focus:bg-white focus:ring-1;
+	}
+
+	.tool-btn {
+		@apply active:bg-creator-blue text-warm-gray-500 flex h-8 w-8 cursor-pointer items-center justify-center rounded-sm transition-none hover:bg-black/5 active:text-white;
+	}
+	.tool-btn.active {
+		@apply bg-creator-blue hover:bg-creator-blue-active text-white shadow-sm;
+	}
+}
