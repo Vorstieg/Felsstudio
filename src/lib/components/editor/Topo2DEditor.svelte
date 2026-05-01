@@ -1670,7 +1670,7 @@
 				const meta = topoSymbols.find((s) => s.id === d.type);
 				return -(meta?.height || 24) / 2;
 			})
-			.attr('href', (d) => `/icons/topo-symbols/${d.type}.svg`);
+			.attr('href', (d) => `${base}/icons/topo-symbols/${d.type}.svg`);
 
 		// Selection/Gizmo Overlay
 		symbolGroups.each(function (symbol) {

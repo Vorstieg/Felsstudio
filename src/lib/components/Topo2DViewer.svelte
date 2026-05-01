@@ -243,7 +243,7 @@
 					.attr('height', baseSize)
 					.attr('x', -radius)
 					.attr('y', -radius)
-					.attr('href', `/icons/topo-symbols/${symbol.type}.svg`);
+					.attr('href', `${base}/icons/topo-symbols/${symbol.type}.svg`);
 			});
 	}
 
@@ -297,5 +297,8 @@
 		style="touch-action: none;"
 	>
 		<g bind:this={gElement}> </g>
+	</svg>
+</div>
+ment}> </g>
 	</svg>
 </div>

@@ -107,7 +107,7 @@ export const topoSymbols = [
 	{
 		id: 'bolt',
 		name: 'Bolt',
-		icon: '/icons/topo-symbols/bolt.svg',
+		icon: `${base}/icons/topo-symbols/bolt.svg`,
 		type: 'fixpoint',
 		width: 16,
 		height: 16
@@ -115,7 +115,7 @@ export const topoSymbols = [
 	{
 		id: 'piton',
 		name: 'Piton',
-		icon: '/icons/topo-symbols/piton.svg',
+		icon: `${base}/icons/topo-symbols/piton.svg`,
 		type: 'fixpoint',
 		width: 16,
 		height: 16
@@ -123,7 +123,7 @@ export const topoSymbols = [
 	{
 		id: 'hourglass',
 		name: 'Hourglass',
-		icon: '/icons/topo-symbols/hourglass.svg',
+		icon: `${base}/icons/topo-symbols/hourglass.svg`,
 		type: 'fixpoint',
 		width: 16,
 		height: 16
@@ -131,7 +131,7 @@ export const topoSymbols = [
 	{
 		id: 'belay',
 		name: 'Belay',
-		icon: '/icons/topo-symbols/belay.svg',
+		icon: `${base}/icons/topo-symbols/belay.svg`,
 		type: 'fixpoint',
 		width: 16,
 		height: 16
@@ -139,7 +139,7 @@ export const topoSymbols = [
 	{
 		id: 'abseil',
 		name: 'Abseil',
-		icon: '/icons/topo-symbols/abseil.svg',
+		icon: `${base}/icons/topo-symbols/abseil.svg`,
 		type: 'fixpoint',
 		width: 16,
 		height: 16
@@ -149,7 +149,7 @@ export const topoSymbols = [
 	{
 		id: 'crux',
 		name: 'Crux',
-		icon: '/icons/topo-symbols/crux.svg',
+		icon: `${base}/icons/topo-symbols/crux.svg`,
 		type: 'feature',
 		width: 32,
 		height: 32
@@ -157,7 +157,7 @@ export const topoSymbols = [
 	{
 		id: 'crack',
 		name: 'Crack',
-		icon: '/icons/topo-symbols/crack.svg',
+		icon: `${base}/icons/topo-symbols/crack.svg`,
 		type: 'feature',
 		width: 32,
 		height: 32
@@ -165,7 +165,7 @@ export const topoSymbols = [
 	{
 		id: 'chimney',
 		name: 'Chimney',
-		icon: '/icons/topo-symbols/chimney.svg',
+		icon: `${base}/icons/topo-symbols/chimney.svg`,
 		type: 'feature',
 		width: 32,
 		height: 32
@@ -173,7 +173,7 @@ export const topoSymbols = [
 	{
 		id: 'slab',
 		name: 'Slab',
-		icon: '/icons/topo-symbols/slab.svg',
+		icon: `${base}/icons/topo-symbols/slab.svg`,
 		type: 'feature',
 		width: 32,
 		height: 32
@@ -181,7 +181,7 @@ export const topoSymbols = [
 	{
 		id: 'overhang',
 		name: 'Overhang',
-		icon: '/icons/topo-symbols/overhang.svg',
+		icon: `${base}/icons/topo-symbols/overhang.svg`,
 		type: 'feature',
 		width: 32,
 		height: 32
@@ -189,7 +189,7 @@ export const topoSymbols = [
 	{
 		id: 'rubble',
 		name: 'Rubble',
-		icon: '/icons/topo-symbols/rubble.svg',
+		icon: `${base}/icons/topo-symbols/rubble.svg`,
 		type: 'feature',
 		width: 32,
 		height: 32
@@ -197,7 +197,7 @@ export const topoSymbols = [
 	{
 		id: 'tree',
 		name: 'Tree',
-		icon: '/icons/topo-symbols/tree.svg',
+		icon: `${base}/icons/topo-symbols/tree.svg`,
 		type: 'feature',
 		width: 32,
 		height: 32

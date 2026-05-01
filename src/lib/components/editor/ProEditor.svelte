@@ -456,7 +456,7 @@
                             onclick={() => userState.ui.selectedSymbol = type}
                             title={$_(`topo.fixpoints.${type}`)}
                         >
-                            <img src="/icons/topo-symbols/{type}.svg" alt={type} class="w-3 h-3 {userState.ui.selectedSymbol === type ? 'invert brightness-0' : 'opacity-70'}" />
+                            <img src="{base}/icons/topo-symbols/{type}.svg" alt={type} class="w-3 h-3 {userState.ui.selectedSymbol === type ? 'invert brightness-0' : 'opacity-70'}" />
                             <span class="text-[9px] font-bold uppercase tracking-tighter">{$_(`topo.fixpoints.${type}`)}</span>
                         </button>
                     {/each}
