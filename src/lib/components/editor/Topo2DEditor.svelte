@@ -1,5 +1,6 @@
 <script>
 	import { userState } from '$lib/state/editor.svelte.js';
+	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { zoom as d3Zoom } from 'd3-zoom';
 	import { select } from 'd3-selection';

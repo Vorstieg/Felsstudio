@@ -1,5 +1,6 @@
 <script>
 	import { onMount } from 'svelte';
+	import { base } from '$app/paths';
 	import { zoom as d3Zoom } from 'd3-zoom';
 	import { select } from 'd3-selection';
 	import { getHitAreaSize } from '$lib/assets/js/mobile-utils.js';

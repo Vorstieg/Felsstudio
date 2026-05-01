@@ -1,5 +1,6 @@
 import { Vector3 } from 'three';
 import { generateId } from './id-utils.js';
+import { base } from '$app/paths';
 
 export const availableTopoTags = [
 	'Kinderfreundlich',
