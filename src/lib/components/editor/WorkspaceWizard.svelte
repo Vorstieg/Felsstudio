@@ -127,13 +127,16 @@
                         const projectBlob = await projectEntry.async('blob');
                         projectFile = new File([projectBlob], projectEntry.name.split('/').pop());
                     }
-                    const cropEntries = Object.values(zip.files).filter(f => !f.dir && f.name.startsWith('crops/'));
+                    const cropEntries = Object.values(zip.files).filter(f => !f.dir && f.name.includes('/crops/') || f.name.startsWith('crops/'));
 
                     if (cropEntries.length > 0) {
                         const cropsMap = {};
                         for (const entry of cropEntries) {
                             const blob = await entry.async('blob');
-                            cropsMap[entry.name] = URL.createObjectURL(blob);
+                            // Use just the filename to make matching easier
+                            const fileName = entry.name.split('/').pop().split('\\').pop();
+                            cropsMap[fileName] = URL.createObjectURL(blob);
+                            cropsMap[entry.name] = cropsMap[fileName]; // Keep original path just in case
                         }
                         userState.clustering.cropsMap = cropsMap;
                     }
@@ -143,6 +146,7 @@
 					const text = await projectFile.text(); const project = JSON.parse(text);
 					userState.clustering.rawHits = (project.hits || []).map(h => ({ 
                         ...h, 
+                        crop: h.crop || h.hit_crop || h.img,
                         edge_dist: h.edge_dist ?? 0, 
                         normal_dot: h.normal_dot ?? 1.0, 
                         cam_dist: h.cam_dist ?? 1.0 
