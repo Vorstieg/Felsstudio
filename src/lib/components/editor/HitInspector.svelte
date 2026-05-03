@@ -34,13 +34,28 @@
 
     function getCropSrc(hit) {
         if (!hit?.crop) return null;
-        if (userState.clustering.cropsMap && userState.clustering.cropsMap[hit.crop]) {
-            return userState.clustering.cropsMap[hit.crop];
+        
+        if (userState.clustering.cropsMap) {
+            if (userState.clustering.cropsMap[hit.crop]) {
+                return userState.clustering.cropsMap[hit.crop];
+            }
+            // Try matching just the filename in case the map keys are just filenames
+            const fileName = hit.crop.split('/').pop().split('\\').pop();
+            if (userState.clustering.cropsMap[fileName]) {
+                return userState.clustering.cropsMap[fileName];
+            }
+            // Try matching with crops/ prefix
+            if (userState.clustering.cropsMap['crops/' + fileName]) {
+                return userState.clustering.cropsMap['crops/' + fileName];
+            }
         }
-        if (hit.crop.startsWith('http') || hit.crop.startsWith('data:')) {
+        
+        if (hit.crop.startsWith('http') || hit.crop.startsWith('data:') || hit.crop.startsWith('blob:')) {
             return hit.crop;
         }
-        return null;
+        
+        // Fallback to returning the path directly so the browser can attempt to load it relative to the current URL or absolute root
+        return hit.crop;
     }
 
     // Keyboard controls for review
