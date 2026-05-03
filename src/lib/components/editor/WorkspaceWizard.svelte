@@ -127,7 +127,7 @@
                         const projectBlob = await projectEntry.async('blob');
                         projectFile = new File([projectBlob], projectEntry.name.split('/').pop());
                     }
-                    const cropEntries = Object.values(zip.files).filter(f => !f.dir && f.name.includes('/crops/') || f.name.startsWith('crops/'));
+                    const cropEntries = Object.values(zip.files).filter(f => !f.dir && (f.name.toLowerCase().endsWith('.jpg') || f.name.toLowerCase().endsWith('.jpeg') || f.name.toLowerCase().endsWith('.png') || f.name.toLowerCase().endsWith('.webp')));
 
                     if (cropEntries.length > 0) {
                         const cropsMap = {};
@@ -166,7 +166,11 @@
 					if (project.name) userState.topo.name = project.name;
 					if (!zipFile && cropFolderFiles && cropFolderFiles.length > 0) {
 						const cropsMap = {};
-						for (const file of cropFolderFiles) { cropsMap[file.name] = URL.createObjectURL(file); }
+						for (const file of cropFolderFiles) { 
+                            const blobUrl = URL.createObjectURL(file);
+                            cropsMap[file.name] = blobUrl; 
+                            cropsMap[file.name.toLowerCase()] = blobUrl;
+                        }
 						userState.clustering.cropsMap = cropsMap;
 					}
 				} else {

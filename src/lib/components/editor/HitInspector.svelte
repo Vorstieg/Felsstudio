@@ -36,18 +36,22 @@
         if (!hit?.crop) return null;
         
         if (userState.clustering.cropsMap) {
-            if (userState.clustering.cropsMap[hit.crop]) {
-                return userState.clustering.cropsMap[hit.crop];
-            }
+            const cropKey = hit.crop;
+            const cropKeyLower = cropKey.toLowerCase();
+            
+            if (userState.clustering.cropsMap[cropKey]) return userState.clustering.cropsMap[cropKey];
+            if (userState.clustering.cropsMap[cropKeyLower]) return userState.clustering.cropsMap[cropKeyLower];
+
             // Try matching just the filename in case the map keys are just filenames
-            const fileName = hit.crop.split('/').pop().split('\\').pop();
-            if (userState.clustering.cropsMap[fileName]) {
-                return userState.clustering.cropsMap[fileName];
-            }
+            const fileName = cropKey.split('/').pop().split('\\').pop();
+            const fileNameLower = fileName.toLowerCase();
+            
+            if (userState.clustering.cropsMap[fileName]) return userState.clustering.cropsMap[fileName];
+            if (userState.clustering.cropsMap[fileNameLower]) return userState.clustering.cropsMap[fileNameLower];
+
             // Try matching with crops/ prefix
-            if (userState.clustering.cropsMap['crops/' + fileName]) {
-                return userState.clustering.cropsMap['crops/' + fileName];
-            }
+            if (userState.clustering.cropsMap['crops/' + fileName]) return userState.clustering.cropsMap['crops/' + fileName];
+            if (userState.clustering.cropsMap['crops/' + fileNameLower]) return userState.clustering.cropsMap['crops/' + fileNameLower];
         }
         
         if (hit.crop.startsWith('http') || hit.crop.startsWith('data:') || hit.crop.startsWith('blob:')) {
