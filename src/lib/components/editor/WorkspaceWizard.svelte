@@ -135,8 +135,11 @@
                             const blob = await entry.async('blob');
                             // Use just the filename to make matching easier
                             const fileName = entry.name.split('/').pop().split('\\').pop();
-                            cropsMap[fileName] = URL.createObjectURL(blob);
-                            cropsMap[entry.name] = cropsMap[fileName]; // Keep original path just in case
+                            const blobUrl = URL.createObjectURL(blob);
+                            cropsMap[fileName] = blobUrl;
+                            cropsMap[fileName.toLowerCase()] = blobUrl;
+                            cropsMap[entry.name] = blobUrl; 
+                            cropsMap[entry.name.toLowerCase()] = blobUrl;
                         }
                         userState.clustering.cropsMap = cropsMap;
                     }
