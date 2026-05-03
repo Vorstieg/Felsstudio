@@ -116,6 +116,7 @@
 		try {
 			if (workspace === 'topos/3d/new') {
                 userState.topo.editorMode = '3d';
+                if (zipFile) {
                     const zip = await JSZip.loadAsync(zipFile);
                     const glbEntry = Object.values(zip.files).find(f => !f.dir && f.name.toLowerCase().endsWith('.glb'));
                     if (glbEntry) {
@@ -133,7 +134,6 @@
                         const cropsMap = {};
                         for (const entry of cropEntries) {
                             const blob = await entry.async('blob');
-                            // Use just the filename to make matching easier
                             const fileName = entry.name.split('/').pop().split('\\').pop();
                             const blobUrl = URL.createObjectURL(blob);
                             cropsMap[fileName] = blobUrl;
@@ -143,6 +143,7 @@
                         }
                         userState.clustering.cropsMap = cropsMap;
                     }
+                }
 				if (!glbFile) throw new Error('GLB Model is required');
 				await loadGlb(glbFile); 
 				if (projectFile) {

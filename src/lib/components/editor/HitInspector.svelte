@@ -57,11 +57,11 @@
         if (hit.crop.startsWith('http') || hit.crop.startsWith('data:') || hit.crop.startsWith('blob:')) {
             return hit.crop;
         }
-        
-        // Fallback to returning the path directly so the browser can attempt to load it relative to the current URL or absolute root
-        return hit.crop;
-    }
 
+        // Final fallback: if it's missing from the map, we return null to avoid spurious 404s
+        // on relative filenames that don't exist on the server root.
+        return null;
+        }
     // Keyboard controls for review
     function handleKeyDown(e) {
         const stage = userState.clustering.review.stage;
