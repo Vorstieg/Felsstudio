@@ -168,8 +168,8 @@
 						userState.clustering.gpsData = gpsMap;
 					}
 					if (project.name) userState.topo.name = project.name;
-					if (!zipFile && cropFolderFiles && cropFolderFiles.length > 0) {
-						const cropsMap = {};
+					if (cropFolderFiles && cropFolderFiles.length > 0) {
+						const cropsMap = { ...(userState.clustering.cropsMap || {}) };
 						for (const file of cropFolderFiles) { 
                             const blobUrl = URL.createObjectURL(file);
                             cropsMap[file.name] = blobUrl; 

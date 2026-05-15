@@ -425,25 +425,71 @@
         {/if}
     {/each}
 
-    {#each visualClusters as cluster (cluster.id)}
-        <T.Mesh position={cluster.anchor} onclick={(e) => { e.stopPropagation(); userState.clustering.selectedClusterId = cluster.id; }}>
-            <T.SphereGeometry args={[userState.clustering.selectedClusterId === cluster.id ? 0.12 : 0.08]} />
-            <T.MeshBasicMaterial color={cluster.color} />
-        </T.Mesh>
-        {#if userState.clustering.showAnnotations}
-            <CssObject position={cluster.anchor} scaleWithZoom={true}>
-                <div class="annotation !bg-black/50 !text-white !p-1 !rounded !text-[8px] border border-white/20 {userState.clustering.selectedClusterId === cluster.id ? '!border-cyan-400 !bg-cyan-900/80' : ''}">
-                    {cluster.members.length}
-                </div>
-            </CssObject>
-        {/if}
-    {/each}
+    {#if activeTool === 'ai-bolts'}
+        {#each visualClusters as cluster (cluster.id)}
+            {@const isSelected = userState.clustering.selectedClusterId === cluster.id}
+            {@const isLocked = userState.clustering.lockedClusterId === cluster.id}
+            {@const isAnchor = cluster.class === 'anchor' || cluster.class === 'belay'}
+            <T.Group position={cluster.anchor} scale={isSelected || isLocked ? 1.5 : 1}>
+                <T.Mesh 
+                    onpointerenter={(e) => {
+                        e.stopPropagation();
+                        if (!userState.clustering.lockedClusterId) {
+                            userState.clustering.selectedClusterId = cluster.id;
+                        }
+                    }}
+                    onpointerleave={(e) => {
+                        e.stopPropagation();
+                        if (!userState.clustering.lockedClusterId) {
+                            userState.clustering.selectedClusterId = null;
+                        }
+                    }}
+                    onclick={(e) => { 
+                        e.stopPropagation(); 
+                        if (userState.clustering.lockedClusterId === cluster.id) {
+                            userState.clustering.lockedClusterId = null;
+                            userState.clustering.selectedClusterId = null;
+                        } else {
+                            userState.clustering.lockedClusterId = cluster.id;
+                            userState.clustering.selectedClusterId = cluster.id;
+                        }
+                    }}
+                >
+                    <T.SphereGeometry args={[0.15]} />
+                    <T.MeshBasicMaterial transparent opacity={0} depthWrite={false} />
+                </T.Mesh>
 
-    {#each visualRawHits as hit (hit.id)}
-        <T.Mesh position={hit.pos}><T.SphereGeometry args={[0.02]} /><T.MeshBasicMaterial color={hit.color} transparent opacity={0.6} /></T.Mesh>
-    {/each}
+                {#if isAnchor}
+                    <T.Mesh rotation={[Math.PI / 2, 0, 0]}>
+                        <T is={THREE.TorusGeometry} args={[0.08, 0.025, 16, 32]} />
+                        <T.MeshBasicMaterial color={cluster.color} />
+                    </T.Mesh>
+                    <T.Mesh>
+                        <T.SphereGeometry args={[0.04]} />
+                        <T.MeshBasicMaterial color={cluster.color} />
+                    </T.Mesh>
+                {:else}
+                    <T.Mesh>
+                        <T.SphereGeometry args={[0.08]} />
+                        <T.MeshBasicMaterial color={cluster.color} />
+                    </T.Mesh>
+                {/if}
+            </T.Group>
+            {#if userState.clustering.showAnnotations}
+                <CssObject position={cluster.anchor} scaleWithZoom={true}>
+                    <div class="annotation !bg-black/50 !text-white !p-1 !rounded !text-[8px] border border-white/20 {userState.clustering.selectedClusterId === cluster.id ? '!border-cyan-400 !bg-cyan-900/80' : ''}">
+                        {cluster.members.length}
+                    </div>
+                </CssObject>
+            {/if}
+        {/each}
 
-    {#each visualCameras as cam (cam.id)}
-        <T.Mesh position={cam.pos}><T.SphereGeometry args={[0.05]} /><T.MeshBasicMaterial color="#0075de" /></T.Mesh>
-    {/each}
+        {#each visualRawHits as hit (hit.id)}
+            <T.Mesh position={hit.pos}><T.SphereGeometry args={[0.02]} /><T.MeshBasicMaterial color={hit.color} transparent opacity={0.6} /></T.Mesh>
+        {/each}
+
+        {#each visualCameras as cam (cam.id)}
+            <T.Mesh position={cam.pos}><T.SphereGeometry args={[0.05]} /><T.MeshBasicMaterial color="#0075de" /></T.Mesh>
+        {/each}
+    {/if}
 </T.Group>

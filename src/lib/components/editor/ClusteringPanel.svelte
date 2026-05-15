@@ -171,16 +171,6 @@
             <div class="flex justify-between text-micro-data font-mono"><span class="text-warm-gray-500">{$_('ui.filtered')}</span> <span class="font-bold">{userState.clustering.stats.totalHits - userState.clustering.stats.confCut - userState.clustering.stats.edgeCut}</span></div>
             <div class="flex justify-between text-micro-data font-mono border-t border-black/15 mt-1 pt-1"><span class="text-near-black font-bold">{$_('ui.final_clusters')}</span> <span class="text-creator-blue font-bold">{userState.clustering.stats.finalClusters}</span></div>
         </div>
-
-        {#if userState.clustering.clusters.length > 0}
-            <button 
-                class="w-full btn-primary !bg-creator-blue !hover:bg-creator-blue-active flex items-center justify-center gap-2"
-                onclick={() => userState.startAiConversion()}
-            >
-                <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
-                {$_('ui.convert_to_fixpoints')}
-            </button>
-        {/if}
 	</div>
 </div>
 

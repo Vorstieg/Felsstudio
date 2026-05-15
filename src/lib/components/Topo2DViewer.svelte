@@ -300,6 +300,3 @@
 		<g bind:this={gElement}> </g>
 	</svg>
 </div>
-ment}> </g>
-	</svg>
-</div>

@@ -3,6 +3,7 @@
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
 	import { _ } from 'svelte-i18n';
 	import { onMount } from 'svelte';
+	import { generateSymbolId } from '$lib/assets/js/id-utils.js';
 	import {
 		availableTopoTags,
 		availableRouteTags,
@@ -27,10 +28,12 @@
 	let routes = $derived(userState.topo.routes);
 	let lastSelectedId = $state(null);
 	let lastSelectedFpId = $state(null);
+	let lastLockedClusterId = $state(null);
 
 	$effect(() => {
 		const selectedId = userState.ui.selectedRouteId;
 		const selectedFpId = userState.ui.selectedFixpointId;
+		const lockedClusterId = userState.clustering.lockedClusterId;
 
 		if (selectedId && selectedId !== lastSelectedId) {
 			lastSelectedId = selectedId;
@@ -68,7 +71,50 @@
 		} else if (!selectedFpId) {
 			lastSelectedFpId = null;
 		}
+
+		if (lockedClusterId && lockedClusterId !== lastLockedClusterId) {
+			lastLockedClusterId = lockedClusterId;
+			if (activeTab !== 'fixpoints') activeTab = 'fixpoints';
+			setTimeout(() => {
+				const el = document.getElementById('ai-bolt-' + lockedClusterId);
+				el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			}, 100);
+		} else if (!lockedClusterId) {
+			lastLockedClusterId = null;
+		}
 	});
+
+	let aiSuggestions = $derived.by(() => {
+		if (activeTool !== 'ai-bolts' || !userState.clustering.clusters) return [];
+		return userState.clustering.clusters.filter(c => {
+			return !userState.topo.fixPoints.some(fp => {
+				const dist = Math.sqrt(
+					Math.pow(fp.position[0] - c.anchor[0], 2) +
+					Math.pow(fp.position[1] - c.anchor[1], 2) +
+					Math.pow(fp.position[2] - c.anchor[2], 2)
+				);
+				return dist < 0.1; // 10cm threshold
+			});
+		});
+	});
+
+	function addAiBolt(c) {
+		let type = 'bolt';
+		if (c.class === 'anchor' || c.class === 'belay') type = 'belay';
+
+		userState.topo.fixPoints.push({
+			id: generateSymbolId(),
+			type: type,
+			position: [...c.anchor],
+			meta: {
+				ai_source: true,
+				confidence: c.conf,
+				observations: c.members.length,
+				original_class: c.class
+			}
+		});
+		userState.clustering.selectedClusterId = null;
+	}
 
 	let activeTab = $state('info'); 
 	let isMobile = $state(false);
@@ -90,7 +136,7 @@
 </script>
 
 <!-- Desktop Layout -->
-<div class="hidden md:flex fixed top-14 right-2 z-50 w-80 flex-col max-h-[calc(100vh-4rem)]">
+<div class="hidden md:flex fixed top-14 right-2 z-50 w-80 flex-col" style="max-height: calc(100vh - {userState.clustering.selectedClusterId ? '8.5rem' : '4rem'}); transition: max-height 0.2s ease-out;">
 	<!-- Scrollable Content Area -->
 	<div class="panel flex flex-col flex-1 overflow-hidden shadow-panel">
 		<div class="flex justify-between items-center border-b border-black/15 p-3 pb-2 mb-2 flex-shrink-0">
@@ -362,6 +408,38 @@
 				{/if}
 
 				{#if activeTab === 'fixpoints'}
+					{#if aiSuggestions.length > 0}
+						<div class="mb-4 space-y-1.5" style="margin-bottom: {userState.clustering.selectedClusterId ? '70px' : '1rem'}">
+							<p class="text-ui-label text-creator-blue px-1 mb-0.5">Nearby Suggestions</p>
+							<div class="grid grid-cols-1 gap-1.5">
+								{#each aiSuggestions as cluster (cluster.id)}
+									<!-- svelte-ignore a11y_click_events_have_key_events -->
+									<!-- svelte-ignore a11y_no_static_element_interactions -->
+									<div id={'ai-bolt-' + cluster.id} class="panel-inner p-2 transition-none flex items-center gap-2 border cursor-pointer {userState.clustering.lockedClusterId === cluster.id ? 'border-creator-blue ring-2 ring-creator-blue/20 bg-creator-blue/10' : 'border-creator-blue/30 bg-creator-blue/5 hover:border-creator-blue/50'}"
+										onmouseenter={() => { if (!userState.clustering.lockedClusterId) userState.clustering.selectedClusterId = cluster.id; }}
+										onmouseleave={() => { if (!userState.clustering.lockedClusterId) userState.clustering.selectedClusterId = null; }}
+										onclick={() => { 
+											if (userState.clustering.lockedClusterId === cluster.id) {
+												userState.clustering.lockedClusterId = null;
+												userState.clustering.selectedClusterId = null;
+											} else {
+												userState.clustering.lockedClusterId = cluster.id;
+												userState.clustering.selectedClusterId = cluster.id;
+											}
+										}}
+									>
+										<div class="w-6 h-6 rounded-sm bg-creator-blue/10 flex items-center justify-center text-creator-blue text-micro-data font-bold border border-creator-blue/20 shadow-sm"><i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i></div>
+										<div class="flex-1">
+											<span class="text-sm font-bold text-near-black">AI {cluster.class === 'anchor' || cluster.class === 'belay' ? 'Anchor' : 'Bolt'}</span>
+											<span class="text-[10px] text-warm-gray-500 ml-1">({Math.round(cluster.conf)}%)</span>
+										</div>
+										<button class="px-2 py-1 bg-near-black text-white rounded-sm text-micro-data font-bold hover:bg-black" onclick={(e) => { e.stopPropagation(); addAiBolt(cluster); }}>Add</button>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
 					{#if userState.topo.fixPoints.length === 0}
 						<div class="bg-warm-white rounded-sm p-4 text-center border border-black/15">
 							<p class="text-body-text text-warm-gray-500 font-medium">{$_('ui.no_fixpoints_yet')}</p>
@@ -422,6 +500,27 @@
 						</div>
 					{/each}
 				{:else if activeTab === 'fixpoints'}
+					{#if aiSuggestions.length > 0}
+						<div class="mb-4 space-y-1.5">
+							<p class="text-ui-label text-creator-blue px-1 mb-0.5">Nearby Suggestions</p>
+							<div class="space-y-1.5">
+								{#each aiSuggestions as cluster (cluster.id)}
+									<div id={'ai-bolt-' + cluster.id} class="panel p-3 flex items-center gap-3 border-2 border-creator-blue/30 bg-creator-blue/5"
+										onmouseenter={() => userState.clustering.selectedClusterId = cluster.id}
+										onmouseleave={() => userState.clustering.selectedClusterId = null}
+									>
+										<div class="w-8 h-8 rounded-sm bg-creator-blue/10 flex items-center justify-center text-creator-blue text-xs font-black shadow-sm"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+										<div class="flex-1">
+											<div class="text-sm font-black text-near-black">AI Bolt</div>
+											<div class="text-xs text-warm-gray-500">{Math.round(cluster.conf)}% Match</div>
+										</div>
+										<button class="w-9 h-9 flex items-center justify-center rounded-sm bg-near-black text-white font-bold text-xs" onclick={() => addAiBolt(cluster)}>Add</button>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
 					{#each userState.topo.fixPoints as point, i (point.id)}
 						<div class="panel p-3 flex items-center gap-3 border-2 border-transparent">
 							<div class="w-8 h-8 rounded-sm transition-none bg-warm-gray-100 flex items-center justify-center text-warm-gray-500 text-xs font-black shadow-sm">{i + 1}</div>

@@ -91,8 +91,8 @@
 	let lastSelectedClusterId = null;
 
 	$effect(() => {
-		const clusterId = userState.clustering.selectedClusterId;
-		if (clusterId && clusterId !== lastSelectedClusterId && userState.clustering.review.stage) {
+		const clusterId = userState.clustering.lockedClusterId;
+		if (clusterId && clusterId !== lastSelectedClusterId) {
 			lastSelectedClusterId = clusterId;
 			const cluster = userState.clustering.clusters.find((c) => c.id === clusterId);
 			if (cluster && cluster.members.length > 0) {
@@ -131,7 +131,7 @@
 
     // Keep OrbitControls in sync with tween
     $effect(() => {
-        if (controlsRef && (userState.clustering.selectedClusterId || userState.clustering.review.stage)) {
+        if (controlsRef && userState.clustering.selectedClusterId) {
             const _ = $cameraPosStore;
             const __ = $targetPosStore;
             controlsRef.update();
