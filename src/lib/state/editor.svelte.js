@@ -45,6 +45,7 @@ export const userState = $state({
 		maxCamDist: 50,
 		minViewSpread: 0.4,
 		minObservations: 4,
+		initializedHits: 0,
 
 		rawHits: [], // All imported hits from detections.json
 		clusters: [], // Final grouped bolts/fixpoints

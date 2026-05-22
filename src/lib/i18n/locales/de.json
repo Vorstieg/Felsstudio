@@ -320,7 +320,7 @@
 		"apply_changes": "Änderungen übernehmen",
 		"labels": "Beschriftungen",
 		"interactive_view": "Interaktive Ansicht",
-		"ai-bolts": "AI Bolts",
+		"ai-bolts": "KI Bohrhaken",
 		"schematic_view": "Schematische Ansicht",
 		"select_tool_hint": "Wähle ein Werkzeug aus, um mit der Bearbeitung zu beginnen",
 		"generate_2d": "2D Topo generieren",
@@ -356,6 +356,17 @@
 		"capture_photo": "Foto aufnehmen",
 		"image_load_error": "Fehler beim Laden des Bildes. Überprüfe die URL.",
 		"camera_access_failed": "Kamera-Zugriff fehlgeschlagen",
-		"select_image_file": "Bitte wähle eine Bilddatei (JPG, PNG, etc.)"
+		"select_image_file": "Bitte wähle eine Bilddatei (JPG, PNG, etc.)",
+		"ai_anchor": "KI Stand",
+		"ai_bolt": "KI Bohrhaken",
+		"nearby_suggestions": "Vorschläge in der Nähe",
+		"dismiss": "Verwerfen",
+		"match": "Übereinstimmung",
+		"observations": "Sichtungen",
+		"spread": "Spreizung",
+		"angle": "Winkel",
+		"source_image": "Quellbild",
+		"show_camera_trail": "Kamera-Pfad anzeigen",
+		"ai_suggestions_title": "KI Vorschläge"
 	}
 }

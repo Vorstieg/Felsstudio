@@ -351,6 +351,17 @@
 		"capture_photo": "Capture Photo",
 		"image_load_error": "Error loading image. Check the URL.",
 		"camera_access_failed": "Camera access failed",
-		"select_image_file": "Please select an image file (JPG, PNG, etc.)"
+		"select_image_file": "Please select an image file (JPG, PNG, etc.)",
+		"ai_anchor": "AI Anchor",
+		"ai_bolt": "AI Bolt",
+		"nearby_suggestions": "Nearby Suggestions",
+		"dismiss": "Dismiss",
+		"match": "Match",
+		"observations": "Observations",
+		"spread": "Spread",
+		"angle": "Angle",
+		"source_image": "Source Image",
+		"show_camera_trail": "Show Camera Trail",
+		"ai_suggestions_title": "AI Suggestions"
 	}
 }
