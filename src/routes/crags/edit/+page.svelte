@@ -8,10 +8,11 @@
 	import { base } from '$app/paths';
 	import { goto } from '$app/navigation';
 
+	import MapSearch from '$lib/components/editor/MapSearch.svelte';
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
 
 	let mapElement = $state();
-	let map;
+	let map = $state();
 	let cragMarker;
 	let transitMarkers = $state([]);
 	let parkingMarkers = $state([]);
@@ -234,6 +235,15 @@
 			createTransitMarker(point);
 		}
 		detectedAssets = detectedAssets.filter(a => a.id !== asset.id);
+	}
+
+	function setCragPositionFromSearch(coordinates) {
+		if (!coordinates) return;
+		cragEditorState.crag.geometry.coordinates = coordinates;
+		if (cragMarker) cragMarker.setLngLat(coordinates);
+		if (activeTool === 'parking' || activeTool === 'transit') {
+			scanNearbyAssets(activeTool === 'parking' ? 'parking' : 'transit');
+		}
 	}
 
 	function initMarkersAndLayers() {
@@ -579,9 +589,13 @@
 			</button>
 		</div>
 	</div>
-</div>
+	</div>
 
-<div class="fixed top-14 right-2 z-50 flex flex-col w-80 max-h-[calc(100vh-4rem)]">
+	<div class="fixed top-14 left-2 z-50 w-[min(24rem,calc(100vw-1rem))] md:right-auto">
+		<MapSearch {map} onUsePosition={setCragPositionFromSearch} />
+	</div>
+
+	<div class="fixed top-14 right-2 z-50 flex flex-col w-80 max-h-[calc(100vh-4rem)]">
 	<div class="panel flex-1 flex flex-col overflow-hidden">
 		<div class="flex justify-between items-center border-b border-black/15 p-3 pb-2 mb-2 flex-shrink-0">
 			<div>
