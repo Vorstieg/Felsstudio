@@ -4,6 +4,7 @@
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import * as turf from '@turf/turf';
 	import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
+	import { userState } from '$lib/state/editor.svelte.js';
 	import { base } from '$app/paths';
 	import { goto } from '$app/navigation';
 
@@ -685,6 +686,28 @@
 		}), `${baseName}-transit-track${i > 0 ? '-' + i : ''}.json`));
 	}
 
+	function createTopoFromCrag() {
+		const crag = $state.snapshot(cragEditorState.crag);
+		const today = new Date().toISOString().split('T')[0];
+		userState.reset();
+		userState.topo = {
+			...userState.topo,
+			name: crag.name || '',
+			description: crag.description_de || crag.description_en || '',
+			rock: crag.rock_type || userState.topo.rock,
+			tags: [...(crag.tags || []), ...(crag.type || [])],
+			date: crag.date || today,
+			updated: today,
+			coordinates: [
+				crag.geometry?.coordinates?.[1] ?? 0,
+				crag.geometry?.coordinates?.[0] ?? 0
+			],
+			editorMode: '2d'
+		};
+		userState.ui.workspace = 'topos/2d/new';
+		goto(`${base}/topos/2d/new`);
+	}
+
 	function addEquipmentItem() {
 		cragEditorState.crag.equipment = [...cragEditorState.crag.equipment, { name: 'Expressschlingen', amount: 12 }];
 	}
@@ -710,6 +733,7 @@
 	onHandleTrackConfirm={handleTrackConfirm}
 	onCancelTrackEdit={cancelTrackEdit}
 	onGpxUpload={handleGpxUpload}
+	onCreateTopo={createTopoFromCrag}
 	onExport={downloadExport}
 />
 

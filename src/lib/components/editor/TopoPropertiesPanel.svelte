@@ -86,12 +86,12 @@
 
 	let aiSuggestions = $derived.by(() => {
 		if (activeTool !== 'ai-bolts' || !userState.clustering.clusters) return [];
-		return userState.clustering.clusters.filter(c => {
-			return !userState.topo.fixPoints.some(fp => {
+		return userState.clustering.clusters.filter((c) => {
+			return !userState.topo.fixPoints.some((fp) => {
 				const dist = Math.sqrt(
 					Math.pow(fp.position[0] - c.anchor[0], 2) +
-					Math.pow(fp.position[1] - c.anchor[1], 2) +
-					Math.pow(fp.position[2] - c.anchor[2], 2)
+						Math.pow(fp.position[1] - c.anchor[1], 2) +
+						Math.pow(fp.position[2] - c.anchor[2], 2)
 				);
 				return dist < 0.1; // 10cm threshold
 			});
@@ -136,11 +136,17 @@
 </script>
 
 <!-- Desktop Layout -->
-<div class="hidden md:flex fixed top-14 right-2 z-50 w-80 flex-col"
-		 style="max-height: calc(100vh - {userState.clustering.lockedClusterId ? '8.5rem' : '4rem'}); transition: max-height 0.2s ease-out;">
+<div
+	class="hidden md:flex fixed top-14 right-2 z-50 w-80 flex-col"
+	style="max-height: calc(100vh - {userState.clustering.lockedClusterId
+		? '8.5rem'
+		: '4rem'}); transition: max-height 0.2s ease-out;"
+>
 	<!-- Scrollable Content Area -->
 	<div class="panel flex flex-col flex-1 overflow-hidden shadow-panel">
-		<div class="flex justify-between items-center border-b border-black/15 p-3 pb-2 mb-2 flex-shrink-0">
+		<div
+			class="flex justify-between items-center border-b border-black/15 p-3 pb-2 mb-2 flex-shrink-0"
+		>
 			<div>
 				<h1 class="text-section-title">{$_('ui.properties')}</h1>
 				<p class="text-ui-label !m-0">{$_('ui.topo_inspector')}</p>
@@ -148,26 +154,45 @@
 		</div>
 
 		<!-- Tab Bar -->
-		<div class="bg-black/5 rounded-sm p-0.5 border border-black/10 flex gap-0.5 mx-3 mb-2 flex-shrink-0">
+		<div
+			class="bg-black/5 rounded-sm p-0.5 border border-black/10 flex gap-0.5 mx-3 mb-2 flex-shrink-0"
+		>
 			<button
-				class="flex-1 px-2 py-1.5 rounded-sm text-ui-label transition-none whitespace-nowrap {activeTab === 'info' ? 'bg-white shadow-sm text-near-black' : 'text-warm-gray-500 hover:bg-black/5'}"
+				class="flex-1 px-2 py-1.5 rounded-sm text-ui-label transition-none whitespace-nowrap {activeTab ===
+				'info'
+					? 'bg-white shadow-sm text-near-black'
+					: 'text-warm-gray-500 hover:bg-black/5'}"
 				onclick={() => switchTab('info')}
 			>
 				{$_('menu.info')}
 			</button>
 			<button
-				class="flex-1 px-2 py-1.5 rounded-sm text-ui-label transition-none whitespace-nowrap {activeTab === 'routes' ? 'bg-white shadow-sm text-near-black' : 'text-warm-gray-500 hover:bg-black/5'}"
+				class="flex-1 px-2 py-1.5 rounded-sm text-ui-label transition-none whitespace-nowrap {activeTab ===
+				'routes'
+					? 'bg-white shadow-sm text-near-black'
+					: 'text-warm-gray-500 hover:bg-black/5'}"
 				onclick={() => switchTab('routes')}
 			>
-				{$_('topo.routes')} <span
-				class="ml-1 text-micro-data {activeTab === 'routes' ? 'text-warm-gray-400' : 'text-warm-gray-400'}">{routes.length}</span>
+				{$_('topo.routes')}
+				<span
+					class="ml-1 text-micro-data {activeTab === 'routes'
+						? 'text-warm-gray-400'
+						: 'text-warm-gray-400'}">{routes.length}</span
+				>
 			</button>
 			<button
-				class="flex-1 px-2 py-1.5 rounded-sm text-ui-label transition-none whitespace-nowrap {activeTab === 'fixpoints' ? 'bg-white shadow-sm text-near-black' : 'text-warm-gray-500 hover:bg-black/5'}"
+				class="flex-1 px-2 py-1.5 rounded-sm text-ui-label transition-none whitespace-nowrap {activeTab ===
+				'fixpoints'
+					? 'bg-white shadow-sm text-near-black'
+					: 'text-warm-gray-500 hover:bg-black/5'}"
 				onclick={() => switchTab('fixpoints')}
 			>
-				{$_('ui.fixpoints')} <span
-				class="ml-1 text-micro-data {activeTab === 'fixpoints' ? 'text-warm-gray-400' : 'text-warm-gray-400'}">{userState.topo.fixPoints.length}</span>
+				{$_('ui.fixpoints')}
+				<span
+					class="ml-1 text-micro-data {activeTab === 'fixpoints'
+						? 'text-warm-gray-400'
+						: 'text-warm-gray-400'}">{userState.topo.fixPoints.length}</span
+				>
 			</button>
 		</div>
 
@@ -178,19 +203,33 @@
 						<div class="space-y-2.5">
 							<div class="space-y-0.5">
 								<label for="name" class="text-ui-label block">{$_('ui.name')}</label>
-								<input type="text" id="name" bind:value={userState.topo.name} class="input-studio w-full"
-											 placeholder={$_('ui.name_placeholder')} />
+								<input
+									type="text"
+									id="name"
+									bind:value={userState.topo.name}
+									class="input-studio w-full"
+									placeholder={$_('ui.name_placeholder')}
+								/>
 							</div>
 
 							<div class="space-y-0.5">
 								<label for="author" class="text-ui-label block">{$_('ui.author')}</label>
-								<input type="text" id="author" bind:value={userState.topo.author} class="input-studio w-full"
-											 placeholder={$_('ui.author_placeholder')} />
+								<input
+									type="text"
+									id="author"
+									bind:value={userState.topo.author}
+									class="input-studio w-full"
+									placeholder={$_('ui.author_placeholder')}
+								/>
 							</div>
 
 							<div class="space-y-0.5">
 								<label for="rock" class="text-ui-label block">{$_('ui.rock_type')}</label>
-								<select id="rock" bind:value={userState.topo.rock} class="input-studio w-full appearance-none">
+								<select
+									id="rock"
+									bind:value={userState.topo.rock}
+									class="input-studio w-full appearance-none"
+								>
 									<option value="granite">{$_('rock_types.granite')}</option>
 									<option value="gneiss">{$_('rock_types.gneiss')}</option>
 									<option value="limestone">{$_('rock_types.limestone')}</option>
@@ -210,23 +249,33 @@
 								{#if Object.keys(userState.clustering.gpsData || {}).length > 0}
 									<ClusteringMap />
 								{:else}
-									<div class="flex items-center gap-2 p-1.5 rounded-sm bg-black/5 border border-black/15 shadow-sm">
+									<div
+										class="flex items-center gap-2 p-1.5 rounded-sm bg-black/5 border border-black/15 shadow-sm"
+									>
 										<button
 											class="bg-near-black text-white hover:bg-black px-2.5 py-1.5 rounded-sm text-ui-label transition-none flex items-center gap-1.5 shadow-sm"
-											onclick={() => (showMapModal = true)}>
+											onclick={() => (showMapModal = true)}
+										>
 											<i class="fa-solid fa-map-location-dot opacity-60"></i>{$_('ui.open_map')}
 										</button>
 										<div class="flex-1 min-w-0 pr-1">
 											{#if userState.topo.coordinates[0] !== 0}
 												<div
-													class="text-micro-data font-mono truncate leading-none text-near-black font-bold">{userState.topo.coordinates[1].toFixed(5)}
-													, {userState.topo.coordinates[0].toFixed(5)}</div>
+													class="text-micro-data font-mono truncate leading-none text-near-black font-bold"
+												>
+													{userState.topo.coordinates[1].toFixed(5)}
+													, {userState.topo.coordinates[0].toFixed(5)}
+												</div>
 												<div
-													class="text-[9px] text-warm-gray-400 font-bold uppercase mt-1 leading-none tracking-tight">{userState.topo.wallAzimuth}
+													class="text-[9px] text-warm-gray-400 font-bold uppercase mt-1 leading-none tracking-tight"
+												>
+													{userState.topo.wallAzimuth}
 													° / {userState.topo.altitude ? userState.topo.altitude.toFixed(0) : 0}m
 												</div>
 											{:else}
-												<div class="text-micro-data text-warm-gray-400 italic">{$_('sun.no_geodata')}</div>
+												<div class="text-micro-data text-warm-gray-400 italic">
+													{$_('sun.no_geodata')}
+												</div>
 											{/if}
 										</div>
 									</div>
@@ -235,15 +284,22 @@
 
 							<div class="space-y-0.5">
 								<label for="description" class="text-ui-label block">{$_('ui.description')}</label>
-								<textarea id="description" bind:value={userState.topo.description} rows="2"
-													class="input-studio w-full resize-none"
-													placeholder={$_('ui.description_placeholder')}></textarea>
+								<textarea
+									id="description"
+									bind:value={userState.topo.description}
+									rows="2"
+									class="input-studio w-full resize-none"
+									placeholder={$_('ui.description_placeholder')}
+								></textarea>
 							</div>
 
 							<div class="space-y-0.5">
 								<label class="text-ui-label block">{$_('ui.tags')}</label>
 								<div>
-									<TagSelector bind:selectedTags={userState.topo.tags} availableTags={availableTopoTags} />
+									<TagSelector
+										bind:selectedTags={userState.topo.tags}
+										availableTags={availableTopoTags}
+									/>
 								</div>
 							</div>
 
@@ -264,43 +320,64 @@
 					{/if}
 
 					{#each routes as route, i (route.id)}
-						<div id={'route-' + route.id}
-								 class={'panel-inner p-2.5 relative overflow-hidden transition-none border ' + (userState.ui.selectedRouteId === route.id ? 'border-creator-blue' : 'border-black/10')}>
-							<div class="flex justify-between items-center mb-2 cursor-pointer group" onclick={() => {
-								if (userState.ui.selectedRouteId === route.id) {
-									userState.ui.selectedRouteId = null;
-									drawingTarget = null;
-								} else {
-									userState.ui.selectedRouteId = route.id;
-									userState.ui.selectedFixpointId = null;
-									if (route.type !== 'multi-pitch') {
-										drawingTarget = { type: 'route', id: route.id };
-									} else {
+						<div
+							id={'route-' + route.id}
+							class={'panel-inner p-2.5 relative overflow-visible transition-none border ' +
+								(userState.ui.selectedRouteId === route.id
+									? 'border-creator-blue'
+									: 'border-black/10')}
+						>
+							<div
+								class="flex justify-between items-center mb-2 cursor-pointer group"
+								onclick={() => {
+									if (userState.ui.selectedRouteId === route.id) {
+										userState.ui.selectedRouteId = null;
 										drawingTarget = null;
+									} else {
+										userState.ui.selectedRouteId = route.id;
+										userState.ui.selectedFixpointId = null;
+										if (route.type !== 'multi-pitch') {
+											drawingTarget = { type: 'route', id: route.id };
+										} else {
+											drawingTarget = null;
+										}
 									}
-								}
-							}}>
+								}}
+							>
 								<div class="flex items-center gap-2">
 									<div
-										class="w-5 h-5 rounded-sm {userState.ui.selectedRouteId === route.id ? 'bg-creator-blue text-white' : 'bg-black/5 text-warm-gray-500'} flex items-center justify-center text-micro-data font-bold shadow-sm transition-none">{i + 1}</div>
+										class="w-5 h-5 rounded-sm {userState.ui.selectedRouteId === route.id
+											? 'bg-creator-blue text-white'
+											: 'bg-black/5 text-warm-gray-500'} flex items-center justify-center text-micro-data font-bold shadow-sm transition-none"
+									>
+										{i + 1}
+									</div>
 									<h3
-										class={'text-body-text font-bold ' + (userState.ui.selectedRouteId === route.id ? 'text-creator-blue' : 'text-near-black')}>{route.name || `${$_('ui.route')} ${i + 1}`}</h3>
+										class={'text-body-text font-bold ' +
+											(userState.ui.selectedRouteId === route.id
+												? 'text-creator-blue'
+												: 'text-near-black')}
+									>
+										{route.name || `${$_('ui.route')} ${i + 1}`}
+									</h3>
 								</div>
 
 								<div class="flex items-center gap-1">
 									<button
 										class="text-warm-gray-300 hover:text-rose-600 transition-none w-6 h-6 flex items-center justify-center rounded-sm hover:bg-rose-50"
 										onclick={(e) => {
-										e.stopPropagation();
-										const index = userState.topo.routes.indexOf(route);
-										if (index > -1) {
-											userState.topo.routes.splice(index, 1);
-											if (userState.ui.selectedRouteId === route.id) {
-												userState.ui.selectedRouteId = null;
-												drawingTarget = null;
+											e.stopPropagation();
+											const index = userState.topo.routes.indexOf(route);
+											if (index > -1) {
+												userState.topo.routes.splice(index, 1);
+												if (userState.ui.selectedRouteId === route.id) {
+													userState.ui.selectedRouteId = null;
+													drawingTarget = null;
+												}
 											}
-										}
-									}} title={$_('ui.delete_route')}>
+										}}
+										title={$_('ui.delete_route')}
+									>
 										<i class="fa-solid fa-trash-can text-[10px]"></i>
 									</button>
 								</div>
@@ -314,9 +391,11 @@
 									</div>
 									<div class="w-1/3 space-y-0.5">
 										<label class="text-ui-label block">{$_('ui.type')}</label>
-										<select value={Array.isArray(route.type) ? route.type[0] : route.type}
-														onchange={(e) => convertRouteType(route, e.currentTarget.value)}
-														class="input-studio w-full appearance-none">
+										<select
+											value={Array.isArray(route.type) ? route.type[0] : route.type}
+											onchange={(e) => convertRouteType(route, e.currentTarget.value)}
+											class="input-studio w-full appearance-none"
+										>
 											<option value="sports-climbing">SC</option>
 											<option value="bouldering">B</option>
 											<option value="trad">T</option>
@@ -348,24 +427,38 @@
 											<label class="text-ui-label block">{$_('ui.length')}</label>
 											<div class="flex items-center gap-1">
 												<div class="relative flex-1">
-													<input type="number" bind:value={route.length} class="input-studio w-full !pr-4" />
+													<input
+														type="number"
+														bind:value={route.length}
+														class="input-studio w-full !pr-4"
+													/>
 													<span class="absolute right-1 top-1.5 text-micro-data">m</span>
 												</div>
 												<button
 													class="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-sm bg-black/5 hover:bg-creator-blue hover:text-white transition-none border border-black/10"
-													onclick={() => (route.length = calculateRouteLength(route, userState.topo.scale))}><i
-													class="fa-solid fa-calculator text-[10px]"></i></button>
+													onclick={() =>
+														(route.length = calculateRouteLength(route, userState.topo.scale))}
+													><i class="fa-solid fa-calculator text-[10px]"></i></button
+												>
 											</div>
 										</div>
 										{#if route.type === 'sports-climbing'}
 											<div class="space-y-0.5">
 												<label class="text-ui-label block">{$_('topo.protection')}</label>
 												<div class="flex items-center gap-1">
-													<input type="number" bind:value={route.boltAmount} class="input-studio flex-1" />
+													<input
+														type="number"
+														bind:value={route.boltAmount}
+														class="input-studio flex-1"
+													/>
 													<button
 														class="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-sm bg-black/5 hover:bg-creator-blue hover:text-white transition-none border border-black/10"
-														onclick={() => (route.boltAmount = calculateBoltAmount(route, userState.topo.fixPoints))}><i
-														class="fa-solid fa-calculator text-[10px]"></i></button>
+														onclick={() =>
+															(route.boltAmount = calculateBoltAmount(
+																route,
+																userState.topo.fixPoints
+															))}><i class="fa-solid fa-calculator text-[10px]"></i></button
+													>
 												</div>
 											</div>
 										{/if}
@@ -374,20 +467,26 @@
 									<div class="p-1.5 rounded-sm bg-warm-white space-y-1 border border-black/10">
 										<div class="flex justify-between items-center mb-0.5">
 											<label class="text-ui-label block">{$_('ui.pitches')}</label>
-											<select bind:value={route._gradeScale}
-															class="bg-white border border-black/15 rounded-sm px-1 py-0.5 text-micro-data outline-none">
+											<select
+												bind:value={route._gradeScale}
+												class="bg-white border border-black/15 rounded-sm px-1 py-0.5 text-micro-data outline-none"
+											>
 												<option value="french">FR</option>
 												<option value="uiaa">UIAA</option>
 											</select>
 										</div>
 										{#each route.pitches as pitch, idx}
 											<div
-												class="grid grid-cols-12 gap-1 items-center bg-white p-1 rounded-sm border border-black/10 shadow-sm">
-												<div class="col-span-1 flex justify-center"><span
-													class="text-micro-data font-bold">{idx + 1}</span></div>
+												class="grid grid-cols-12 gap-1 items-center bg-white p-1 rounded-sm border border-black/10 shadow-sm"
+											>
+												<div class="col-span-1 flex justify-center">
+													<span class="text-micro-data font-bold">{idx + 1}</span>
+												</div>
 												<div class="col-span-5 flex min-w-0">
-													<select bind:value={pitch.grade}
-																	class="w-full bg-transparent border border-black/15 rounded-sm px-1 py-0.5 text-body-text outline-none">
+													<select
+														bind:value={pitch.grade}
+														class="w-full bg-transparent border border-black/15 rounded-sm px-1 py-0.5 text-body-text outline-none"
+													>
 														<option value="">Grade</option>
 														{#each standardGrades as g}
 															{#if route._gradeScale !== 'uiaa' || uiaaMap[g]}
@@ -398,19 +497,28 @@
 												</div>
 												<div class="col-span-5 flex items-center gap-0.5">
 													<div class="relative flex-1">
-														<input type="number" bind:value={pitch.length}
-																	 class="w-full bg-transparent border border-black/15 rounded-sm pl-1 pr-3 py-0.5 text-body-text outline-none" />
-														<span class="absolute right-1 inset-y-0 flex items-center text-[9px]">m</span>
+														<input
+															type="number"
+															bind:value={pitch.length}
+															class="w-full bg-transparent border border-black/15 rounded-sm pl-1 pr-3 py-0.5 text-body-text outline-none"
+														/>
+														<span class="absolute right-1 inset-y-0 flex items-center text-[9px]"
+															>m</span
+														>
 													</div>
 													<button
 														class="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-sm bg-black/5 hover:bg-creator-blue hover:text-white"
-														onclick={() => (pitch.length = calculateRouteLength(pitch, userState.topo.scale))}><i
-														class="fa-solid fa-calculator text-[8px]"></i></button>
+														onclick={() =>
+															(pitch.length = calculateRouteLength(pitch, userState.topo.scale))}
+														><i class="fa-solid fa-calculator text-[8px]"></i></button
+													>
 												</div>
 												<div class="col-span-1 flex justify-center">
-													<button class="text-warm-gray-300 hover:text-rose-600"
-																	onclick={() => route.pitches.splice(idx, 1)}><i
-														class="fa-solid fa-trash-can text-[9px]"></i></button>
+													<button
+														class="text-warm-gray-300 hover:text-rose-600"
+														onclick={() => route.pitches.splice(idx, 1)}
+														><i class="fa-solid fa-trash-can text-[9px]"></i></button
+													>
 												</div>
 											</div>
 										{/each}
@@ -419,31 +527,51 @@
 
 								<div class="space-y-0.5">
 									<label class="text-ui-label block">{$_('ui.description')}</label>
-									<textarea bind:value={route.description} rows="1" class="input-studio w-full resize-none"></textarea>
+									<textarea
+										bind:value={route.description}
+										rows="1"
+										class="input-studio w-full resize-none"
+									></textarea>
 								</div>
 
 								<div class="flex items-center justify-between gap-2 pt-1 border-t border-black/10">
 									<div class="flex-1">
-										<TagSelector bind:selectedTags={route.tags} availableTags={availableRouteTags} small={true} />
+										<TagSelector
+											bind:selectedTags={route.tags}
+											availableTags={availableRouteTags}
+											small={true}
+										/>
 									</div>
 									{#if userState.topo.fixPoints.length > 0}
 										<details class="group/fp flex-none relative">
 											<summary
-												class="list-none flex items-center justify-center w-6 h-6 rounded-sm bg-black/5 text-warm-gray-500 cursor-pointer hover:bg-creator-blue hover:text-white transition-none shadow-sm">
-												<i class="fa-solid fa-hashtag text-[10px]"></i></summary>
+												class="list-none flex items-center justify-center w-6 h-6 rounded-sm bg-black/5 text-warm-gray-500 cursor-pointer hover:bg-creator-blue hover:text-white transition-none shadow-sm"
+											>
+												<i class="fa-solid fa-hashtag text-[10px]"></i></summary
+											>
 											<div
-												class="absolute bottom-7 right-0 z-20 bg-white shadow-modal rounded-sm p-2 border border-black/15 min-w-[140px]">
-												<p class="text-ui-label mb-1.5 border-b border-black/10 pb-1">{$_('ui.assign_fixpoints')}</p>
+												class="absolute bottom-7 right-0 z-20 bg-white shadow-modal rounded-sm p-2 border border-black/15 min-w-[140px]"
+											>
+												<p class="text-ui-label mb-1.5 border-b border-black/10 pb-1">
+													{$_('ui.assign_fixpoints')}
+												</p>
 												<div class="grid grid-cols-5 gap-1">
 													{#each userState.topo.fixPoints as fp, idx}
 														<button
-															class={'w-6 h-6 flex items-center justify-center rounded-sm text-micro-data font-bold transition-none ' + (route.fixPoints?.includes(fp.id) ? 'bg-creator-blue text-white shadow-sm' : 'bg-black/5 text-warm-gray-500 hover:bg-black/10')}
+															class={'w-6 h-6 flex items-center justify-center rounded-sm text-micro-data font-bold transition-none ' +
+																(route.fixPoints?.includes(fp.id)
+																	? 'bg-creator-blue text-white shadow-sm'
+																	: 'bg-black/5 text-warm-gray-500 hover:bg-black/10')}
 															onclick={(e) => {
-															e.stopPropagation();
-															if (!route.fixPoints) route.fixPoints = [];
-															if (route.fixPoints.includes(fp.id)) { route.fixPoints = route.fixPoints.filter((id) => id !== fp.id); } 
-															else { route.fixPoints.push(fp.id); }
-														}}>{idx + 1}</button>
+																e.stopPropagation();
+																if (!route.fixPoints) route.fixPoints = [];
+																if (route.fixPoints.includes(fp.id)) {
+																	route.fixPoints = route.fixPoints.filter((id) => id !== fp.id);
+																} else {
+																	route.fixPoints.push(fp.id);
+																}
+															}}>{idx + 1}</button
+														>
 													{/each}
 												</div>
 											</div>
@@ -457,17 +585,26 @@
 
 				{#if activeTab === 'fixpoints'}
 					{#if aiSuggestions.length > 0}
-						<div class="bg-creator-blue/5 rounded-sm p-2 border border-creator-blue/20 space-y-1.5 mb-4"
-								 style="margin-bottom: {userState.clustering.lockedClusterId ? '70px' : '1rem'}">
-							<div class="flex justify-between items-center"><span
-								class="text-ui-label text-creator-blue">{$_('ui.ai_suggestions_title')}</span></div>
+						<div
+							class="bg-creator-blue/5 rounded-sm p-2 border border-creator-blue/20 space-y-1.5 mb-4"
+							style="margin-bottom: {userState.clustering.lockedClusterId ? '70px' : '1rem'}"
+						>
+							<div class="flex justify-between items-center">
+								<span class="text-ui-label text-creator-blue">{$_('ui.ai_suggestions_title')}</span>
+							</div>
 							<div class="space-y-1">
 								{#each aiSuggestions as cluster (cluster.id)}
 									<!-- svelte-ignore a11y_click_events_have_key_events -->
 									<!-- svelte-ignore a11y_no_static_element_interactions -->
-									<div id={'ai-bolt-' + cluster.id}
-											 class="bg-white rounded-sm p-1.5 shadow-sm border flex items-center justify-between gap-2 group transition-none cursor-pointer {userState.clustering.lockedClusterId === cluster.id ? 'border-creator-blue ring-1 ring-creator-blue' : (userState.clustering.selectedClusterId === cluster.id ? 'border-creator-blue/60' : 'border-black/15 hover:border-creator-blue')}"
-											 onclick={() => {
+									<div
+										id={'ai-bolt-' + cluster.id}
+										class="bg-white rounded-sm p-1.5 shadow-sm border flex items-center justify-between gap-2 group transition-none cursor-pointer {userState
+											.clustering.lockedClusterId === cluster.id
+											? 'border-creator-blue ring-1 ring-creator-blue'
+											: userState.clustering.selectedClusterId === cluster.id
+												? 'border-creator-blue/60'
+												: 'border-black/15 hover:border-creator-blue'}"
+										onclick={() => {
 											if (userState.clustering.lockedClusterId === cluster.id) {
 												userState.clustering.lockedClusterId = null;
 											} else {
@@ -478,18 +615,29 @@
 									>
 										<div class="flex items-center gap-2">
 											<div
-												class="w-6 h-6 rounded-sm bg-creator-blue/10 flex items-center justify-center text-creator-blue text-micro-data font-bold">
-												<i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i></div>
+												class="w-6 h-6 rounded-sm bg-creator-blue/10 flex items-center justify-center text-creator-blue text-micro-data font-bold"
+											>
+												<i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
+											</div>
 											<div class="min-w-0">
-												<p
-													class="text-body-text font-bold text-near-black leading-tight truncate">{cluster.class === 'anchor' || cluster.class === 'belay' ? $_('ui.ai_anchor') : $_('ui.ai_bolt')}
-													<span class="text-[10px] text-warm-gray-500 font-normal ml-0.5">({Math.round(cluster.conf)}
-														%)</span></p>
+												<p class="text-body-text font-bold text-near-black leading-tight truncate">
+													{cluster.class === 'anchor' || cluster.class === 'belay'
+														? $_('ui.ai_anchor')
+														: $_('ui.ai_bolt')}
+													<span class="text-[10px] text-warm-gray-500 font-normal ml-0.5"
+														>({Math.round(cluster.conf)}
+														%)</span
+													>
+												</p>
 											</div>
 										</div>
 										<button
 											class="px-2 py-1 bg-near-black text-white rounded-sm text-micro-data font-bold hover:bg-black"
-											onclick={(e) => { e.stopPropagation(); addAiBolt(cluster); }}>Add
+											onclick={(e) => {
+												e.stopPropagation();
+												addAiBolt(cluster);
+											}}
+											>Add
 										</button>
 									</div>
 								{/each}
@@ -499,18 +647,30 @@
 
 					{#if userState.topo.fixPoints.length === 0}
 						<div class="bg-warm-white rounded-sm p-4 text-center border border-black/15">
-							<p class="text-body-text text-warm-gray-500 font-medium">{$_('ui.no_fixpoints_yet')}</p>
+							<p class="text-body-text text-warm-gray-500 font-medium">
+								{$_('ui.no_fixpoints_yet')}
+							</p>
 						</div>
 					{:else}
 						<div class="grid grid-cols-1 gap-1.5">
 							{#each userState.topo.fixPoints as point, i (point.id)}
-								<div id={'fixpoint-' + point.id}
-										 class={'panel-inner p-2 transition-none flex items-center gap-2 border ' + (userState.ui.selectedFixpointId === point.id ? 'border-creator-blue' : 'border-transparent')}>
+								<div
+									id={'fixpoint-' + point.id}
+									class={'panel-inner p-2 transition-none flex items-center gap-2 border ' +
+										(userState.ui.selectedFixpointId === point.id
+											? 'border-creator-blue'
+											: 'border-transparent')}
+								>
 									<div
-										class="w-6 h-6 rounded-sm bg-black/5 flex items-center justify-center text-warm-gray-500 text-micro-data font-bold border border-black/10 shadow-sm">{i + 1}</div>
+										class="w-6 h-6 rounded-sm bg-black/5 flex items-center justify-center text-warm-gray-500 text-micro-data font-bold border border-black/10 shadow-sm"
+									>
+										{i + 1}
+									</div>
 									<div class="flex-1">
-										<select bind:value={point.type}
-														class="w-full bg-transparent text-body-text font-bold text-near-black outline-none appearance-none">
+										<select
+											bind:value={point.type}
+											class="w-full bg-transparent text-body-text font-bold text-near-black outline-none appearance-none"
+										>
 											{#each topoSymbols as symbol}
 												<option value={symbol.id}>{$_(`topo.fixpoints.${symbol.id}`)}</option>
 											{/each}
@@ -519,13 +679,17 @@
 									<button
 										class="text-warm-gray-300 hover:text-rose-600 transition-none w-6 h-6 flex items-center justify-center rounded-sm hover:bg-rose-50"
 										onclick={() => {
-										const pointId = point.id;
-										userState.topo.fixPoints.splice(i, 1);
-										if (userState.ui.selectedFixpointId === pointId) userState.ui.selectedFixpointId = null;
-										userState.topo.routes.forEach((r) => {
-											if (r.fixPoints && r.fixPoints.includes(pointId)) { r.fixPoints = r.fixPoints.filter((id) => id !== pointId); }
-										});
-									}}><i class="fa-solid fa-trash-can text-[10px]"></i></button>
+											const pointId = point.id;
+											userState.topo.fixPoints.splice(i, 1);
+											if (userState.ui.selectedFixpointId === pointId)
+												userState.ui.selectedFixpointId = null;
+											userState.topo.routes.forEach((r) => {
+												if (r.fixPoints && r.fixPoints.includes(pointId)) {
+													r.fixPoints = r.fixPoints.filter((id) => id !== pointId);
+												}
+											});
+										}}><i class="fa-solid fa-trash-can text-[10px]"></i></button
+									>
 								</div>
 							{/each}
 						</div>
@@ -538,59 +702,121 @@
 
 <!-- Mobile Bottom Sheet -->
 {#if isMobile}
-	<div use:resize
-			 class="fixed left-0 right-0 top-1/2 bottom-0 z-40 bg-white rounded-t-[2rem] shadow-modal border-t border-black/10 overflow-hidden">
+	<div
+		use:resize
+		class="fixed left-0 right-0 top-1/2 bottom-0 z-40 bg-white rounded-t-[2rem] shadow-modal border-t border-black/10 overflow-hidden"
+	>
 		<div class="bg-warm-gray-200 h-1.5 w-12 rounded-sm self-center mt-3 mx-auto"></div>
 		<div class="flex gap-1 p-2 border-b border-black/5 bg-warm-white/50 mt-2">
 			<button
-				class="flex-1 py-2.5 rounded-sm transition-none text-xs font-bold transition-all {activeTab === 'info' ? 'bg-creator-blue text-white' : 'text-warm-gray-400'}"
-				onclick={() => switchTab('info')}><i class="fa-solid fa-circle-info"></i></button>
+				class="flex-1 py-2.5 rounded-sm transition-none text-xs font-bold transition-all {activeTab ===
+				'info'
+					? 'bg-creator-blue text-white'
+					: 'text-warm-gray-400'}"
+				onclick={() => switchTab('info')}><i class="fa-solid fa-circle-info"></i></button
+			>
 			<button
-				class="flex-1 py-2.5 rounded-sm transition-none text-xs font-bold transition-all {activeTab === 'routes' ? 'bg-creator-blue text-white' : 'text-warm-gray-400'}"
-				onclick={() => switchTab('routes')}><i class="fa-solid fa-route"></i><span
-				class="ml-1.5 text-[10px]">{routes.length}</span></button>
+				class="flex-1 py-2.5 rounded-sm transition-none text-xs font-bold transition-all {activeTab ===
+				'routes'
+					? 'bg-creator-blue text-white'
+					: 'text-warm-gray-400'}"
+				onclick={() => switchTab('routes')}
+				><i class="fa-solid fa-route"></i><span class="ml-1.5 text-[10px]">{routes.length}</span
+				></button
+			>
 			<button
-				class="flex-1 py-2.5 rounded-sm transition-none text-xs font-bold transition-all {activeTab === 'fixpoints' ? 'bg-creator-blue text-white' : 'text-warm-gray-400'}"
-				onclick={() => switchTab('fixpoints')}><i class="fa-solid fa-location-dot"></i><span
-				class="ml-1.5 text-[10px]">{userState.topo.fixPoints.length}</span></button>
+				class="flex-1 py-2.5 rounded-sm transition-none text-xs font-bold transition-all {activeTab ===
+				'fixpoints'
+					? 'bg-creator-blue text-white'
+					: 'text-warm-gray-400'}"
+				onclick={() => switchTab('fixpoints')}
+				><i class="fa-solid fa-location-dot"></i><span class="ml-1.5 text-[10px]"
+					>{userState.topo.fixPoints.length}</span
+				></button
+			>
 		</div>
 		<div class="overflow-y-auto custom-scrollbar" style="height: calc(100% - 100px);">
 			<div class="p-4 space-y-3">
 				{#if activeTab === 'routes'}
 					{#each routes as route, i (route.id)}
 						<div
-							class="panel p-3 border-2 {userState.ui.selectedRouteId === route.id ? 'border-creator-blue ring-4 ring-creator-blue/5' : 'border-transparent'}">
-							<div class="flex items-center gap-3 cursor-pointer" onclick={() => {
-								if (userState.ui.selectedRouteId === route.id) { userState.ui.selectedRouteId = null; drawingTarget = null; } 
-								else { userState.ui.selectedRouteId = route.id; if (route.type !== 'multi-pitch') drawingTarget = { type: 'route', id: route.id }; if (isMobile) snapToBiggestHeight(); }
-							}}>
+							class="panel p-3 border-2 {userState.ui.selectedRouteId === route.id
+								? 'border-creator-blue ring-4 ring-creator-blue/5'
+								: 'border-transparent'}"
+						>
+							<div
+								class="flex items-center gap-3 cursor-pointer"
+								onclick={() => {
+									if (userState.ui.selectedRouteId === route.id) {
+										userState.ui.selectedRouteId = null;
+										drawingTarget = null;
+									} else {
+										userState.ui.selectedRouteId = route.id;
+										if (route.type !== 'multi-pitch')
+											drawingTarget = { type: 'route', id: route.id };
+										if (isMobile) snapToBiggestHeight();
+									}
+								}}
+							>
 								<div
-									class="w-8 h-8 rounded-sm transition-none {userState.ui.selectedRouteId === route.id ? 'bg-creator-blue text-white' : 'bg-warm-gray-100 text-warm-gray-500'} flex items-center justify-center text-xs font-black transition-colors shadow-sm">{i + 1}</div>
+									class="w-8 h-8 rounded-sm transition-none {userState.ui.selectedRouteId ===
+									route.id
+										? 'bg-creator-blue text-white'
+										: 'bg-warm-gray-100 text-warm-gray-500'} flex items-center justify-center text-xs font-black transition-colors shadow-sm"
+								>
+									{i + 1}
+								</div>
 								<div class="flex-1 min-w-0">
 									<div
-										class="font-black text-sm truncate {userState.ui.selectedRouteId === route.id ? 'text-creator-blue' : 'text-near-black'}">{route.name || `${$_('ui.route')} ${i + 1}`}</div>
+										class="font-black text-sm truncate {userState.ui.selectedRouteId === route.id
+											? 'text-creator-blue'
+											: 'text-near-black'}"
+									>
+										{route.name || `${$_('ui.route')} ${i + 1}`}
+									</div>
 									<div class="text-[10px] text-warm-gray-400 font-bold uppercase tracking-wider">
 										{#if route.grade}{getGradeLabel(route.grade, route._gradeScale || 'french')} ·{/if}
-										{#if route.length}{route.length}m ·{/if}{$_(`types.${route.type}`)}</div>
+										{#if route.length}{route.length}m ·{/if}{$_(`types.${route.type}`)}
+									</div>
 								</div>
 								<button
 									class="w-9 h-9 flex items-center justify-center rounded-sm text-warm-gray-200 hover:text-red-500 hover:bg-red-50 transition-none"
-									onclick={(e) => { e.stopPropagation(); const index = userState.topo.routes.indexOf(route); if (index > -1) { userState.topo.routes.splice(index, 1); if (userState.ui.selectedRouteId === route.id) { userState.ui.selectedRouteId = null; drawingTarget = null; } } }}>
-									<i class="fa-solid fa-trash-can text-sm"></i></button>
+									onclick={(e) => {
+										e.stopPropagation();
+										const index = userState.topo.routes.indexOf(route);
+										if (index > -1) {
+											userState.topo.routes.splice(index, 1);
+											if (userState.ui.selectedRouteId === route.id) {
+												userState.ui.selectedRouteId = null;
+												drawingTarget = null;
+											}
+										}
+									}}
+								>
+									<i class="fa-solid fa-trash-can text-sm"></i></button
+								>
 							</div>
 						</div>
 					{/each}
 				{:else if activeTab === 'fixpoints'}
 					{#if aiSuggestions.length > 0}
 						<div class="mb-4 space-y-1.5">
-							<p class="text-ui-label text-creator-blue px-1 mb-0.5">{$_('ui.nearby_suggestions')}</p>
+							<p class="text-ui-label text-creator-blue px-1 mb-0.5">
+								{$_('ui.nearby_suggestions')}
+							</p>
 							<div class="space-y-1.5">
 								{#each aiSuggestions as cluster (cluster.id)}
 									<!-- svelte-ignore a11y_click_events_have_key_events -->
 									<!-- svelte-ignore a11y_no_static_element_interactions -->
-									<div id={'ai-bolt-' + cluster.id}
-											 class="panel p-3 flex items-center gap-3 border-2 cursor-pointer transition-none {userState.clustering.lockedClusterId === cluster.id ? 'border-creator-blue bg-creator-blue/10' : (userState.clustering.selectedClusterId === cluster.id ? 'border-creator-blue/60 bg-creator-blue/10' : 'border-creator-blue/30 bg-creator-blue/5 hover:border-creator-blue/60 hover:bg-creator-blue/10')}"
-											 onclick={() => {
+									<div
+										id={'ai-bolt-' + cluster.id}
+										class="panel p-3 flex items-center gap-3 border-2 cursor-pointer transition-none {userState
+											.clustering.lockedClusterId === cluster.id
+											? 'border-creator-blue bg-creator-blue/10'
+											: userState.clustering.selectedClusterId === cluster.id
+												? 'border-creator-blue/60 bg-creator-blue/10'
+												: 'border-creator-blue/30 bg-creator-blue/5 hover:border-creator-blue/60 hover:bg-creator-blue/10'}"
+										onclick={() => {
 											if (userState.clustering.lockedClusterId === cluster.id) {
 												userState.clustering.lockedClusterId = null;
 											} else {
@@ -600,16 +826,27 @@
 										}}
 									>
 										<div
-											class="w-8 h-8 rounded-sm bg-creator-blue/10 flex items-center justify-center text-creator-blue text-xs font-black shadow-sm">
-											<i class="fa-solid fa-wand-magic-sparkles"></i></div>
+											class="w-8 h-8 rounded-sm bg-creator-blue/10 flex items-center justify-center text-creator-blue text-xs font-black shadow-sm"
+										>
+											<i class="fa-solid fa-wand-magic-sparkles"></i>
+										</div>
 										<div class="flex-1">
-											<div
-												class="text-sm font-black text-near-black">{cluster.class === 'anchor' || cluster.class === 'belay' ? $_('ui.ai_anchor') : $_('ui.ai_bolt')}</div>
-											<div class="text-xs text-warm-gray-500">{Math.round(cluster.conf)}% {$_('ui.match')}</div>
+											<div class="text-sm font-black text-near-black">
+												{cluster.class === 'anchor' || cluster.class === 'belay'
+													? $_('ui.ai_anchor')
+													: $_('ui.ai_bolt')}
+											</div>
+											<div class="text-xs text-warm-gray-500">
+												{Math.round(cluster.conf)}% {$_('ui.match')}
+											</div>
 										</div>
 										<button
 											class="w-9 h-9 flex items-center justify-center rounded-sm bg-near-black text-white font-bold text-xs"
-											onclick={(e) => { e.stopPropagation(); addAiBolt(cluster); }}>Add
+											onclick={(e) => {
+												e.stopPropagation();
+												addAiBolt(cluster);
+											}}
+											>Add
 										</button>
 									</div>
 								{/each}
@@ -620,16 +857,22 @@
 					{#each userState.topo.fixPoints as point, i (point.id)}
 						<div class="panel p-3 flex items-center gap-3 border-2 border-transparent">
 							<div
-								class="w-8 h-8 rounded-sm transition-none bg-warm-gray-100 flex items-center justify-center text-warm-gray-500 text-xs font-black shadow-sm">{i + 1}</div>
-							<select bind:value={point.type}
-											class="flex-1 bg-transparent text-sm font-black text-near-black outline-none appearance-none">
+								class="w-8 h-8 rounded-sm transition-none bg-warm-gray-100 flex items-center justify-center text-warm-gray-500 text-xs font-black shadow-sm"
+							>
+								{i + 1}
+							</div>
+							<select
+								bind:value={point.type}
+								class="flex-1 bg-transparent text-sm font-black text-near-black outline-none appearance-none"
+							>
 								{#each topoSymbols as symbol}
 									<option value={symbol.id}>{$_(`topo.fixpoints.${symbol.id}`)}</option>
 								{/each}
 							</select>
 							<button
 								class="w-9 h-9 flex items-center justify-center rounded-sm text-warm-gray-200 hover:bg-red-50 hover:text-red-500 transition-none"
-								onclick={() => userState.topo.fixPoints.splice(i, 1)}><i class="fa-solid fa-trash-can text-sm"></i>
+								onclick={() => userState.topo.fixPoints.splice(i, 1)}
+								><i class="fa-solid fa-trash-can text-sm"></i>
 							</button>
 						</div>
 					{/each}
@@ -637,8 +880,13 @@
 					<div class="space-y-4 pt-1">
 						<div class="space-y-1.5 px-1">
 							<label for="name-mobile" class="label-studio">{$_('ui.name')}</label>
-							<input type="text" id="name-mobile" bind:value={userState.topo.name} class="input-studio w-full"
-										 placeholder={$_('ui.name_placeholder')} />
+							<input
+								type="text"
+								id="name-mobile"
+								bind:value={userState.topo.name}
+								class="input-studio w-full"
+								placeholder={$_('ui.name_placeholder')}
+							/>
 						</div>
 						<div class="px-1 pt-2">
 							<ImageUploader />
@@ -651,13 +899,13 @@
 {/if}
 
 <style>
-    :global(.grabber.top) {
-        height: 100px;
-        width: 100%;
-        position: absolute;
-        top: 0;
-        left: 0;
-        cursor: pointer;
-        z-index: 10;
-    }
+	:global(.grabber.top) {
+		height: 100px;
+		width: 100%;
+		position: absolute;
+		top: 0;
+		left: 0;
+		cursor: pointer;
+		z-index: 10;
+	}
 </style>
