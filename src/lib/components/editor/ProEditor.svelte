@@ -718,8 +718,8 @@
 		<Topo2DEditor
 			bind:this={editor2D}
 			bind:activeTool
+			bind:drawingTarget
 			selectedSymbol={userState.ui.selectedSymbol}
-			{drawingTarget}
 			bind:hasPendingChanges
 		/>
 	{:else}

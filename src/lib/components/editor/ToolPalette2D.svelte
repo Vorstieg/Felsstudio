@@ -18,7 +18,7 @@
 	import { vibrateOnAction } from '$lib/assets/js/mobile-utils.js';
 	import { topoSymbols } from '$lib/assets/js/topo-utils.js';
 	import { _ } from 'svelte-i18n';
-    import { userState } from '$lib/state/editor.svelte.js';
+	import { userState } from '$lib/state/editor.svelte.js';
 
 	let isMobile = $state(false);
 
@@ -76,7 +76,10 @@
 	>
 		<!-- Tools -->
 		<button
-			class="w-10 h-10 flex items-center justify-center rounded-sm transition-none {activeTool === 'route' ? 'bg-creator-blue text-white' : 'text-warm-gray-500 hover:bg-black/5'}"
+			class="w-10 h-10 flex items-center justify-center rounded-sm transition-none {activeTool ===
+			'route'
+				? 'bg-creator-blue text-white'
+				: 'text-warm-gray-500 hover:bg-black/5'}"
 			onclick={() => (activeTool = activeTool === 'route' ? null : 'route')}
 			title={$_('ui.route')}
 		>
@@ -84,7 +87,21 @@
 		</button>
 
 		<button
-			class="w-10 h-10 flex items-center justify-center rounded-sm transition-none {activeTool === 'outline' ? 'bg-creator-blue text-white' : 'text-warm-gray-500 hover:bg-black/5'}"
+			class="w-10 h-10 flex items-center justify-center rounded-sm transition-none {activeTool ===
+			'multipitch'
+				? 'bg-creator-blue text-white'
+				: 'text-warm-gray-500 hover:bg-black/5'}"
+			onclick={() => (activeTool = activeTool === 'multipitch' ? null : 'multipitch')}
+			title={$_('ui.multipitch')}
+		>
+			<i class="fa-solid fa-timeline"></i>
+		</button>
+
+		<button
+			class="w-10 h-10 flex items-center justify-center rounded-sm transition-none {activeTool ===
+			'outline'
+				? 'bg-creator-blue text-white'
+				: 'text-warm-gray-500 hover:bg-black/5'}"
 			onclick={() => (activeTool = activeTool === 'outline' ? null : 'outline')}
 			title={$_('ui.outline')}
 		>
@@ -92,7 +109,10 @@
 		</button>
 
 		<button
-			class="w-10 h-10 flex items-center justify-center rounded-sm transition-none {activeTool === 'fixpoint' ? 'bg-creator-blue text-white' : 'text-warm-gray-500 hover:bg-black/5'}"
+			class="w-10 h-10 flex items-center justify-center rounded-sm transition-none {activeTool ===
+			'fixpoint'
+				? 'bg-creator-blue text-white'
+				: 'text-warm-gray-500 hover:bg-black/5'}"
 			onclick={() => toggleTool('fixpoint', 'fixpoint')}
 			title={$_('ui.fixpoints')}
 		>
@@ -100,7 +120,10 @@
 		</button>
 
 		<button
-			class="w-10 h-10 flex items-center justify-center rounded-sm transition-none {activeTool === 'symbol' ? 'bg-creator-blue text-white' : 'text-warm-gray-500 hover:bg-black/5'}"
+			class="w-10 h-10 flex items-center justify-center rounded-sm transition-none {activeTool ===
+			'symbol'
+				? 'bg-creator-blue text-white'
+				: 'text-warm-gray-500 hover:bg-black/5'}"
 			onclick={() => toggleTool('symbol', 'feature')}
 			title={$_('ui.symbol')}
 		>
@@ -108,7 +131,10 @@
 		</button>
 
 		<button
-			class="w-10 h-10 flex items-center justify-center rounded-sm transition-none {activeTool === 'eraser' ? 'bg-creator-blue text-white' : 'text-warm-gray-500 hover:bg-black/5'}"
+			class="w-10 h-10 flex items-center justify-center rounded-sm transition-none {activeTool ===
+			'eraser'
+				? 'bg-creator-blue text-white'
+				: 'text-warm-gray-500 hover:bg-black/5'}"
 			onclick={() => (activeTool = activeTool === 'eraser' ? null : 'eraser')}
 			title={$_('ui.delete')}
 		>
@@ -146,7 +172,10 @@
 			<div class="grid grid-cols-5 gap-1.5">
 				{#each activeTool === 'fixpoint' ? fixpoints : features as symbol}
 					<button
-						class="flex flex-col items-center gap-1 p-1.5 rounded-sm transition-none {selectedSymbol === symbol.id ? 'bg-black/10 ring-1 ring-black/20' : 'hover:bg-black/5'}"
+						class="flex flex-col items-center gap-1 p-1.5 rounded-sm transition-none {selectedSymbol ===
+						symbol.id
+							? 'bg-black/10 ring-1 ring-black/20'
+							: 'hover:bg-black/5'}"
 						onclick={() => {
 							selectedSymbol = symbol.id;
 							showSymbolPicker = false;
@@ -162,36 +191,54 @@
 
 	<!-- Desktop mode -->
 {:else}
-    <!-- Floating Hint Panel for Route/Outline -->
-    {#if activeTool === 'route' || activeTool === 'outline'}
-        <div class="fixed top-[58px] left-2 flex items-center gap-3 p-1.5 bg-white rounded border border-black/15 shadow-modal z-[100]">
-            <div class="px-2 py-0.5 border-r border-black/10">
-                <p class="text-ui-label text-near-black !m-0">{$_(`ui.${activeTool}`)}</p>
-            </div>
-            <div class="flex items-center gap-4 px-1 text-warm-gray-500">
-                <div class="flex items-center gap-1.5 text-micro-data">
-                    <span>{$_('ui.set_vertex')}</span>
-                    <kbd class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm">{$_('ui.click')}</kbd>
-                </div>
-                <div class="flex items-center gap-1.5 text-micro-data">
-                    <span>{$_('ui.undo_vertex')}</span>
-                    <kbd class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm">Backspace</kbd>
-                </div>
-                <div class="flex items-center gap-1.5 text-micro-data">
-                    <span>{$_('ui.finalize')}</span>
-                    <kbd class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm">Enter / N</kbd>
-                </div>
-                <div class="flex items-center gap-1.5 text-micro-data">
-                    <span>{$_('ui.cancel')}</span>
-                    <kbd class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm">Esc</kbd>
-                </div>
-            </div>
-        </div>
-    {/if}
+	<!-- Floating Hint Panel for Route/Outline -->
+	{#if activeTool === 'route' || activeTool === 'multipitch' || activeTool === 'outline'}
+		<div
+			class="fixed top-[58px] left-2 flex items-center gap-3 p-1.5 bg-white rounded border border-black/15 shadow-modal z-[100]"
+		>
+			<div class="px-2 py-0.5 border-r border-black/10">
+				<p class="text-ui-label text-near-black !m-0">{$_(`ui.${activeTool}`)}</p>
+			</div>
+			<div class="flex items-center gap-4 px-1 text-warm-gray-500">
+				<div class="flex items-center gap-1.5 text-micro-data">
+					<span>{$_('ui.set_vertex')}</span>
+					<kbd
+						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+						>{$_('ui.click')}</kbd
+					>
+				</div>
+				<div class="flex items-center gap-1.5 text-micro-data">
+					<span>{$_('ui.undo_vertex')}</span>
+					<kbd
+						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+						>Backspace</kbd
+					>
+				</div>
+				<div class="flex items-center gap-1.5 text-micro-data">
+					<span>{$_('ui.finalize')}</span>
+					<kbd
+						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+						>Enter / N</kbd
+					>
+				</div>
+				<div class="flex items-center gap-1.5 text-micro-data">
+					<span>{$_('ui.cancel')}</span>
+					<kbd
+						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+						>Esc</kbd
+					>
+				</div>
+			</div>
+		</div>
+	{/if}
 
 	<div class="panel p-1.5 flex items-center justify-between shadow-panel bg-white">
 		<div class="flex items-center gap-2.5">
-			<button class="w-7 h-7 flex items-center justify-center rounded-sm bg-black/5 hover:bg-black/10 text-near-black transition-none border border-black/10 ml-0.5" onclick={() => goto(base + '/')} title={$_('ui.back_to_launcher')}>
+			<button
+				class="w-7 h-7 flex items-center justify-center rounded-sm bg-black/5 hover:bg-black/10 text-near-black transition-none border border-black/10 ml-0.5"
+				onclick={() => goto(base + '/')}
+				title={$_('ui.back_to_launcher')}
+			>
 				<i class="fa-solid fa-arrow-left text-[11px]"></i>
 			</button>
 			<div class="ml-1 mr-3 hidden sm:block">
@@ -206,6 +253,14 @@
 				>
 					<i class="fa-solid fa-route"></i>
 					<span class="hidden md:inline">{$_('ui.route')}</span>
+				</button>
+
+				<button
+					class={`flex items-center gap-2 rounded-sm py-1.5 px-3 text-ui-label transition-none ${activeTool === 'multipitch' ? 'bg-creator-blue text-white' : 'bg-transparent text-warm-gray-500 hover:bg-black/5'}`}
+					onclick={() => (activeTool = activeTool === 'multipitch' ? null : 'multipitch')}
+				>
+					<i class="fa-solid fa-timeline"></i>
+					<span class="hidden md:inline">{$_('ui.multipitch')}</span>
 				</button>
 
 				<button
@@ -226,37 +281,58 @@
 					</button>
 
 					{#if showSymbolPicker && activeTool === 'fixpoint'}
-						<div class="fixed top-[58px] left-2 flex flex-col gap-2 p-2 bg-white rounded border border-black/15 shadow-modal z-[100] min-w-[320px]">
-                            <div class="px-1 py-0.5 border-b border-black/10 flex justify-between items-center">
-                                <p class="text-ui-label text-near-black !m-0">{$_('ui.fixpoints')}</p>
-                                <span class="text-[9px] text-warm-gray-400 font-medium">{$_('ui.select_type_to_place')}</span>
-                            </div>
-                            <div class="grid grid-cols-5 gap-1">
-                                {#each fixpoints as symbol}
-                                    <button
-                                        class="flex flex-col items-center gap-1 p-1.5 rounded transition-none {selectedSymbol === symbol.id ? 'bg-black/10 ring-1 ring-black/10' : 'hover:bg-black/5'}"
-                                        onclick={() => (selectedSymbol = symbol.id)}
-                                        title={$_(`topo.fixpoints.${symbol.id}`)}
-                                    >
-                                        <img src={symbol.icon} alt={symbol.name} class="w-4 h-4 opacity-80" />
-                                        <span class="text-[7px] font-black uppercase text-warm-gray-500 truncate w-full text-center">{$_(`topo.fixpoints.${symbol.id}`)}</span>
-                                    </button>
-                                {/each}
-                            </div>
-                            <div class="pt-1.5 border-t border-black/10 flex flex-row flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-warm-gray-500">
-                                <div class="flex items-center gap-1.5 text-micro-data">
-                                    <span>{$_('ui.place')}</span>
-                                    <kbd class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm">{$_('ui.click')}</kbd>
-                                </div>
-                                <div class="flex items-center gap-1.5 text-micro-data">
-                                    <span>{$_('ui.scale_up')}</span>
-                                    <kbd class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm">+</kbd>
-                                </div>
-                                <div class="flex items-center gap-1.5 text-micro-data">
-                                    <span>{$_('ui.scale_down')}</span>
-                                    <kbd class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm">-</kbd>
-                                </div>
-                            </div>
+						<div
+							class="fixed top-[58px] left-2 flex flex-col gap-2 p-2 bg-white rounded border border-black/15 shadow-modal z-[100] min-w-[320px]"
+						>
+							<div class="px-1 py-0.5 border-b border-black/10 flex justify-between items-center">
+								<p class="text-ui-label text-near-black !m-0">{$_('ui.fixpoints')}</p>
+								<span class="text-[9px] text-warm-gray-400 font-medium"
+									>{$_('ui.select_type_to_place')}</span
+								>
+							</div>
+							<div class="grid grid-cols-5 gap-1">
+								{#each fixpoints as symbol}
+									<button
+										class="flex flex-col items-center gap-1 p-1.5 rounded transition-none {selectedSymbol ===
+										symbol.id
+											? 'bg-black/10 ring-1 ring-black/10'
+											: 'hover:bg-black/5'}"
+										onclick={() => (selectedSymbol = symbol.id)}
+										title={$_(`topo.fixpoints.${symbol.id}`)}
+									>
+										<img src={symbol.icon} alt={symbol.name} class="w-4 h-4 opacity-80" />
+										<span
+											class="text-[7px] font-black uppercase text-warm-gray-500 truncate w-full text-center"
+											>{$_(`topo.fixpoints.${symbol.id}`)}</span
+										>
+									</button>
+								{/each}
+							</div>
+							<div
+								class="pt-1.5 border-t border-black/10 flex flex-row flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-warm-gray-500"
+							>
+								<div class="flex items-center gap-1.5 text-micro-data">
+									<span>{$_('ui.place')}</span>
+									<kbd
+										class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+										>{$_('ui.click')}</kbd
+									>
+								</div>
+								<div class="flex items-center gap-1.5 text-micro-data">
+									<span>{$_('ui.scale_up')}</span>
+									<kbd
+										class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+										>+</kbd
+									>
+								</div>
+								<div class="flex items-center gap-1.5 text-micro-data">
+									<span>{$_('ui.scale_down')}</span>
+									<kbd
+										class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+										>-</kbd
+									>
+								</div>
+							</div>
 						</div>
 					{/if}
 				</div>
@@ -271,41 +347,65 @@
 					</button>
 
 					{#if showSymbolPicker && activeTool === 'symbol'}
-						<div class="fixed top-[58px] left-2 flex flex-col gap-2 p-2 bg-white rounded border border-black/15 shadow-modal z-[100] min-w-[320px]">
-                            <div class="px-1 py-0.5 border-b border-black/10 flex justify-between items-center">
-                                <p class="text-ui-label text-near-black !m-0">{$_('ui.symbol')}</p>
-                                <span class="text-[9px] text-warm-gray-400 font-medium">{$_('ui.select_feature_to_place')}</span>
-                            </div>
-                            <div class="grid grid-cols-5 gap-1">
-                                {#each features as symbol}
-                                    <button
-                                        class="flex flex-col items-center gap-1 p-1.5 rounded transition-none {selectedSymbol === symbol.id ? 'bg-black/10 ring-1 ring-black/10' : 'hover:bg-black/5'}"
-                                        onclick={() => (selectedSymbol = symbol.id)}
-                                        title={$_(`topo.fixpoints.${symbol.id}`)}
-                                    >
-                                        <img src={symbol.icon} alt={symbol.name} class="w-4 h-4 opacity-80" />
-                                        <span class="text-[7px] font-black uppercase text-warm-gray-500 truncate w-full text-center">{$_(`topo.fixpoints.${symbol.id}`)}</span>
-                                    </button>
-                                {/each}
-                            </div>
-                            <div class="pt-1.5 border-t border-black/10 flex flex-row flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-warm-gray-500">
-                                <div class="flex items-center gap-1.5 text-micro-data">
-                                    <span>{$_('ui.place')}</span>
-                                    <kbd class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm">{$_('ui.click')}</kbd>
-                                </div>
-                                <div class="flex items-center gap-1.5 text-micro-data">
-                                    <span>{$_('ui.scale_up')}</span>
-                                    <kbd class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm">+</kbd>
-                                </div>
-                                <div class="flex items-center gap-1.5 text-micro-data">
-                                    <span>{$_('ui.scale_down')}</span>
-                                    <kbd class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm">-</kbd>
-                                </div>
-                                <div class="flex items-center gap-1.5 text-micro-data">
-                                    <span>{$_('ui.rotate')}</span>
-                                    <kbd class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm">{$_('ui.drag_handle')}</kbd>
-                                </div>
-                            </div>
+						<div
+							class="fixed top-[58px] left-2 flex flex-col gap-2 p-2 bg-white rounded border border-black/15 shadow-modal z-[100] min-w-[320px]"
+						>
+							<div class="px-1 py-0.5 border-b border-black/10 flex justify-between items-center">
+								<p class="text-ui-label text-near-black !m-0">{$_('ui.symbol')}</p>
+								<span class="text-[9px] text-warm-gray-400 font-medium"
+									>{$_('ui.select_feature_to_place')}</span
+								>
+							</div>
+							<div class="grid grid-cols-5 gap-1">
+								{#each features as symbol}
+									<button
+										class="flex flex-col items-center gap-1 p-1.5 rounded transition-none {selectedSymbol ===
+										symbol.id
+											? 'bg-black/10 ring-1 ring-black/10'
+											: 'hover:bg-black/5'}"
+										onclick={() => (selectedSymbol = symbol.id)}
+										title={$_(`topo.fixpoints.${symbol.id}`)}
+									>
+										<img src={symbol.icon} alt={symbol.name} class="w-4 h-4 opacity-80" />
+										<span
+											class="text-[7px] font-black uppercase text-warm-gray-500 truncate w-full text-center"
+											>{$_(`topo.fixpoints.${symbol.id}`)}</span
+										>
+									</button>
+								{/each}
+							</div>
+							<div
+								class="pt-1.5 border-t border-black/10 flex flex-row flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-warm-gray-500"
+							>
+								<div class="flex items-center gap-1.5 text-micro-data">
+									<span>{$_('ui.place')}</span>
+									<kbd
+										class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+										>{$_('ui.click')}</kbd
+									>
+								</div>
+								<div class="flex items-center gap-1.5 text-micro-data">
+									<span>{$_('ui.scale_up')}</span>
+									<kbd
+										class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+										>+</kbd
+									>
+								</div>
+								<div class="flex items-center gap-1.5 text-micro-data">
+									<span>{$_('ui.scale_down')}</span>
+									<kbd
+										class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+										>-</kbd
+									>
+								</div>
+								<div class="flex items-center gap-1.5 text-micro-data">
+									<span>{$_('ui.rotate')}</span>
+									<kbd
+										class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+										>{$_('ui.drag_handle')}</kbd
+									>
+								</div>
+							</div>
 						</div>
 					{/if}
 				</div>
@@ -319,33 +419,35 @@
 				</button>
 			</div>
 
-            <div class="w-px h-5 bg-black/15 mx-1.5 hidden sm:block"></div>
+			<div class="w-px h-5 bg-black/15 mx-1.5 hidden sm:block"></div>
 
-            <div class="flex items-center gap-1">
-                <button 
-                    class="w-7 h-7 flex items-center justify-center rounded-sm text-warm-gray-500 hover:bg-black/5 transition-none" 
-                    onclick={onUndo} 
-                    title="{$_('ui.undo_desc')} (Ctrl+Z)"
-                >
-                    <i class="fa-solid fa-rotate-left text-[11px]"></i>
-                </button>
-                <button 
-                    class="w-7 h-7 flex items-center justify-center rounded-sm text-warm-gray-500 hover:bg-black/5 transition-none" 
-                    onclick={onRedo} 
-                    title="{$_('ui.redo_desc')} (Ctrl+Y)"
-                >
-                    <i class="fa-solid fa-rotate-right text-[11px]"></i>
-                </button>
-            </div>
+			<div class="flex items-center gap-1">
+				<button
+					class="w-7 h-7 flex items-center justify-center rounded-sm text-warm-gray-500 hover:bg-black/5 transition-none"
+					onclick={onUndo}
+					title="{$_('ui.undo_desc')} (Ctrl+Z)"
+				>
+					<i class="fa-solid fa-rotate-left text-[11px]"></i>
+				</button>
+				<button
+					class="w-7 h-7 flex items-center justify-center rounded-sm text-warm-gray-500 hover:bg-black/5 transition-none"
+					onclick={onRedo}
+					title="{$_('ui.redo_desc')} (Ctrl+Y)"
+				>
+					<i class="fa-solid fa-rotate-right text-[11px]"></i>
+				</button>
+			</div>
 		</div>
 
 		<div class="flex items-center gap-3 pr-1">
-            {#if userState.ui.lastSaved}
-                <div class="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-sm bg-black/5 text-warm-gray-400">
-                    <i class="fa-solid fa-cloud-check text-[9px]"></i>
-                    <span class="text-[9px] font-bold uppercase tracking-tighter">{$_('ui.saved')}</span>
-                </div>
-            {/if}
+			{#if userState.ui.lastSaved}
+				<div
+					class="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-sm bg-black/5 text-warm-gray-400"
+				>
+					<i class="fa-solid fa-cloud-check text-[9px]"></i>
+					<span class="text-[9px] font-bold uppercase tracking-tighter">{$_('ui.saved')}</span>
+				</div>
+			{/if}
 			{#if hasPendingChanges}
 				<div class="flex gap-1">
 					<button
@@ -362,7 +464,10 @@
 					</button>
 				</div>
 			{/if}
-			<button class="bg-near-black text-white px-4 py-1.5 rounded-sm text-[11px] font-bold shadow-sm hover:bg-black transition-none uppercase tracking-widest ml-1" onclick={onExport}>
+			<button
+				class="bg-near-black text-white px-4 py-1.5 rounded-sm text-[11px] font-bold shadow-sm hover:bg-black transition-none uppercase tracking-widest ml-1"
+				onclick={onExport}
+			>
 				{$_('ui.export')}
 			</button>
 		</div>

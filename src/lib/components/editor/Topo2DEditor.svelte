@@ -9,7 +9,7 @@
 	import { EraserTool } from './tools/EraserTool.svelte.js';
 	import { OutlineTool } from './tools/OutlineTool.svelte.js';
 	import { SelectTool } from './tools/SelectTool.svelte.js';
-	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
+	import { generateId, initializeIdCounters } from '$lib/assets/js/id-utils.js';
 	import { topoSymbols } from '$lib/assets/js/topo-utils.js';
 	import {
 		getTouchTargetSize,
@@ -22,7 +22,7 @@
 	let {
 		activeTool = $bindable(null),
 		selectedSymbol = 'bolt',
-		drawingTarget = null,
+		drawingTarget = $bindable(null),
 		hasPendingChanges = $bindable(false)
 	} = $props();
 
@@ -52,6 +52,7 @@
 	// Synchronize drawingTarget to the tool
 	$effect(() => {
 		if (currentTool instanceof RouteTool) {
+			currentTool.mode = activeTool === 'multipitch' ? 'multipitch' : 'route';
 			currentTool.drawingTarget = drawingTarget;
 		}
 	});
@@ -747,8 +748,78 @@
 
 	// Finalize/Cancel functions delegated to Tools (removed local versions)
 
+	function activatePitchTarget(route, pitch) {
+		userState.ui.selectedRouteId = route.id;
+		userState.ui.selectedFixpointId = null;
+		drawingTarget = { type: 'pitch', routeId: route.id, pitchId: pitch.id };
+		activeTool = 'multipitch';
+	}
+
+	function createNextPitchTarget(route, currentPitchId = null) {
+		if (!route || route.type !== 'multi-pitch') return;
+		if (!route.pitches) route.pitches = [];
+
+		const currentIndex = currentPitchId
+			? route.pitches.findIndex((pitch) => pitch.id === currentPitchId)
+			: route.pitches.length - 1;
+		const nextExistingPitch = route.pitches[currentIndex + 1];
+
+		if (nextExistingPitch) {
+			activatePitchTarget(route, nextExistingPitch);
+			return;
+		}
+
+		const pitch = {
+			id: generateId('pitch'),
+			pitchNumber: route.pitches.length + 1,
+			points2D: [],
+			points: [],
+			grade: '',
+			length: 0,
+			type: 'pitch'
+		};
+		route.pitches = [...route.pitches, pitch];
+		activatePitchTarget(route, pitch);
+		saveHistory();
+	}
+
+	function finishRouteTool() {
+		const mode = activeTool;
+		const targetBeforeFinish = drawingTarget;
+		const selectedRouteBeforeFinish = userState.ui.selectedRouteId;
+		const draftPointCount = currentTool instanceof RouteTool ? currentTool.currentPoints.length : 0;
+
+		currentTool.finalize();
+
+		if (mode === 'route') {
+			drawingTarget = null;
+			clearSelection();
+			return;
+		}
+
+		if (mode !== 'multipitch') return;
+
+		const route =
+			userState.topo.routes.find((r) => r.id === targetBeforeFinish?.routeId) ||
+			userState.topo.routes.find((r) => r.id === userState.ui.selectedRouteId) ||
+			userState.topo.routes.find((r) => r.id === selectedRouteBeforeFinish);
+
+		if (!route || route.type !== 'multi-pitch') return;
+
+		const currentPitchId =
+			targetBeforeFinish?.type === 'pitch'
+				? targetBeforeFinish.pitchId
+				: draftPointCount >= 2
+					? route.pitches?.[route.pitches.length - 1]?.id
+					: null;
+
+		createNextPitchTarget(route, currentPitchId);
+	}
+
 	export function finalize() {
-		if (currentTool && typeof currentTool.finalize === 'function') {
+		if (currentTool instanceof RouteTool) {
+			finishRouteTool();
+		} else if (currentTool && typeof currentTool.finalize === 'function') {
 			currentTool.finalize();
 		} else {
 			currentTool.onKeyDown?.({ key: 'n' });
@@ -761,6 +832,8 @@
 		} else {
 			currentTool.onKeyDown?.({ key: 'Escape' });
 		}
+		drawingTarget = null;
+		clearSelection();
 	}
 
 	function handleKeyDown(event) {
@@ -779,7 +852,10 @@
 
 			// Priority 2: If a tool is active, deselect it
 			if (activeTool !== null) {
+				currentTool.cancel?.();
+				drawingTarget = null;
 				activeTool = null;
+				clearSelection();
 				return;
 			}
 
@@ -863,6 +939,15 @@
 			}
 		}
 
+		if (
+			currentTool instanceof RouteTool &&
+			(event.key === 'n' || event.key === 'N' || event.key === 'Enter')
+		) {
+			event.preventDefault();
+			finishRouteTool();
+			return;
+		}
+
 		currentTool.onKeyDown(event);
 
 		if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
@@ -872,12 +957,12 @@
 			event.preventDefault();
 			redo();
 		} else if (event.key === '+' || event.key === '=') {
-            updateSymbolScale(0.1);
-            saveHistory();
-        } else if (event.key === '-' || event.key === '_') {
-            updateSymbolScale(-0.1);
-            saveHistory();
-        }
+			updateSymbolScale(0.1);
+			saveHistory();
+		} else if (event.key === '-' || event.key === '_') {
+			updateSymbolScale(-0.1);
+			saveHistory();
+		}
 	}
 
 	function updateSymbolScale(delta) {

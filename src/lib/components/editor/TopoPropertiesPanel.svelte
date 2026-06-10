@@ -3,7 +3,7 @@
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
 	import { _ } from 'svelte-i18n';
 	import { onMount } from 'svelte';
-	import { generateSymbolId } from '$lib/assets/js/id-utils.js';
+	import { generateId, generateSymbolId } from '$lib/assets/js/id-utils.js';
 	import {
 		availableTopoTags,
 		availableRouteTags,
@@ -114,6 +114,28 @@
 			}
 		});
 		userState.clustering.selectedClusterId = null;
+	}
+
+	function addPitch(route) {
+		if (!route.pitches) route.pitches = [];
+		const pitch = {
+			id: generateId('pitch'),
+			pitchNumber: route.pitches.length + 1,
+			points2D: [],
+			points: [],
+			grade: '',
+			length: 0,
+			type: 'pitch'
+		};
+		route.pitches = [...route.pitches, pitch];
+		drawPitch(route, pitch);
+	}
+
+	function drawPitch(route, pitch) {
+		userState.ui.selectedRouteId = route.id;
+		userState.ui.selectedFixpointId = null;
+		drawingTarget = { type: 'pitch', routeId: route.id, pitchId: pitch.id };
+		activeTool = 'multipitch';
 	}
 
 	let activeTab = $state('info');
@@ -467,13 +489,21 @@
 									<div class="p-1.5 rounded-sm bg-warm-white space-y-1 border border-black/10">
 										<div class="flex justify-between items-center mb-0.5">
 											<label class="text-ui-label block">{$_('ui.pitches')}</label>
-											<select
-												bind:value={route._gradeScale}
-												class="bg-white border border-black/15 rounded-sm px-1 py-0.5 text-micro-data outline-none"
-											>
-												<option value="french">FR</option>
-												<option value="uiaa">UIAA</option>
-											</select>
+											<div class="flex items-center gap-1">
+												<button
+													class="bg-white border border-black/15 rounded-sm px-1.5 py-0.5 text-micro-data font-bold text-warm-gray-500 hover:bg-creator-blue hover:text-white transition-none"
+													onclick={() => addPitch(route)}
+												>
+													{$_('ui.add_pitch')}
+												</button>
+												<select
+													bind:value={route._gradeScale}
+													class="bg-white border border-black/15 rounded-sm px-1 py-0.5 text-micro-data outline-none"
+												>
+													<option value="french">FR</option>
+													<option value="uiaa">UIAA</option>
+												</select>
+											</div>
 										</div>
 										{#each route.pitches as pitch, idx}
 											<div
@@ -482,7 +512,7 @@
 												<div class="col-span-1 flex justify-center">
 													<span class="text-micro-data font-bold">{idx + 1}</span>
 												</div>
-												<div class="col-span-5 flex min-w-0">
+												<div class="col-span-4 flex min-w-0">
 													<select
 														bind:value={pitch.grade}
 														class="w-full bg-transparent border border-black/15 rounded-sm px-1 py-0.5 text-body-text outline-none"
@@ -513,10 +543,20 @@
 														><i class="fa-solid fa-calculator text-[8px]"></i></button
 													>
 												</div>
-												<div class="col-span-1 flex justify-center">
+												<div class="col-span-2 flex justify-center gap-1">
+													<button
+														class="text-warm-gray-300 hover:text-creator-blue"
+														onclick={() => drawPitch(route, pitch)}
+														title={$_('ui.draw_pitch')}
+														><i class="fa-solid fa-pencil text-[9px]"></i></button
+													>
 													<button
 														class="text-warm-gray-300 hover:text-rose-600"
-														onclick={() => route.pitches.splice(idx, 1)}
+														onclick={() => {
+															route.pitches.splice(idx, 1);
+															if (drawingTarget?.pitchId === pitch.id) drawingTarget = null;
+														}}
+														title={$_('ui.delete_pitch')}
 														><i class="fa-solid fa-trash-can text-[9px]"></i></button
 													>
 												</div>
