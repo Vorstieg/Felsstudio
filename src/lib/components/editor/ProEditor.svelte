@@ -43,6 +43,7 @@
 	userState.ui.workspace = getInitialWorkspace();
 
 	let activeTool = $state(getInitialActiveTool());
+	let selectedOutlineStyle = $state('rock');
 	let modelComponent = $state();
 	let editorInternal = $state();
 	let drawingTarget = $state(null);
@@ -221,6 +222,7 @@
 			routes: userState.topo.routes,
 			fixPoints: userState.topo.fixPoints,
 			outlines: userState.topo.outlines,
+			textLabels: userState.topo.textLabels,
 			image2D: userState.topo.image2D,
 			name: userState.topo.name,
 			clustering: userState.clustering,
@@ -520,6 +522,7 @@
 			<ToolPalette2D
 				bind:activeTool
 				bind:selectedSymbol={userState.ui.selectedSymbol}
+				bind:selectedOutlineStyle
 				{hasPendingChanges}
 				onFinishRoute={handleFinishRoute}
 				onCancelAction={handleCancelAction}
@@ -703,6 +706,7 @@
 		<ToolPalette2D
 			bind:activeTool
 			bind:selectedSymbol={userState.ui.selectedSymbol}
+			bind:selectedOutlineStyle
 			{hasPendingChanges}
 			onFinishRoute={handleFinishRoute}
 			onCancelAction={handleCancelAction}
@@ -720,6 +724,7 @@
 			bind:activeTool
 			bind:drawingTarget
 			selectedSymbol={userState.ui.selectedSymbol}
+			{selectedOutlineStyle}
 			bind:hasPendingChanges
 		/>
 	{:else}

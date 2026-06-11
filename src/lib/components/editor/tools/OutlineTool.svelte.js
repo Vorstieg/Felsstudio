@@ -4,6 +4,7 @@ import { generateOutlineId } from '$lib/assets/js/id-utils.js';
 export class OutlineTool {
 	id = 'outline';
 	currentPoints = $state([]);
+	selectedStyle = 'rock';
 
 	constructor({ saveHistory } = {}) {
 		this.saveHistory = saveHistory || (() => {});
@@ -59,6 +60,7 @@ export class OutlineTool {
 		const outlineId = generateOutlineId();
 		userState.topo.outlines.push({
 			id: outlineId,
+			lineStyle: this.selectedStyle || 'rock',
 			points2D: $state.snapshot(this.currentPoints)
 		});
 

@@ -9,6 +9,7 @@ export const userState = $state({
 		routes: [],
 		fixPoints: [], // Unified markers: [{id, type, position: [x,y,z], position2D: [x,y], rotation2D, scale2D}]
 		outlines: [], // Rock outlines: [{id, points2D: [[x,y], ...]}]
+		textLabels: [],
 		date: '',
 		updated: '',
 		modelOffset: [0, 0, 0],
@@ -27,6 +28,7 @@ export const userState = $state({
 		selectedRouteId: null, // ID of the route currently selected for editing
 		selectedOutlineId: null, // ID of the rock outline currently selected for editing
 		selectedFixpointId: null,
+		selectedTextLabelId: null,
 		selectedSymbol: 'bolt',
 		activeDraftId: null,
 		lastSaved: null,
@@ -85,6 +87,7 @@ export const userState = $state({
 			routes: [],
 			fixPoints: [],
 			outlines: [],
+			textLabels: [],
 			date: '',
 			updated: '',
 			modelOffset: [0, 0, 0],
@@ -104,6 +107,7 @@ export const userState = $state({
 		this.ui.lastSaved = null;
 		this.ui.modelUrl = null;
 		this.ui.glbBlob = null;
+		this.ui.selectedTextLabelId = null;
 		this.clustering.rawHits = [];
 		this.clustering.clusters = [];
 		this.clustering.cameraPositions = {};
