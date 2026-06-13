@@ -53,13 +53,6 @@
 	let showSymbolPicker = $state(false);
 	const fixpoints = topoSymbols.filter((s) => s.type === 'fixpoint');
 	const features = topoSymbols.filter((s) => s.type === 'feature');
-	const outlineStyles = [
-		{ id: 'rock', label: 'Rock' },
-		{ id: 'approach', label: 'Approach' },
-		{ id: 'descent', label: 'Descent' },
-		{ id: 'variant', label: 'Variant' },
-		{ id: 'fixedRope', label: 'Rope' }
-	];
 
 	function toggleTool(tool, category) {
 		if (activeTool === tool) {
@@ -116,13 +109,7 @@
 			<i class="fa-solid fa-draw-polygon"></i>
 		</button>
 
-		{#if activeTool === 'outline'}
-			<select bind:value={selectedOutlineStyle} class="h-10 rounded-sm border border-black/15 bg-white px-2 text-[11px] font-bold text-near-black">
-				{#each outlineStyles as style}
-					<option value={style.id}>{style.label}</option>
-				{/each}
-			</select>
-		{/if}
+
 
 		<button
 			class="w-10 h-10 flex items-center justify-center rounded-sm transition-none {activeTool ===
@@ -298,13 +285,7 @@
 					<span class="hidden md:inline">{$_('ui.outline')}</span>
 				</button>
 
-				{#if activeTool === 'outline'}
-					<select bind:value={selectedOutlineStyle} class="h-8 rounded-sm border border-black/15 bg-white px-2 text-ui-label text-near-black outline-none">
-						{#each outlineStyles as style}
-							<option value={style.id}>{style.label}</option>
-						{/each}
-					</select>
-				{/if}
+
 
 				<div class="relative group/tool">
 					<button
