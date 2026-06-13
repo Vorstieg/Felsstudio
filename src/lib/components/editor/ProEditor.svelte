@@ -18,15 +18,18 @@
 	import HitInspector from '$lib/components/editor/HitInspector.svelte';
 	import { userState } from '$lib/state/editor.svelte.js';
 	import { draftsState } from '$lib/state/drafts.svelte.js';
+	import { isMobileViewport } from '$lib/assets/js/mobile-utils.js';
+	import { prepareOutlinesForExport } from '$lib/assets/js/outline-geometry.js';
 
 	// 2D Editor imports
 	import Topo2DEditor from '$lib/components/editor/Topo2DEditor.svelte';
 	import ToolPalette2D from '$lib/components/editor/ToolPalette2D.svelte';
+	import OutlineToolOptions from '$lib/components/editor/tools/OutlineToolOptions.svelte';
 
 	import { generateSymbolId, initializeIdCounters } from '$lib/assets/js/id-utils.js';
 
 	let { workspace = '3d-create', children } = $props();
-
+	let isMobile = $state(false);
 	function getInitialEditorMode() {
 		return workspace.startsWith('2d') ? '2d' : '3d';
 	}
@@ -159,6 +162,13 @@
 		draftsState.init();
 		initializeIdCounters(userState.topo);
 
+		// Initialize mobile detection (client-side only)
+		isMobile = isMobileViewport();
+		const handleResize = () => {
+			isMobile = isMobileViewport();
+		};
+		window.addEventListener('resize', handleResize);
+
 		// Force model offset from state
 		modelPositionOffset = userState.topo.modelOffset;
 
@@ -180,6 +190,7 @@
 		window.addEventListener('keydown', handleKeyDown);
 		window.addEventListener('keyup', handleKeyUp);
 		return () => {
+			window.removeEventListener('resize', handleResize);
 			window.removeEventListener('keydown', handleKeyDown);
 			window.removeEventListener('keyup', handleKeyUp);
 		};
@@ -225,6 +236,8 @@
 			textLabels: userState.topo.textLabels,
 			image2D: userState.topo.image2D,
 			name: userState.topo.name,
+			crag_id: userState.topo.crag_id,
+			sector_id: userState.topo.sector_id,
 			clustering: userState.clustering,
 			glbBlob: userState.ui.glbBlob,
 			modelRevision: userState.ui.modelRevision
@@ -359,6 +372,10 @@
 
 		const baseName = (userState.topo.name || 'topo').trim().toLowerCase().replace(/\s+/g, '-');
 		let topoToSave = JSON.parse(JSON.stringify(userState.topo));
+		topoToSave.outlines = prepareOutlinesForExport(topoToSave.outlines || [], {
+			baseWidth: 1000,
+			baseHeight: 1000 / (topoToSave.imageAspectRatio || 1.5)
+		});
 
 		if (workspace === '3d-create') {
 			// Convert visible clusters to fixPoints
@@ -716,6 +733,17 @@
 		/>
 	{/if}
 </div>
+
+	{#if browser && userState.topo.editorMode === "2d" && activeTool === "outline"}
+		<div class="fixed top-[100px] left-2 z-[101]">
+			<OutlineToolOptions
+				outlineTool={editor2D?.getCurrentTool?.()}
+				bind:selectedOutlineStyle
+				onClose={() => (activeTool = null)}
+			/>
+		</div>
+	{/if}
+
 
 <div class="h-screen w-screen absolute overflow-hidden bg-warm-white">
 	{#if userState.topo.editorMode === '2d'}

@@ -5,6 +5,7 @@
 		"dev": "vite dev --host",
 		"build": "vite build",
 		"preview": "vite preview",
+		"test:outline": "node scripts/test-outline-geometry.mjs",
 		"lint": "prettier --ignore-path .gitignore --check . && eslint --ignore-path .gitignore .",
 		"format": "prettier --ignore-path .gitignore --write ."
 	},

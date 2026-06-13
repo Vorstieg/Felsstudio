@@ -19,11 +19,21 @@ const fetchCrags = async ({ offset = 0, limit = cragsPerPage, search = '' } = {}
 	let sortedCrags = crags.sort((a, b) => new Date(b.properties.date) - new Date(a.properties.date));
 
 	if (search) {
+		const query = search.toLowerCase();
 		sortedCrags = sortedCrags.filter(
-			(crag) =>
-				crag.properties.name.toLowerCase().includes(search.toLowerCase()) ||
-				crag.properties.type.includes(search) ||
-				crag.properties.path.toLowerCase().includes(search.toLowerCase())
+			(crag) => {
+				const sectors = crag.properties.sectors || [];
+				return (
+					crag.properties.name.toLowerCase().includes(query) ||
+					crag.properties.type.includes(search) ||
+					crag.properties.path.toLowerCase().includes(query) ||
+					sectors.some((sector) =>
+						(sector.name || '').toLowerCase().includes(query) ||
+						(sector.id || '').toLowerCase().includes(query) ||
+						(sector.type || []).includes(search)
+					)
+				);
+			}
 		);
 	}
 

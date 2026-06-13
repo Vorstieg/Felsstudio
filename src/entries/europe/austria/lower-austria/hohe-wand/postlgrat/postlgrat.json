@@ -1,0 +1,21 @@
+{
+	"type": "Feature",
+	"properties": {
+		"id": "postlgrat",
+		"date": "2026-06-11",
+		"updated": "2026-06-11",
+		"path": "hohe-wand/postlgrat",
+		"name": "Postlgrat",
+		"type": ["multi-pitch"],
+		"description_de": "Postlgrat ist eine leichte Mehrseillaengenroute an der Hohen Wand. Die Route ist etwa 320 m lang, hat zehn Seillaengen und ist mit 3+ bewertet.",
+		"description_en": "Postlgrat is an easy multi-pitch route on Hohe Wand. The route is about 320 m long, has ten pitches, and is graded UIAA 3+.",
+		"topo": {
+			"site": "bergsteigen.com",
+			"link": "https://www.bergsteigen.com/"
+		}
+	},
+	"geometry": {
+		"type": "Point",
+		"coordinates": [16.0539, 47.8328]
+	}
+}

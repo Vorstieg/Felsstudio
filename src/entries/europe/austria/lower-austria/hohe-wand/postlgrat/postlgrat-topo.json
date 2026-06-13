@@ -1,0 +1,421 @@
+{
+	"name": "Postlgrat",
+	"description": "2D schematic topo converted from the supplied bergsteigen.com Postlsteig-Postlgrat / Hohe Wand topo image.",
+	"rock": "limestone",
+	"tags": ["multi-pitch", "hohe-wand", "postlwand", "easy"],
+	"date": "2026-06-11",
+	"updated": "2026-06-11",
+	"editorMode": "2d",
+	"image2D": null,
+	"imageAspectRatio": 0.7066508314,
+	"wallAzimuth": 150,
+	"metadata": {
+		"area": "Hohe Wand",
+		"sector": "Postlwand",
+		"exposure": "SO",
+		"heightMeters": 320,
+		"durationMinutes": 150,
+		"approachMinutes": 15,
+		"descentMinutes": 30,
+		"overallGrade": "3+",
+		"source": {
+			"site": "bergsteigen.com",
+			"copyright": "bergsteigen.com / Alpinverlag",
+			"note": "Geometry is a manually normalized 2D interpretation of the supplied topo image. Source precision is schematic; pitch lengths, grades, and labels are copied from the image."
+		},
+		"access": {
+			"approach": "Start near the lower Postlgrat inscription; Postlsteig and the red-marked approach are shown as separate approach/variant outlines.",
+			"descent": "From the top continue to the Drachenflieger Startplatz / Voellerin area and descend via the marked trail."
+		}
+	},
+	"routes": [
+		{
+			"id": "postlgrat",
+			"name": "Postlgrat",
+			"type": "multi-pitch",
+			"_gradeScale": "uiaa",
+			"grade": "3+",
+			"lineStyle": "redDashed",
+			"length": 320,
+			"tags": ["alpine", "multi-pitch", "easy"],
+			"points": [],
+			"points2D": [
+				[0.647, 0.94],
+				[0.647, 0.91],
+				[0.642, 0.867],
+				[0.619, 0.835],
+				[0.602, 0.797],
+				[0.602, 0.764],
+				[0.555, 0.72],
+				[0.54, 0.69],
+				[0.464, 0.689],
+				[0.448, 0.634],
+				[0.444, 0.588],
+				[0.454, 0.542],
+				[0.466, 0.5],
+				[0.51, 0.488],
+				[0.535, 0.456],
+				[0.535, 0.41],
+				[0.548, 0.368],
+				[0.58, 0.34],
+				[0.584, 0.303],
+				[0.536, 0.266],
+				[0.507, 0.236],
+				[0.501, 0.195],
+				[0.486, 0.155],
+				[0.479, 0.116],
+				[0.493, 0.071]
+			],
+			"fixPoints": [
+				"belay-0",
+				"belay-1",
+				"belay-2",
+				"belay-3",
+				"belay-4",
+				"belay-5",
+				"belay-6",
+				"belay-7",
+				"belay-8",
+				"belay-9",
+				"belay-10"
+			],
+			"pitches": [
+				{
+					"id": "pitch-1",
+					"pitchNumber": 1,
+					"type": "pitch",
+					"grade": "2-",
+					"length": 30,
+					"description": "Right out of the chimney at the lower Postlgrat start.",
+					"labelOffset2D": [0.065, 0.006],
+					"points": [],
+					"points2D": [
+						[0.647, 0.94],
+						[0.647, 0.91],
+						[0.642, 0.867]
+					]
+				},
+				{
+					"id": "pitch-2",
+					"pitchNumber": 2,
+					"type": "pitch",
+					"grade": "1-",
+					"length": 30,
+					"labelOffset2D": [0.07, 0.012],
+					"points": [],
+					"points2D": [
+						[0.642, 0.867],
+						[0.619, 0.835],
+						[0.602, 0.797]
+					]
+				},
+				{
+					"id": "pitch-3",
+					"pitchNumber": 3,
+					"type": "pitch",
+					"grade": "2+",
+					"length": 35,
+					"description": "Cable-protected traverse and broken terrain toward the Buch feature.",
+					"labelOffset2D": [0.065, 0.006],
+					"points": [],
+					"points2D": [
+						[0.602, 0.797],
+						[0.602, 0.764],
+						[0.555, 0.72],
+						[0.54, 0.69]
+					]
+				},
+				{
+					"id": "pitch-4",
+					"pitchNumber": 4,
+					"type": "pitch",
+					"grade": "3",
+					"length": 30,
+					"description": "Traverse left from Buch, then up the first pillar.",
+					"labelOffset2D": [0.055, 0.006],
+					"points": [],
+					"points2D": [
+						[0.54, 0.69],
+						[0.464, 0.689],
+						[0.448, 0.634],
+						[0.444, 0.588]
+					]
+				},
+				{
+					"id": "pitch-5",
+					"pitchNumber": 5,
+					"type": "pitch",
+					"grade": "3",
+					"length": 20,
+					"description": "Gratkante / pillar section.",
+					"labelOffset2D": [0.06, 0.006],
+					"points": [],
+					"points2D": [
+						[0.444, 0.588],
+						[0.454, 0.542],
+						[0.466, 0.5]
+					]
+				},
+				{
+					"id": "pitch-6",
+					"pitchNumber": 6,
+					"type": "pitch",
+					"grade": "3-",
+					"length": 20,
+					"description": "Pfeiler section below the upper edge.",
+					"labelOffset2D": [0.065, 0.008],
+					"points": [],
+					"points2D": [
+						[0.466, 0.5],
+						[0.51, 0.488],
+						[0.535, 0.456],
+						[0.535, 0.41]
+					]
+				},
+				{
+					"id": "pitch-7",
+					"pitchNumber": 7,
+					"type": "pitch",
+					"grade": "3",
+					"length": 20,
+					"description": "Kante.",
+					"labelOffset2D": [0.058, 0.006],
+					"points": [],
+					"points2D": [
+						[0.535, 0.41],
+						[0.548, 0.368],
+						[0.58, 0.34]
+					]
+				},
+				{
+					"id": "pitch-8",
+					"pitchNumber": 8,
+					"type": "pitch",
+					"grade": "2+",
+					"length": 25,
+					"description": "Easy terrain past the next pillar.",
+					"labelOffset2D": [0.055, 0.006],
+					"points": [],
+					"points2D": [
+						[0.58, 0.34],
+						[0.584, 0.303],
+						[0.536, 0.266]
+					]
+				},
+				{
+					"id": "pitch-9",
+					"pitchNumber": 9,
+					"type": "pitch",
+					"grade": "3+",
+					"length": 35,
+					"description": "Ramp and Postlwand section.",
+					"labelOffset2D": [0.065, 0.008],
+					"points": [],
+					"points2D": [
+						[0.536, 0.266],
+						[0.507, 0.236],
+						[0.501, 0.195]
+					]
+				},
+				{
+					"id": "pitch-10",
+					"pitchNumber": 10,
+					"type": "pitch",
+					"grade": "3+",
+					"length": 20,
+					"description": "Exit via the Wandstelle with aid, then to the Voellerin / hang-glider launch area.",
+					"labelOffset2D": [0.06, 0.01],
+					"points": [],
+					"points2D": [
+						[0.501, 0.195],
+						[0.486, 0.155],
+						[0.479, 0.116],
+						[0.493, 0.071]
+					]
+				}
+			]
+		}
+	],
+	"fixPoints": [
+		{ "id": "belay-0", "type": "belay", "position2D": [0.647, 0.94], "rotation2D": 0, "scale2D": 1.15 },
+		{ "id": "belay-1", "type": "belay", "position2D": [0.642, 0.867], "rotation2D": 0, "scale2D": 1.15 },
+		{ "id": "belay-2", "type": "belay", "position2D": [0.602, 0.797], "rotation2D": 0, "scale2D": 1.15 },
+		{ "id": "belay-3", "type": "belay", "position2D": [0.54, 0.69], "rotation2D": 0, "scale2D": 1.15 },
+		{ "id": "belay-4", "type": "belay", "position2D": [0.444, 0.588], "rotation2D": 0, "scale2D": 1.15 },
+		{ "id": "belay-5", "type": "belay", "position2D": [0.466, 0.5], "rotation2D": 0, "scale2D": 1.15 },
+		{ "id": "belay-6", "type": "belay", "position2D": [0.535, 0.41], "rotation2D": 0, "scale2D": 1.15 },
+		{ "id": "belay-7", "type": "belay", "position2D": [0.58, 0.34], "rotation2D": 0, "scale2D": 1.15 },
+		{ "id": "belay-8", "type": "belay", "position2D": [0.536, 0.266], "rotation2D": 0, "scale2D": 1.15 },
+		{ "id": "belay-9", "type": "belay", "position2D": [0.501, 0.195], "rotation2D": 0, "scale2D": 1.15 },
+		{ "id": "belay-10", "type": "belay", "position2D": [0.493, 0.071], "rotation2D": 0, "scale2D": 1.15 },
+		{ "id": "bolt-1", "type": "bolt", "position2D": [0.642, 0.91], "rotation2D": 0, "scale2D": 0.78 },
+		{ "id": "bolt-2", "type": "bolt", "position2D": [0.63, 0.846], "rotation2D": 0, "scale2D": 0.78 },
+		{ "id": "bolt-3", "type": "bolt", "position2D": [0.603, 0.765], "rotation2D": 0, "scale2D": 0.78 },
+		{ "id": "bolt-4", "type": "bolt", "position2D": [0.554, 0.719], "rotation2D": 0, "scale2D": 0.78 },
+		{ "id": "bolt-5", "type": "bolt", "position2D": [0.45, 0.64], "rotation2D": 0, "scale2D": 0.78 },
+		{ "id": "bolt-6", "type": "bolt", "position2D": [0.457, 0.535], "rotation2D": 0, "scale2D": 0.78 },
+		{ "id": "bolt-7", "type": "bolt", "position2D": [0.51, 0.488], "rotation2D": 0, "scale2D": 0.78 },
+		{ "id": "bolt-8", "type": "bolt", "position2D": [0.536, 0.371], "rotation2D": 0, "scale2D": 0.78 },
+		{ "id": "bolt-9", "type": "bolt", "position2D": [0.58, 0.305], "rotation2D": 0, "scale2D": 0.78 },
+		{ "id": "bolt-10", "type": "bolt", "position2D": [0.504, 0.236], "rotation2D": 0, "scale2D": 0.78 },
+		{ "id": "bolt-11", "type": "bolt", "position2D": [0.486, 0.154], "rotation2D": 0, "scale2D": 0.78 },
+		{ "id": "tree-1", "type": "tree", "position2D": [0.645, 0.838], "rotation2D": 0, "scale2D": 1.0 },
+		{ "id": "tree-2", "type": "tree", "position2D": [0.537, 0.813], "rotation2D": 0, "scale2D": 1.0 },
+		{ "id": "tree-3", "type": "tree", "position2D": [0.393, 0.585], "rotation2D": 0, "scale2D": 1.0 },
+		{ "id": "tree-4", "type": "tree", "position2D": [0.454, 0.494], "rotation2D": 0, "scale2D": 1.0 },
+		{ "id": "tree-5", "type": "tree", "position2D": [0.592, 0.321], "rotation2D": 0, "scale2D": 1.0 },
+		{ "id": "tree-6", "type": "tree", "position2D": [0.483, 0.091], "rotation2D": 0, "scale2D": 1.0 },
+		{ "id": "tree-7", "type": "tree", "position2D": [0.42, 0.084], "rotation2D": 0, "scale2D": 1.0 }
+	],
+	"outlines": [
+		{
+			"id": "rock-lower-postlgrat",
+			"lineStyle": "rock",
+			"points2D": [
+				[0.61, 0.96],
+				[0.627, 0.927],
+				[0.638, 0.879],
+				[0.624, 0.846]
+			]
+		},
+		{
+			"id": "rock-right-wall",
+			"lineStyle": "rock",
+			"points2D": [
+				[0.69, 0.942],
+				[0.657, 0.888],
+				[0.631, 0.802],
+				[0.598, 0.693],
+				[0.582, 0.589],
+				[0.599, 0.486],
+				[0.628, 0.393],
+				[0.664, 0.279],
+				[0.669, 0.203],
+				[0.663, 0.114]
+			]
+		},
+		{
+			"id": "rock-left-ridge",
+			"lineStyle": "rock",
+			"points2D": [
+				[0.456, 0.72],
+				[0.418, 0.652],
+				[0.406, 0.572],
+				[0.425, 0.491],
+				[0.464, 0.405],
+				[0.505, 0.316],
+				[0.469, 0.231],
+				[0.46, 0.139]
+			]
+		},
+		{
+			"id": "approach-postlgrat-start",
+			"lineStyle": "approach",
+			"points2D": [
+				[0.24, 0.973],
+				[0.345, 0.973],
+				[0.48, 0.955],
+				[0.595, 0.947],
+				[0.647, 0.94]
+			]
+		},
+		{
+			"id": "approach-postlsteig",
+			"lineStyle": "approach",
+			"points2D": [
+				[0.205, 0.953],
+				[0.203, 0.902],
+				[0.229, 0.848],
+				[0.242, 0.799],
+				[0.278, 0.762],
+				[0.352, 0.733],
+				[0.402, 0.696],
+				[0.464, 0.689]
+			]
+		},
+		{
+			"id": "descent-voellerin",
+			"lineStyle": "descent",
+			"points2D": [
+				[0.493, 0.071],
+				[0.51, 0.049],
+				[0.555, 0.046],
+				[0.577, 0.03],
+				[0.498, 0.025],
+				[0.404, 0.029],
+				[0.343, 0.048]
+			]
+		},
+		{
+			"id": "fixed-rope-b",
+			"lineStyle": "fixedRope",
+			"points2D": [
+				[0.602, 0.797],
+				[0.606, 0.764],
+				[0.592, 0.735]
+			]
+		},
+		{
+			"id": "fixed-rope-ab",
+			"lineStyle": "fixedRope",
+			"points2D": [
+				[0.536, 0.69],
+				[0.505, 0.684],
+				[0.464, 0.689]
+			]
+		},
+		{
+			"id": "variant-postlrippe",
+			"lineStyle": "variant",
+			"points2D": [
+				[0.35, 0.58],
+				[0.386, 0.535],
+				[0.429, 0.506]
+			]
+		},
+		{
+			"id": "variant-postlsteig-red",
+			"lineStyle": "variant",
+			"points2D": [
+				[0.355, 0.674],
+				[0.37, 0.632],
+				[0.397, 0.588],
+				[0.431, 0.561],
+				[0.444, 0.588]
+			]
+		},
+		{
+			"id": "variant-upper-ramp",
+			"lineStyle": "variant",
+			"points2D": [
+				[0.525, 0.392],
+				[0.489, 0.358],
+				[0.486, 0.303],
+				[0.536, 0.266]
+			]
+		}
+	],
+	"textLabels": [
+		{ "id": "label-title", "text": "Postlgrat", "position2D": [0.595, 0.97], "fontSize2D": 0.03, "color": "#1f1f1f", "fontWeight": 700 },
+		{ "id": "label-lower-start", "text": "gelbe Schrift\nUnterer Postlgrat", "position2D": [0.48, 0.925], "fontSize2D": 0.018, "color": "#1f1f1f", "fontWeight": 700 },
+		{ "id": "label-chimney", "text": "rechts aus\nKamin", "position2D": [0.68, 0.866], "fontSize2D": 0.018, "color": "#1f1f1f", "fontWeight": 700 },
+		{ "id": "label-drahtseil-b", "text": "Drahtseil  B", "position2D": [0.513, 0.775], "fontSize2D": 0.019, "color": "#0877bd", "fontWeight": 700 },
+		{ "id": "label-drahtseil-ab", "text": "A-B\nDrahtseil", "position2D": [0.448, 0.707], "fontSize2D": 0.019, "color": "#0877bd", "fontWeight": 700 },
+		{ "id": "label-buch", "text": "Buch", "position2D": [0.538, 0.671], "fontSize2D": 0.02, "color": "#1f1f1f", "fontWeight": 700 },
+		{ "id": "label-pfeiler-lower", "text": "Pfeiler", "position2D": [0.535, 0.61], "fontSize2D": 0.019, "color": "#1f1f1f", "fontWeight": 700 },
+		{ "id": "label-gratkante", "text": "Gratkante", "position2D": [0.535, 0.552], "fontSize2D": 0.019, "color": "#1f1f1f", "fontWeight": 700 },
+		{ "id": "label-pfeiler-upper", "text": "Pfeiler", "position2D": [0.545, 0.491], "fontSize2D": 0.019, "color": "#1f1f1f", "fontWeight": 700 },
+		{ "id": "label-kante", "text": "Kante", "position2D": [0.61, 0.438], "fontSize2D": 0.019, "color": "#1f1f1f", "fontWeight": 700 },
+		{ "id": "label-postlgrat-mid", "text": "Postlgrat", "position2D": [0.596, 0.496], "fontSize2D": 0.029, "color": "#1f1f1f", "fontWeight": 700 },
+		{ "id": "label-rampe-1", "text": "Rampe", "position2D": [0.462, 0.322], "fontSize2D": 0.018, "color": "#1f1f1f", "fontWeight": 700 },
+		{ "id": "label-rampe-2", "text": "Rampe", "position2D": [0.39, 0.264], "fontSize2D": 0.018, "color": "#1f1f1f", "fontWeight": 700 },
+		{ "id": "label-postlwand", "text": "Postlwand", "position2D": [0.617, 0.215], "fontSize2D": 0.022, "color": "#777777", "fontWeight": 700 },
+		{ "id": "label-wandstelle", "text": "Wandstelle\n(mit Eisenhilfe)", "position2D": [0.535, 0.093], "fontSize2D": 0.019, "color": "#1f1f1f", "fontWeight": 700 },
+		{ "id": "label-voellerin", "text": "Drachenflieger Startplatz\n(Voellerin)", "position2D": [0.23, 0.035], "fontSize2D": 0.02, "color": "#1f1f1f", "fontWeight": 700 },
+		{ "id": "label-postlrippe", "text": "Postlrippe\n(3)", "position2D": [0.315, 0.555], "fontSize2D": 0.018, "color": "#777777", "fontWeight": 700 },
+		{ "id": "label-postlsteig", "text": "Postlsteig\n(rote Punkte, 1-2)", "position2D": [0.35, 0.49], "fontSize2D": 0.018, "color": "#1f1f1f", "fontWeight": 700 },
+		{ "id": "label-red-script", "text": "rote Schrift\nPostlsteig 2+", "position2D": [0.225, 0.912], "fontSize2D": 0.019, "color": "#1f1f1f", "fontWeight": 700 },
+		{ "id": "label-postlsteig-bottom", "text": "Postlsteig", "position2D": [0.125, 0.987], "fontSize2D": 0.026, "color": "#1f1f1f", "fontWeight": 700 },
+		{ "id": "label-topo-note", "text": "10 SL / 320 m / 3+", "position2D": [0.69, 0.13], "fontSize2D": 0.018, "color": "#1f1f1f", "fontWeight": 700 }
+	]
+}

@@ -1,21 +1,103 @@
 {
-	"type": "Feature",
-	"properties": {
-		"id": "blassenstein",
-		"date": "2024-04-09",
-		"updated": "2024-04-09",
-		"path": "scheibbs/blassenstein",
-		"name": "Blassenstein",
-		"type": ["sports-climbing"],
-		"description_de": "Öffentlich ist der Blassenstein etwas schwierig erreichbar, dafür lockt er mit einer Wunderschönen Aussicht über das Mostviertel. Online ist leider kein Topo verfügbar. Um beim Blassenstein zu klettern ist es notwendig, sich ein stück abzuseilen.\n",
-		"description_en": "Public transport to Blassenstein is somewhat difficult, but it entices with a beautiful view over the Mostviertel. Unfortunately, no topo is available online. To climb at Blassenstein, it is necessary to rappel down a bit.\n",
-		"topo": {
-			"site": "thecrag.com",
-			"link": "https://www.thecrag.com/de/klettern/austria/wien-vienna-area/area/4287648768"
-		}
-	},
-	"geometry": {
-		"type": "Point",
-		"coordinates": [15.1998192, 48.0088208]
-	}
+  "type": "Feature",
+  "properties": {
+    "id": "blassenstein",
+    "date": "2024-04-09",
+    "updated": "2026-06-13",
+    "path": "scheibbs/blassenstein",
+    "name": "Blassenstein",
+    "type": [
+      "sports-climbing"
+    ],
+    "description_de": "Öffentlich ist der Blassenstein etwas schwierig erreichbar, dafür lockt er mit einer wunderschönen Aussicht über das Mostviertel. Die lokalen Topos sind aus dem Kletterführer Blassenstein übernommen und enthalten die Sektoren NW, unter der Warte und Naxos. Für mehrere Einstiege ist Abseilen oder ein schwach ausgetretener Waldweg nötig.\n",
+    "description_en": "Public transport to Blassenstein is somewhat difficult, but it offers a beautiful view over the Mostviertel. The local topos are based on the Kletterführer Blassenstein guide and cover the NW, unter der Warte, and Naxos sectors. Several starts require rappelling or a faint forest path.\n",
+    "topo": {
+      "site": "Kletterführer Blassenstein",
+      "link": ""
+    },
+    "sectors": [
+      {
+        "id": "nw",
+        "name": "Sektor NW",
+        "sort": 10,
+        "type": [
+          "sports-climbing"
+        ],
+        "tags": [
+          "abseil",
+          "recommended"
+        ],
+        "description_de": "Nordwestlicher Wandbereich mit den Routen NW 1 bis NW 16, einem 40 m Abseilweg und einem stahlseilversicherten Verbindungssteig zum Sektor unter der Warte.",
+        "description_en": "North-west wall section with routes NW 1 to NW 16, a 40 m rappel line, and a cable-protected connecting path to the sector unter der Warte.",
+        "topo": {
+          "site": "Kletterführer Blassenstein",
+          "link": ""
+        },
+        "assets": {
+          "topos": [
+            "blassenstein-nw-topo.json"
+          ],
+          "images": [],
+          "models": []
+        }
+      },
+      {
+        "id": "unter-der-warte",
+        "name": "Sektor unter der Warte",
+        "sort": 20,
+        "type": [
+          "sports-climbing"
+        ],
+        "tags": [
+          "abseil",
+          "seasonal-restriction"
+        ],
+        "description_de": "Wandbereich unter der Aussichtswarte mit 21 Einträgen, 10 m Abseilweg, Wandbuch-Hinweis und saisonalem Rabennest-Hinweis am Großen Überhang.",
+        "description_en": "Wall section below the lookout tower with 21 listed lines, a 10 m rappel line, a route-book note, and a seasonal raven-nesting note on Großer Überhang.",
+        "topo": {
+          "site": "Kletterführer Blassenstein",
+          "link": ""
+        },
+        "assets": {
+          "topos": [
+            "blassenstein-unter-der-warte-topo.json"
+          ],
+          "images": [],
+          "models": []
+        }
+      },
+      {
+        "id": "naxos",
+        "name": "Sektor Naxos",
+        "sort": 30,
+        "type": [
+          "sports-climbing"
+        ],
+        "tags": [
+          "schematic",
+          "projects"
+        ],
+        "description_de": "Schematisch nach Routentabelle erfasster Bereich mit acht Routen und Projekten; die Routen 6 bis 8 erreicht man laut Führer am besten durch Abseilen.",
+        "description_en": "Schematic sector based on the route table, with eight routes and projects; according to the guide, routes 6 to 8 are best reached by rappelling.",
+        "topo": {
+          "site": "Kletterführer Blassenstein",
+          "link": ""
+        },
+        "assets": {
+          "topos": [
+            "blassenstein-naxos-topo.json"
+          ],
+          "images": [],
+          "models": []
+        }
+      }
+    ]
+  },
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      15.1998192,
+      48.0088208
+    ]
+  }
 }

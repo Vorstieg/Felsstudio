@@ -13,6 +13,14 @@
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
 	import { topoSymbols } from '$lib/assets/js/topo-utils.js';
 	import {
+		getOutlinePoints,
+		insertOutlinePoint,
+		pointsToSvg,
+		removeOutlinePoint,
+		setOutlinePoint,
+		translateOutline
+	} from '$lib/assets/js/outline-geometry.js';
+	import {
 		getTouchTargetSize,
 		getHitAreaSize,
 		getTouchPoint,
@@ -32,7 +40,11 @@
 	let gElement = $state(null);
 
 	// Pass editor callbacks to all tools
-	const toolConfig = { saveHistory, beginTextEdit };
+	const toolConfig = {
+		saveHistory,
+		beginTextEdit,
+		getCanvasSize: () => ({ baseWidth, baseHeight })
+	};
 	const tools = {
 		route: new RouteTool(toolConfig),
 		multipitch: null,
@@ -100,7 +112,7 @@
 		currentTool instanceof RouteTool ? currentTool.currentPoints : []
 	);
 	let currentOutlinePoints = $derived(
-		currentTool instanceof OutlineTool ? currentTool.currentPoints : []
+		currentTool instanceof OutlineTool ? currentTool.getPreviewPoints() : []
 	);
 
 	$effect(() => {
@@ -528,8 +540,8 @@
 				}
 			} else if (outlineId) {
 				const outline = userState.topo.outlines.find((o) => o.id === outlineId);
-				if (outline && outline.points2D.length > 2) {
-					outline.points2D = outline.points2D.filter((_, i) => i !== pointIndex);
+				if (outline && getOutlinePoints(outline, { baseWidth, baseHeight }).length > 2) {
+					removeOutlinePoint(outline, pointIndex, { baseWidth, baseHeight });
 					return;
 				}
 			}
@@ -567,9 +579,7 @@
 		} else if (outlineId) {
 			const outline = userState.topo.outlines.find((o) => o.id === outlineId);
 			if (outline) {
-				const newPoints = [...outline.points2D];
-				newPoints.splice(insertIndex, 0, [point.x, point.y]);
-				outline.points2D = newPoints;
+				insertOutlinePoint(outline, insertIndex, [point.x, point.y], { baseWidth, baseHeight });
 			}
 		}
 		// Set dragging state to allow immediate dragging after click
@@ -609,10 +619,12 @@
 			});
 
 			// Move outlines
-			draggingSelection.items.outlines.forEach(({ outlineId, startPoints }) => {
+			draggingSelection.items.outlines.forEach(({ outlineId, startOutline }) => {
 				const outline = userState.topo.outlines.find((o) => o.id === outlineId);
-				if (outline && outline.points2D) {
-					outline.points2D = startPoints.map((p) => [p[0] + deltaX, p[1] + deltaY]);
+				if (outline) {
+					const movedOutline = JSON.parse(JSON.stringify(startOutline));
+					translateOutline(movedOutline, deltaX, deltaY, { baseWidth, baseHeight });
+					Object.assign(outline, movedOutline);
 				}
 			});
 
@@ -658,9 +670,10 @@
 			} else if (draggingPoint.outlineId) {
 				const outline = userState.topo.outlines.find((o) => o.id === draggingPoint.outlineId);
 				if (outline) {
-					const newPoints = [...outline.points2D];
-					newPoints[draggingPoint.pointIndex] = [mouse.x, mouse.y];
-					outline.points2D = newPoints;
+					setOutlinePoint(outline, draggingPoint.pointIndex, [mouse.x, mouse.y], {
+						baseWidth,
+						baseHeight
+					});
 				}
 			}
 		} else if (rotatingSymbol) {
@@ -916,7 +929,7 @@
 				if (o && o.points2D) {
 					outlines.push({
 						outlineId: o.id,
-						startPoints: JSON.parse(JSON.stringify(o.points2D))
+						startOutline: JSON.parse(JSON.stringify(o))
 					});
 				}
 			} else if (type === 'symbol') {
@@ -1082,6 +1095,10 @@
 		}
 		drawingTarget = null;
 		clearSelection();
+	}
+
+	export function getCurrentTool() {
+		return currentTool;
 	}
 
 	function handleKeyDown(event) {
@@ -1367,9 +1384,7 @@
 				(update) => update,
 				(exit) => exit.remove()
 			)
-			.attr('points', (d) =>
-				d.points2D.map((p) => `${p[0] * baseWidth},${p[1] * baseHeight}`).join(' ')
-			)
+			.attr('points', (d) => pointsToSvg(getOutlinePoints(d, { baseWidth, baseHeight }), { baseWidth, baseHeight }))
 			.attr('stroke-width', getHitAreaSize(8))
 			.style('pointer-events', activeTool !== null && activeTool !== 'eraser' ? 'none' : 'auto');
 
@@ -1385,9 +1400,7 @@
 				(update) => update,
 				(exit) => exit.remove()
 			)
-			.attr('points', (d) =>
-				d.points2D.map((p) => `${p[0] * baseWidth},${p[1] * baseHeight}`).join(' ')
-			)
+			.attr('points', (d) => pointsToSvg(getOutlinePoints(d, { baseWidth, baseHeight }), { baseWidth, baseHeight }))
 			.attr('stroke', (d) => (isSelected('outline', d.id) ? '#3b82f6' : getOutlineLineStyle(d.lineStyle).stroke))
 			.attr('stroke-width', (d) => {
 				const style = getOutlineLineStyle(d.lineStyle);
@@ -1397,6 +1410,28 @@
 			.attr('stroke-linecap', 'round')
 			.attr('stroke-linejoin', 'round')
 			.style('pointer-events', activeTool !== null && activeTool !== 'eraser' ? 'none' : 'auto');
+
+		// Filled shapes (for closed outlines with fill)
+		const outlineFillSelection = outlinesLayer
+			.selectAll('polygon.outline-fill')
+			.data(
+				userState.topo.outlines.filter(
+					(d) => d.fillColor && getOutlinePoints(d, { baseWidth, baseHeight }).length > 2
+				),
+				(d) => d.id
+			);
+
+		outlineFillSelection
+			.join(
+				(enter) => enter.append('polygon').attr('class', 'outline-fill'),
+				(update) => update,
+				(exit) => exit.remove()
+			)
+			.attr('points', (d) => pointsToSvg(getOutlinePoints(d, { baseWidth, baseHeight }), { baseWidth, baseHeight }))
+			.attr('fill', (d) => d.fillColor || 'none')
+			.attr('fill-opacity', (d) => d.fillOpacity || 0.3)
+			.attr('stroke', 'none')
+			.style('pointer-events', 'none');
 
 		// Rock Outline Handles
 		const outlineHandlesData = [];
@@ -1411,14 +1446,15 @@
 				selectedItems.size <= 1
 			) {
 				const handleSize = getTouchTargetSize(activeTool === 'eraser' ? 7 : 4);
-				outline.points2D.forEach((p, i) => {
+				const outlinePoints = getOutlinePoints(outline, { baseWidth, baseHeight });
+				outlinePoints.forEach((p, i) => {
 					outlineHandlesData.push({ outlineId: outline.id, index: i, p, handleSize });
 				});
 
 				const midpointSize = getTouchTargetSize(3);
-				for (let j = 0; j < outline.points2D.length - 1; j++) {
-					const p1 = outline.points2D[j];
-					const p2 = outline.points2D[j + 1];
+				for (let j = 0; j < outlinePoints.length - 1; j++) {
+					const p1 = outlinePoints[j];
+					const p2 = outlinePoints[j + 1];
 					outlineMidpointsData.push({
 						outlineId: outline.id,
 						insertIndex: j + 1,
@@ -1910,6 +1946,37 @@
 			)
 			.attr('cx', (p) => p[0] * baseWidth)
 			.attr('cy', (p) => p[1] * baseHeight);
+
+		// Current outline fill preview (for closed shapes)
+		const currentOutlineFillData = currentOutlineData.length > 0 && currentOutlinePoints.length > 2
+			? [
+				{
+					points: currentOutlinePoints,
+					pointsStr: currentOutlinePoints
+						.map((p) => `${p[0] * baseWidth},${p[1] * baseHeight}`)
+						.join(' ')
+				}
+			]
+			: [];
+
+		currentLayer
+			.selectAll('polygon.current-outline-fill')
+			.data(currentOutlineFillData)
+			.join(
+				(enter) => enter.append('polygon').attr('class', 'current-outline-fill'),
+				(update) => update,
+				(exit) => exit.remove()
+			)
+			.attr('points', (d) => d.pointsStr)
+			.attr('fill', (d) => {
+				const tool = currentTool;
+				return tool instanceof OutlineTool && tool.fillColor ? tool.fillColor : 'rgba(255, 165, 0, 0.2)';
+			})
+			.attr('fill-opacity', (d) => {
+				const tool = currentTool;
+				return tool instanceof OutlineTool && tool.fillOpacity ? tool.fillOpacity : 0.2;
+			})
+			.attr('stroke', 'none');
 
 		// 4. Handles Rendering (Selected Route)
 		const routePointHandlesData = [];
@@ -2461,7 +2528,15 @@
 		}
 		for (const o of userState.topo.outlines) {
 			o.lineStyle;
-			for (const p of o.points2D) {
+			o.fillColor;
+			o.fillOpacity;
+			o.closed;
+			o.shape?.type;
+			o.shape?.radius2D;
+			o.shape?.fromCenter;
+			o.shape?.square;
+			const outlinePoints = getOutlinePoints(o, { baseWidth, baseHeight });
+			for (const p of outlinePoints) {
 				p[0];
 				p[1];
 			}

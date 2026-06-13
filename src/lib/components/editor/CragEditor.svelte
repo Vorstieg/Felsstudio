@@ -17,6 +17,7 @@
 	let mapElement = $state();
 	let map = $state();
 	let cragMarker;
+	let sectorMarkers = $state([]);
 	let transitMarkers = $state([]);
 	let parkingMarkers = $state([]);
 	let mapStyle = $state('transport');
@@ -25,6 +26,7 @@
 
 	let activeTool = $state('position'); // 'position' | 'transit' | 'parking' | 'track'
 	let activeTab = $state('info'); // 'info' | 'registry'
+	let selectedSectorId = $state(null);
 	let currentTrackPoints = $state([]);
 	let routeDraftWaypoints = $state([]);
 	let editingTrackIndex = $state(null);
@@ -105,8 +107,7 @@
 			}
 
 			if (activeTool === 'position') {
-				if (cragMarker) cragMarker.setLngLat(lngLat);
-				cragEditorState.crag.geometry.coordinates = lngLat;
+				setSelectedPosition(lngLat);
 			} else if (activeTool === 'transit') {
 				addTransitPoint(lngLat);
 			} else if (activeTool === 'parking') {
@@ -136,6 +137,13 @@
 	$effect(() => {
 		if (!isMapLoaded || !map) return;
 		syncTrackData();
+	});
+
+	$effect(() => {
+		if (!isMapLoaded || !map) return;
+		JSON.stringify(cragEditorState.crag.sectors || []);
+		selectedSectorId;
+		untrack(() => syncSectorMarkers());
 	});
 
 	$effect(() => {
@@ -346,11 +354,33 @@
 
 	function setCragPositionFromSearch(coordinates) {
 		if (!coordinates) return;
-		cragEditorState.crag.geometry.coordinates = coordinates;
-		if (cragMarker) cragMarker.setLngLat(coordinates);
+		setSelectedPosition(coordinates);
 		if (activeTool === 'parking' || activeTool === 'transit') {
 			scanNearbyAssets(activeTool === 'parking' ? 'parking' : 'transit');
 		}
+	}
+
+	function setSelectedPosition(coordinates) {
+		if (selectedSectorId) {
+			updateSectorCoordinates(selectedSectorId, coordinates);
+			return;
+		}
+		cragEditorState.crag.geometry.coordinates = coordinates;
+		if (cragMarker) cragMarker.setLngLat(coordinates);
+	}
+
+	function updateSectorCoordinates(id, coordinates) {
+		cragEditorState.crag.sectors = (cragEditorState.crag.sectors || []).map((sector) => {
+			if (sector.id !== id) return sector;
+			return {
+				...sector,
+				geometry: {
+					type: 'Point',
+					...(sector.geometry || {}),
+					coordinates
+				}
+			};
+		});
 	}
 
 	function initMarkersAndLayers() {
@@ -403,6 +433,7 @@
 			cragEditorState.crag.geometry.coordinates = [pos.lng, pos.lat];
 			if (activeTool === 'parking' || activeTool === 'transit') scanNearbyAssets(activeTool === 'parking' ? 'parking' : 'transit');
 		});
+		syncSectorMarkers();
 
 		transitMarkers.forEach(m => m.marker.remove());
 		transitMarkers = [];
@@ -559,6 +590,37 @@
 		parkingMarkers.push({ id: point.id, marker });
 	}
 
+	function syncSectorMarkers() {
+		if (!map) return;
+		sectorMarkers.forEach(m => m.marker.remove());
+		sectorMarkers = [];
+		(cragEditorState.crag.sectors || []).forEach((sector) => {
+			const coordinates = sector.geometry?.coordinates;
+			if (!Array.isArray(coordinates) || coordinates.length < 2) return;
+			const el = document.createElement('button');
+			el.type = 'button';
+			el.className = `sector-marker ${selectedSectorId === sector.id ? 'is-selected' : ''}`;
+			el.title = sector.name || sector.id || 'Sector';
+			el.innerHTML = `<span>${sector.sort || 'S'}</span>`;
+			el.addEventListener('click', (event) => {
+				event.stopPropagation();
+				selectedSectorId = sector.id;
+				activeTab = 'sectors';
+				activeTool = 'position';
+			});
+			const marker = new maplibregl.Marker({ element: el, draggable: true }).setLngLat(coordinates).addTo(map);
+			marker.on('dragstart', () => {
+				selectedSectorId = sector.id;
+				activeTab = 'sectors';
+			});
+			marker.on('dragend', () => {
+				const pos = marker.getLngLat();
+				updateSectorCoordinates(sector.id, [pos.lng, pos.lat]);
+			});
+			sectorMarkers.push({ id: sector.id, marker });
+		});
+	}
+
 	function removeTransit(id) {
 		cragEditorState.transit = cragEditorState.transit.filter(p => p.id !== id);
 		const m = transitMarkers.find(m => m.id === id);
@@ -688,19 +750,24 @@
 
 	function createTopoFromCrag() {
 		const crag = $state.snapshot(cragEditorState.crag);
+		const sector = (crag.sectors || []).find((item) => item.id === selectedSectorId);
+		const source = sector || crag;
+		const coordinates = source.geometry?.coordinates || crag.geometry?.coordinates || [];
 		const today = new Date().toISOString().split('T')[0];
 		userState.reset();
 		userState.topo = {
 			...userState.topo,
-			name: crag.name || '',
-			description: crag.description_de || crag.description_en || '',
-			rock: crag.rock_type || userState.topo.rock,
-			tags: [...(crag.tags || []), ...(crag.type || [])],
+			name: sector ? `${crag.name || ''} - ${sector.name || sector.id}` : crag.name || '',
+			crag_id: crag.id || '',
+			sector_id: sector?.id || '',
+			description: source.description_de || source.description_en || crag.description_de || crag.description_en || '',
+			rock: source.rock_type || crag.rock_type || userState.topo.rock,
+			tags: [...(crag.tags || []), ...(crag.type || []), ...(sector?.tags || []), ...(sector?.type || [])],
 			date: crag.date || today,
 			updated: today,
 			coordinates: [
-				crag.geometry?.coordinates?.[1] ?? 0,
-				crag.geometry?.coordinates?.[0] ?? 0
+				coordinates?.[1] ?? 0,
+				coordinates?.[0] ?? 0
 			],
 			editorMode: '2d'
 		};
@@ -714,6 +781,70 @@
 
 	function removeEquipmentItem(idx) {
 		cragEditorState.crag.equipment = cragEditorState.crag.equipment.filter((_, i) => i !== idx);
+	}
+
+	function createSector() {
+		const sectors = cragEditorState.crag.sectors || [];
+		const nextNumber = sectors.length + 1;
+		const id = `sector-${nextNumber}`;
+		cragEditorState.crag.sectors = [
+			...sectors,
+			{
+				id,
+				name: `Sector ${nextNumber}`,
+				sort: nextNumber * 10,
+				type: [],
+				tags: [],
+				security: '',
+				rock_type: '',
+				description_de: '',
+				description_en: '',
+				approach_de: '',
+				approach_en: '',
+				geometry: {
+					type: 'Point',
+					coordinates: [...cragEditorState.crag.geometry.coordinates]
+				},
+				topo: { site: '', link: '' },
+				assets: { topos: [], images: [], models: [] }
+			}
+		];
+		selectedSectorId = id;
+		activeTab = 'sectors';
+		activeTool = 'position';
+	}
+
+	function duplicateSector(id) {
+		const sectors = cragEditorState.crag.sectors || [];
+		const source = sectors.find((sector) => sector.id === id);
+		if (!source) return;
+		const copyId = `${source.id || 'sector'}-copy`;
+		const uniqueId = sectors.some((sector) => sector.id === copyId) ? `${copyId}-${sectors.length + 1}` : copyId;
+		cragEditorState.crag.sectors = [
+			...sectors,
+			{
+				...JSON.parse(JSON.stringify(source)),
+				id: uniqueId,
+				name: `${source.name || source.id} Copy`,
+				sort: (Number(source.sort) || sectors.length * 10) + 1
+			}
+		];
+		selectedSectorId = uniqueId;
+		activeTab = 'sectors';
+	}
+
+	function removeSector(id) {
+		cragEditorState.crag.sectors = (cragEditorState.crag.sectors || []).filter((sector) => sector.id !== id);
+		if (selectedSectorId === id) selectedSectorId = null;
+	}
+
+	function moveSector(id, direction) {
+		const sectors = [...(cragEditorState.crag.sectors || [])];
+		const index = sectors.findIndex((sector) => sector.id === id);
+		const nextIndex = index + direction;
+		if (index < 0 || nextIndex < 0 || nextIndex >= sectors.length) return;
+		[sectors[index], sectors[nextIndex]] = [sectors[nextIndex], sectors[index]];
+		cragEditorState.crag.sectors = sectors.map((sector, i) => ({ ...sector, sort: (i + 1) * 10 }));
 	}
 </script>
 
@@ -751,8 +882,18 @@
 	{securityOptions}
 	{rockTypes}
 	{commonEquipment}
+	bind:selectedSectorId
 	onAddEquipmentItem={addEquipmentItem}
 	onRemoveEquipmentItem={removeEquipmentItem}
+	onAddSector={createSector}
+	onDuplicateSector={duplicateSector}
+	onRemoveSector={removeSector}
+	onMoveSector={moveSector}
+	onFocusSector={(sector) => {
+		selectedSectorId = sector.id;
+		activeTool = 'position';
+		if (sector.geometry?.coordinates && map) map.easeTo({ center: sector.geometry.coordinates, zoom: Math.max(map.getZoom(), 15), duration: 400 });
+	}}
 	onSetHoverHighlight={setHoverHighlight}
 	onAddDetectedAsset={addDetectedAsset}
 	onRemoveTransit={removeTransit}
@@ -769,8 +910,29 @@
         right: 24px !important;
     }
 
-    :global(.crag-marker), :global(.parking-marker), :global(.transit-marker) {
+    :global(.crag-marker), :global(.parking-marker), :global(.transit-marker), :global(.sector-marker) {
         filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
         cursor: move;
+    }
+
+    :global(.sector-marker) {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        border: 2px solid #ffffff;
+        background: #31302e;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1;
+        padding: 0;
+    }
+
+    :global(.sector-marker.is-selected) {
+        background: #0075de;
+        box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.25);
     }
 </style>

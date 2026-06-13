@@ -3,6 +3,8 @@ import { Vector3 } from 'three';
 export const userState = $state({
 	topo: {
 		name: '',
+		crag_id: '',
+		sector_id: '',
 		description: '',
 		rock: 'granite',
 		tags: [],
@@ -81,6 +83,8 @@ export const userState = $state({
 	reset() {
 		this.topo = {
 			name: '',
+			crag_id: '',
+			sector_id: '',
 			description: '',
 			rock: 'granite',
 			tags: [],

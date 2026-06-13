@@ -13,8 +13,14 @@
 		securityOptions = [],
 		rockTypes = [],
 		commonEquipment = [],
+		selectedSectorId = $bindable(null),
 		onAddEquipmentItem = () => {},
 		onRemoveEquipmentItem = () => {},
+		onAddSector = () => {},
+		onDuplicateSector = () => {},
+		onRemoveSector = () => {},
+		onMoveSector = () => {},
+		onFocusSector = () => {},
 		onSetHoverHighlight = () => {},
 		onAddDetectedAsset = () => {},
 		onRemoveTransit = () => {},
@@ -24,6 +30,29 @@
 		onFinalizeTrack = () => {},
 		onCancelTrackEdit = () => {}
 	} = $props();
+
+	let selectedSector = $derived(
+		(cragEditorState.crag.sectors || []).find((sector) => sector.id === selectedSectorId)
+	);
+
+	function ensureSectorCollections(sector) {
+		if (!sector.type) sector.type = [];
+		if (!sector.tags) sector.tags = [];
+		if (!sector.topo) sector.topo = { site: '', link: '' };
+		if (!sector.assets) sector.assets = { topos: [], images: [], models: [] };
+		if (!sector.assets.topos) sector.assets.topos = [];
+		if (!sector.assets.images) sector.assets.images = [];
+		if (!sector.assets.models) sector.assets.models = [];
+	}
+
+	function parseAssetList(value) {
+		return value.split(',').map((item) => item.trim()).filter(Boolean);
+	}
+
+	function updateSelectedSectorId(sector, value) {
+		sector.id = value;
+		selectedSectorId = value;
+	}
 </script>
 
 <div class="fixed top-14 right-2 z-50 flex flex-col w-80 max-h-[calc(100vh-4rem)]">
@@ -44,6 +73,11 @@
 				class="flex-1 px-2 py-1.5 rounded-sm text-ui-label transition-none {activeTab === 'registry' ? 'bg-white shadow-sm text-near-black' : 'text-warm-gray-500 hover:bg-black/5'}"
 				onclick={() => activeTab = 'registry'}><i class="fa-solid fa-layer-group mr-1.5"></i> Registry <span
 				class="ml-1 text-micro-data {activeTab === 'registry' ? 'text-warm-gray-400' : 'text-warm-gray-400'}">{cragEditorState.transit.length + cragEditorState.parking.length + cragEditorState.tracks.length}</span>
+			</button>
+			<button
+				class="flex-1 px-2 py-1.5 rounded-sm text-ui-label transition-none {activeTab === 'sectors' ? 'bg-white shadow-sm text-near-black' : 'text-warm-gray-500 hover:bg-black/5'}"
+				onclick={() => activeTab = 'sectors'}><i class="fa-solid fa-table-cells-large mr-1.5"></i> Sectors <span
+				class="ml-1 text-micro-data text-warm-gray-400">{cragEditorState.crag.sectors?.length || 0}</span>
 			</button>
 		</div>
 
@@ -126,6 +160,187 @@
 							bind:value={cragEditorState.crag.description_en} rows="2"
 							class="input-studio w-full resize-none"></textarea></div>
 					</div>
+				</div>
+			{:else if activeTab === 'sectors'}
+				<div class="flex flex-col gap-3">
+					<div class="flex items-center justify-between">
+						<div>
+							<h3 class="text-ui-label text-near-black !m-0">Sectors</h3>
+							<p class="text-micro-data text-warm-gray-400">Optional wall sections inside this crag</p>
+						</div>
+						<button onclick={onAddSector}
+										class="w-7 h-7 rounded-sm bg-creator-blue text-white flex items-center justify-center hover:bg-creator-blue-active transition-none"
+										title="Add sector">
+							<i class="fa-solid fa-plus text-[10px]"></i>
+						</button>
+					</div>
+
+					{#if !cragEditorState.crag.sectors || cragEditorState.crag.sectors.length === 0}
+						<div class="bg-warm-white rounded-sm p-6 text-center border border-black/15">
+							<i class="fa-solid fa-table-cells-large text-2xl text-warm-gray-300 mb-2 block"></i>
+							<p class="text-ui-label text-warm-gray-500">No Sectors</p>
+						</div>
+					{/if}
+
+					<div class="space-y-1">
+						{#each cragEditorState.crag.sectors || [] as sector, i}
+							{@const isSelected = selectedSectorId === sector.id}
+							<div
+								class="w-full panel-inner p-2 text-left border-black/10 hover:border-creator-blue transition-none cursor-pointer {isSelected ? 'border-creator-blue bg-creator-blue/5' : ''}"
+								role="button"
+								tabindex="0"
+								onclick={() => { selectedSectorId = sector.id; ensureSectorCollections(sector); onFocusSector(sector); }}
+								onkeydown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										selectedSectorId = sector.id;
+										ensureSectorCollections(sector);
+										onFocusSector(sector);
+									}
+								}}
+							>
+								<div class="flex items-center justify-between gap-2">
+									<div class="min-w-0">
+										<div class="text-body-text font-bold truncate">{sector.name || sector.id || 'Unnamed Sector'}</div>
+										<div class="text-micro-data text-warm-gray-400 truncate">{sector.id || 'missing-id'}</div>
+									</div>
+									<div class="flex items-center gap-1">
+										<button
+											class="w-6 h-6 rounded-sm text-warm-gray-400 hover:bg-black/5 hover:text-near-black transition-none"
+											title="Move up"
+											onclick={(e) => { e.stopPropagation(); onMoveSector(sector.id, -1); }}
+											disabled={i === 0}
+										><i class="fa-solid fa-arrow-up text-[10px]"></i></button>
+										<button
+											class="w-6 h-6 rounded-sm text-warm-gray-400 hover:bg-black/5 hover:text-near-black transition-none"
+											title="Move down"
+											onclick={(e) => { e.stopPropagation(); onMoveSector(sector.id, 1); }}
+											disabled={i === (cragEditorState.crag.sectors || []).length - 1}
+										><i class="fa-solid fa-arrow-down text-[10px]"></i></button>
+									</div>
+								</div>
+							</div>
+						{/each}
+					</div>
+
+					{#if selectedSector}
+						{@const sector = selectedSector}
+						{@const _normalizedSector = ensureSectorCollections(sector)}
+						<div class="space-y-3 pt-3 border-t border-black/15">
+							<div class="flex items-center justify-between">
+								<h3 class="text-ui-label text-near-black !m-0">Selected Sector</h3>
+								<div class="flex items-center gap-1">
+									<button onclick={() => onDuplicateSector(sector.id)}
+													class="w-7 h-7 rounded-sm text-warm-gray-400 hover:bg-black/5 hover:text-near-black transition-none"
+													title="Duplicate sector">
+										<i class="fa-solid fa-copy text-[10px]"></i>
+									</button>
+									<button onclick={() => onRemoveSector(sector.id)}
+													class="w-7 h-7 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600 transition-none"
+													title="Delete sector">
+										<i class="fa-solid fa-trash-can text-[10px]"></i>
+									</button>
+								</div>
+							</div>
+
+							<div class="grid grid-cols-2 gap-2">
+								<div class="space-y-0.5">
+									<label class="text-ui-label block">Name</label>
+									<input type="text" bind:value={sector.name} class="input-studio w-full" placeholder="Sector name" />
+								</div>
+								<div class="space-y-0.5">
+									<label class="text-ui-label block">ID</label>
+									<input
+										type="text"
+										value={sector.id}
+										oninput={(e) => updateSelectedSectorId(sector, e.currentTarget.value)}
+										class="input-studio w-full font-mono"
+										placeholder="sector-id"
+									/>
+								</div>
+							</div>
+
+							<div class="grid grid-cols-2 gap-2">
+								<div class="space-y-0.5">
+									<label class="text-ui-label block">Security</label>
+									<select bind:value={sector.security} class="input-studio w-full appearance-none">
+										<option value="">Crag default</option>
+										{#each securityOptions as opt}
+											<option value={opt}>{opt}</option>
+										{/each}
+									</select>
+								</div>
+								<div class="space-y-0.5">
+									<label class="text-ui-label block">Rock Type</label>
+									<select bind:value={sector.rock_type} class="input-studio w-full appearance-none">
+										<option value="">Crag default</option>
+										{#each rockTypes as opt}
+											<option value={opt}>{opt}</option>
+										{/each}
+									</select>
+								</div>
+							</div>
+
+							<div class="space-y-0.5">
+								<label class="text-ui-label block">Sector Type</label>
+								<TagSelector bind:selectedTags={sector.type} availableTags={cragTypes} />
+							</div>
+							<div class="space-y-0.5">
+								<label class="text-ui-label block">Tags</label>
+								<TagSelector bind:selectedTags={sector.tags} availableTags={availableTags} />
+							</div>
+
+							<div class="space-y-0.5 pt-2 border-t border-black/15">
+								<label class="text-ui-label block">Description (DE)</label>
+								<textarea bind:value={sector.description_de} rows="2" class="input-studio w-full resize-none"></textarea>
+							</div>
+							<div class="space-y-0.5">
+								<label class="text-ui-label block">Description (EN)</label>
+								<textarea bind:value={sector.description_en} rows="2" class="input-studio w-full resize-none"></textarea>
+							</div>
+							<div class="space-y-0.5">
+								<label class="text-ui-label block">Approach (DE)</label>
+								<textarea bind:value={sector.approach_de} rows="2" class="input-studio w-full resize-none"></textarea>
+							</div>
+							<div class="space-y-0.5">
+								<label class="text-ui-label block">Approach (EN)</label>
+								<textarea bind:value={sector.approach_en} rows="2" class="input-studio w-full resize-none"></textarea>
+							</div>
+
+							<div class="grid grid-cols-2 gap-2 pt-2 border-t border-black/15">
+								<div class="space-y-0.5">
+									<label class="text-ui-label block">Topo Site</label>
+									<input type="text" bind:value={sector.topo.site} class="input-studio w-full" />
+								</div>
+								<div class="space-y-0.5">
+									<label class="text-ui-label block">Topo Link</label>
+									<input type="url" bind:value={sector.topo.link} class="input-studio w-full" />
+								</div>
+							</div>
+
+							<div class="space-y-0.5">
+								<label class="text-ui-label block">Topo Assets</label>
+								<input
+									type="text"
+									value={sector.assets.topos.join(', ')}
+									oninput={(e) => sector.assets.topos = parseAssetList(e.currentTarget.value)}
+									class="input-studio w-full font-mono"
+									placeholder="sector-topo.json"
+								/>
+							</div>
+
+							<div class="flex items-center justify-between bg-white rounded-sm border border-black/15 p-2">
+								<span class="text-ui-label text-warm-gray-500 !m-0">Position</span>
+								{#if sector.geometry?.coordinates}
+									<span class="font-mono text-micro-data text-creator-blue font-bold">
+										{sector.geometry.coordinates[1].toFixed(5)}, {sector.geometry.coordinates[0].toFixed(5)}
+									</span>
+								{:else}
+									<span class="text-micro-data text-warm-gray-400">Crag default</span>
+								{/if}
+							</div>
+						</div>
+					{/if}
 				</div>
 			{:else}
 				<div class="flex flex-col gap-2">

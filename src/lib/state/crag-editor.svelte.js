@@ -10,6 +10,7 @@ export const cragEditorState = $state({
 		description_de: '',
 		description_en: '',
 		equipment: [], // List of { name, amount, sizes }
+		sectors: [], // List of sector objects: { id, name, geometry, type, tags, descriptions, topo, assets }
 		topo: {
 			site: '',
 			link: ''
@@ -39,6 +40,7 @@ export const cragEditorState = $state({
 			description_de: '',
 			description_en: '',
 			equipment: [],
+			sectors: [],
 			topo: { site: '', link: '' },
 			geometry: { type: 'Point', coordinates: [16.37, 48.21] },
 			date: today,
