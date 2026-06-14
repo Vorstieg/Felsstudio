@@ -15,6 +15,7 @@
 	let error = $state(null);
 	let loadMode = $state('entry'); 
 	let searchQuery = $state('');
+	let expandedCragPath = $state(null);
 
 	// Files state
 	let glbFile = $state(null);
@@ -56,17 +57,38 @@
             if (workspace === 'topos/2d/new') requirementMet = hasGlb;
             else if (workspace.includes('/edit') && workspace !== 'crags/edit') requirementMet = hasTopo;
             
-			return requirementMet && (searchQuery === '' || l.properties.name.toLowerCase().includes(searchQuery.toLowerCase()) || l.properties.path.toLowerCase().includes(searchQuery.toLowerCase()));
+			const query = searchQuery.toLowerCase();
+			const sectorMatch = (l.properties.sectors || []).some((sector) =>
+				(sector.name || '').toLowerCase().includes(query) ||
+				(sector.id || '').toLowerCase().includes(query) ||
+				(sector.type || []).includes(searchQuery)
+			);
+			return requirementMet && (
+				searchQuery === '' ||
+				l.properties.name.toLowerCase().includes(query) ||
+				l.properties.path.toLowerCase().includes(query) ||
+				sectorMatch
+			);
 		})
 	);
 
-	async function loadFromEntry(crag) {
+	function isTopoWorkspace() {
+		return workspace.startsWith('topos/');
+	}
+
+	function getSectorTopoPath(path, sector) {
+		const topoAsset = sector?.assets?.topos?.[0];
+		if (!topoAsset) return null;
+		return `/src/entries/${path}/${topoAsset}`;
+	}
+
+	async function loadFromEntry(crag, sector = null) {
 		isLoading = true; error = null; userState.reset();
 		try {
 			const path = crag.properties.path;
 			const name = path.split('/').at(-1);
 			const jsonFiles = import.meta.glob('/src/entries/**/*.json');
-			const topoPath = `/src/entries/${path}/${name}-topo.json`;
+			const topoPath = getSectorTopoPath(path, sector) || `/src/entries/${path}/${name}-topo.json`;
 			const cragPath = `/src/entries/${path}/${name}.json`;
             
             if (workspace.startsWith('crags/')) {
@@ -280,19 +302,39 @@
                             <span class="text-micro-data font-bold text-near-black uppercase tracking-widest">{$_('ui.initializing')}</span>
                         </div>
                     </div>
-                {/if}
+				{/if}
 				{#each filteredLocations as crag}
-					<button 
-                        class="w-full p-2.5 text-left bg-white border border-transparent hover:border-black/15 hover:bg-black/5 rounded transition-none group flex items-center justify-between disabled:opacity-50" 
-                        onclick={() => loadFromEntry(crag)}
-                        disabled={isLoading}
-                    >
-						<div>
-							<div class="text-body-text font-bold group-hover:text-creator-blue transition-none">{crag.properties.name}</div>
-							<div class="text-micro-data text-warm-gray-400">{crag.properties.path}</div>
-						</div>
-						<i class="fa-solid fa-chevron-right text-warm-gray-300 text-[10px] group-hover:text-creator-blue transition-none"></i>
-					</button>
+					{@const sectors = crag.properties.sectors || []}
+					{@const showSectorChoices = isTopoWorkspace() && sectors.length > 0}
+					<div class="bg-white rounded border border-transparent hover:border-black/15 transition-none">
+						<button
+							class="w-full p-2.5 text-left hover:bg-black/5 rounded transition-none group flex items-center justify-between disabled:opacity-50"
+							onclick={() => showSectorChoices
+								? (expandedCragPath = expandedCragPath === crag.properties.path ? null : crag.properties.path)
+								: loadFromEntry(crag)}
+							disabled={isLoading}
+						>
+							<div>
+								<div class="text-body-text font-bold group-hover:text-creator-blue transition-none">{crag.properties.name}</div>
+								<div class="text-micro-data text-warm-gray-400">{crag.properties.path}</div>
+							</div>
+							<i class="fa-solid {showSectorChoices && expandedCragPath === crag.properties.path ? 'fa-chevron-down' : 'fa-chevron-right'} text-warm-gray-300 text-[10px] group-hover:text-creator-blue transition-none"></i>
+						</button>
+						{#if showSectorChoices && expandedCragPath === crag.properties.path}
+							<div class="border-t border-black/10 p-1.5 space-y-1 bg-warm-white/70">
+								{#each sectors as sector}
+									<button
+										class="w-full px-2 py-1.5 rounded-sm text-left text-body-text bg-white border border-black/10 hover:border-creator-blue hover:text-creator-blue transition-none disabled:opacity-50"
+										onclick={() => loadFromEntry(crag, sector)}
+										disabled={isLoading}
+									>
+										<span class="font-bold">{sector.name || sector.id}</span>
+										<span class="block text-micro-data text-warm-gray-400">{sector.assets?.topos?.[0] || 'No topo asset'}</span>
+									</button>
+								{/each}
+							</div>
+						{/if}
+					</div>
 				{:else}
 					<div class="text-center py-6 text-body-text text-warm-gray-500">{$_('ui.no_entries_found')}</div>
 				{/each}

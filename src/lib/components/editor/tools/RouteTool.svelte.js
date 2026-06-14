@@ -1,8 +1,9 @@
 import { userState } from '$lib/state/editor.svelte.js';
-import { generateRouteId } from '$lib/assets/js/id-utils.js';
+import { generateId, generateRouteId } from '$lib/assets/js/id-utils.js';
 
 export class RouteTool {
 	id = 'route';
+	mode = 'route';
 	currentPoints = $state([]);
 	drawingTarget = $state(null);
 
@@ -13,13 +14,25 @@ export class RouteTool {
 	onMouseDown(event, point) {
 		event.stopPropagation();
 
-		// If we have a drawing target (e.g. a specific pitch), we append to it
+		// If we have a drawing target (e.g. a specific pitch or variant), we append to it
 		if (this.drawingTarget && this.drawingTarget.type === 'pitch') {
 			const route = userState.topo.routes.find((r) => r.id === this.drawingTarget.routeId);
 			if (route && route.pitches) {
 				const pitch = route.pitches.find((p) => p.id === this.drawingTarget.pitchId);
 				if (pitch) {
 					pitch.points2D = [...(pitch.points2D || []), [point.x, point.y]];
+					this.saveHistory();
+					return;
+				}
+			}
+		}
+
+		if (this.drawingTarget && this.drawingTarget.type === 'variant') {
+			const route = userState.topo.routes.find((r) => r.id === this.drawingTarget.routeId);
+			if (route && route.variants) {
+				const variant = route.variants.find((v) => v.id === this.drawingTarget.variantId);
+				if (variant) {
+					variant.points2D = [...(variant.points2D || []), [point.x, point.y]];
 					this.saveHistory();
 					return;
 				}
@@ -76,16 +89,69 @@ export class RouteTool {
 			return;
 		}
 
+		const points2D = $state.snapshot(this.currentPoints);
+
+		if (this.mode === 'multipitch' && this.drawingTarget?.type === 'newPitch') {
+			const route = userState.topo.routes.find((r) => r.id === this.drawingTarget.routeId);
+			if (!route || route.type !== 'multi-pitch') return;
+			if (!route.pitches) route.pitches = [];
+			route.pitches = [
+				...route.pitches,
+				{
+					id: generateId('pitch'),
+					pitchNumber: route.pitches.length + 1,
+					points2D,
+					points: [],
+					grade: '',
+					length: 0,
+					lineStyle: '',
+					type: 'pitch'
+				}
+			];
+			userState.ui.selectedRouteId = route.id;
+			this.currentPoints = [];
+			this.saveHistory();
+			return;
+		}
+
 		const routeId = generateRouteId();
-		userState.topo.routes.push({
-			id: routeId,
-			points2D: $state.snapshot(this.currentPoints),
-			points: [],
-			tags: [],
-			name: `Route ${userState.topo.routes.length + 1}`,
-			grade: '5a',
-			type: 'sports-climbing'
-		});
+
+		if (this.mode === 'multipitch') {
+			userState.topo.routes.push({
+				id: routeId,
+				points: [],
+				tags: [],
+				fixPoints: [],
+				name: `Route ${userState.topo.routes.length + 1}`,
+				type: 'multi-pitch',
+				lineStyle: 'red',
+				_gradeScale: 'french',
+				pitches: [
+					{
+						id: generateId('pitch'),
+						pitchNumber: 1,
+						points2D,
+						points: [],
+						grade: '5a',
+						length: 0,
+						lineStyle: '',
+						type: 'pitch'
+					}
+				]
+			});
+		} else {
+			userState.topo.routes.push({
+				id: routeId,
+				points2D,
+				points: [],
+				tags: [],
+				name: `Route ${userState.topo.routes.length + 1}`,
+				grade: '5a',
+				lineStyle: 'red',
+				type: 'sports-climbing'
+			});
+		}
+		userState.ui.selectedRouteId = routeId;
 
 		this.currentPoints = [];
 		this.saveHistory();

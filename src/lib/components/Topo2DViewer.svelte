@@ -5,6 +5,7 @@
 	import { select } from 'd3-selection';
 	import { getHitAreaSize } from '$lib/assets/js/mobile-utils.js';
 	import { topoSymbols } from '$lib/assets/js/topo-utils.js';
+	import { getOutlinePoints, pointsToSvg } from '$lib/assets/js/outline-geometry.js';
 
 	let {
 		topo,
@@ -135,7 +136,7 @@
 				(exit) => exit.remove()
 			)
 			.attr('points', (d) =>
-				d.points2D.map((p) => `${p[0] * baseWidth},${p[1] * baseHeight}`).join(' ')
+				pointsToSvg(getOutlinePoints(d, { baseWidth, baseHeight }), { baseWidth, baseHeight })
 			);
 
 		// 2. Routes
@@ -260,8 +261,12 @@
 		});
 		if (topo.outlines) {
 			topo.outlines.forEach((o) => {
-				if (o.points2D) {
-					o.points2D.forEach((p) => {
+				const points = getOutlinePoints(o, { baseWidth, baseHeight });
+				o.lineStyle;
+				o.shape?.type;
+				o.shape?.radius2D;
+				if (points) {
+					points.forEach((p) => {
 						p[0];
 						p[1];
 					});

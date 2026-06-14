@@ -9,8 +9,17 @@
 	import { EraserTool } from './tools/EraserTool.svelte.js';
 	import { OutlineTool } from './tools/OutlineTool.svelte.js';
 	import { SelectTool } from './tools/SelectTool.svelte.js';
+	import { TextTool } from './tools/TextTool.svelte.js';
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
 	import { topoSymbols } from '$lib/assets/js/topo-utils.js';
+	import {
+		getOutlinePoints,
+		insertOutlinePoint,
+		pointsToSvg,
+		removeOutlinePoint,
+		setOutlinePoint,
+		translateOutline
+	} from '$lib/assets/js/outline-geometry.js';
 	import {
 		getTouchTargetSize,
 		getHitAreaSize,
@@ -22,20 +31,26 @@
 	let {
 		activeTool = $bindable(null),
 		selectedSymbol = 'bolt',
-		drawingTarget = null,
+		selectedOutlineStyle = 'rock',
+		drawingTarget = $bindable(null),
 		hasPendingChanges = $bindable(false)
 	} = $props();
 
 	let svgElement = $state(null);
 	let gElement = $state(null);
 
-	// Pass saveHistory callback to all tools
-	const toolConfig = { saveHistory };
+	// Pass editor callbacks to all tools
+	const toolConfig = {
+		saveHistory,
+		beginTextEdit,
+		getCanvasSize: () => ({ baseWidth, baseHeight })
+	};
 	const tools = {
 		route: new RouteTool(toolConfig),
 		multipitch: null,
 		symbol: new SymbolTool(toolConfig),
 		fixpoint: null,
+		text: new TextTool(toolConfig),
 		eraser: new EraserTool(toolConfig),
 		outline: new OutlineTool(toolConfig),
 		select: new SelectTool(toolConfig)
@@ -52,6 +67,7 @@
 	// Synchronize drawingTarget to the tool
 	$effect(() => {
 		if (currentTool instanceof RouteTool) {
+			currentTool.mode = activeTool === 'multipitch' ? 'multipitch' : 'route';
 			currentTool.drawingTarget = drawingTarget;
 		}
 	});
@@ -60,6 +76,9 @@
 	$effect(() => {
 		if (tools.symbol) {
 			tools.symbol.selectedType = selectedSymbol;
+		}
+		if (tools.outline) {
+			tools.outline.selectedStyle = selectedOutlineStyle;
 		}
 	});
 
@@ -73,11 +92,13 @@
 		if (
 			currentTool instanceof RouteTool ||
 			currentTool instanceof OutlineTool ||
-			currentTool instanceof SymbolTool
+			currentTool instanceof SymbolTool ||
+			currentTool instanceof TextTool
 		) {
 			userState.ui.selectedFixpointId = null;
 			userState.ui.selectedRouteId = null;
 			userState.ui.selectedOutlineId = null;
+			userState.ui.selectedTextLabelId = null;
 			selectedSymbolInstance = null;
 			selectedItems.clear();
 		}
@@ -91,7 +112,7 @@
 		currentTool instanceof RouteTool ? currentTool.currentPoints : []
 	);
 	let currentOutlinePoints = $derived(
-		currentTool instanceof OutlineTool ? currentTool.currentPoints : []
+		currentTool instanceof OutlineTool ? currentTool.getPreviewPoints() : []
 	);
 
 	$effect(() => {
@@ -107,7 +128,12 @@
 	let rotatingSymbol = $state(null); // { id, startAngle, startRotation }
 	let scalingSymbol = $state(null); // { id, startDist, startScale }
 	let draggingLabel = $state(null); // { routeId, pitchId }
+	let draggingTextLabel = $state(null); // { id, startPos, startMouse }
 	let draggingSelection = $state(null); // { items: { routes: [], outlines: [], symbols: [] }, startMouse }
+	let editingTextLabelId = $state(null);
+	let editingTextValue = $state('');
+	let editingTextOriginalValue = $state('');
+	let editingTextNeedsFocus = false;
 	let baseWidth = $state(1000);
 	let baseHeight = $state(667);
 	let zoomBehavior = null;
@@ -134,7 +160,8 @@
 			JSON.stringify({
 				routes: userState.topo.routes,
 				fixPoints: userState.topo.fixPoints,
-				outlines: userState.topo.outlines
+				outlines: userState.topo.outlines,
+				textLabels: userState.topo.textLabels || []
 			})
 		);
 
@@ -157,6 +184,7 @@
 			userState.topo.routes = JSON.parse(JSON.stringify(state.routes));
 			userState.topo.fixPoints = JSON.parse(JSON.stringify(state.fixPoints));
 			userState.topo.outlines = JSON.parse(JSON.stringify(state.outlines));
+			userState.topo.textLabels = JSON.parse(JSON.stringify(state.textLabels || []));
 		}
 	}
 
@@ -167,6 +195,7 @@
 			userState.topo.routes = JSON.parse(JSON.stringify(state.routes));
 			userState.topo.fixPoints = JSON.parse(JSON.stringify(state.fixPoints));
 			userState.topo.outlines = JSON.parse(JSON.stringify(state.outlines));
+			userState.topo.textLabels = JSON.parse(JSON.stringify(state.textLabels || []));
 		}
 	}
 
@@ -284,6 +313,42 @@
 			x: transformedX / baseWidth,
 			y: transformedY / baseHeight
 		};
+	}
+
+	function getRouteLineStyle(styleId = 'red') {
+		const styles = {
+			red: { stroke: '#dc2626', width: 4, dash: null },
+			redDashed: { stroke: '#dc2626', width: 4, dash: '18 12' },
+			variant: { stroke: '#8f8a84', width: 3, dash: '8 8' }
+		};
+		return styles[styleId] || styles.red;
+	}
+
+	function getOutlineLineStyle(styleId = 'rock') {
+		const styles = {
+			rock: { stroke: '#d97706', width: 3, dash: '5,5' },
+			approach: { stroke: '#eab308', width: 4, dash: null },
+			descent: { stroke: '#6b7280', width: 3, dash: '10 10' },
+			variant: { stroke: '#8f8a84', width: 3, dash: '8 8' },
+			fixedRope: { stroke: '#1d70b8', width: 5, dash: null }
+		};
+		return styles[styleId] || styles.rock;
+	}
+
+	function formatPitchLabel(pitch, pitchIndex) {
+		const number = pitch.pitchNumber || pitchIndex + 1;
+		const length = Number(pitch.length) > 0 ? `${pitch.length}m` : '';
+		const grade = pitch.grade || '';
+		const details = [length, grade].filter(Boolean).join(' / ');
+		return details ? `${number}.SL / ${details}` : `${number}.SL`;
+	}
+
+	function formatVariantLabel(variant, variantIndex) {
+		const name = variant.name || `Variant ${variantIndex + 1}`;
+		const length = Number(variant.length) > 0 ? `${variant.length}m` : '';
+		const grade = variant.grade || '';
+		const details = [length, grade].filter(Boolean).join(' / ');
+		return details ? `${name} / ${details}` : name;
 	}
 
 	// Touch event helpers
@@ -414,6 +479,12 @@
 		// Only handle left click for drawing/selection
 		if (event.button !== 0 && !event.touches) return;
 
+		if (editingTextLabelId) {
+			commitTextEdit();
+			event.stopPropagation?.();
+			return;
+		}
+
 		const point = getSVGPoint(event);
 		if (!point) return;
 
@@ -422,12 +493,24 @@
 			clearSelection();
 		}
 
+		const textLabelIdsBefore =
+			activeTool === 'text'
+				? new Set((userState.topo.textLabels || []).map((label) => label.id))
+				: null;
+
 		// Delegate to tool - this handles placing points, etc.
 		currentTool.onMouseDown(event, point);
+
+		if (activeTool === 'text' && textLabelIdsBefore) {
+			const createdLabel = (userState.topo.textLabels || []).find(
+				(label) => !textLabelIdsBefore.has(label.id)
+			);
+			if (createdLabel) beginTextEdit(createdLabel.id);
+		}
 	}
 
 	// Forward dragging events if tools support it (optional future step)
-	function handlePointMouseDown(event, { routeId, pitchId, outlineId, pointIndex }) {
+	function handlePointMouseDown(event, { routeId, pitchId, variantId, outlineId, pointIndex }) {
 		// Only allow point manipulation in selection mode (null tool) or eraser mode
 		if (activeTool !== null && activeTool !== 'eraser') return;
 
@@ -444,6 +527,12 @@
 							pitch.points2D = pitch.points2D.filter((_, i) => i !== pointIndex);
 							return;
 						}
+					} else if (variantId && route.variants) {
+						const variant = route.variants.find((v) => v.id === variantId);
+						if (variant && variant.points2D.length > 2) {
+							variant.points2D = variant.points2D.filter((_, i) => i !== pointIndex);
+							return;
+						}
 					} else if (route.points2D.length > 2) {
 						route.points2D = route.points2D.filter((_, i) => i !== pointIndex);
 						return;
@@ -451,18 +540,18 @@
 				}
 			} else if (outlineId) {
 				const outline = userState.topo.outlines.find((o) => o.id === outlineId);
-				if (outline && outline.points2D.length > 2) {
-					outline.points2D = outline.points2D.filter((_, i) => i !== pointIndex);
+				if (outline && getOutlinePoints(outline, { baseWidth, baseHeight }).length > 2) {
+					removeOutlinePoint(outline, pointIndex, { baseWidth, baseHeight });
 					return;
 				}
 			}
 		}
 
 		// Set dragging state
-		draggingPoint = { routeId, pitchId, outlineId, pointIndex };
+		draggingPoint = { routeId, pitchId, variantId, outlineId, pointIndex };
 	}
 
-	function handleMidpointClick(event, { routeId, pitchId, outlineId, insertIndex, point }) {
+	function handleMidpointClick(event, { routeId, pitchId, variantId, outlineId, insertIndex, point }) {
 		event?.stopPropagation?.();
 		if (routeId) {
 			const route = userState.topo.routes.find((r) => r.id === routeId);
@@ -474,6 +563,13 @@
 						newPoints.splice(insertIndex, 0, [point.x, point.y]);
 						pitch.points2D = newPoints;
 					}
+				} else if (variantId && route.variants) {
+					const variant = route.variants.find((v) => v.id === variantId);
+					if (variant) {
+						const newPoints = [...variant.points2D];
+						newPoints.splice(insertIndex, 0, [point.x, point.y]);
+						variant.points2D = newPoints;
+					}
 				} else if (route.points2D) {
 					const newPoints = [...route.points2D];
 					newPoints.splice(insertIndex, 0, [point.x, point.y]);
@@ -483,13 +579,11 @@
 		} else if (outlineId) {
 			const outline = userState.topo.outlines.find((o) => o.id === outlineId);
 			if (outline) {
-				const newPoints = [...outline.points2D];
-				newPoints.splice(insertIndex, 0, [point.x, point.y]);
-				outline.points2D = newPoints;
+				insertOutlinePoint(outline, insertIndex, [point.x, point.y], { baseWidth, baseHeight });
 			}
 		}
 		// Set dragging state to allow immediate dragging after click
-		draggingPoint = { routeId, pitchId, outlineId, pointIndex: insertIndex };
+		draggingPoint = { routeId, pitchId, variantId, outlineId, pointIndex: insertIndex };
 		saveHistory();
 	}
 
@@ -505,13 +599,18 @@
 			const deltaY = mouse.y - draggingSelection.startMouse.y;
 
 			// Move routes
-			draggingSelection.items.routes.forEach(({ routeId, pitchId, startPoints }) => {
+			draggingSelection.items.routes.forEach(({ routeId, pitchId, variantId, startPoints }) => {
 				const route = userState.topo.routes.find((r) => r.id === routeId);
 				if (route) {
 					if (pitchId && route.pitches) {
 						const pitch = route.pitches.find((p) => p.id === pitchId);
 						if (pitch && pitch.points2D) {
 							pitch.points2D = startPoints.map((p) => [p[0] + deltaX, p[1] + deltaY]);
+						}
+					} else if (variantId && route.variants) {
+						const variant = route.variants.find((v) => v.id === variantId);
+						if (variant && variant.points2D) {
+							variant.points2D = startPoints.map((p) => [p[0] + deltaX, p[1] + deltaY]);
 						}
 					} else if (route.points2D) {
 						route.points2D = startPoints.map((p) => [p[0] + deltaX, p[1] + deltaY]);
@@ -520,10 +619,12 @@
 			});
 
 			// Move outlines
-			draggingSelection.items.outlines.forEach(({ outlineId, startPoints }) => {
+			draggingSelection.items.outlines.forEach(({ outlineId, startOutline }) => {
 				const outline = userState.topo.outlines.find((o) => o.id === outlineId);
-				if (outline && outline.points2D) {
-					outline.points2D = startPoints.map((p) => [p[0] + deltaX, p[1] + deltaY]);
+				if (outline) {
+					const movedOutline = JSON.parse(JSON.stringify(startOutline));
+					translateOutline(movedOutline, deltaX, deltaY, { baseWidth, baseHeight });
+					Object.assign(outline, movedOutline);
 				}
 			});
 
@@ -532,6 +633,14 @@
 				const symbol = userState.topo.fixPoints.find((s) => s.id === symbolId);
 				if (symbol) {
 					symbol.position2D = [startPos[0] + deltaX, startPos[1] + deltaY];
+				}
+			});
+
+			// Move text labels
+			draggingSelection.items.texts.forEach(({ textId, startPos }) => {
+				const label = userState.topo.textLabels?.find((t) => t.id === textId);
+				if (label) {
+					label.position2D = [startPos[0] + deltaX, startPos[1] + deltaY];
 				}
 			});
 		} else if (draggingPoint) {
@@ -545,6 +654,13 @@
 							newPoints[draggingPoint.pointIndex] = [mouse.x, mouse.y];
 							pitch.points2D = newPoints;
 						}
+					} else if (draggingPoint.variantId && route.variants) {
+						const variant = route.variants.find((v) => v.id === draggingPoint.variantId);
+						if (variant) {
+							const newPoints = [...variant.points2D];
+							newPoints[draggingPoint.pointIndex] = [mouse.x, mouse.y];
+							variant.points2D = newPoints;
+						}
 					} else if (route.points2D) {
 						const newPoints = [...route.points2D];
 						newPoints[draggingPoint.pointIndex] = [mouse.x, mouse.y];
@@ -554,9 +670,10 @@
 			} else if (draggingPoint.outlineId) {
 				const outline = userState.topo.outlines.find((o) => o.id === draggingPoint.outlineId);
 				if (outline) {
-					const newPoints = [...outline.points2D];
-					newPoints[draggingPoint.pointIndex] = [mouse.x, mouse.y];
-					outline.points2D = newPoints;
+					setOutlinePoint(outline, draggingPoint.pointIndex, [mouse.x, mouse.y], {
+						baseWidth,
+						baseHeight
+					});
 				}
 			}
 		} else if (rotatingSymbol) {
@@ -581,12 +698,22 @@
 			if (route) {
 				const target = draggingLabel.pitchId
 					? route.pitches.find((p) => p.id === draggingLabel.pitchId)
-					: route;
+					: draggingLabel.variantId
+						? route.variants?.find((v) => v.id === draggingLabel.variantId)
+						: route;
 				if (target && target.points2D?.length > 0) {
 					const basePoint = target.points2D[0];
 					if (!target.labelOffset2D) target.labelOffset2D = [0, 0.05];
 					target.labelOffset2D = [mouse.x - basePoint[0], mouse.y - basePoint[1]];
 				}
+			}
+		} else if (draggingTextLabel) {
+			const label = userState.topo.textLabels?.find((t) => t.id === draggingTextLabel.id);
+			if (label) {
+				label.position2D = [
+					draggingTextLabel.startPos[0] + mouse.x - draggingTextLabel.startMouse.x,
+					draggingTextLabel.startPos[1] + mouse.y - draggingTextLabel.startMouse.y
+				];
 			}
 		}
 	}
@@ -595,7 +722,14 @@
 		const point = getSVGPoint(event);
 		if (point) currentTool.onMouseUp(event, point);
 
-		if (draggingPoint || rotatingSymbol || scalingSymbol || draggingLabel || draggingSelection) {
+		if (
+			draggingPoint ||
+			rotatingSymbol ||
+			scalingSymbol ||
+			draggingLabel ||
+			draggingTextLabel ||
+			draggingSelection
+		) {
 			saveHistory();
 		}
 		draggingPoint = null;
@@ -603,6 +737,7 @@
 		scalingSymbol = null;
 
 		draggingLabel = null;
+		draggingTextLabel = null;
 		draggingSelection = null;
 	}
 
@@ -616,6 +751,7 @@
 			userState.ui.selectedRouteId = null;
 			userState.ui.selectedFixpointId = null;
 			userState.ui.selectedOutlineId = null;
+			userState.ui.selectedTextLabelId = null;
 			selectedSymbolInstance = null;
 		}
 
@@ -631,11 +767,13 @@
 				selectedSymbolInstance = userState.topo.fixPoints.find((s) => s.id === id);
 			} else if (type === 'outline') {
 				userState.ui.selectedOutlineId = id;
+			} else if (type === 'text') {
+				userState.ui.selectedTextLabelId = id;
 			}
 		}
 	}
 
-	function handleObjectMouseDown(event, { type, id, pitchId = null }) {
+	function handleObjectMouseDown(event, { type, id, pitchId = null, variantId = null }) {
 		if (activeTool !== null) return;
 		event?.stopPropagation?.();
 		const mouse = getSVGPoint(event);
@@ -643,6 +781,15 @@
 
 		if (!isSelected(type, id)) {
 			selectObject(type, id, isShiftPressed);
+		}
+		if (type === 'route') {
+			if (pitchId) {
+				drawingTarget = { type: 'pitch', routeId: id, pitchId };
+			} else if (variantId) {
+				drawingTarget = { type: 'variant', routeId: id, variantId };
+			} else {
+				drawingTarget = null;
+			}
 		}
 
 		draggingSelection = collectDraggingSelection(mouse);
@@ -652,8 +799,65 @@
 		userState.ui.selectedFixpointId = null;
 		userState.ui.selectedRouteId = null;
 		userState.ui.selectedOutlineId = null;
+		userState.ui.selectedTextLabelId = null;
 		selectedSymbolInstance = null;
 		selectedItems.clear();
+	}
+
+	function beginTextEdit(id) {
+		const label = userState.topo.textLabels?.find((textLabel) => textLabel.id === id);
+		if (!label) return;
+		selectObject('text', id);
+		editingTextLabelId = id;
+		editingTextValue = label.text || '';
+		editingTextOriginalValue = label.text || '';
+		editingTextNeedsFocus = true;
+	}
+
+	function commitTextEdit() {
+		if (!editingTextLabelId) return;
+		const label = userState.topo.textLabels?.find(
+			(textLabel) => textLabel.id === editingTextLabelId
+		);
+		const nextText = editingTextValue.trim();
+
+		if (label) {
+			if (nextText) {
+				label.text = nextText;
+			} else {
+				userState.topo.textLabels = (userState.topo.textLabels || []).filter(
+					(textLabel) => textLabel.id !== editingTextLabelId
+				);
+				userState.ui.selectedTextLabelId = null;
+				selectedItems.delete(`text:${editingTextLabelId}`);
+			}
+		}
+
+		if (nextText !== editingTextOriginalValue) saveHistory();
+		editingTextLabelId = null;
+		editingTextValue = '';
+		editingTextOriginalValue = '';
+	}
+
+	function cancelTextEdit() {
+		const label = userState.topo.textLabels?.find(
+			(textLabel) => textLabel.id === editingTextLabelId
+		);
+		if (label) label.text = editingTextOriginalValue;
+		editingTextLabelId = null;
+		editingTextValue = '';
+		editingTextOriginalValue = '';
+	}
+
+	function handleTextEditKeyDown(event) {
+		event.stopPropagation();
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			commitTextEdit();
+		} else if (event.key === 'Escape') {
+			event.preventDefault();
+			cancelTextEdit();
+		}
 	}
 
 	function handleObjectClick(event, type, id) {
@@ -667,26 +871,54 @@
 		const routes = [];
 		const outlines = [];
 		const symbols = [];
+		const texts = [];
 
 		selectedItems.forEach((itemKey) => {
 			const [type, id] = itemKey.split(':');
 
 			if (type === 'route') {
 				const r = userState.topo.routes.find((rt) => rt.id === id);
-				if (r && r.points2D) {
-					routes.push({
-						routeId: r.id,
-						pitchId: null,
-						startPoints: JSON.parse(JSON.stringify(r.points2D))
-					});
-					// Also collect pitches if any
+				if (r) {
+					const selectedPitchId =
+						drawingTarget?.type === 'pitch' && drawingTarget.routeId === r.id
+							? drawingTarget.pitchId
+							: null;
+					const selectedVariantId =
+						drawingTarget?.type === 'variant' && drawingTarget.routeId === r.id
+							? drawingTarget.variantId
+							: null;
+
+					if (r.points2D && !selectedPitchId && !selectedVariantId) {
+						routes.push({
+							routeId: r.id,
+							pitchId: null,
+							variantId: null,
+							startPoints: JSON.parse(JSON.stringify(r.points2D))
+						});
+					}
+
 					if (r.pitches) {
 						r.pitches.forEach((p) => {
+							if (selectedPitchId && p.id !== selectedPitchId) return;
 							if (p.points2D) {
 								routes.push({
 									routeId: r.id,
 									pitchId: p.id,
+									variantId: null,
 									startPoints: JSON.parse(JSON.stringify(p.points2D))
+								});
+							}
+						});
+					}
+					if (r.variants) {
+						r.variants.forEach((v) => {
+							if (selectedVariantId && v.id !== selectedVariantId) return;
+							if (v.points2D) {
+								routes.push({
+									routeId: r.id,
+									pitchId: null,
+									variantId: v.id,
+									startPoints: JSON.parse(JSON.stringify(v.points2D))
 								});
 							}
 						});
@@ -697,7 +929,7 @@
 				if (o && o.points2D) {
 					outlines.push({
 						outlineId: o.id,
-						startPoints: JSON.parse(JSON.stringify(o.points2D))
+						startOutline: JSON.parse(JSON.stringify(o))
 					});
 				}
 			} else if (type === 'symbol') {
@@ -708,18 +940,39 @@
 						startPos: [...s.position2D]
 					});
 				}
+			} else if (type === 'text') {
+				const t = userState.topo.textLabels?.find((label) => label.id === id);
+				if (t && t.position2D) {
+					texts.push({
+						textId: t.id,
+						startPos: [...t.position2D]
+					});
+				}
 			}
 		});
 
 		return {
-			items: { routes, outlines, symbols },
+			items: { routes, outlines, symbols, texts },
 			startMouse: mouse
 		};
 	}
 
-	function handleLabelMouseDown(event, { routeId, pitchId }) {
+	function handleTextMouseDown(event, label) {
+		if (activeTool !== null) return;
 		event?.stopPropagation?.();
-		draggingLabel = { routeId, pitchId };
+		const mouse = getSVGPoint(event);
+		if (!mouse || !label.position2D) return;
+		selectObject('text', label.id, isShiftPressed);
+		draggingTextLabel = {
+			id: label.id,
+			startPos: [...label.position2D],
+			startMouse: mouse
+		};
+	}
+
+	function handleLabelMouseDown(event, { routeId, pitchId, variantId }) {
+		event?.stopPropagation?.();
+		draggingLabel = { routeId, pitchId, variantId };
 	}
 
 	function handleRotateGizmoMouseDown(event, symbol) {
@@ -747,8 +1000,87 @@
 
 	// Finalize/Cancel functions delegated to Tools (removed local versions)
 
+	function activatePitchTarget(route, pitch) {
+		userState.ui.selectedRouteId = route.id;
+		userState.ui.selectedFixpointId = null;
+		drawingTarget = { type: 'pitch', routeId: route.id, pitchId: pitch.id };
+		activeTool = 'multipitch';
+	}
+
+	function activateNewPitchTarget(route) {
+		userState.ui.selectedRouteId = route.id;
+		userState.ui.selectedFixpointId = null;
+		drawingTarget = { type: 'newPitch', routeId: route.id };
+		activeTool = 'multipitch';
+	}
+
+	function createNextPitchTarget(route, currentPitchId = null) {
+		if (!route || route.type !== 'multi-pitch') return;
+		if (!route.pitches) route.pitches = [];
+
+		const currentIndex = currentPitchId
+			? route.pitches.findIndex((pitch) => pitch.id === currentPitchId)
+			: route.pitches.length - 1;
+		const currentPitch = currentIndex >= 0 ? route.pitches[currentIndex] : null;
+		if (currentPitch && (currentPitch.points2D?.length || 0) < 2) {
+			activatePitchTarget(route, currentPitch);
+			return;
+		}
+		const nextExistingPitch = route.pitches[currentIndex + 1];
+
+		if (nextExistingPitch) {
+			activatePitchTarget(route, nextExistingPitch);
+			return;
+		}
+
+		activateNewPitchTarget(route);
+	}
+
+	function finishRouteTool() {
+		const mode = activeTool;
+		const targetBeforeFinish = drawingTarget;
+		const selectedRouteBeforeFinish = userState.ui.selectedRouteId;
+		const draftPointCount = currentTool instanceof RouteTool ? currentTool.currentPoints.length : 0;
+
+		currentTool.finalize();
+
+		if (mode === 'route') {
+			drawingTarget = null;
+			clearSelection();
+			return;
+		}
+
+		if (mode !== 'multipitch') return;
+
+		if (targetBeforeFinish?.type === 'variant') {
+			drawingTarget = null;
+			activeTool = null;
+			return;
+		}
+
+		if (!targetBeforeFinish && draftPointCount < 2) return;
+
+		const route =
+			userState.topo.routes.find((r) => r.id === targetBeforeFinish?.routeId) ||
+			userState.topo.routes.find((r) => r.id === userState.ui.selectedRouteId) ||
+			userState.topo.routes.find((r) => r.id === selectedRouteBeforeFinish);
+
+		if (!route || route.type !== 'multi-pitch') return;
+
+		const currentPitchId =
+			targetBeforeFinish?.type === 'pitch'
+				? targetBeforeFinish.pitchId
+				: draftPointCount >= 2
+					? route.pitches?.[route.pitches.length - 1]?.id
+					: null;
+
+		createNextPitchTarget(route, currentPitchId);
+	}
+
 	export function finalize() {
-		if (currentTool && typeof currentTool.finalize === 'function') {
+		if (currentTool instanceof RouteTool) {
+			finishRouteTool();
+		} else if (currentTool && typeof currentTool.finalize === 'function') {
 			currentTool.finalize();
 		} else {
 			currentTool.onKeyDown?.({ key: 'n' });
@@ -761,9 +1093,17 @@
 		} else {
 			currentTool.onKeyDown?.({ key: 'Escape' });
 		}
+		drawingTarget = null;
+		clearSelection();
+	}
+
+	export function getCurrentTool() {
+		return currentTool;
 	}
 
 	function handleKeyDown(event) {
+		if (editingTextLabelId) return;
+
 		// Track shift key for multi-select
 		if (event.key === 'Shift') {
 			isShiftPressed = true;
@@ -779,7 +1119,10 @@
 
 			// Priority 2: If a tool is active, deselect it
 			if (activeTool !== null) {
+				currentTool.cancel?.();
+				drawingTarget = null;
 				activeTool = null;
+				clearSelection();
 				return;
 			}
 
@@ -789,7 +1132,7 @@
 
 		if (event.key === 'Delete' || event.key === 'Backspace') {
 			if (selectedItems.size > 0) {
-				const idsByType = { route: [], symbol: [], outline: [] };
+				const idsByType = { route: [], symbol: [], outline: [], text: [] };
 				selectedItems.forEach((itemKey) => {
 					const [type, id] = itemKey.split(':');
 					idsByType[type].push(id);
@@ -833,6 +1176,13 @@
 					userState.ui.selectedOutlineId = null;
 				}
 
+				if (idsByType.text.length > 0) {
+					userState.topo.textLabels = (userState.topo.textLabels || []).filter(
+						(t) => !idsByType.text.includes(t.id)
+					);
+					userState.ui.selectedTextLabelId = null;
+				}
+
 				selectedItems.clear();
 				saveHistory();
 				return;
@@ -863,6 +1213,15 @@
 			}
 		}
 
+		if (
+			currentTool instanceof RouteTool &&
+			(event.key === 'n' || event.key === 'N' || event.key === 'Enter')
+		) {
+			event.preventDefault();
+			finishRouteTool();
+			return;
+		}
+
 		currentTool.onKeyDown(event);
 
 		if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
@@ -872,12 +1231,12 @@
 			event.preventDefault();
 			redo();
 		} else if (event.key === '+' || event.key === '=') {
-            updateSymbolScale(0.1);
-            saveHistory();
-        } else if (event.key === '-' || event.key === '_') {
-            updateSymbolScale(-0.1);
-            saveHistory();
-        }
+			updateSymbolScale(0.1);
+			saveHistory();
+		} else if (event.key === '-' || event.key === '_') {
+			updateSymbolScale(-0.1);
+			saveHistory();
+		}
 	}
 
 	function updateSymbolScale(delta) {
@@ -915,7 +1274,7 @@
 		// Interaction state check for suppressing handles/gizmos
 		// We suppress handles when moving OBJECTS, but NOT when moving POINTS
 		const isAnyInteractionActive =
-			draggingSelection || draggingLabel || rotatingSymbol || scalingSymbol;
+			draggingSelection || draggingLabel || draggingTextLabel || rotatingSymbol || scalingSymbol;
 
 		// Ensure layer groups exist and are stable
 		function getOrCreateLayer(className, touchActionNone = false) {
@@ -933,6 +1292,7 @@
 		const currentLayer = getOrCreateLayer('current-layer');
 		const handlesLayer = getOrCreateLayer('handles-layer', true);
 		const symbolsLayer = getOrCreateLayer('symbols-layer');
+		const textLayer = getOrCreateLayer('text-layer', true);
 
 		// 1. Background Rendering
 		bgLayer
@@ -1024,9 +1384,7 @@
 				(update) => update,
 				(exit) => exit.remove()
 			)
-			.attr('points', (d) =>
-				d.points2D.map((p) => `${p[0] * baseWidth},${p[1] * baseHeight}`).join(' ')
-			)
+			.attr('points', (d) => pointsToSvg(getOutlinePoints(d, { baseWidth, baseHeight }), { baseWidth, baseHeight }))
 			.attr('stroke-width', getHitAreaSize(8))
 			.style('pointer-events', activeTool !== null && activeTool !== 'eraser' ? 'none' : 'auto');
 
@@ -1042,12 +1400,38 @@
 				(update) => update,
 				(exit) => exit.remove()
 			)
-			.attr('points', (d) =>
-				d.points2D.map((p) => `${p[0] * baseWidth},${p[1] * baseHeight}`).join(' ')
-			)
-			.attr('stroke', (d) => (isSelected('outline', d.id) ? '#b45309' : '#d97706'))
-			.attr('stroke-width', (d) => (isSelected('outline', d.id) ? 4 : 3))
+			.attr('points', (d) => pointsToSvg(getOutlinePoints(d, { baseWidth, baseHeight }), { baseWidth, baseHeight }))
+			.attr('stroke', (d) => (isSelected('outline', d.id) ? '#3b82f6' : getOutlineLineStyle(d.lineStyle).stroke))
+			.attr('stroke-width', (d) => {
+				const style = getOutlineLineStyle(d.lineStyle);
+				return isSelected('outline', d.id) ? style.width + 1 : style.width;
+			})
+			.attr('stroke-dasharray', (d) => getOutlineLineStyle(d.lineStyle).dash)
+			.attr('stroke-linecap', 'round')
+			.attr('stroke-linejoin', 'round')
 			.style('pointer-events', activeTool !== null && activeTool !== 'eraser' ? 'none' : 'auto');
+
+		// Filled shapes (for closed outlines with fill)
+		const outlineFillSelection = outlinesLayer
+			.selectAll('polygon.outline-fill')
+			.data(
+				userState.topo.outlines.filter(
+					(d) => d.fillColor && getOutlinePoints(d, { baseWidth, baseHeight }).length > 2
+				),
+				(d) => d.id
+			);
+
+		outlineFillSelection
+			.join(
+				(enter) => enter.append('polygon').attr('class', 'outline-fill'),
+				(update) => update,
+				(exit) => exit.remove()
+			)
+			.attr('points', (d) => pointsToSvg(getOutlinePoints(d, { baseWidth, baseHeight }), { baseWidth, baseHeight }))
+			.attr('fill', (d) => d.fillColor || 'none')
+			.attr('fill-opacity', (d) => d.fillOpacity || 0.3)
+			.attr('stroke', 'none')
+			.style('pointer-events', 'none');
 
 		// Rock Outline Handles
 		const outlineHandlesData = [];
@@ -1062,14 +1446,15 @@
 				selectedItems.size <= 1
 			) {
 				const handleSize = getTouchTargetSize(activeTool === 'eraser' ? 7 : 4);
-				outline.points2D.forEach((p, i) => {
+				const outlinePoints = getOutlinePoints(outline, { baseWidth, baseHeight });
+				outlinePoints.forEach((p, i) => {
 					outlineHandlesData.push({ outlineId: outline.id, index: i, p, handleSize });
 				});
 
 				const midpointSize = getTouchTargetSize(3);
-				for (let j = 0; j < outline.points2D.length - 1; j++) {
-					const p1 = outline.points2D[j];
-					const p2 = outline.points2D[j + 1];
+				for (let j = 0; j < outlinePoints.length - 1; j++) {
+					const p1 = outlinePoints[j];
+					const p2 = outlinePoints[j + 1];
 					outlineMidpointsData.push({
 						outlineId: outline.id,
 						insertIndex: j + 1,
@@ -1162,30 +1547,55 @@
 		const routeMidpointsData = [];
 
 		userState.topo.routes.forEach((route, i) => {
-			const processLine = (points, id, label, isPitch = false, parentRouteId = null) => {
+			const processLine = (
+				points,
+				id,
+				label,
+				isPitch = false,
+				parentRouteId = null,
+				isVariant = false,
+				labelOnly = false
+			) => {
 				if (!points || points.length < 1) return;
 
 				const lineSelected =
 					isSelected('route', parentRouteId || id) ||
-					(drawingTarget?.type === 'pitch' && drawingTarget.pitchId === id);
+					(drawingTarget?.type === 'pitch' && drawingTarget.pitchId === id) ||
+					(drawingTarget?.type === 'variant' && drawingTarget.variantId === id);
 
-				routesData.push({
-					id: parentRouteId || id,
-					pitchId: isPitch ? id : null,
-					isPitch,
-					points,
-					pointsStr: points.map((p) => `${p[0] * baseWidth},${p[1] * baseHeight}`).join(' '),
-					lineSelected,
-					label,
-					index: i
-				});
+				if (!labelOnly) {
+					routesData.push({
+						id: parentRouteId || id,
+						pitchId: isPitch ? id : null,
+						variantId: isVariant ? id : null,
+						isPitch,
+						isVariant,
+						points,
+						pointsStr: points.map((p) => `${p[0] * baseWidth},${p[1] * baseHeight}`).join(' '),
+						lineSelected,
+						label,
+						routeObj: isPitch
+							? route.pitches.find((p) => p.id === id)
+							: isVariant
+								? route.variants.find((v) => v.id === id)
+								: route,
+						parentRoute: route,
+						index: i
+					});
+				}
 
 				if (label) {
-					const routeObj = isPitch ? route.pitches.find((p) => p.id === id) : route;
+					const routeObj = isPitch
+						? route.pitches.find((p) => p.id === id)
+						: isVariant
+							? route.variants.find((v) => v.id === id)
+							: route;
 					routeLabelsData.push({
 						id: parentRouteId || id,
 						pitchId: isPitch ? id : null,
+						variantId: isVariant ? id : null,
 						isPitch,
+						isVariant,
 						label,
 						points,
 						routeObj,
@@ -1197,7 +1607,8 @@
 					!isAnyInteractionActive &&
 					lineSelected &&
 					activeTool === null &&
-					selectedItems.size <= 1
+					selectedItems.size <= 1 &&
+					!labelOnly
 				) {
 					if (points && points.length > 1) {
 						const midpointSize = getTouchTargetSize(2);
@@ -1207,6 +1618,7 @@
 							routeMidpointsData.push({
 								routeId: parentRouteId || id,
 								pitchId: isPitch ? id : null,
+								variantId: isVariant ? id : null,
 								insertIndex: j + 1,
 								midX: (p1[0] + p2[0]) / 2,
 								midY: (p1[1] + p2[1]) / 2,
@@ -1218,12 +1630,17 @@
 			};
 
 			if (route.type === 'multi-pitch' && route.pitches) {
-				route.pitches.forEach((pitch) => {
-					processLine(pitch.points2D, pitch.id, null, true, route.id);
+				route.pitches.forEach((pitch, pitchIndex) => {
+					const pitchLabel = formatPitchLabel(pitch, pitchIndex);
+					processLine(pitch.points2D, pitch.id, pitchLabel, true, route.id);
 				});
 				if (route.pitches[0]?.points2D?.length > 0) {
-					processLine(route.pitches[0].points2D, route.id, i + 1, false);
+					processLine(route.pitches[0].points2D, route.id, i + 1, false, null, false, true);
 				}
+				(route.variants || []).forEach((variant, variantIndex) => {
+					const variantLabel = formatVariantLabel(variant, variantIndex);
+					processLine(variant.points2D, variant.id, variantLabel, false, route.id, true);
+				});
 			} else {
 				processLine(route.points2D, route.id, i + 1);
 			}
@@ -1231,7 +1648,7 @@
 
 		const routeGroupSelection = routesLayer
 			.selectAll('g.route-container')
-			.data(routesData, (d) => `route-${d.id}-${d.pitchId || 'main'}`);
+			.data(routesData, (d) => `route-${d.id}-${d.pitchId || d.variantId || 'main'}`);
 
 		const routeGroups = routeGroupSelection
 			.join(
@@ -1239,7 +1656,11 @@
 				(update) => update,
 				(exit) => exit.remove()
 			)
-			.attr('class', (d) => `route-container ${d.isPitch ? 'pitch-group' : 'route-group'}`);
+			.attr(
+				'class',
+				(d) =>
+					`route-container ${d.isPitch ? 'pitch-group' : d.isVariant ? 'variant-group' : 'route-group'}`
+			);
 
 		// Hit Area
 		routeGroups
@@ -1257,7 +1678,8 @@
 							handleObjectMouseDown(e, {
 								type: 'route',
 								id: d.id,
-								pitchId: d.pitchId
+								pitchId: d.pitchId,
+								variantId: d.variantId
 							});
 						})
 						.on('touchstart', (e, d) => {
@@ -1268,7 +1690,8 @@
 								handleObjectMouseDown(e.touches[0], {
 									type: 'route',
 									id: d.id,
-									pitchId: d.pitchId
+									pitchId: d.pitchId,
+									variantId: d.variantId
 								});
 							}
 						})
@@ -1296,7 +1719,8 @@
 							handleObjectMouseDown(e, {
 								type: 'route',
 								id: d.id,
-								pitchId: d.pitchId
+								pitchId: d.pitchId,
+								variantId: d.variantId
 							})
 						)
 						.on('touchstart', (e, d) => {
@@ -1307,7 +1731,8 @@
 								handleObjectMouseDown(e.touches[0], {
 									type: 'route',
 									id: d.id,
-									pitchId: d.pitchId
+									pitchId: d.pitchId,
+									variantId: d.variantId
 								});
 							}
 						})
@@ -1316,14 +1741,18 @@
 				(exit) => exit.remove()
 			)
 			.attr('points', (d) => d.pointsStr)
-			.attr('stroke', (d) => (d.lineSelected ? '#3b82f6' : '#12538b'))
-			.attr('stroke-width', (d) => (d.lineSelected ? 5 : 3))
+			.attr('stroke', (d) => (d.lineSelected ? '#3b82f6' : getRouteLineStyle(d.routeObj?.lineStyle || d.parentRoute?.lineStyle).stroke))
+			.attr('stroke-width', (d) => {
+				const style = getRouteLineStyle(d.routeObj?.lineStyle || d.parentRoute?.lineStyle);
+				return d.lineSelected ? style.width + 2 : style.width;
+			})
+			.attr('stroke-dasharray', (d) => getRouteLineStyle(d.routeObj?.lineStyle || d.parentRoute?.lineStyle).dash)
 			.style('pointer-events', activeTool !== null && activeTool !== 'eraser' ? 'none' : 'auto');
 
 		// Route Labels
 		const labelSelection = routesLayer
 			.selectAll('text.route-label')
-			.data(routeLabelsData, (d) => `label-${d.id}-${d.pitchId || 'main'}`);
+			.data(routeLabelsData, (d) => `label-${d.id}-${d.pitchId || d.variantId || 'main'}`);
 
 		labelSelection
 			.join(
@@ -1338,7 +1767,8 @@
 						.on('mousedown', (e, d) =>
 							handleLabelMouseDown(e, {
 								routeId: d.id,
-								pitchId: d.pitchId
+								pitchId: d.pitchId,
+								variantId: d.variantId
 							})
 						)
 						.on('touchstart', (e, d) => {
@@ -1348,7 +1778,8 @@
 								activeTouch = e.touches[0].identifier;
 								handleLabelMouseDown(e.touches[0], {
 									routeId: d.id,
-									pitchId: d.pitchId
+									pitchId: d.pitchId,
+									variantId: d.variantId
 								});
 							}
 						})
@@ -1373,7 +1804,7 @@
 			.selectAll('circle.route-midpoint')
 			.data(
 				routeMidpointsData,
-				(d) => `route-${d.routeId}-mid-${d.pitchId || 'main'}-${d.insertIndex}`
+				(d) => `route-${d.routeId}-mid-${d.pitchId || d.variantId || 'main'}-${d.insertIndex}`
 			);
 
 		routeMidpointSelection
@@ -1406,6 +1837,7 @@
 					handleMidpointClick(e, {
 						routeId: d.routeId,
 						pitchId: d.pitchId,
+						variantId: d.variantId,
 						insertIndex: d.insertIndex,
 						point: { x: d.midX, y: d.midY }
 					});
@@ -1415,6 +1847,7 @@
 				handleMidpointClick(e, {
 					routeId: d.routeId,
 					pitchId: d.pitchId,
+					variantId: d.variantId,
 					insertIndex: d.insertIndex,
 					point: { x: d.midX, y: d.midY }
 				})
@@ -1488,12 +1921,15 @@
 						.append('polyline')
 						.attr('class', 'current-outline')
 						.attr('fill', 'none')
-						.attr('stroke', '#f59e0b')
-						.attr('stroke-width', 2),
+						.attr('stroke-linecap', 'round')
+						.attr('stroke-linejoin', 'round'),
 				(update) => update,
 				(exit) => exit.remove()
 			)
-			.attr('points', (d) => d.pointsStr);
+			.attr('points', (d) => d.pointsStr)
+			.attr('stroke', getOutlineLineStyle(selectedOutlineStyle).stroke)
+			.attr('stroke-width', getOutlineLineStyle(selectedOutlineStyle).width)
+			.attr('stroke-dasharray', getOutlineLineStyle(selectedOutlineStyle).dash);
 
 		currentLayer
 			.selectAll('circle.current-outline-point')
@@ -1510,6 +1946,37 @@
 			)
 			.attr('cx', (p) => p[0] * baseWidth)
 			.attr('cy', (p) => p[1] * baseHeight);
+
+		// Current outline fill preview (for closed shapes)
+		const currentOutlineFillData = currentOutlineData.length > 0 && currentOutlinePoints.length > 2
+			? [
+				{
+					points: currentOutlinePoints,
+					pointsStr: currentOutlinePoints
+						.map((p) => `${p[0] * baseWidth},${p[1] * baseHeight}`)
+						.join(' ')
+				}
+			]
+			: [];
+
+		currentLayer
+			.selectAll('polygon.current-outline-fill')
+			.data(currentOutlineFillData)
+			.join(
+				(enter) => enter.append('polygon').attr('class', 'current-outline-fill'),
+				(update) => update,
+				(exit) => exit.remove()
+			)
+			.attr('points', (d) => d.pointsStr)
+			.attr('fill', (d) => {
+				const tool = currentTool;
+				return tool instanceof OutlineTool && tool.fillColor ? tool.fillColor : 'rgba(255, 165, 0, 0.2)';
+			})
+			.attr('fill-opacity', (d) => {
+				const tool = currentTool;
+				return tool instanceof OutlineTool && tool.fillOpacity ? tool.fillOpacity : 0.2;
+			})
+			.attr('stroke', 'none');
 
 		// 4. Handles Rendering (Selected Route)
 		const routePointHandlesData = [];
@@ -1530,7 +1997,10 @@
 				}
 			}
 
-			if (activeTool === 'multipitch' && drawingTarget?.type === 'pitch') {
+			if (
+				(activeTool === null || activeTool === 'eraser' || activeTool === 'multipitch') &&
+				drawingTarget?.type === 'pitch'
+			) {
 				const route = userState.topo.routes.find((r) => r.id === drawingTarget.routeId);
 				if (route && route.pitches) {
 					const pitch = route.pitches.find((p) => p.id === drawingTarget.pitchId);
@@ -1539,6 +2009,29 @@
 							routePointHandlesData.push({
 								routeId: route.id,
 								pitchId: pitch.id,
+								variantId: null,
+								index,
+								p,
+								handleSize: getTouchTargetSize(activeTool === 'eraser' ? 5 : 3)
+							});
+						});
+					}
+				}
+			}
+
+			if (
+				(activeTool === null || activeTool === 'eraser' || activeTool === 'multipitch') &&
+				drawingTarget?.type === 'variant'
+			) {
+				const route = userState.topo.routes.find((r) => r.id === drawingTarget.routeId);
+				if (route && route.variants) {
+					const variant = route.variants.find((v) => v.id === drawingTarget.variantId);
+					if (variant && variant.points2D) {
+						variant.points2D.forEach((p, index) => {
+							routePointHandlesData.push({
+								routeId: route.id,
+								pitchId: null,
+								variantId: variant.id,
 								index,
 								p,
 								handleSize: getTouchTargetSize(activeTool === 'eraser' ? 5 : 3)
@@ -1551,7 +2044,10 @@
 
 		const routePointHandleSelection = handlesLayer
 			.selectAll('circle.route-point-handle')
-			.data(routePointHandlesData, (d) => `handle-${d.routeId}-${d.pitchId || 'main'}-${d.index}`);
+			.data(
+				routePointHandlesData,
+				(d) => `handle-${d.routeId}-${d.pitchId || d.variantId || 'main'}-${d.index}`
+			);
 
 		routePointHandleSelection
 			.join(
@@ -1564,6 +2060,7 @@
 							handlePointMouseDown(e, {
 								routeId: d.routeId,
 								pitchId: d.pitchId,
+								variantId: d.variantId,
 								pointIndex: d.index
 							})
 						)
@@ -1576,6 +2073,7 @@
 								handlePointMouseDown(e.touches[0], {
 									routeId: d.routeId,
 									pitchId: d.pitchId,
+									variantId: d.variantId,
 									pointIndex: d.index
 								});
 							}
@@ -1812,6 +2310,167 @@
 				.attr('r', radius + 10)
 				.style('display', itemSelected ? 'block' : 'none');
 		});
+
+		const textLabels = userState.topo.textLabels || [];
+		const textSelection = textLayer.selectAll('g.text-label-group').data(textLabels, (d) => d.id);
+
+		const textGroups = textSelection
+			.join(
+				(enter) =>
+					enter
+						.append('g')
+						.attr('class', 'text-label-group cursor-move')
+						.style('touch-action', 'none')
+						.on('mousedown', (e, d) => handleTextMouseDown(e, d))
+						.on('touchstart', (e, d) => {
+							if (e.touches.length === 1) {
+								e.preventDefault();
+								e.stopPropagation();
+								activeTouch = e.touches[0].identifier;
+								handleTextMouseDown(e.touches[0], d);
+							}
+						})
+						.on('dblclick', (e, d) => {
+							e.stopPropagation();
+							beginTextEdit(d.id);
+						}),
+				(update) => update,
+				(exit) => exit.remove()
+			)
+			.attr(
+				'transform',
+				(d) => `translate(${(d.position2D?.[0] || 0) * baseWidth}, ${(d.position2D?.[1] || 0) * baseHeight}) rotate(${d.rotation2D || 0})`
+			)
+			.style('pointer-events', activeTool !== null && activeTool !== 'eraser' ? 'none' : 'auto');
+
+		textGroups
+			.selectAll('text.text-label')
+			.data((d) => [d])
+			.join(
+				(enter) =>
+					enter
+						.append('text')
+						.attr('class', 'text-label')
+						.attr('dominant-baseline', 'middle')
+						.attr('text-anchor', 'middle')
+						.style('user-select', 'none'),
+				(update) => update,
+				(exit) => exit.remove()
+			)
+			.attr('font-size', (d) => (d.fontSize2D || 0.025) * baseHeight)
+			.attr('font-weight', (d) => d.fontWeight || 700)
+			.attr('fill', (d) => d.color || '#23201d')
+			.text((d) => d.text || '');
+
+		const editingTextLabel = (userState.topo.textLabels || []).find(
+			(label) => label.id === editingTextLabelId
+		);
+
+		const textEditors = textLayer
+			.selectAll('foreignObject.text-editor')
+			.data(editingTextLabel ? [editingTextLabel] : [], (d) => d.id);
+
+		const textEditorObjects = textEditors
+			.join(
+				(enter) => {
+					const editor = enter
+						.append('foreignObject')
+						.attr('class', 'text-editor')
+						.style('overflow', 'visible')
+						.style('pointer-events', 'all');
+
+					editor
+						.append('xhtml:input')
+						.attr('type', 'text')
+						.attr('class', 'text-editor-input')
+						.style('width', '100%')
+						.style('height', '100%')
+						.style('box-sizing', 'border-box')
+						.style('border', '1px solid #3b82f6')
+						.style('border-radius', '2px')
+						.style('background', 'rgba(255, 255, 255, 0.96)')
+						.style('color', '#23201d')
+						.style('font', 'inherit')
+						.style('font-weight', '700')
+						.style('line-height', '1')
+						.style('outline', 'none')
+						.style('padding', '2px 5px')
+						.style('text-align', 'center')
+						.on('mousedown', (event) => event.stopPropagation())
+						.on('click', (event) => event.stopPropagation())
+						.on('dblclick', (event) => event.stopPropagation())
+						.on('touchstart', (event) => event.stopPropagation())
+						.on('keydown', handleTextEditKeyDown)
+						.on('input', (event) => {
+							editingTextValue = event.currentTarget.value;
+						})
+						.on('blur', commitTextEdit);
+
+					return editor;
+				},
+				(update) => update,
+				(exit) => exit.remove()
+			)
+			.attr(
+				'transform',
+				(d) => `translate(${(d.position2D?.[0] || 0) * baseWidth}, ${(d.position2D?.[1] || 0) * baseHeight}) rotate(${d.rotation2D || 0})`
+			)
+			.attr('x', (d) => {
+				const fontSize = (d.fontSize2D || 0.025) * baseHeight;
+				const width = Math.max(120, (editingTextValue.length || 4) * fontSize * 0.75);
+				return -width / 2;
+			})
+			.attr('y', (d) => -((d.fontSize2D || 0.025) * baseHeight) * 0.9)
+			.attr('width', (d) => {
+				const fontSize = (d.fontSize2D || 0.025) * baseHeight;
+				return Math.max(120, (editingTextValue.length || 4) * fontSize * 0.75);
+			})
+			.attr('height', (d) => Math.max(28, (d.fontSize2D || 0.025) * baseHeight * 1.8));
+
+		textEditorObjects
+			.select('input.text-editor-input')
+			.property('value', editingTextValue)
+			.style('font-size', (d) => `${Math.max(14, (d.fontSize2D || 0.025) * baseHeight)}px`)
+			.style('font-weight', (d) => d.fontWeight || 700)
+			.style('color', (d) => d.color || '#23201d')
+			.each(function () {
+				if (!editingTextNeedsFocus) return;
+				requestAnimationFrame(() => {
+					this.focus();
+					this.select();
+				});
+				editingTextNeedsFocus = false;
+			});
+
+		textGroups.each(function (label) {
+			const group = select(this);
+			const selected = isSelected('text', label.id);
+			group
+				.selectAll('rect.text-selection')
+				.data(selected ? [label] : [])
+				.join(
+					(enter) =>
+						enter
+							.append('rect')
+							.attr('class', 'text-selection')
+							.attr('fill', 'none')
+							.attr('stroke', '#3b82f6')
+							.attr('stroke-width', 1)
+							.attr('stroke-dasharray', '2,2'),
+					(update) => update,
+					(exit) => exit.remove()
+				)
+				.each(function () {
+					const textNode = group.select('text.text-label').node();
+					if (!textNode) return;
+					const box = textNode.getBBox();
+					select(this)
+						.attr('x', box.x - 4)
+						.attr('y', box.y - 2)
+						.attr('width', box.width + 8)
+						.attr('height', box.height + 4);
+				});
+		});
 	}
 
 	// Trigger D3 render on state changes
@@ -1819,6 +2478,7 @@
 		// Explicitly track deep reactive dependencies for D3 rendering
 		// Svelte 5 needs to see these accessed synchronously to track them
 		for (const r of userState.topo.routes) {
+			r.lineStyle;
 			if (r.labelOffset2D) {
 				r.labelOffset2D[0];
 				r.labelOffset2D[1];
@@ -1831,6 +2491,10 @@
 			}
 			if (r.pitches) {
 				for (const pitch of r.pitches) {
+					pitch.lineStyle;
+					pitch.grade;
+					pitch.length;
+					pitch.pitchNumber;
 					if (pitch.labelOffset2D) {
 						pitch.labelOffset2D[0];
 						pitch.labelOffset2D[1];
@@ -1843,9 +2507,36 @@
 					}
 				}
 			}
+			if (r.variants) {
+				for (const variant of r.variants) {
+					variant.name;
+					variant.lineStyle;
+					variant.grade;
+					variant.length;
+					if (variant.labelOffset2D) {
+						variant.labelOffset2D[0];
+						variant.labelOffset2D[1];
+					}
+					if (variant.points2D) {
+						for (const p of variant.points2D) {
+							p[0];
+							p[1];
+						}
+					}
+				}
+			}
 		}
 		for (const o of userState.topo.outlines) {
-			for (const p of o.points2D) {
+			o.lineStyle;
+			o.fillColor;
+			o.fillOpacity;
+			o.closed;
+			o.shape?.type;
+			o.shape?.radius2D;
+			o.shape?.fromCenter;
+			o.shape?.square;
+			const outlinePoints = getOutlinePoints(o, { baseWidth, baseHeight });
+			for (const p of outlinePoints) {
 				p[0];
 				p[1];
 			}
@@ -1856,6 +2547,16 @@
 				s.position2D[1];
 				s.rotation2D;
 				s.scale2D;
+			}
+		}
+		for (const t of userState.topo.textLabels || []) {
+			t.text;
+			t.fontSize2D;
+			t.color;
+			t.fontWeight;
+			if (t.position2D) {
+				t.position2D[0];
+				t.position2D[1];
 			}
 		}
 		for (const p of currentRoutePoints) {
@@ -1873,6 +2574,8 @@
 			selectedRoute: userState.ui.selectedRouteId,
 			selectedOutline: userState.ui.selectedOutlineId,
 			selectedFixpoint: userState.ui.selectedFixpointId,
+			editingText: editingTextLabelId,
+			editingTextValue,
 			selectedItems: selectedItems.size,
 			transform: transform,
 			base: { baseWidth, baseHeight }
