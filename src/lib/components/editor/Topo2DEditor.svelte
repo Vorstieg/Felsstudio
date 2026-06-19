@@ -551,7 +551,10 @@
 		draggingPoint = { routeId, pitchId, variantId, outlineId, pointIndex };
 	}
 
-	function handleMidpointClick(event, { routeId, pitchId, variantId, outlineId, insertIndex, point }) {
+	function handleMidpointClick(
+		event,
+		{ routeId, pitchId, variantId, outlineId, insertIndex, point }
+	) {
 		event?.stopPropagation?.();
 		if (routeId) {
 			const route = userState.topo.routes.find((r) => r.id === routeId);
@@ -1384,7 +1387,9 @@
 				(update) => update,
 				(exit) => exit.remove()
 			)
-			.attr('points', (d) => pointsToSvg(getOutlinePoints(d, { baseWidth, baseHeight }), { baseWidth, baseHeight }))
+			.attr('points', (d) =>
+				pointsToSvg(getOutlinePoints(d, { baseWidth, baseHeight }), { baseWidth, baseHeight })
+			)
 			.attr('stroke-width', getHitAreaSize(8))
 			.style('pointer-events', activeTool !== null && activeTool !== 'eraser' ? 'none' : 'auto');
 
@@ -1400,8 +1405,12 @@
 				(update) => update,
 				(exit) => exit.remove()
 			)
-			.attr('points', (d) => pointsToSvg(getOutlinePoints(d, { baseWidth, baseHeight }), { baseWidth, baseHeight }))
-			.attr('stroke', (d) => (isSelected('outline', d.id) ? '#3b82f6' : getOutlineLineStyle(d.lineStyle).stroke))
+			.attr('points', (d) =>
+				pointsToSvg(getOutlinePoints(d, { baseWidth, baseHeight }), { baseWidth, baseHeight })
+			)
+			.attr('stroke', (d) =>
+				isSelected('outline', d.id) ? '#3b82f6' : getOutlineLineStyle(d.lineStyle).stroke
+			)
 			.attr('stroke-width', (d) => {
 				const style = getOutlineLineStyle(d.lineStyle);
 				return isSelected('outline', d.id) ? style.width + 1 : style.width;
@@ -1412,14 +1421,12 @@
 			.style('pointer-events', activeTool !== null && activeTool !== 'eraser' ? 'none' : 'auto');
 
 		// Filled shapes (for closed outlines with fill)
-		const outlineFillSelection = outlinesLayer
-			.selectAll('polygon.outline-fill')
-			.data(
-				userState.topo.outlines.filter(
-					(d) => d.fillColor && getOutlinePoints(d, { baseWidth, baseHeight }).length > 2
-				),
-				(d) => d.id
-			);
+		const outlineFillSelection = outlinesLayer.selectAll('polygon.outline-fill').data(
+			userState.topo.outlines.filter(
+				(d) => d.fillColor && getOutlinePoints(d, { baseWidth, baseHeight }).length > 2
+			),
+			(d) => d.id
+		);
 
 		outlineFillSelection
 			.join(
@@ -1427,7 +1434,9 @@
 				(update) => update,
 				(exit) => exit.remove()
 			)
-			.attr('points', (d) => pointsToSvg(getOutlinePoints(d, { baseWidth, baseHeight }), { baseWidth, baseHeight }))
+			.attr('points', (d) =>
+				pointsToSvg(getOutlinePoints(d, { baseWidth, baseHeight }), { baseWidth, baseHeight })
+			)
 			.attr('fill', (d) => d.fillColor || 'none')
 			.attr('fill-opacity', (d) => d.fillOpacity || 0.3)
 			.attr('stroke', 'none')
@@ -1741,12 +1750,19 @@
 				(exit) => exit.remove()
 			)
 			.attr('points', (d) => d.pointsStr)
-			.attr('stroke', (d) => (d.lineSelected ? '#3b82f6' : getRouteLineStyle(d.routeObj?.lineStyle || d.parentRoute?.lineStyle).stroke))
+			.attr('stroke', (d) =>
+				d.lineSelected
+					? '#3b82f6'
+					: getRouteLineStyle(d.routeObj?.lineStyle || d.parentRoute?.lineStyle).stroke
+			)
 			.attr('stroke-width', (d) => {
 				const style = getRouteLineStyle(d.routeObj?.lineStyle || d.parentRoute?.lineStyle);
 				return d.lineSelected ? style.width + 2 : style.width;
 			})
-			.attr('stroke-dasharray', (d) => getRouteLineStyle(d.routeObj?.lineStyle || d.parentRoute?.lineStyle).dash)
+			.attr(
+				'stroke-dasharray',
+				(d) => getRouteLineStyle(d.routeObj?.lineStyle || d.parentRoute?.lineStyle).dash
+			)
 			.style('pointer-events', activeTool !== null && activeTool !== 'eraser' ? 'none' : 'auto');
 
 		// Route Labels
@@ -1948,16 +1964,17 @@
 			.attr('cy', (p) => p[1] * baseHeight);
 
 		// Current outline fill preview (for closed shapes)
-		const currentOutlineFillData = currentOutlineData.length > 0 && currentOutlinePoints.length > 2
-			? [
-				{
-					points: currentOutlinePoints,
-					pointsStr: currentOutlinePoints
-						.map((p) => `${p[0] * baseWidth},${p[1] * baseHeight}`)
-						.join(' ')
-				}
-			]
-			: [];
+		const currentOutlineFillData =
+			currentOutlineData.length > 0 && currentOutlinePoints.length > 2
+				? [
+						{
+							points: currentOutlinePoints,
+							pointsStr: currentOutlinePoints
+								.map((p) => `${p[0] * baseWidth},${p[1] * baseHeight}`)
+								.join(' ')
+						}
+					]
+				: [];
 
 		currentLayer
 			.selectAll('polygon.current-outline-fill')
@@ -1970,7 +1987,9 @@
 			.attr('points', (d) => d.pointsStr)
 			.attr('fill', (d) => {
 				const tool = currentTool;
-				return tool instanceof OutlineTool && tool.fillColor ? tool.fillColor : 'rgba(255, 165, 0, 0.2)';
+				return tool instanceof OutlineTool && tool.fillColor
+					? tool.fillColor
+					: 'rgba(255, 165, 0, 0.2)';
 			})
 			.attr('fill-opacity', (d) => {
 				const tool = currentTool;
@@ -2169,7 +2188,10 @@
 				const meta = topoSymbols.find((s) => s.id === d.type);
 				return -(meta?.height || 24) / 2;
 			})
-			.attr('href', (d) => `${base}/icons/topo-symbols/${d.type}.svg`);
+			.attr('href', (d) => {
+				const meta = topoSymbols.find((s) => s.id === d.type);
+				return meta?.icon || `${base}/icons/topo-symbols/${d.type}.svg`;
+			});
 
 		// Selection/Gizmo Overlay
 		symbolGroups.each(function (symbol) {
@@ -2339,7 +2361,8 @@
 			)
 			.attr(
 				'transform',
-				(d) => `translate(${(d.position2D?.[0] || 0) * baseWidth}, ${(d.position2D?.[1] || 0) * baseHeight}) rotate(${d.rotation2D || 0})`
+				(d) =>
+					`translate(${(d.position2D?.[0] || 0) * baseWidth}, ${(d.position2D?.[1] || 0) * baseHeight}) rotate(${d.rotation2D || 0})`
 			)
 			.style('pointer-events', activeTool !== null && activeTool !== 'eraser' ? 'none' : 'auto');
 
@@ -2413,7 +2436,8 @@
 			)
 			.attr(
 				'transform',
-				(d) => `translate(${(d.position2D?.[0] || 0) * baseWidth}, ${(d.position2D?.[1] || 0) * baseHeight}) rotate(${d.rotation2D || 0})`
+				(d) =>
+					`translate(${(d.position2D?.[0] || 0) * baseWidth}, ${(d.position2D?.[1] || 0) * baseHeight}) rotate(${d.rotation2D || 0})`
 			)
 			.attr('x', (d) => {
 				const fontSize = (d.fontSize2D || 0.025) * baseHeight;
