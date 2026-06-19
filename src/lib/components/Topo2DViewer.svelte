@@ -245,7 +245,7 @@
 					.attr('height', baseSize)
 					.attr('x', -radius)
 					.attr('y', -radius)
-					.attr('href', `${base}/icons/topo-symbols/${symbol.type}.svg`);
+					.attr('href', meta?.icon || `${base}/icons/topo-symbols/${symbol.type}.svg`);
 			});
 	}
 
@@ -287,7 +287,7 @@
 		// Map simple triggers
 		selectedRouteId;
 		transform;
-		baseWidth; 
+		baseWidth;
 		baseHeight;
 		topo.image2D;
 

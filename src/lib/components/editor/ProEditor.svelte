@@ -20,6 +20,7 @@
 	import { draftsState } from '$lib/state/drafts.svelte.js';
 	import { isMobileViewport } from '$lib/assets/js/mobile-utils.js';
 	import { prepareOutlinesForExport } from '$lib/assets/js/outline-geometry.js';
+	import { topoSymbols } from '$lib/assets/js/topo-utils.js';
 
 	// 2D Editor imports
 	import Topo2DEditor from '$lib/components/editor/Topo2DEditor.svelte';
@@ -51,6 +52,7 @@
 	let editorInternal = $state();
 	let drawingTarget = $state(null);
 	let hasPendingChanges = $state(false);
+	const fixpointSymbols = topoSymbols.filter((symbol) => symbol.type === 'fixpoint');
 
 	// Lasso state
 	let selectedIndicesMap = $state(new Map());
@@ -621,24 +623,24 @@
 				</div>
 				<div class="w-px h-4 bg-black/10 mx-1"></div>
 				<div class="flex items-center gap-1">
-					{#each ['bolt', 'belay', 'piton', 'tree', 'abseil'] as type}
+					{#each fixpointSymbols as symbol}
 						<button
 							class="flex items-center gap-2 h-7 px-2.5 rounded-sm transition-none border {userState
-								.ui.selectedSymbol === type
+								.ui.selectedSymbol === symbol.id
 								? 'bg-creator-blue text-white border-creator-blue shadow-sm'
 								: 'bg-black/5 text-warm-gray-500 border-black/5 hover:bg-black/10 hover:text-near-black'}"
-							onclick={() => (userState.ui.selectedSymbol = type)}
-							title={$_(`topo.fixpoints.${type}`)}
+							onclick={() => (userState.ui.selectedSymbol = symbol.id)}
+							title={$_(`topo.fixpoints.${symbol.id}`)}
 						>
 							<img
-								src="{base}/icons/topo-symbols/{type}.svg"
-								alt={type}
-								class="w-3 h-3 {userState.ui.selectedSymbol === type
+								src={symbol.icon}
+								alt={symbol.name}
+								class="w-3 h-3 {userState.ui.selectedSymbol === symbol.id
 									? 'invert brightness-0'
 									: 'opacity-70'}"
 							/>
 							<span class="text-[9px] font-bold uppercase tracking-tighter"
-								>{$_(`topo.fixpoints.${type}`)}</span
+								>{$_(`topo.fixpoints.${symbol.id}`)}</span
 							>
 						</button>
 					{/each}
@@ -734,16 +736,15 @@
 	{/if}
 </div>
 
-	{#if browser && userState.topo.editorMode === "2d" && activeTool === "outline"}
-		<div class="fixed top-[100px] left-2 z-[101]">
-			<OutlineToolOptions
-				outlineTool={editor2D?.getCurrentTool?.()}
-				bind:selectedOutlineStyle
-				onClose={() => (activeTool = null)}
-			/>
-		</div>
-	{/if}
-
+{#if browser && userState.topo.editorMode === '2d' && activeTool === 'outline'}
+	<div class="fixed top-[100px] left-2 z-[101]">
+		<OutlineToolOptions
+			outlineTool={editor2D?.getCurrentTool?.()}
+			bind:selectedOutlineStyle
+			onClose={() => (activeTool = null)}
+		/>
+	</div>
+{/if}
 
 <div class="h-screen w-screen absolute overflow-hidden bg-warm-white">
 	{#if userState.topo.editorMode === '2d'}
