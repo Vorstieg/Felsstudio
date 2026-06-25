@@ -104,7 +104,7 @@ export function calculateBoltAmount(route, fixPoints = []) {
 }
 
 export const topoSymbols = [
-	// Fixpoints (Small)
+	// UIAA fixpoints / protection
 	{
 		id: 'bolt',
 		name: 'Bolt',
@@ -139,14 +139,14 @@ export const topoSymbols = [
 	},
 	{
 		id: 'abseil',
-		name: 'Abseil',
+		name: 'Abseil station',
 		icon: `${base}/icons/topo-symbols/abseil.svg`,
 		type: 'fixpoint',
 		width: 16,
 		height: 16
 	},
 
-	// Features (Large)
+	// UIAA terrain/features
 	{
 		id: 'crux',
 		name: 'Crux',
@@ -172,6 +172,14 @@ export const topoSymbols = [
 		height: 32
 	},
 	{
+		id: 'corner',
+		name: 'Corner',
+		icon: `${base}/icons/topo-symbols/corner.svg`,
+		type: 'feature',
+		width: 32,
+		height: 32
+	},
+	{
 		id: 'slab',
 		name: 'Slab',
 		icon: `${base}/icons/topo-symbols/slab.svg`,
@@ -188,17 +196,129 @@ export const topoSymbols = [
 		height: 32
 	},
 	{
+		id: 'roof',
+		name: 'Roof',
+		icon: `${base}/icons/topo-symbols/roof.svg`,
+		type: 'feature',
+		width: 32,
+		height: 32
+	},
+	{
+		id: 'ramp',
+		name: 'Ramp',
+		icon: `${base}/icons/topo-symbols/ramp.svg`,
+		type: 'feature',
+		width: 32,
+		height: 32
+	},
+	{
+		id: 'gully',
+		name: 'Gully',
+		icon: `${base}/icons/topo-symbols/gully.svg`,
+		type: 'feature',
+		width: 32,
+		height: 32
+	},
+	{
+		id: 'ledge',
+		name: 'Ledge / band',
+		icon: `${base}/icons/topo-symbols/ledge.svg`,
+		type: 'feature',
+		width: 32,
+		height: 32
+	},
+	{
+		id: 'shoulder',
+		name: 'Shoulder',
+		icon: `${base}/icons/topo-symbols/shoulder.svg`,
+		type: 'feature',
+		width: 32,
+		height: 32
+	},
+	{
+		id: 'band',
+		name: 'Band',
+		icon: `${base}/icons/topo-symbols/band.svg`,
+		type: 'feature',
+		width: 32,
+		height: 32
+	},
+	{
+		id: 'cave',
+		name: 'Cave / niche',
+		icon: `${base}/icons/topo-symbols/cave.svg`,
+		type: 'feature',
+		width: 32,
+		height: 32
+	},
+	{
+		id: 'chockstone',
+		name: 'Chockstone',
+		icon: `${base}/icons/topo-symbols/chockstone.svg`,
+		type: 'feature',
+		width: 32,
+		height: 32
+	},
+	{
 		id: 'rubble',
-		name: 'Rubble',
+		name: 'Boulders / rubble',
 		icon: `${base}/icons/topo-symbols/rubble.svg`,
 		type: 'feature',
 		width: 32,
 		height: 32
 	},
 	{
-		id: 'tree',
-		name: 'Tree',
-		icon: `${base}/icons/topo-symbols/tree.svg`,
+		id: 'grass',
+		name: 'Grass',
+		icon: `${base}/icons/topo-symbols/grass.svg`,
+		type: 'feature',
+		width: 32,
+		height: 32
+	},
+	{
+		id: 'snow',
+		name: 'Snow / firn',
+		icon: `${base}/icons/topo-symbols/snow.svg`,
+		type: 'feature',
+		width: 32,
+		height: 32
+	},
+	{
+		id: 'cornice',
+		name: 'Cornice',
+		icon: `${base}/icons/topo-symbols/cornice.svg`,
+		type: 'feature',
+		width: 32,
+		height: 32
+	},
+	{
+		id: 'water-streak',
+		name: 'Water streak',
+		icon: `${base}/icons/topo-symbols/water-streak.svg`,
+		type: 'feature',
+		width: 32,
+		height: 32
+	},
+	{
+		id: 'leaf-tree',
+		name: 'Leaf tree',
+		icon: `${base}/icons/topo-symbols/leaf-tree.svg`,
+		type: 'feature',
+		width: 32,
+		height: 32
+	},
+	{
+		id: 'needle-tree',
+		name: 'Needle tree',
+		icon: `${base}/icons/topo-symbols/needle-tree.svg`,
+		type: 'feature',
+		width: 32,
+		height: 32
+	},
+	{
+		id: 'bivouac',
+		name: 'Bivouac site',
+		icon: `${base}/icons/topo-symbols/bivouac.svg`,
 		type: 'feature',
 		width: 32,
 		height: 32

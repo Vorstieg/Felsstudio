@@ -9,6 +9,7 @@
 	import CssObject from '../CssObject.svelte';
 	import { userState } from '$lib/state/editor.svelte.js';
 	import { Topo3DInteractionManager } from './3d/InteractionManager.svelte.js';
+	import { topoSymbols } from '$lib/assets/js/topo-utils.js';
 
 	interactivity();
 
@@ -30,6 +31,9 @@
 
 	// --- Interaction Manager ---
 	const interaction = new Topo3DInteractionManager();
+	const topo3DFixpointTypes = new Set(
+		topoSymbols.filter((symbol) => symbol.type === 'fixpoint').map((symbol) => symbol.id)
+	);
 
 	// --- Export Functionality Binding ---
 	export const downloadModel = (filename = 'model.glb') => {
@@ -96,7 +100,9 @@
 					const oldIndices = index.array;
 					const newIndices = [];
 					for (let i = 0; i < oldIndices.length; i += 3) {
-						const a = oldIndices[i], b = oldIndices[i + 1], c = oldIndices[i + 2];
+						const a = oldIndices[i],
+							b = oldIndices[i + 1],
+							c = oldIndices[i + 2];
 						if (!(meshSelection.has(a) && meshSelection.has(b) && meshSelection.has(c))) {
 							newIndices.push(a, b, c);
 						}
@@ -108,19 +114,33 @@
 					const newPositions = [];
 					const newColors = [];
 					for (let i = 0; i < position.count; i += 3) {
-						const a = i, b = i + 1, c = i + 2;
+						const a = i,
+							b = i + 1,
+							c = i + 2;
 						if (!(meshSelection.has(a) && meshSelection.has(b) && meshSelection.has(c))) {
 							const i3 = i * 3;
 							newPositions.push(
-								posArray[i3], posArray[i3 + 1], posArray[i3 + 2],
-								posArray[i3 + 3], posArray[i3 + 4], posArray[i3 + 5],
-								posArray[i3 + 6], posArray[i3 + 7], posArray[i3 + 8]
+								posArray[i3],
+								posArray[i3 + 1],
+								posArray[i3 + 2],
+								posArray[i3 + 3],
+								posArray[i3 + 4],
+								posArray[i3 + 5],
+								posArray[i3 + 6],
+								posArray[i3 + 7],
+								posArray[i3 + 8]
 							);
 							if (colArray) {
 								newColors.push(
-									colArray[i3], colArray[i3 + 1], colArray[i3 + 2],
-									colArray[i3 + 3], colArray[i3 + 4], colArray[i3 + 5],
-									colArray[i3 + 6], colArray[i3 + 7], colArray[i3 + 8]
+									colArray[i3],
+									colArray[i3 + 1],
+									colArray[i3 + 2],
+									colArray[i3 + 3],
+									colArray[i3 + 4],
+									colArray[i3 + 5],
+									colArray[i3 + 6],
+									colArray[i3 + 7],
+									colArray[i3 + 8]
 								);
 							}
 						}
@@ -179,7 +199,7 @@
 		const globalNodeMap = new Map();
 		let globalNodeCount = 0;
 		const vReusable = new THREE.Vector3();
-		const meshVertexData = allMeshes.map(mesh => {
+		const meshVertexData = allMeshes.map((mesh) => {
 			const pos = mesh.geometry.attributes.position;
 			const vertexToGlobalNode = new Int32Array(pos.count);
 			mesh.updateMatrixWorld(true);
@@ -194,7 +214,12 @@
 		});
 
 		const nodeToFacesHead = new Int32Array(globalNodeCount).fill(-1);
-		const totalFaces = allMeshes.reduce((sum, m) => sum + (m.geometry.index ? m.geometry.index.count / 3 : m.geometry.attributes.position.count / 3), 0);
+		const totalFaces = allMeshes.reduce(
+			(sum, m) =>
+				sum +
+				(m.geometry.index ? m.geometry.index.count / 3 : m.geometry.attributes.position.count / 3),
+			0
+		);
 		const next = new Int32Array(totalFaces * 3);
 		const data = new Int32Array(totalFaces * 3);
 		let ptr = 0;
@@ -226,7 +251,8 @@
 			if (visited[i]) continue;
 			const island = [];
 			const queue = new Int32Array(allFaces.length);
-			let h = 0, t = 0;
+			let h = 0,
+				t = 0;
 			queue[t++] = i;
 			visited[i] = 1;
 			while (h < t) {
@@ -248,16 +274,19 @@
 		}
 		if (islands.length <= 1) return;
 		islands.sort((a, b) => b.length - a.length);
-		allMeshes.forEach(mesh => {
+		allMeshes.forEach((mesh) => {
 			const geo = mesh.geometry;
 			if (!geo.attributes.color) {
-				geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3).fill(1), 3));
+				geo.setAttribute(
+					'color',
+					new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3).fill(1), 3)
+				);
 			}
 			const colors = geo.attributes.color;
 			for (let i = 0; i < colors.count; i++) colors.setXYZ(i, 1, 1, 1);
 			if (mesh.material) {
 				const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-				mats.forEach(m => {
+				mats.forEach((m) => {
 					m.vertexColors = true;
 					m.needsUpdate = true;
 				});
@@ -285,7 +314,7 @@
 	// --- State Sync ---
 	let visualRoutes = $derived.by(() => {
 		const offset = userState.topo.modelOffset || [0, 0, 0];
-		return userState.topo.routes.flatMap(route => {
+		return userState.topo.routes.flatMap((route) => {
 			const processPoints = (points, subId, label) => {
 				let normal = null;
 				let displacement = new Vector3(0, 0, 0);
@@ -293,12 +322,28 @@
 					normal = new Vector3(route.orientation[0], route.orientation[1], route.orientation[2]);
 					displacement = normal.clone().multiplyScalar(0.05);
 				}
-				const vecPoints = (points || []).map(p => new Vector3(p[0] + offset[0], p[1] + offset[1], p[2] + offset[2]).add(displacement));
-				const curve = vecPoints.length >= 2 ? new CatmullRomCurve3(vecPoints, false, 'catmullrom', 0) : null;
-				return { id: subId, rawPoints: vecPoints, curve, normal, label: label || route.id, parentId: route.id };
+				const vecPoints = (points || []).map((p) =>
+					new Vector3(p[0] + offset[0], p[1] + offset[1], p[2] + offset[2]).add(displacement)
+				);
+				const curve =
+					vecPoints.length >= 2 ? new CatmullRomCurve3(vecPoints, false, 'catmullrom', 0) : null;
+				return {
+					id: subId,
+					rawPoints: vecPoints,
+					curve,
+					normal,
+					label: label || route.id,
+					parentId: route.id
+				};
 			};
 			if (route.type === 'multi-pitch' && route.pitches) {
-				return route.pitches.map((pitch, idx) => processPoints(pitch.points || [], pitch.id || `${route.id}_p${idx}`, `${route.id}.${idx + 1}`));
+				return route.pitches.map((pitch, idx) =>
+					processPoints(
+						pitch.points || [],
+						pitch.id || `${route.id}_p${idx}`,
+						`${route.id}.${idx + 1}`
+					)
+				);
 			} else return [processPoints(route.points, route.id)];
 		});
 	});
@@ -306,17 +351,25 @@
 	let visualFixPoints = $derived.by(() => {
 		const offset = userState.topo.modelOffset || [0, 0, 0];
 		return userState.topo.fixPoints
-			.filter(pt => pt.position && ['bolt', 'belay', 'abseil', 'piton', 'tree'].includes(pt.type))
-			.map(pt => ({
+			.filter((pt) => pt.position && topo3DFixpointTypes.has(pt.type))
+			.map((pt) => ({
 				...pt,
-				rawPosition: [pt.position[0] + offset[0], pt.position[1] + offset[1], pt.position[2] + offset[2]],
-				isAssigned: userState.ui.selectedRouteId ? userState.topo.routes.find(r => r.id === userState.ui.selectedRouteId)?.fixPoints?.includes(pt.id) : false
+				rawPosition: [
+					pt.position[0] + offset[0],
+					pt.position[1] + offset[1],
+					pt.position[2] + offset[2]
+				],
+				isAssigned: userState.ui.selectedRouteId
+					? userState.topo.routes
+							.find((r) => r.id === userState.ui.selectedRouteId)
+							?.fixPoints?.includes(pt.id)
+					: false
 			}));
 	});
 
 	let visualRawHits = $derived.by(() => {
 		const clusterId = userState.clustering.lockedClusterId;
-		const cluster = userState.clustering.clusters.find(c => c.id === clusterId);
+		const cluster = userState.clustering.clusters.find((c) => c.id === clusterId);
 		if (!cluster) return [];
 		const offset = userState.topo.modelOffset || [0, 0, 0];
 		return cluster.members.map((h, i) => ({
@@ -337,7 +390,7 @@
 
 	let visualClusters = $derived.by(() => {
 		const offset = userState.topo.modelOffset || [0, 0, 0];
-		return userState.clustering.clusters.map(c => ({
+		return userState.clustering.clusters.map((c) => ({
 			...c,
 			anchor: [c.anchor[0] + offset[0], c.anchor[1] + offset[1], c.anchor[2] + offset[2]]
 		}));
@@ -354,7 +407,7 @@
 	// Compute BVH for the loaded scene to accelerate raycasting
 	$effect(() => {
 		if (gltfScene) {
-			gltfScene.traverse(child => {
+			gltfScene.traverse((child) => {
 				if (child.isMesh && child.geometry && !child.geometry.boundsTree) {
 					child.geometry.computeBoundsTree();
 				}
@@ -373,13 +426,14 @@
 
 <T.Group>
 	{#if gltfScene}
-		<T is={gltfScene}
-			 onclick={(e) => interaction.handleMeshClick(e)}
-			 ondblclick={(e) => interaction.handleMeshDblClick(e, activeTool)}
-			 onpointermove={(e) => interaction.handleMeshPointerMove(e, activeTool)}
-			 dispose={null}
-			 position={userState.topo.modelOffset || [0, 0, 0]}
-			 {...props}
+		<T
+			is={gltfScene}
+			onclick={(e) => interaction.handleMeshClick(e)}
+			ondblclick={(e) => interaction.handleMeshDblClick(e, activeTool)}
+			onpointermove={(e) => interaction.handleMeshPointerMove(e, activeTool)}
+			dispose={null}
+			position={userState.topo.modelOffset || [0, 0, 0]}
+			{...props}
 		/>
 	{/if}
 
@@ -388,15 +442,20 @@
 	{#if interaction.previewLineSegment}
 		<T.Mesh>
 			<MeshLineGeometry points={interaction.previewLineSegment.points} />
-			<MeshLineMaterial color={"#ffeb3b"} width={0.1} resolution={[$size.width, $size.height]} transparent
-												opacity={0.7} />
+			<MeshLineMaterial
+				color={'#ffeb3b'}
+				width={0.1}
+				resolution={[$size.width, $size.height]}
+				transparent
+				opacity={0.7}
+			/>
 		</T.Mesh>
 	{/if}
 
 	{#each interaction.currentLineSegments as segment (segment.id)}
 		<T.Mesh>
 			<MeshLineGeometry points={segment.points} />
-			<MeshLineMaterial color={"#ff00ff"} width={0.15} resolution={[$size.width, $size.height]} />
+			<MeshLineMaterial color={'#ff00ff'} width={0.15} resolution={[$size.width, $size.height]} />
 		</T.Mesh>
 	{/each}
 
@@ -404,16 +463,25 @@
 		<CssObject position={point.rawPosition} scaleWithZoom={true} pointerEvents={true}>
 			<div
 				class="flex items-center justify-center w-6 h-6 -m-3 transition-all cursor-pointer group"
-				onclick={(e) => { interaction.handleFixPointClick(e, point.id); }}
+				onclick={(e) => {
+					interaction.handleFixPointClick(e, point.id);
+				}}
 				ondblclick={(e) => interaction.handleFixPointDblClick(e, point.id, activeTool)}
 				role="button"
 				tabindex="0"
 			>
-				<div class="w-2 h-2 rounded-full shadow-sm border border-white/40 transition-all
-                    {point.type === 'belay' ? 'bg-orange-500' : (point.type === 'bolt' ? 'bg-creator-blue' : 'bg-near-black')} 
+				<div
+					class="w-2 h-2 rounded-full shadow-sm border border-white/40 transition-all
+                    {point.type === 'belay'
+						? 'bg-orange-500'
+						: point.type === 'bolt'
+							? 'bg-creator-blue'
+							: 'bg-near-black'} 
                     {point.isAssigned ? 'ring-2 ring-green-500 ring-offset-1' : ''} 
-                    {userState.ui.selectedFixpointId === point.id ? 'ring-2 ring-yellow-400 ring-offset-1 scale-150' : 'group-hover:scale-125'}">
-				</div>
+                    {userState.ui.selectedFixpointId === point.id
+						? 'ring-2 ring-yellow-400 ring-offset-1 scale-150'
+						: 'group-hover:scale-125'}"
+				></div>
 			</div>
 		</CssObject>
 	{/each}
@@ -421,9 +489,17 @@
 	{#each visualRoutes as route (route.id)}
 		{#if route.rawPoints && route.rawPoints.length > 0}
 			<CssObject position={route.rawPoints[0]} pointerEvents={true}>
-				<div class={"route-label " + (userState.ui.selectedRouteId === route.parentId ? "selected" : "")}
-						 onclick={(e) => { e.stopPropagation(); userState.ui.selectedRouteId = (userState.ui.selectedRouteId === route.parentId) ? null : route.parentId; }}
-						 role="button" tabindex="0">
+				<div
+					class={'route-label ' +
+						(userState.ui.selectedRouteId === route.parentId ? 'selected' : '')}
+					onclick={(e) => {
+						e.stopPropagation();
+						userState.ui.selectedRouteId =
+							userState.ui.selectedRouteId === route.parentId ? null : route.parentId;
+					}}
+					role="button"
+					tabindex="0"
+				>
 					{route.label}
 				</div>
 			</CssObject>
@@ -434,8 +510,16 @@
 			<T.Mesh>
 				<MeshLineGeometry points={route.rawPoints} />
 				<MeshLineMaterial
-					width={userState.ui.selectedRouteId === route.parentId ? 0.12 : (interaction.lastSnappedRouteId === route.parentId ? 0.10 : 0.06)}
-					color={userState.ui.selectedRouteId === route.parentId ? "#0075de" : (interaction.lastSnappedRouteId === route.parentId ? "#f59e0b" : "#0075de")}
+					width={userState.ui.selectedRouteId === route.parentId
+						? 0.12
+						: interaction.lastSnappedRouteId === route.parentId
+							? 0.1
+							: 0.06}
+					color={userState.ui.selectedRouteId === route.parentId
+						? '#0075de'
+						: interaction.lastSnappedRouteId === route.parentId
+							? '#f59e0b'
+							: '#0075de'}
 					resolution={[$size.width, $size.height]}
 					transparent
 					opacity={userState.ui.selectedRouteId === route.parentId ? 1 : 0.4}
@@ -447,15 +531,22 @@
 				{#each route.rawPoints as p}
 					<T.Mesh position={[p.x, p.y, p.z]}>
 						<T.SphereGeometry args={[0.015]} />
-						<T.MeshBasicMaterial color={userState.ui.selectedRouteId === route.parentId ? "#0075de" : "#f59e0b"} />
+						<T.MeshBasicMaterial
+							color={userState.ui.selectedRouteId === route.parentId ? '#0075de' : '#f59e0b'}
+						/>
 					</T.Mesh>
 				{/each}
 			{/if}
 			{#if route.curve}
 				<T.Mesh
-					onclick={(e) => { e.stopPropagation(); userState.ui.selectedRouteId = (userState.ui.selectedRouteId === route.parentId) ? null : route.parentId; }}
+					onclick={(e) => {
+						e.stopPropagation();
+						userState.ui.selectedRouteId =
+							userState.ui.selectedRouteId === route.parentId ? null : route.parentId;
+					}}
 					ondblclick={(e) => interaction.handleRouteDblClick(e, route.parentId, activeTool)}
-					onpointermove={(e) => interaction.handleMeshPointerMove(e, activeTool)}>
+					onpointermove={(e) => interaction.handleMeshPointerMove(e, activeTool)}
+				>
 					<T is={TubeGeometry} args={[route.curve, route.rawPoints.length, 0.15, 4, false]} />
 					<T.MeshBasicMaterial transparent opacity={0} depthWrite={false} />
 				</T.Mesh>
@@ -471,24 +562,24 @@
 			<T.Group position={cluster.anchor} scale={isSelected || isLocked ? 1.5 : 1}>
 				<T.Mesh
 					onpointerenter={(e) => {
-                        e.stopPropagation();
-                        userState.clustering.selectedClusterId = cluster.id;
-                    }}
+						e.stopPropagation();
+						userState.clustering.selectedClusterId = cluster.id;
+					}}
 					onpointerleave={(e) => {
-                        e.stopPropagation();
-                        if (userState.clustering.selectedClusterId === cluster.id) {
-                            userState.clustering.selectedClusterId = null;
-                        }
-                    }}
+						e.stopPropagation();
+						if (userState.clustering.selectedClusterId === cluster.id) {
+							userState.clustering.selectedClusterId = null;
+						}
+					}}
 					onclick={(e) => {
-                        e.stopPropagation(); 
-                        if (userState.clustering.lockedClusterId === cluster.id) {
-                            userState.clustering.lockedClusterId = null;
-                        } else {
-                            userState.clustering.lockedClusterId = cluster.id;
-                        }
-                        userState.clustering.selectedClusterId = cluster.id;
-                    }}
+						e.stopPropagation();
+						if (userState.clustering.lockedClusterId === cluster.id) {
+							userState.clustering.lockedClusterId = null;
+						} else {
+							userState.clustering.lockedClusterId = cluster.id;
+						}
+						userState.clustering.selectedClusterId = cluster.id;
+					}}
 				>
 					<T.SphereGeometry args={[0.15]} />
 					<T.MeshBasicMaterial transparent opacity={0} depthWrite={false} />
@@ -509,7 +600,11 @@
 			{#if userState.clustering.showAnnotations}
 				<CssObject position={cluster.anchor} scaleWithZoom={true}>
 					<div
-						class="annotation !bg-black/50 !text-white !p-1 !rounded !text-[8px] border border-white/20 {userState.clustering.selectedClusterId === cluster.id ? '!border-cyan-400 !bg-cyan-900/80' : ''}">
+						class="annotation !bg-black/50 !text-white !p-1 !rounded !text-[8px] border border-white/20 {userState
+							.clustering.selectedClusterId === cluster.id
+							? '!border-cyan-400 !bg-cyan-900/80'
+							: ''}"
+					>
 						{cluster.members.length}
 					</div>
 				</CssObject>
