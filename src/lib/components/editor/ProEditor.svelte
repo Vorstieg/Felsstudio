@@ -426,12 +426,12 @@
 			}
 
 			// Save topo JSON to Felslager
-			await writeJson(`entries/${savePath}/${baseName}-topo.json`, topoToSave);
+			await writeJson(`${savePath}/${baseName}-topo.json`, topoToSave);
 
 			// Upload GLB model if available (3D mode)
 			if (userState.topo.editorMode === '3d' && userState.ui.glbBlob) {
 				await writeFile(
-					`entries/${savePath}/${baseName}.glb`,
+					`${savePath}/${baseName}.glb`,
 					userState.ui.glbBlob,
 					'model/gltf-binary'
 				);

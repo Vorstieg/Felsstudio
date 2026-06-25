@@ -732,7 +732,7 @@
 			const baseName = (cragEditorState.crag.name || 'new-crag').trim().toLowerCase().replace(/\s+/g, '-');
 			
 			// Save main crag JSON
-			await writeJson(`entries/${savePath}/${baseName}.json`, {
+			await writeJson(`${savePath}/${baseName}.json`, {
 				type: 'Feature',
 				properties: {
 					...$state.snapshot(cragEditorState.crag),
@@ -745,7 +745,7 @@
 			// Save transit points
 			for (let i = 0; i < cragEditorState.transit.length; i++) {
 				const t = cragEditorState.transit[i];
-				await writeJson(`entries/${savePath}/${baseName}-transit${i > 0 ? '-' + i : ''}.json`, {
+				await writeJson(`${savePath}/${baseName}-transit${i > 0 ? '-' + i : ''}.json`, {
 					type: 'Feature',
 					properties: { name: t.name, type: t.type },
 					geometry: { type: 'Point', coordinates: t.coordinates }
@@ -755,7 +755,7 @@
 			// Save parking spots
 			for (let i = 0; i < cragEditorState.parking.length; i++) {
 				const p = cragEditorState.parking[i];
-				await writeJson(`entries/${savePath}/${baseName}-parking${i > 0 ? '-' + i : ''}.json`, {
+				await writeJson(`${savePath}/${baseName}-parking${i > 0 ? '-' + i : ''}.json`, {
 					type: 'Feature',
 					properties: { type: 'parking-space' },
 					geometry: { type: 'Point', coordinates: p.coordinates }
@@ -765,7 +765,7 @@
 			// Save approach tracks
 			for (let i = 0; i < cragEditorState.tracks.length; i++) {
 				const t = cragEditorState.tracks[i];
-				await writeJson(`entries/${savePath}/${baseName}-transit-track${i > 0 ? '-' + i : ''}.json`, {
+				await writeJson(`${savePath}/${baseName}-transit-track${i > 0 ? '-' + i : ''}.json`, {
 					type: 'Feature',
 					properties: {},
 					geometry: { type: 'LineString', coordinates: t.coordinates }

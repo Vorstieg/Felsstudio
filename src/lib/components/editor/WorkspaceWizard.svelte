@@ -41,12 +41,12 @@
         if (workspace === 'crags/new') loadMode = 'file';
 
 		try {
-			const allFiles = await listDir('entries', { recursive: true });
+			const allFiles = await listDir('', { recursive: true });
 			const topoPaths = allFiles
 				.filter(f => f.type === 'file' && f.name.endsWith('-topo.json'))
 				.map(f => {
 					const parts = f.path.split('/');
-					return parts.slice(1, -1).join('/');
+					return parts.slice(0, -1).join('/');
 				});
 			topoFiles = new Set(topoPaths);
 
@@ -54,7 +54,7 @@
 				.filter(f => f.type === 'file' && f.name.endsWith('.glb'))
 				.map(f => {
 					const parts = f.path.split('/');
-					return parts.slice(1, -1).join('/');
+					return parts.slice(0, -1).join('/');
 				});
 			glbFiles = new Set(glbPaths);
 		} catch (err) {
@@ -101,8 +101,8 @@
 		try {
 			const path = crag.properties.path;
 			const name = path.split('/').at(-1);
-			const topoPath = `entries/${path}/${name}-topo.json`;
-			const cragJsonPath = `entries/${path}/${name}.json`;
+			const topoPath = `${path}/${name}-topo.json`;
+			const cragJsonPath = `${path}/${name}.json`;
             
 			if (workspace.startsWith('crags/')) {
 				const { cragEditorState } = await import('$lib/state/crag-editor.svelte.js');
@@ -115,7 +115,7 @@
 				
 				// Load related files (transit, parking, tracks)
 				try {
-					const dirFiles = await listDir(`entries/${path}`);
+					const dirFiles = await listDir(path);
 					for (const f of dirFiles) {
 						if (f.type !== 'file' || !f.name.endsWith('.json') || f.name === `${name}.json`) continue;
 						try {
@@ -133,7 +133,7 @@
 			} else if (workspace === 'topos/2d/new') {
 				try { userState.topo = { ...userState.topo, ...await readJson(topoPath) }; } catch { /* no topo yet */ }
 				// Load GLB from Felslager
-				const glbUrl = fileUrl(`entries/${path}/${name}.glb`);
+				const glbUrl = fileUrl(`${path}/${name}.glb`);
 				try {
 					const res = await fetch(glbUrl);
 					if (res.ok) {
@@ -151,7 +151,7 @@
 				} catch { /* no topo yet */ }
 				if (workspace.includes('/3d/')) {
 					userState.topo.editorMode = '3d';
-					const glbUrl = fileUrl(`entries/${path}/${name}.glb`);
+					const glbUrl = fileUrl(`${path}/${name}.glb`);
 					try {
 						const res = await fetch(glbUrl);
 						if (res.ok) {
@@ -165,9 +165,9 @@
 					const imgNames = [`${name}.jpg`, `${name}.png`, 'topo.jpg'];
 					for (const imgName of imgNames) {
 						try {
-							const res = await fetch(fileUrl(`entries/${path}/${imgName}`));
+							const res = await fetch(fileUrl(`${path}/${imgName}`));
 							if (res.ok) {
-								userState.topo.image2D = fileUrl(`entries/${path}/${imgName}`);
+								userState.topo.image2D = fileUrl(`${path}/${imgName}`);
 								break;
 							}
 						} catch { /* try next */ }
