@@ -4,6 +4,8 @@
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
 
+	import SaveStatus from '$lib/components/ui/SaveStatus.svelte';
+
 	let {
 		activeTool = $bindable('route'),
 		selectedSymbol = $bindable('bolt'),
@@ -13,7 +15,9 @@
 		onCancelAction = null,
 		onUndo = null,
 		onRedo = null,
-		onExport = null
+		onExport = null,
+		status = 'idle',
+		errorMessage = ''
 	} = $props();
 
 	import { vibrateOnAction } from '$lib/assets/js/mobile-utils.js';
@@ -465,14 +469,7 @@
 		</div>
 
 		<div class="flex items-center gap-3 pr-1">
-			{#if userState.ui.lastSaved}
-				<div
-					class="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-sm bg-black/5 text-warm-gray-400"
-				>
-					<i class="fa-solid fa-cloud-check text-[9px]"></i>
-					<span class="text-[9px] font-bold uppercase tracking-tighter">{$_('ui.saved')}</span>
-				</div>
-			{/if}
+			<SaveStatus {status} {errorMessage} />
 			{#if hasPendingChanges}
 				<div class="flex gap-1">
 					<button
@@ -490,10 +487,11 @@
 				</div>
 			{/if}
 			<button
-				class="bg-near-black text-white px-4 py-1.5 rounded-sm text-[11px] font-bold shadow-sm hover:bg-black transition-none uppercase tracking-widest ml-1"
+				class="bg-creator-blue text-white px-4 py-1.5 rounded-sm text-[11px] font-bold shadow-sm hover:bg-creator-blue-active transition-none uppercase tracking-widest ml-1"
 				onclick={onExport}
+				disabled={status === 'saving'}
 			>
-				{$_('ui.export')}
+				{$_('save.save_to_server')}
 			</button>
 		</div>
 	</div>

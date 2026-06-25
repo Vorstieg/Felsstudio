@@ -1,5 +1,6 @@
 <script>
 	import { _ } from 'svelte-i18n';
+	import SaveStatus from '$lib/components/ui/SaveStatus.svelte';
 
 	let {
 		activeTool = $bindable('position'),
@@ -14,7 +15,9 @@
 		onCancelTrackEdit = () => {},
 		onGpxUpload = () => {},
 		onCreateTopo = () => {},
-		onExport = () => {}
+		onExport = () => {},
+		status = 'idle',
+		errorMessage = ''
 	} = $props();
 </script>
 
@@ -104,10 +107,12 @@
 				2D Topo
 			</button>
 
+			<SaveStatus {status} {errorMessage} />
 			<button
-				class="bg-near-black text-white px-4 py-1.5 rounded-sm text-[11px] font-bold shadow-sm hover:bg-black transition-none uppercase tracking-widest"
-				onclick={onExport}>
-				Export
+				class="bg-creator-blue text-white px-4 py-1.5 rounded-sm text-[11px] font-bold shadow-sm hover:bg-creator-blue-active transition-none uppercase tracking-widest"
+				onclick={onExport}
+				disabled={status === 'saving'}>
+				{$_('save.save_to_server')}
 			</button>
 		</div>
 	</div>

@@ -8,6 +8,7 @@
 	import { init, addMessages, _, getLocaleFromNavigator } from 'svelte-i18n';
 	import en from '$lib/i18n/locales/en.json';
 	import de from '$lib/i18n/locales/de.json';
+	import AuthPrompt from '$lib/components/ui/AuthPrompt.svelte';
 
 	addMessages('en', en);
 	addMessages('de', de);
@@ -38,6 +39,7 @@
 	<main id="main" class="w-full h-full overflow-hidden" tabindex="-1">
 		{@render children?.()}
 	</main>
+	<AuthPrompt />
 </div>
 
 <style>

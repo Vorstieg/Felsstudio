@@ -8,6 +8,7 @@
 	import { generate2DFromTopo } from '$lib/assets/js/topo-projection.js';
 	import { parseRegistrationCsv, projectHits } from '$lib/assets/js/hit-projection.js';
 	import JSZip from 'jszip';
+	import { listDir, readJson, fileUrl } from '$lib/api/felslager.js';
 
 	let { workspace, onComplete, locations = [] } = $props();
 
@@ -39,13 +40,26 @@
         // Default modes for new paths
         if (workspace === 'crags/new') loadMode = 'file';
 
-		const topoGlob = import.meta.glob('/src/entries/**/*-topo.json');
-		const topoPaths = Object.keys(topoGlob).map(p => p.split('/').slice(3, -1).join('/'));
-		topoFiles = new Set(topoPaths);
+		try {
+			const allFiles = await listDir('entries', { recursive: true });
+			const topoPaths = allFiles
+				.filter(f => f.type === 'file' && f.name.endsWith('-topo.json'))
+				.map(f => {
+					const parts = f.path.split('/');
+					return parts.slice(1, -1).join('/');
+				});
+			topoFiles = new Set(topoPaths);
 
-        const glbGlob = import.meta.glob('/src/entries/**/*.glb');
-        const glbPaths = Object.keys(glbGlob).map(p => p.split('/').slice(3, -1).join('/'));
-        glbFiles = new Set(glbPaths);
+			const glbPaths = allFiles
+				.filter(f => f.type === 'file' && f.name.endsWith('.glb'))
+				.map(f => {
+					const parts = f.path.split('/');
+					return parts.slice(1, -1).join('/');
+				});
+			glbFiles = new Set(glbPaths);
+		} catch (err) {
+			console.error('Failed to load file listing from Felslager:', err);
+		}
 	});
 
 	const filteredLocations = $derived(
@@ -87,48 +101,83 @@
 		try {
 			const path = crag.properties.path;
 			const name = path.split('/').at(-1);
-			const jsonFiles = import.meta.glob('/src/entries/**/*.json');
-			const topoPath = getSectorTopoPath(path, sector) || `/src/entries/${path}/${name}-topo.json`;
-			const cragPath = `/src/entries/${path}/${name}.json`;
+			const topoPath = `entries/${path}/${name}-topo.json`;
+			const cragJsonPath = `entries/${path}/${name}.json`;
             
-            if (workspace.startsWith('crags/')) {
-                const { cragEditorState } = await import('$lib/state/crag-editor.svelte.js');
-                cragEditorState.reset();
-                if (jsonFiles[cragPath]) {
-                    const cragData = (await jsonFiles[cragPath]()).default;
-                    Object.assign(cragEditorState.crag, cragData.properties);
-                    cragEditorState.crag.geometry = cragData.geometry;
-                }
-                const dir = `/src/entries/${path}/`;
-                const relatedPaths = Object.keys(jsonFiles).filter(p => p.startsWith(dir));
-                for (const rPath of relatedPaths) {
-                    if (rPath === cragPath) continue;
-                    const data = (await jsonFiles[rPath]()).default;
-                    if (rPath.endsWith('-transit.json')) cragEditorState.transit.push({ id: Math.random().toString(36).substr(2, 9), name: data.properties.name, type: data.properties.type || 'bus', coordinates: data.geometry.coordinates });
-                    else if (rPath.endsWith('-parking.json')) cragEditorState.parking.push({ id: Math.random().toString(36).substr(2, 9), coordinates: data.geometry.coordinates });
-                    else if (rPath.endsWith('-transit-track.json')) cragEditorState.tracks.push({ id: Math.random().toString(36).substr(2, 9), name: data.properties.name || 'Approach Track', coordinates: data.geometry.coordinates });
-                }
-            } else if (workspace === 'topos/2d/new') {
-                if (jsonFiles[topoPath]) userState.topo = { ...userState.topo, ...(await jsonFiles[topoPath]()).default };
-                const glbGlob = import.meta.glob('/src/entries/**/*.glb', { query: '?url', import: 'default' });
-                const mPath = `/src/entries/${path}/${name}.glb`;
-                if (glbGlob[mPath]) { const url = await glbGlob[mPath](); const res = await fetch(url); const blob = await res.blob(); await loadGlb(new File([blob], `${name}.glb`)); }
-                generate2DFromTopo(userState.topo); 
-                userState.topo.editorMode = '2d';
-            } else {
-                if (jsonFiles[topoPath]) { userState.topo = { ...userState.topo, ...(await jsonFiles[topoPath]()).default }; initializeIdCounters(userState.topo); }
-                if (workspace.includes('/3d/')) {
-                    userState.topo.editorMode = '3d';
-                    const glbGlob = import.meta.glob('/src/entries/**/*.glb', { query: '?url', import: 'default' });
-                    const mPath = `/src/entries/${path}/${name}.glb`;
-                    if (glbGlob[mPath]) { const url = await glbGlob[mPath](); const res = await fetch(url); const blob = await res.blob(); await loadGlb(new File([blob], `${name}.glb`)); }
-                } else {
-                    userState.topo.editorMode = '2d';
-                    const imgs = import.meta.glob('/src/entries/**/*.{jpg,jpeg,png,webp}', { query: '?url', import: 'default' });
-                    const options = [`/src/entries/${path}/${name}.jpg`, `/src/entries/${path}/${name}.png`, `/src/entries/${path}/topo.jpg` ];
-                    for(const p of options) { if (imgs[p]) { userState.topo.image2D = await imgs[p](); break; } }
-                }
-            }
+			if (workspace.startsWith('crags/')) {
+				const { cragEditorState } = await import('$lib/state/crag-editor.svelte.js');
+				cragEditorState.reset();
+				try {
+					const cragData = await readJson(cragJsonPath);
+					Object.assign(cragEditorState.crag, cragData.properties);
+					cragEditorState.crag.geometry = cragData.geometry;
+				} catch { /* crag file may not exist */ }
+				
+				// Load related files (transit, parking, tracks)
+				try {
+					const dirFiles = await listDir(`entries/${path}`);
+					for (const f of dirFiles) {
+						if (f.type !== 'file' || !f.name.endsWith('.json') || f.name === `${name}.json`) continue;
+						try {
+							const data = await readJson(f.path);
+							if (f.name.includes('-transit-track')) {
+								cragEditorState.tracks.push({ id: Math.random().toString(36).substr(2, 9), name: data.properties.name || 'Approach Track', coordinates: data.geometry.coordinates });
+							} else if (f.name.includes('-transit')) {
+								cragEditorState.transit.push({ id: Math.random().toString(36).substr(2, 9), name: data.properties.name, type: data.properties.type || 'bus', coordinates: data.geometry.coordinates });
+							} else if (f.name.includes('-parking')) {
+								cragEditorState.parking.push({ id: Math.random().toString(36).substr(2, 9), coordinates: data.geometry.coordinates });
+							}
+						} catch { /* skip unreadable files */ }
+					}
+				} catch { /* directory listing may fail */ }
+			} else if (workspace === 'topos/2d/new') {
+				try { userState.topo = { ...userState.topo, ...await readJson(topoPath) }; } catch { /* no topo yet */ }
+				// Load GLB from Felslager
+				const glbUrl = fileUrl(`entries/${path}/${name}.glb`);
+				try {
+					const res = await fetch(glbUrl);
+					if (res.ok) {
+						const blob = await res.blob();
+						await loadGlb(new File([blob], `${name}.glb`));
+					}
+				} catch { /* GLB may not exist */ }
+				generate2DFromTopo(userState.topo);
+				userState.topo.editorMode = '2d';
+			} else {
+				try {
+					const topoData = await readJson(topoPath);
+					userState.topo = { ...userState.topo, ...topoData };
+					initializeIdCounters(userState.topo);
+				} catch { /* no topo yet */ }
+				if (workspace.includes('/3d/')) {
+					userState.topo.editorMode = '3d';
+					const glbUrl = fileUrl(`entries/${path}/${name}.glb`);
+					try {
+						const res = await fetch(glbUrl);
+						if (res.ok) {
+							const blob = await res.blob();
+							await loadGlb(new File([blob], `${name}.glb`));
+						}
+					} catch { /* GLB may not exist */ }
+				} else {
+					userState.topo.editorMode = '2d';
+					// Try to load 2D image from Felslager
+					const imgNames = [`${name}.jpg`, `${name}.png`, 'topo.jpg'];
+					for (const imgName of imgNames) {
+						try {
+							const res = await fetch(fileUrl(`entries/${path}/${imgName}`));
+							if (res.ok) {
+								userState.topo.image2D = fileUrl(`entries/${path}/${imgName}`);
+								break;
+							}
+						} catch { /* try next */ }
+					}
+				}
+			}
+			
+			// Store the entry path for saving later
+			userState.topo._entryPath = path;
+			
 			onComplete();
 		} catch (err) { console.error(err); error = "Failed to load entry: " + err.message; } finally { isLoading = false; }
 	}

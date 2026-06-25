@@ -11,6 +11,8 @@
 	import MapSearch from '$lib/components/editor/MapSearch.svelte';
 	import CragEditorToolbar from '$lib/components/editor/crag/CragEditorToolbar.svelte';
 	import CragEditorSidebar from '$lib/components/editor/crag/CragEditorSidebar.svelte';
+	import { writeJson } from '$lib/api/felslager.js';
+	import { authState } from '$lib/api/auth.svelte.js';
 
 	let { inspectorShadow = true } = $props();
 
@@ -23,6 +25,8 @@
 	let mapStyle = $state('transport');
 	let currentLoadedStyle = $state();
 	let isMapLoaded = $state(false);
+	let saveStatus = $state('idle');
+	let saveError = $state('');
 
 	let activeTool = $state('position'); // 'position' | 'transit' | 'parking' | 'track'
 	let activeTab = $state('info'); // 'info' | 'registry'
@@ -711,41 +715,70 @@
 		}
 	}
 
-	function downloadExport() {
-		const baseName = (cragEditorState.crag.name || 'new-crag').trim().toLowerCase().replace(/\s+/g, '-');
-		const blob = (data) => new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-		const save = (b, n) => {
-			const url = URL.createObjectURL(b);
-			const a = document.createElement('a');
-			a.href = url;
-			a.download = n;
-			a.click();
-			URL.revokeObjectURL(url);
-		};
-		save(blob({
-			type: 'Feature',
-			properties: {
-				...$state.snapshot(cragEditorState.crag),
-				id: baseName,
-				updated: new Date().toISOString().split('T')[0]
-			},
-			geometry: cragEditorState.crag.geometry
-		}), `${baseName}.json`);
-		cragEditorState.transit.forEach((t, i) => save(blob({
-			type: 'Feature',
-			properties: { name: t.name, type: t.type },
-			geometry: { type: 'Point', coordinates: t.coordinates }
-		}), `${baseName}-transit${i > 0 ? '-' + i : ''}.json`));
-		cragEditorState.parking.forEach((p, i) => save(blob({
-			type: 'Feature',
-			properties: { type: 'parking-space' },
-			geometry: { type: 'Point', coordinates: p.coordinates }
-		}), `${baseName}-parking${i > 0 ? '-' + i : ''}.json`));
-		cragEditorState.tracks.forEach((t, i) => save(blob({
-			type: 'Feature',
-			properties: {},
-			geometry: { type: 'LineString', coordinates: t.coordinates }
-		}), `${baseName}-transit-track${i > 0 ? '-' + i : ''}.json`));
+	async function saveToServer() {
+		if (!authState.requireAuth(() => saveToServer())) return;
+		
+		const savePath = cragEditorState.crag.path;
+		if (!savePath) {
+			saveStatus = 'error';
+			saveError = $_('save.save_path_required');
+			return;
+		}
+		
+		saveStatus = 'saving';
+		saveError = '';
+		
+		try {
+			const baseName = (cragEditorState.crag.name || 'new-crag').trim().toLowerCase().replace(/\s+/g, '-');
+			
+			// Save main crag JSON
+			await writeJson(`entries/${savePath}/${baseName}.json`, {
+				type: 'Feature',
+				properties: {
+					...$state.snapshot(cragEditorState.crag),
+					id: baseName,
+					updated: new Date().toISOString().split('T')[0]
+				},
+				geometry: cragEditorState.crag.geometry
+			});
+			
+			// Save transit points
+			for (let i = 0; i < cragEditorState.transit.length; i++) {
+				const t = cragEditorState.transit[i];
+				await writeJson(`entries/${savePath}/${baseName}-transit${i > 0 ? '-' + i : ''}.json`, {
+					type: 'Feature',
+					properties: { name: t.name, type: t.type },
+					geometry: { type: 'Point', coordinates: t.coordinates }
+				});
+			}
+			
+			// Save parking spots
+			for (let i = 0; i < cragEditorState.parking.length; i++) {
+				const p = cragEditorState.parking[i];
+				await writeJson(`entries/${savePath}/${baseName}-parking${i > 0 ? '-' + i : ''}.json`, {
+					type: 'Feature',
+					properties: { type: 'parking-space' },
+					geometry: { type: 'Point', coordinates: p.coordinates }
+				});
+			}
+			
+			// Save approach tracks
+			for (let i = 0; i < cragEditorState.tracks.length; i++) {
+				const t = cragEditorState.tracks[i];
+				await writeJson(`entries/${savePath}/${baseName}-transit-track${i > 0 ? '-' + i : ''}.json`, {
+					type: 'Feature',
+					properties: {},
+					geometry: { type: 'LineString', coordinates: t.coordinates }
+				});
+			}
+			
+			saveStatus = 'success';
+			setTimeout(() => { if (saveStatus === 'success') saveStatus = 'idle'; }, 3000);
+		} catch (err) {
+			console.error('Save failed:', err);
+			saveStatus = 'error';
+			saveError = err.message;
+		}
 	}
 
 	function createTopoFromCrag() {
@@ -865,7 +898,9 @@
 	onCancelTrackEdit={cancelTrackEdit}
 	onGpxUpload={handleGpxUpload}
 	onCreateTopo={createTopoFromCrag}
-	onExport={downloadExport}
+	onExport={saveToServer}
+	status={saveStatus}
+	errorMessage={saveError}
 />
 
 <div class="fixed top-14 left-2 z-50 w-[min(24rem,calc(100vw-1rem))] md:right-auto">

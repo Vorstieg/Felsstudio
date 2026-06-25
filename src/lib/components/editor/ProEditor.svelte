@@ -28,9 +28,15 @@
 	import OutlineToolOptions from '$lib/components/editor/tools/OutlineToolOptions.svelte';
 
 	import { generateSymbolId, initializeIdCounters } from '$lib/assets/js/id-utils.js';
+	import { writeJson, writeFile } from '$lib/api/felslager.js';
+	import { authState } from '$lib/api/auth.svelte.js';
+	import SaveStatus from '$lib/components/ui/SaveStatus.svelte';
 
 	let { workspace = '3d-create', children } = $props();
 	let isMobile = $state(false);
+	let saveStatus = $state('idle');
+	let saveError = $state('');
+
 	function getInitialEditorMode() {
 		return workspace.startsWith('2d') ? '2d' : '3d';
 	}
@@ -368,52 +374,75 @@
 		return estGps.map((v) => v / weightSum);
 	}
 
-	function combinedExport() {
-		userState.topo.date = new Date().toISOString().split('T')[0];
-		userState.topo.updated = new Date().toISOString().split('T')[0];
+	async function combinedExport() {
+		// Require authentication
+		if (!authState.requireAuth(() => combinedExport())) return;
+		
+		// Require a save path
+		const savePath = userState.topo._entryPath;
+		if (!savePath) {
+			saveStatus = 'error';
+			saveError = 'No save path set. Set it in the Properties panel.';
+			return;
+		}
+		
+		saveStatus = 'saving';
+		saveError = '';
+		
+		try {
+			userState.topo.date = userState.topo.date || new Date().toISOString().split('T')[0];
+			userState.topo.updated = new Date().toISOString().split('T')[0];
 
-		const baseName = (userState.topo.name || 'topo').trim().toLowerCase().replace(/\s+/g, '-');
-		let topoToSave = JSON.parse(JSON.stringify(userState.topo));
-		topoToSave.outlines = prepareOutlinesForExport(topoToSave.outlines || [], {
-			baseWidth: 1000,
-			baseHeight: 1000 / (topoToSave.imageAspectRatio || 1.5)
-		});
+			const baseName = (userState.topo.name || 'topo').trim().toLowerCase().replace(/\s+/g, '-');
+			let topoToSave = JSON.parse(JSON.stringify(userState.topo));
+			
+			// Remove internal UI fields before saving
+			delete topoToSave._entryPath;
 
-		if (workspace === '3d-create') {
-			// Convert visible clusters to fixPoints
-			const confirmedBolts = userState.clustering.clusters.map((c) => ({
-				id: generateSymbolId(),
-				type: c.class || 'bolt',
-				position: c.anchor,
-				// Optional: store original cluster stats in metadata
-				meta: {
-					observations: c.members.length,
-					confidence: c.conf
-				}
-			}));
-			topoToSave.fixPoints = [...(topoToSave.fixPoints || []), ...confirmedBolts];
+			// Reset modelOffset to [0, 0, 0] in the exported topo.json file,
+			// because the exported GLB model has been centered to [0, 0, 0] as well.
+			topoToSave.modelOffset = [0, 0, 0];
 
-			// Auto-estimate GPS origin if not set
-			if (topoToSave.coordinates[0] === 0 && topoToSave.coordinates[1] === 0) {
-				const originGps = estimateGpsOrigin();
-				if (originGps) {
-					topoToSave.coordinates = [originGps[0], originGps[1]];
-					topoToSave.altitude = originGps[2];
+			if (workspace === '3d-create') {
+				// Convert visible clusters to fixPoints
+				const confirmedBolts = userState.clustering.clusters.map(c => ({
+					id: generateSymbolId(),
+					type: c.class || 'bolt',
+					position: c.anchor,
+					meta: {
+						observations: c.members.length,
+						confidence: c.conf
+					}
+				}));
+				topoToSave.fixPoints = [...(topoToSave.fixPoints || []), ...confirmedBolts];
+
+				if (topoToSave.coordinates[0] === 0 && topoToSave.coordinates[1] === 0) {
+					const originGps = estimateGpsOrigin();
+					if (originGps) {
+						topoToSave.coordinates = [originGps[0], originGps[1]];
+						topoToSave.altitude = originGps[2];
+					}
 				}
 			}
-		}
 
-		const jsonContent = JSON.stringify(topoToSave, undefined, 4);
-		const blob = new Blob([jsonContent], { type: 'application/json' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = `${baseName}-topo.json`;
-		a.click();
-		URL.revokeObjectURL(url);
+			// Save topo JSON to Felslager
+			await writeJson(`entries/${savePath}/${baseName}-topo.json`, topoToSave);
 
-		if (userState.topo.editorMode === '3d') {
-			modelComponent?.downloadModel(`${baseName}.glb`);
+			// Upload GLB model if available (3D mode)
+			if (userState.topo.editorMode === '3d' && userState.ui.glbBlob) {
+				await writeFile(
+					`entries/${savePath}/${baseName}.glb`,
+					userState.ui.glbBlob,
+					'model/gltf-binary'
+				);
+			}
+			
+			saveStatus = 'success';
+			setTimeout(() => { if (saveStatus === 'success') saveStatus = 'idle'; }, 3000);
+		} catch (err) {
+			console.error('Save failed:', err);
+			saveStatus = 'error';
+			saveError = err.message;
 		}
 	}
 
@@ -520,19 +549,13 @@
 			</div>
 
 			<div class="flex items-center gap-4 pr-1">
-				{#if userState.ui.lastSaved}
-					<div
-						class="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-sm bg-black/5 text-warm-gray-400"
-					>
-						<i class="fa-solid fa-cloud-check text-[9px]"></i>
-						<span class="text-[9px] font-bold uppercase tracking-tighter">{$_('ui.saved')}</span>
-					</div>
-				{/if}
+				<SaveStatus status={saveStatus} errorMessage={saveError} />
 				<button
-					class="bg-near-black text-white px-4 py-1.5 rounded-sm text-[11px] font-bold shadow-sm hover:bg-black transition-none uppercase tracking-widest"
+					class="bg-creator-blue text-white px-4 py-1.5 rounded-sm text-[11px] font-bold shadow-sm hover:bg-creator-blue-active transition-none uppercase tracking-widest"
 					onclick={combinedExport}
+					disabled={saveStatus === 'saving'}
 				>
-					{$_('ui.export')}
+					{$_('save.save_to_server')}
 				</button>
 			</div>
 		</div>
@@ -548,6 +571,8 @@
 				onUndo={() => editor2D?.undo()}
 				onRedo={() => editor2D?.redo()}
 				onExport={combinedExport}
+				status={saveStatus}
+				errorMessage={saveError}
 			/>
 		</div>
 	{/if}

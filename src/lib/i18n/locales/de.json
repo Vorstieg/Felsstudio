@@ -248,7 +248,7 @@
 		"edit_existing": "Existierendes bearbeiten",
 		"delete_draft": "Entwurf löschen",
 		"saved": "Gespeichert",
-		"export": "Export",
+		"export": "Speichern",
 		"outline_tool_options": "Umriss-Werkzeug",
 		"close": "Schließen",
 		"drawing_mode": "Zeichenmodus",
@@ -412,5 +412,24 @@
 		"source_image": "Quellbild",
 		"show_camera_trail": "Kamera-Pfad anzeigen",
 		"ai_suggestions_title": "KI Vorschläge"
+	},
+	"auth": {
+		"title": "Authentifizierung erforderlich",
+		"description": "Gib deine Felslager-Zugangsdaten ein, um Änderungen zu speichern.",
+		"username": "Benutzername",
+		"password": "Passwort",
+		"username_placeholder": "admin",
+		"login": "Anmelden",
+		"cancel": "Abbrechen"
+	},
+	"save": {
+		"saving": "Speichert...",
+		"saved": "Gespeichert",
+		"failed": "Speichern fehlgeschlagen",
+		"save_to_server": "Speichern",
+		"save_path": "Speicherpfad",
+		"save_path_placeholder": "europe/austria/mödling/efeugrat",
+		"save_path_required": "Speicherpfad ist erforderlich",
+		"upload_assets": "Assets hochladen"
 	}
 }

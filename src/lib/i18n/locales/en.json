@@ -243,7 +243,7 @@
 		"edit_existing": "Edit Existing",
 		"delete_draft": "Delete Draft",
 		"saved": "Saved",
-		"export": "Export",
+		"export": "Save",
 		"outline_tool_options": "Outline Tool",
 		"close": "Close",
 		"drawing_mode": "Drawing Mode",
@@ -407,5 +407,24 @@
 		"source_image": "Source Image",
 		"show_camera_trail": "Show Camera Trail",
 		"ai_suggestions_title": "AI Suggestions"
+	},
+	"auth": {
+		"title": "Authentication Required",
+		"description": "Enter your Felslager credentials to save changes.",
+		"username": "Username",
+		"password": "Password",
+		"username_placeholder": "admin",
+		"login": "Login",
+		"cancel": "Cancel"
+	},
+	"save": {
+		"saving": "Saving...",
+		"saved": "Saved",
+		"failed": "Save Failed",
+		"save_to_server": "Save",
+		"save_path": "Save Path",
+		"save_path_placeholder": "europe/austria/mödling/efeugrat",
+		"save_path_required": "Save path is required",
+		"upload_assets": "Upload Assets"
 	}
 }
