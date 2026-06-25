@@ -112,6 +112,7 @@
 					Object.assign(cragEditorState.crag, cragData.properties);
 					cragEditorState.crag.geometry = cragData.geometry;
 				} catch { /* crag file may not exist */ }
+				cragEditorState.crag.path = path;
 				
 				// Load related files (transit, parking, tracks)
 				try {
