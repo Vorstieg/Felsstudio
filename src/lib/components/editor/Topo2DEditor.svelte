@@ -13,6 +13,7 @@
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
 	import { topoSymbols } from '$lib/assets/js/topo-utils.js';
 	import {
+		getOutlineMidpoints,
 		getOutlinePoints,
 		insertOutlinePoint,
 		pointsToSvg,
@@ -20,6 +21,12 @@
 		setOutlinePoint,
 		translateOutline
 	} from '$lib/assets/js/outline-geometry.js';
+	import {
+		insertPathVertex,
+		movePathVertex,
+		removePathVertex,
+		translatePath
+	} from '$lib/assets/js/path-geometry.js';
 	import {
 		getTouchTargetSize,
 		getHitAreaSize,
@@ -510,6 +517,14 @@
 	}
 
 	// Forward dragging events if tools support it (optional future step)
+	function getRoutePathTarget({ routeId, pitchId, variantId }) {
+		const route = userState.topo.routes.find((item) => item.id === routeId);
+		if (!route) return null;
+		if (pitchId) return route.pitches?.find((pitch) => pitch.id === pitchId) || null;
+		if (variantId) return route.variants?.find((variant) => variant.id === variantId) || null;
+		return route;
+	}
+
 	function handlePointMouseDown(event, { routeId, pitchId, variantId, outlineId, pointIndex }) {
 		// Only allow point manipulation in selection mode (null tool) or eraser mode
 		if (activeTool !== null && activeTool !== 'eraser') return;
@@ -519,24 +534,13 @@
 		// Delete point on Alt+Click or if using the eraser tool
 		if (event.altKey || activeTool === 'eraser') {
 			if (routeId) {
-				const route = userState.topo.routes.find((r) => r.id === routeId);
-				if (route) {
-					if (pitchId && route.pitches) {
-						const pitch = route.pitches.find((p) => p.id === pitchId);
-						if (pitch && pitch.points2D.length > 2) {
-							pitch.points2D = pitch.points2D.filter((_, i) => i !== pointIndex);
-							return;
-						}
-					} else if (variantId && route.variants) {
-						const variant = route.variants.find((v) => v.id === variantId);
-						if (variant && variant.points2D.length > 2) {
-							variant.points2D = variant.points2D.filter((_, i) => i !== pointIndex);
-							return;
-						}
-					} else if (route.points2D.length > 2) {
-						route.points2D = route.points2D.filter((_, i) => i !== pointIndex);
-						return;
-					}
+				const target = getRoutePathTarget({ routeId, pitchId, variantId });
+				if (target?.points2D?.length > 2) {
+					target.points2D = removePathVertex(target.points2D, pointIndex, {
+						closed: false,
+						minPoints: 2
+					});
+					return;
 				}
 			} else if (outlineId) {
 				const outline = userState.topo.outlines.find((o) => o.id === outlineId);
@@ -557,27 +561,14 @@
 	) {
 		event?.stopPropagation?.();
 		if (routeId) {
-			const route = userState.topo.routes.find((r) => r.id === routeId);
-			if (route) {
-				if (pitchId && route.pitches) {
-					const pitch = route.pitches.find((p) => p.id === pitchId);
-					if (pitch) {
-						const newPoints = [...pitch.points2D];
-						newPoints.splice(insertIndex, 0, [point.x, point.y]);
-						pitch.points2D = newPoints;
-					}
-				} else if (variantId && route.variants) {
-					const variant = route.variants.find((v) => v.id === variantId);
-					if (variant) {
-						const newPoints = [...variant.points2D];
-						newPoints.splice(insertIndex, 0, [point.x, point.y]);
-						variant.points2D = newPoints;
-					}
-				} else if (route.points2D) {
-					const newPoints = [...route.points2D];
-					newPoints.splice(insertIndex, 0, [point.x, point.y]);
-					route.points2D = newPoints;
-				}
+			const target = getRoutePathTarget({ routeId, pitchId, variantId });
+			if (target?.points2D) {
+				target.points2D = insertPathVertex(
+					target.points2D,
+					insertIndex,
+					[point.x, point.y],
+					{ closed: false }
+				);
 			}
 		} else if (outlineId) {
 			const outline = userState.topo.outlines.find((o) => o.id === outlineId);
@@ -603,21 +594,9 @@
 
 			// Move routes
 			draggingSelection.items.routes.forEach(({ routeId, pitchId, variantId, startPoints }) => {
-				const route = userState.topo.routes.find((r) => r.id === routeId);
-				if (route) {
-					if (pitchId && route.pitches) {
-						const pitch = route.pitches.find((p) => p.id === pitchId);
-						if (pitch && pitch.points2D) {
-							pitch.points2D = startPoints.map((p) => [p[0] + deltaX, p[1] + deltaY]);
-						}
-					} else if (variantId && route.variants) {
-						const variant = route.variants.find((v) => v.id === variantId);
-						if (variant && variant.points2D) {
-							variant.points2D = startPoints.map((p) => [p[0] + deltaX, p[1] + deltaY]);
-						}
-					} else if (route.points2D) {
-						route.points2D = startPoints.map((p) => [p[0] + deltaX, p[1] + deltaY]);
-					}
+				const target = getRoutePathTarget({ routeId, pitchId, variantId });
+				if (target?.points2D) {
+					target.points2D = translatePath(startPoints, [deltaX, deltaY], { closed: false });
 				}
 			});
 
@@ -648,27 +627,14 @@
 			});
 		} else if (draggingPoint) {
 			if (draggingPoint.routeId) {
-				const route = userState.topo.routes.find((r) => r.id === draggingPoint.routeId);
-				if (route) {
-					if (draggingPoint.pitchId && route.pitches) {
-						const pitch = route.pitches.find((p) => p.id === draggingPoint.pitchId);
-						if (pitch) {
-							const newPoints = [...pitch.points2D];
-							newPoints[draggingPoint.pointIndex] = [mouse.x, mouse.y];
-							pitch.points2D = newPoints;
-						}
-					} else if (draggingPoint.variantId && route.variants) {
-						const variant = route.variants.find((v) => v.id === draggingPoint.variantId);
-						if (variant) {
-							const newPoints = [...variant.points2D];
-							newPoints[draggingPoint.pointIndex] = [mouse.x, mouse.y];
-							variant.points2D = newPoints;
-						}
-					} else if (route.points2D) {
-						const newPoints = [...route.points2D];
-						newPoints[draggingPoint.pointIndex] = [mouse.x, mouse.y];
-						route.points2D = newPoints;
-					}
+				const target = getRoutePathTarget(draggingPoint);
+				if (target?.points2D) {
+					target.points2D = movePathVertex(
+						target.points2D,
+						draggingPoint.pointIndex,
+						[mouse.x, mouse.y],
+						{ closed: false }
+					);
 				}
 			} else if (draggingPoint.outlineId) {
 				const outline = userState.topo.outlines.find((o) => o.id === draggingPoint.outlineId);
@@ -1461,17 +1427,15 @@
 				});
 
 				const midpointSize = getTouchTargetSize(3);
-				for (let j = 0; j < outlinePoints.length - 1; j++) {
-					const p1 = outlinePoints[j];
-					const p2 = outlinePoints[j + 1];
+				getOutlineMidpoints(outline, { baseWidth, baseHeight }).forEach((midpoint) => {
 					outlineMidpointsData.push({
 						outlineId: outline.id,
-						insertIndex: j + 1,
-						midX: (p1[0] + p2[0]) / 2,
-						midY: (p1[1] + p2[1]) / 2,
+						insertIndex: midpoint.insertIndex,
+						midX: midpoint.point[0],
+						midY: midpoint.point[1],
 						midpointSize
 					});
-				}
+				});
 			}
 		});
 
@@ -1518,10 +1482,10 @@
 						.attr('stroke', 'white')
 						.attr('stroke-width', 1)
 						.on('mouseover', function () {
-							select(this).attr('opacity', 1).attr('r', 4);
+							select(this).attr('opacity', 1);
 						})
 						.on('mouseout', function () {
-							select(this).attr('opacity', 0.6).attr('r', 2);
+							select(this).attr('opacity', 0.6);
 						}),
 				(update) => update,
 				(exit) => exit.remove()
@@ -1833,10 +1797,10 @@
 						.attr('stroke', 'white')
 						.attr('stroke-width', 1)
 						.on('mouseover', function () {
-							select(this).attr('opacity', 1).attr('r', 4);
+							select(this).attr('opacity', 1);
 						})
 						.on('mouseout', function () {
-							select(this).attr('opacity', 0.6).attr('r', 2);
+							select(this).attr('opacity', 0.6);
 						}),
 				(update) => update,
 				(exit) => exit.remove()

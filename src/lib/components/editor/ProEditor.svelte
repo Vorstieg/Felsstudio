@@ -374,6 +374,29 @@
 		return estGps.map((v) => v / weightSum);
 	}
 
+	function slugifyName(value, fallback = 'topo') {
+		return (value || fallback).trim().toLowerCase().replace(/\s+/g, '-');
+	}
+
+	function pathBasename(path = '') {
+		return String(path).split('/').filter(Boolean).at(-1) || '';
+	}
+
+	function getExportNames(savePath) {
+		if (userState.topo._topoFileName) {
+			const topoFileName = userState.topo._topoFileName.endsWith('.json')
+				? userState.topo._topoFileName
+				: `${userState.topo._topoFileName}.json`;
+			return {
+				baseName: topoFileName.replace(/-topo\.json$/i, '').replace(/\.json$/i, ''),
+				topoFileName
+			};
+		}
+
+		const baseName = pathBasename(savePath) || slugifyName(userState.topo.name);
+		return { baseName, topoFileName: `${baseName}-topo.json` };
+	}
+
 	async function combinedExport() {
 		// Require authentication
 		if (!authState.requireAuth(() => combinedExport())) return;
@@ -393,11 +416,12 @@
 			userState.topo.date = userState.topo.date || new Date().toISOString().split('T')[0];
 			userState.topo.updated = new Date().toISOString().split('T')[0];
 
-			const baseName = (userState.topo.name || 'topo').trim().toLowerCase().replace(/\s+/g, '-');
+			const { baseName, topoFileName } = getExportNames(savePath);
 			let topoToSave = JSON.parse(JSON.stringify(userState.topo));
 			
 			// Remove internal UI fields before saving
 			delete topoToSave._entryPath;
+			delete topoToSave._topoFileName;
 
 			// Reset modelOffset to [0, 0, 0] in the exported topo.json file,
 			// because the exported GLB model has been centered to [0, 0, 0] as well.
@@ -426,7 +450,7 @@
 			}
 
 			// Save topo JSON to Felslager
-			await writeJson(`${savePath}/${baseName}-topo.json`, topoToSave);
+			await writeJson(`${savePath}/${topoFileName}`, topoToSave);
 
 			// Upload GLB model if available (3D mode)
 			if (userState.topo.editorMode === '3d' && userState.ui.glbBlob) {

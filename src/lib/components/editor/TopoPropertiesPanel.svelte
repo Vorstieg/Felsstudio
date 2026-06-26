@@ -156,6 +156,23 @@
 		activeTool = 'multipitch';
 	}
 
+	function parseAssetList(value) {
+		return value.split(',').map((item) => item.trim()).filter(Boolean);
+	}
+
+	function getGpxAssets(item) {
+		const gpx = item.assets?.gpx;
+		if (!gpx) return [];
+		return Array.isArray(gpx) ? gpx : [gpx];
+	}
+
+	function setGpxAssets(item, value) {
+		item.assets = {
+			...(item.assets || {}),
+			gpx: parseAssetList(value)
+		};
+	}
+
 	function drawPitch(route, pitch) {
 		userState.ui.selectedRouteId = route.id;
 		userState.ui.selectedFixpointId = null;
@@ -585,6 +602,17 @@
 									</select>
 								</div>
 
+								<div class="space-y-0.5">
+									<label class="text-ui-label block">GPX Assets</label>
+									<input
+										type="text"
+										value={getGpxAssets(route).join(', ')}
+										oninput={(e) => setGpxAssets(route, e.currentTarget.value)}
+										class="input-studio w-full font-mono"
+										placeholder="routes/route-name.gpx"
+									/>
+								</div>
+
 								{#if route.type !== 'multi-pitch'}
 									<div class="space-y-0.5">
 										<label class="text-ui-label block">{$_('topo.grade')}</label>
@@ -724,6 +752,15 @@
 															<option value={style.id}>{style.label}</option>
 														{/each}
 													</select>
+												</div>
+												<div class="col-span-12">
+													<input
+														type="text"
+														value={getGpxAssets(pitch).join(', ')}
+														oninput={(e) => setGpxAssets(pitch, e.currentTarget.value)}
+														class="w-full bg-white border border-black/15 rounded-sm px-1 py-0.5 text-micro-data font-mono outline-none"
+														placeholder="routes/route-name-pitch.gpx"
+													/>
 												</div>
 											</div>
 										{/each}

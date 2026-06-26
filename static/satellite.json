@@ -12,7 +12,7 @@
 			"maxzoom": 22
 		},
 		"terrainSource": {
-			"url": "https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=ic9EbrsUoaMeSBLjjuEO",
+			"url": "https://tiles.mapterhorn.com/tilejson.json",
 			"type": "raster-dem"
 		},
 		"places": {
