@@ -1,57 +1,17 @@
-name: Deploy to GitHub Pages
+name: Deploy Felsstudio
 
 on:
   push:
-    branches: 'main'
-  workflow_dispatch:
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: 'pages'
-  cancel-in-progress: true
+    branches: [ main ]
 
 jobs:
-  build_site:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          lfs: true
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build site
-        env:
-          BASE_PATH: ''
-        run: npm run build
-
-      - name: Upload Artifacts
-        uses: actions/upload-pages-artifact@v3
-        with:
-          # this should match the `pages` option in your adapter-static options
-          path: 'build/'
-
   deploy:
-    needs: build_site
-    runs-on: ubuntu-latest
-
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
+    runs-on: self-hosted
     steps:
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Deploy to production
+        run: |
+          cd /home/vorstieg/felsstudio
+          git pull origin main
+          npm install
+          npm run build
+          pm2 restart felsstudio
