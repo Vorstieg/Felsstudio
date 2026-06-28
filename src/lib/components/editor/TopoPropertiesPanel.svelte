@@ -203,6 +203,17 @@
 		activeTool = 'multipitch';
 	}
 
+	function removeFixpoint(point, index) {
+		const pointId = point?.id;
+		userState.topo.fixPoints.splice(index, 1);
+		if (userState.ui.selectedFixpointId === pointId) userState.ui.selectedFixpointId = null;
+		userState.topo.routes.forEach((route) => {
+			if (route.fixPoints && route.fixPoints.includes(pointId)) {
+				route.fixPoints = route.fixPoints.filter((id) => id !== pointId);
+			}
+		});
+	}
+
 	let activeTab = $state('info');
 	let isMobile = $state(false);
 
@@ -1011,17 +1022,8 @@
 									</div>
 									<button
 										class="text-warm-gray-300 hover:text-rose-600 transition-none w-6 h-6 flex items-center justify-center rounded-sm hover:bg-rose-50"
-										onclick={() => {
-											const pointId = point.id;
-											userState.topo.fixPoints.splice(i, 1);
-											if (userState.ui.selectedFixpointId === pointId)
-												userState.ui.selectedFixpointId = null;
-											userState.topo.routes.forEach((r) => {
-												if (r.fixPoints && r.fixPoints.includes(pointId)) {
-													r.fixPoints = r.fixPoints.filter((id) => id !== pointId);
-												}
-											});
-										}}><i class="fa-solid fa-trash-can text-[10px]"></i></button
+										onclick={() => removeFixpoint(point, i)}
+										><i class="fa-solid fa-trash-can text-[10px]"></i></button
 									>
 								</div>
 							{/each}
@@ -1040,7 +1042,7 @@
 		class="fixed left-0 right-0 top-1/2 bottom-0 z-40 bg-white rounded-t-[2rem] shadow-modal border-t border-black/10 overflow-hidden"
 	>
 		<div class="bg-warm-gray-200 h-1.5 w-12 rounded-sm self-center mt-3 mx-auto"></div>
-		<div class="flex gap-1 p-2 border-b border-black/5 bg-warm-white/50 mt-2">
+		<div class="relative z-20 flex gap-1 p-2 border-b border-black/5 bg-warm-white/50 mt-2">
 			<button
 				class="flex-1 py-2.5 rounded-sm transition-none text-xs font-bold transition-all {activeTab ===
 				'info'
@@ -1129,6 +1131,260 @@
 									<i class="fa-solid fa-trash-can text-sm"></i></button
 								>
 							</div>
+
+							{#if userState.ui.selectedRouteId === route.id}
+								<div class="mt-3 space-y-3 border-t border-black/10 pt-3">
+									<div class="grid grid-cols-[1fr_6.5rem] gap-2">
+										<div class="space-y-1">
+											<label class="text-ui-label block">{$_('ui.name')}</label>
+											<input type="text" bind:value={route.name} class="input-studio w-full" />
+										</div>
+										<div class="space-y-1">
+											<label class="text-ui-label block">{$_('ui.type')}</label>
+											<select
+												value={Array.isArray(route.type) ? route.type[0] : route.type}
+												onchange={(e) => convertRouteType(route, e.currentTarget.value)}
+												class="input-studio w-full appearance-none"
+											>
+												<option value="sports-climbing">SC</option>
+												<option value="bouldering">B</option>
+												<option value="trad">T</option>
+												<option value="multi-pitch">MP</option>
+											</select>
+										</div>
+									</div>
+
+									<div class="grid grid-cols-2 gap-2">
+										<div class="space-y-1">
+											<label class="text-ui-label block">Line style</label>
+											<select
+												value={route.lineStyle || 'red'}
+												onchange={(e) => (route.lineStyle = e.currentTarget.value)}
+												class="input-studio w-full appearance-none"
+											>
+												{#each routeLineStyles as style}
+													<option value={style.id}>{style.label}</option>
+												{/each}
+											</select>
+										</div>
+										{#if route.type !== 'multi-pitch'}
+											<div class="space-y-1">
+												<label class="text-ui-label block">{$_('topo.grade')}</label>
+												<div class="flex gap-1">
+													<select bind:value={route._gradeScale} class="input-studio w-16 font-bold">
+														<option value="french">FR</option>
+														<option value="uiaa">UIAA</option>
+													</select>
+													<select bind:value={route.grade} class="input-studio min-w-0 flex-1">
+														{#each standardGrades as g}
+															{#if route._gradeScale !== 'uiaa' || uiaaMap[g]}
+																<option value={g}>{getGradeLabel(g, route._gradeScale)}</option>
+															{/if}
+														{/each}
+													</select>
+												</div>
+											</div>
+										{/if}
+									</div>
+
+									{#if route.type !== 'multi-pitch'}
+										<div class="grid grid-cols-2 gap-2">
+											<div class="space-y-1">
+												<label class="text-ui-label block">{$_('ui.length')}</label>
+												<div class="flex items-center gap-1">
+													<div class="relative min-w-0 flex-1">
+														<input
+															type="number"
+															bind:value={route.length}
+															class="input-studio w-full !pr-5"
+														/>
+														<span class="absolute right-1.5 top-2 text-micro-data">m</span>
+													</div>
+													<button
+														class="h-9 w-9 flex-shrink-0 rounded-sm border border-black/10 bg-black/5 text-warm-gray-500"
+														onclick={() =>
+															(route.length = calculateRouteLength(route, userState.topo.scale))}
+														title={$_('ui.length')}
+														aria-label={$_('ui.length')}
+													>
+														<i class="fa-solid fa-calculator text-[10px]"></i>
+													</button>
+												</div>
+											</div>
+											{#if route.type === 'sports-climbing'}
+												<div class="space-y-1">
+													<label class="text-ui-label block">{$_('topo.protection')}</label>
+													<div class="flex items-center gap-1">
+														<input
+															type="number"
+															bind:value={route.boltAmount}
+															class="input-studio min-w-0 flex-1"
+														/>
+														<button
+															class="h-9 w-9 flex-shrink-0 rounded-sm border border-black/10 bg-black/5 text-warm-gray-500"
+															onclick={() =>
+																(route.boltAmount = calculateBoltAmount(
+																	route,
+																	userState.topo.fixPoints
+																))}
+															title={$_('topo.protection')}
+															aria-label={$_('topo.protection')}
+														>
+															<i class="fa-solid fa-calculator text-[10px]"></i>
+														</button>
+													</div>
+												</div>
+											{/if}
+										</div>
+									{:else}
+										<div class="rounded-sm border border-black/10 bg-warm-white p-2 space-y-2">
+											<div class="flex items-center justify-between gap-2">
+												<label class="text-ui-label block">{$_('ui.pitches')}</label>
+												<div class="flex items-center gap-1">
+													<button
+														class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-warm-gray-500"
+														onclick={() => addPitch(route)}
+													>
+														{$_('ui.add_pitch')}
+													</button>
+													<select
+														bind:value={route._gradeScale}
+														class="rounded-sm border border-black/15 bg-white px-1 py-1 text-micro-data outline-none"
+													>
+														<option value="french">FR</option>
+														<option value="uiaa">UIAA</option>
+													</select>
+												</div>
+											</div>
+											{#each route.pitches || [] as pitch, idx}
+												<div class="grid grid-cols-12 gap-1 rounded-sm border border-black/10 bg-white p-1">
+													<div class="col-span-1 flex items-center justify-center">
+														<span class="text-micro-data font-bold">{idx + 1}</span>
+													</div>
+													<div class="col-span-5">
+														<select
+															bind:value={pitch.grade}
+															class="w-full rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none"
+														>
+															<option value="">Grade</option>
+															{#each standardGrades as g}
+																{#if route._gradeScale !== 'uiaa' || uiaaMap[g]}
+																	<option value={g}>{getGradeLabel(g, route._gradeScale)}</option>
+																{/if}
+															{/each}
+														</select>
+													</div>
+													<div class="col-span-4">
+														<input
+															type="number"
+															bind:value={pitch.length}
+															class="w-full rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none"
+														/>
+													</div>
+													<button
+														class="col-span-1 text-warm-gray-300"
+														onclick={() =>
+															(pitch.length = calculateRouteLength(pitch, userState.topo.scale))}
+														title={$_('ui.length')}
+														aria-label={$_('ui.length')}
+													>
+														<i class="fa-solid fa-calculator text-[9px]"></i>
+													</button>
+													<button
+														class="col-span-1 text-rose-500"
+														onclick={() => {
+															route.pitches.splice(idx, 1);
+															if (drawingTarget?.pitchId === pitch.id) drawingTarget = null;
+														}}
+														title={$_('ui.delete_pitch')}
+														aria-label={$_('ui.delete_pitch')}
+													>
+														<i class="fa-solid fa-trash-can text-[9px]"></i>
+													</button>
+												</div>
+											{/each}
+
+											<div class="border-t border-black/10 pt-2 space-y-2">
+												<div class="flex items-center justify-between">
+													<label class="text-ui-label block">{$_('ui.variants')}</label>
+													<button
+														class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-warm-gray-500"
+														onclick={() => addVariant(route)}
+													>
+														{$_('ui.add_variant')}
+													</button>
+												</div>
+												{#each route.variants || [] as variant, idx}
+													<div class="grid grid-cols-12 gap-1 rounded-sm border border-black/10 bg-white p-1">
+														<input
+															bind:value={variant.name}
+															placeholder={$_('ui.variant_name_placeholder')}
+															class="col-span-5 rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none"
+														/>
+														<select
+															bind:value={variant.grade}
+															class="col-span-4 rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none"
+														>
+															<option value="">Grade</option>
+															{#each standardGrades as g}
+																{#if route._gradeScale !== 'uiaa' || uiaaMap[g]}
+																	<option value={g}>{getGradeLabel(g, route._gradeScale)}</option>
+																{/if}
+															{/each}
+														</select>
+														<button
+															class="col-span-1 text-creator-blue"
+															onclick={() => drawVariant(route, variant)}
+															title={$_('ui.draw_variant')}
+															aria-label={$_('ui.draw_variant')}
+														>
+															<i class="fa-solid fa-pencil text-[9px]"></i>
+														</button>
+														<button
+															class="col-span-1 text-rose-500"
+															onclick={() => {
+																route.variants.splice(idx, 1);
+																route.variants = [...route.variants];
+																if (drawingTarget?.variantId === variant.id) drawingTarget = null;
+															}}
+															title={$_('ui.delete_variant')}
+															aria-label={$_('ui.delete_variant')}
+														>
+															<i class="fa-solid fa-trash-can text-[9px]"></i>
+														</button>
+													</div>
+												{/each}
+											</div>
+										</div>
+									{/if}
+
+									<div class="space-y-1">
+										<label class="text-ui-label block">GPX Assets</label>
+										<input
+											type="text"
+											value={getGpxAssets(route).join(', ')}
+											oninput={(e) => setGpxAssets(route, e.currentTarget.value)}
+											class="input-studio w-full font-mono"
+											placeholder="routes/route-name.gpx"
+										/>
+									</div>
+
+									<div class="space-y-1">
+										<label class="text-ui-label block">{$_('ui.description')}</label>
+										<textarea
+											bind:value={route.description}
+											rows="2"
+											class="input-studio w-full resize-none"
+										></textarea>
+									</div>
+
+									<TagSelector
+										bind:selectedTags={route.tags}
+										availableTags={availableRouteTags}
+										small={true}
+									/>
+								</div>
+							{/if}
 						</div>
 					{/each}
 				{:else if activeTab === 'fixpoints'}
@@ -1187,28 +1443,50 @@
 						</div>
 					{/if}
 
-					{#each userState.topo.fixPoints as point, i (point.id)}
-						<div class="panel p-3 flex items-center gap-3 border-2 border-transparent">
-							<div
-								class="w-8 h-8 rounded-sm transition-none bg-warm-gray-100 flex items-center justify-center text-warm-gray-500 text-xs font-black shadow-sm"
-							>
-								{i + 1}
-							</div>
-							<select
-								bind:value={point.type}
-								class="flex-1 bg-transparent text-sm font-black text-near-black outline-none appearance-none"
-							>
-								{#each topoSymbols as symbol}
-									<option value={symbol.id}>{$_(`topo.fixpoints.${symbol.id}`)}</option>
-								{/each}
-							</select>
-							<button
-								class="w-9 h-9 flex items-center justify-center rounded-sm text-warm-gray-200 hover:bg-red-50 hover:text-red-500 transition-none"
-								onclick={() => userState.topo.fixPoints.splice(i, 1)}
-								><i class="fa-solid fa-trash-can text-sm"></i>
-							</button>
+					{#if userState.topo.fixPoints.length === 0}
+						<div class="bg-warm-white rounded-sm p-4 text-center border border-black/15">
+							<p class="text-body-text text-warm-gray-500 font-medium">
+								{$_('ui.no_fixpoints_yet')}
+							</p>
 						</div>
-					{/each}
+					{:else}
+						{#each userState.topo.fixPoints as point, i (point.id)}
+							<div
+								id={'fixpoint-' + point.id}
+								class="panel p-3 flex items-center gap-3 border-2 {userState.ui
+									.selectedFixpointId === point.id
+									? 'border-creator-blue'
+									: 'border-transparent'}"
+							>
+								<button
+									class="w-9 h-9 rounded-sm transition-none bg-warm-gray-100 flex items-center justify-center text-warm-gray-500 text-xs font-black shadow-sm"
+									onclick={() => {
+										userState.ui.selectedFixpointId =
+											userState.ui.selectedFixpointId === point.id ? null : point.id;
+										userState.ui.selectedRouteId = null;
+									}}
+									aria-label={`${$_('ui.fixpoints')} ${i + 1}`}
+								>
+									{i + 1}
+								</button>
+								<select
+									bind:value={point.type}
+									class="min-w-0 flex-1 bg-transparent text-sm font-black text-near-black outline-none appearance-none"
+								>
+									{#each topoSymbols as symbol}
+										<option value={symbol.id}>{$_(`topo.fixpoints.${symbol.id}`)}</option>
+									{/each}
+								</select>
+								<button
+									class="h-9 flex items-center justify-center gap-1.5 rounded-sm bg-rose-50 px-3 text-[11px] font-bold text-rose-700 transition-none hover:bg-rose-100"
+									onclick={() => removeFixpoint(point, i)}
+								>
+									<i class="fa-solid fa-trash-can text-[10px]"></i>
+									<span>{$_('ui.remove')}</span>
+								</button>
+							</div>
+						{/each}
+					{/if}
 				{:else}
 					<div class="space-y-4 pt-1">
 						<div class="space-y-1.5 px-1">
@@ -1233,7 +1511,7 @@
 
 <style>
 	:global(.grabber.top) {
-		height: 100px;
+		height: 28px;
 		width: 100%;
 		position: absolute;
 		top: 0;

@@ -1872,11 +1872,11 @@
 					enter
 						.append('circle')
 						.attr('class', 'current-point')
-						.attr('r', 3)
 						.attr('fill', '#ff00ff'),
 				(update) => update,
 				(exit) => exit.remove()
 			)
+			.attr('r', getTouchTargetSize(3))
 			.attr('cx', (p) => p[0] * baseWidth)
 			.attr('cy', (p) => p[1] * baseHeight);
 
@@ -1919,11 +1919,11 @@
 					enter
 						.append('circle')
 						.attr('class', 'current-outline-point')
-						.attr('r', 3)
 						.attr('fill', '#f59e0b'),
 				(update) => update,
 				(exit) => exit.remove()
 			)
+			.attr('r', getTouchTargetSize(3))
 			.attr('cx', (p) => p[0] * baseWidth)
 			.attr('cy', (p) => p[1] * baseHeight);
 

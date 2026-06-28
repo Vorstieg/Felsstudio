@@ -785,11 +785,14 @@
 	{/if}
 </div>
 
-{#if browser && userState.topo.editorMode === '2d' && activeTool === 'outline'}
-	<div class="fixed top-[100px] left-2 z-[101]">
+{#if browser && userState.topo.editorMode === '2d' && ['route', 'multipitch', 'outline'].includes(activeTool)}
+	<div class="fixed bottom-16 left-2 right-2 z-[101] md:bottom-auto md:right-auto md:top-[100px]">
 		<OutlineToolOptions
 			outlineTool={editor2D?.getCurrentTool?.()}
+			{activeTool}
 			bind:selectedOutlineStyle
+			onFinalize={handleFinishRoute}
+			onCancelAction={handleCancelAction}
 			onClose={() => (activeTool = null)}
 		/>
 	</div>
