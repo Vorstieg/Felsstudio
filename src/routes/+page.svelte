@@ -62,7 +62,8 @@
 			icon: 'fa-layer-group',
 			color: 'bg-workspace-topo-2d',
 			newId: 'topos/2d/new',
-			editId: 'topos/2d/edit'
+			editId: null,
+			actionLabel: 'ui.new_or_edit'
 		}
 	];
 </script>
@@ -97,15 +98,17 @@
 								class="flex-1 btn-primary"
 								onclick={() => handleSelect(ws.newId)}
 							>
-								{$_('ui.create')}
+								{$_(ws.actionLabel || 'ui.create')}
 							</button>
-							<button
-								class="w-8 h-8 flex items-center justify-center bg-transparent border border-black/15 text-near-black rounded hover:bg-black/5 hover:border-black/30 transition-none"
-								onclick={() => handleSelect(ws.editId)}
-								title={$_('ui.edit_existing')}
-							>
-								<i class="fa-solid fa-pen text-[10px]"></i>
-							</button>
+							{#if ws.editId}
+								<button
+									class="w-8 h-8 flex items-center justify-center bg-transparent border border-black/15 text-near-black rounded hover:bg-black/5 hover:border-black/30 transition-none"
+									onclick={() => handleSelect(ws.editId)}
+									title={$_('ui.edit_existing')}
+								>
+									<i class="fa-solid fa-pen text-[10px]"></i>
+								</button>
+							{/if}
 						</div>
 					</div>
 				{/each}
@@ -209,7 +212,10 @@
 									{$_(workspaces.find((w) => w.newId === selectedWorkspace || w.editId === selectedWorkspace)?.name)}
 								</h2>
 								<p class="text-micro-data text-creator-blue mt-0.5">
-									{$_('ui.workspace_label')}: {$_('ui.' + selectedWorkspace.split('/').at(-1))}
+									{$_('ui.workspace_label')}: {$_(
+										workspaces.find((w) => w.newId === selectedWorkspace)?.actionLabel ||
+											'ui.' + selectedWorkspace.split('/').at(-1)
+									)}
 								</p>
 							</div>
 						</div>

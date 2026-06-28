@@ -3,7 +3,7 @@
  * Wraps all interactions with the Felslager file-system API.
  */
 
-const BASE_URL = import.meta.env.VITE_FELSLAGER_URL || 'http://100.85.95.46:3001/api/fs';
+const BASE_URL = import.meta.env.VITE_FELSLAGER_URL || 'https://felslager.vorstieg.eu/api/fs';
 const CRED_KEY = 'felslager_auth';
 
 // --- Credential Management (sessionStorage) ---
@@ -68,6 +68,10 @@ function authHeaders() {
 	return { Authorization: `Basic ${cred}` };
 }
 
+function isAuthRejected(res) {
+	return res.status === 401 || res.status === 403;
+}
+
 /**
  * Normalize a path (strip leading slash, ensure no double slashes)
  * @param {string} path
@@ -125,10 +129,19 @@ export async function writeFile(path, body, contentType) {
 	const headers = { ...authHeaders() };
 	if (contentType) headers['Content-Type'] = contentType;
 	const url = `${BASE_URL}/${normalizePath(path)}`;
-	const res = await fetch(url, { method: 'PUT', headers, body });
+	let res;
+	try {
+		res = await fetch(url, { method: 'PUT', headers, body });
+	} catch (err) {
+		console.error(`Failed to write ${path}: request failed`, err);
+		throw err;
+	}
 	if (!res.ok) {
+		if (isAuthRejected(res)) clearCredentials();
 		const text = await res.text().catch(() => '');
-		throw new Error(`Failed to write ${path}: ${res.status} ${res.statusText}${text ? ' - ' + text : ''}`);
+		const message = `Failed to write ${path}: ${res.status} ${res.statusText}${text ? ' - ' + text : ''}`;
+		console.error(message);
+		throw new Error(message);
 	}
 	return res;
 }
@@ -152,7 +165,10 @@ export async function writeJson(path, data) {
 export async function deleteFile(path) {
 	const url = `${BASE_URL}/${normalizePath(path)}`;
 	const res = await fetch(url, { method: 'DELETE', headers: authHeaders() });
-	if (!res.ok) throw new Error(`Failed to delete ${path}: ${res.status} ${res.statusText}`);
+	if (!res.ok) {
+		if (isAuthRejected(res)) clearCredentials();
+		throw new Error(`Failed to delete ${path}: ${res.status} ${res.statusText}`);
+	}
 	return res;
 }
 

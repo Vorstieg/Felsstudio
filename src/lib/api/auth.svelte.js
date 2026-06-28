@@ -32,6 +32,7 @@ export const authState = $state({
 	 */
 	login(user, pass) {
 		if (!user || !pass) {
+			clearCredentials();
 			this.error = 'Username and password are required.';
 			return;
 		}

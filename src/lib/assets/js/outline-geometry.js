@@ -133,10 +133,7 @@ export function simplifyPoints(points, tolerancePx = DEFAULT_FREEHAND_SMOOTHING_
 }
 
 export function isClosedShape(points = []) {
-	if (points.length < 3) return false;
-	const first = points[0];
-	const last = points[points.length - 1];
-	return first?.[0] === last?.[0] && first?.[1] === last?.[1];
+	return isClosedPath(points);
 }
 
 export function pointsToSvg(points = [], canvasSize = {}) {
@@ -170,18 +167,20 @@ export function translateOutline(outline, deltaX, deltaY, canvasSize = {}) {
 	} else if (outline.shape?.type === OUTLINE_SHAPE_TYPES.CIRCLE) {
 		outline.shape.center2D = [outline.shape.center2D[0] + deltaX, outline.shape.center2D[1] + deltaY];
 	} else if (outline.shape?.points2D) {
-		outline.shape.points2D = outline.shape.points2D.map((p) => [p[0] + deltaX, p[1] + deltaY]);
+		outline.shape.points2D = translatePath(outline.shape.points2D, [deltaX, deltaY]);
 	} else if (outline.points2D) {
-		outline.points2D = outline.points2D.map((p) => [p[0] + deltaX, p[1] + deltaY]);
+		outline.points2D = translatePath(outline.points2D, [deltaX, deltaY]);
 	}
 
 	outline.points2D = getOutlinePoints(outline, canvasSize);
 }
 
 export function setOutlinePoint(outline, pointIndex, point, canvasSize = {}) {
-	const points = [...getOutlinePoints(outline, canvasSize)];
+	const currentPoints = getOutlinePoints(outline, canvasSize);
+	const points = movePathVertex(currentPoints, pointIndex, point, {
+		closed: isClosedPath(currentPoints)
+	});
 	if (!points[pointIndex]) return;
-	points[pointIndex] = point;
 
 	if (outline.shape?.type === OUTLINE_SHAPE_TYPES.RECTANGLE) {
 		outline.shape = {
@@ -199,8 +198,10 @@ export function setOutlinePoint(outline, pointIndex, point, canvasSize = {}) {
 }
 
 export function insertOutlinePoint(outline, insertIndex, point, canvasSize = {}) {
-	const points = [...getOutlinePoints(outline, canvasSize)];
-	points.splice(insertIndex, 0, point);
+	const currentPoints = getOutlinePoints(outline, canvasSize);
+	const points = insertPathVertex(currentPoints, insertIndex, point, {
+		closed: isClosedPath(currentPoints)
+	});
 	outline.shape = {
 		type: OUTLINE_SHAPE_TYPES.POLYLINE,
 		points2D: points
@@ -209,12 +210,20 @@ export function insertOutlinePoint(outline, insertIndex, point, canvasSize = {})
 }
 
 export function removeOutlinePoint(outline, pointIndex, canvasSize = {}) {
-	const points = getOutlinePoints(outline, canvasSize).filter((_, i) => i !== pointIndex);
+	const currentPoints = getOutlinePoints(outline, canvasSize);
+	const points = removePathVertex(currentPoints, pointIndex, {
+		closed: isClosedPath(currentPoints)
+	});
 	outline.shape = {
 		type: OUTLINE_SHAPE_TYPES.POLYLINE,
 		points2D: points
 	};
 	outline.points2D = points;
+}
+
+export function getOutlineMidpoints(outline, canvasSize = {}) {
+	const points = getOutlinePoints(outline, canvasSize);
+	return getPathMidpoints(points, { closed: isClosedPath(points) });
 }
 
 export function createOutlineRecord({
@@ -255,3 +264,11 @@ export function prepareOutlinesForExport(outlines = [], canvasSize = {}) {
 		return exported;
 	});
 }
+import {
+	getPathMidpoints,
+	insertPathVertex,
+	isClosedPath,
+	movePathVertex,
+	removePathVertex,
+	translatePath
+} from '$lib/assets/js/path-geometry.js';

@@ -3,6 +3,7 @@
 	import maplibregl from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import * as turf from '@turf/turf';
+	import { _ } from 'svelte-i18n';
 	import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
 	import { userState } from '$lib/state/editor.svelte.js';
 	import { base } from '$app/paths';
@@ -13,6 +14,20 @@
 	import CragEditorSidebar from '$lib/components/editor/crag/CragEditorSidebar.svelte';
 	import { writeJson } from '$lib/api/felslager.js';
 	import { authState } from '$lib/api/auth.svelte.js';
+	import {
+		createPolygonAround,
+		getGeometryCenter,
+		getSectorEntryPath,
+		pathBasename,
+		translateGeometryTo
+	} from '$lib/assets/js/sector-utils.js';
+	import {
+		getGeometryPath,
+		insertGeometryVertex,
+		moveGeometryVertex,
+		removeGeometryVertex
+	} from '$lib/assets/js/geometry-path-adapters.js';
+	import { getEditablePath, getPathMidpoints } from '$lib/assets/js/path-geometry.js';
 
 	let { inspectorShadow = true } = $props();
 
@@ -40,21 +55,78 @@
 	let detectedAssets = $state([]);
 	let hoverMarker = null;
 	let draggingTrackPointIndex = null;
+	let draggingSectorVertex = null;
+	let draggingSectorMarkerId = null;
+	let selectedSectorVertex = $state(null);
+	let vertexDeleteUndo = $state(null);
+	let vertexDeleteUndoTimer = null;
 	let areTrackPointDragHandlersReady = false;
+	let areSectorEditHandlersReady = false;
 	let suppressNextMapClick = false;
 
 	const cragTypes = ['sports-climbing', 'multi-pitch', 'bouldering', 'trad'];
 
 	const availableTags = [
-		'Kinderfreundlich', 'Regensicher', 'Kurzer Zustieg', 'Alpin', 'Brüchig', 'Beliebt',
-		'Morgensonne', 'Abendsonne', 'Schattig', 'Technisch', 'Kraft', 'Ausdauer',
-		'Leisten', 'Löcher', 'Riss', 'Platte', 'Überhang', 'Weite Haken', 'Abgespeckt',
-		'Klassiker', 'Boulder-Start'
+		'Kinderfreundlich',
+		'Regensicher',
+		'Kurzer Zustieg',
+		'Alpin',
+		'Brüchig',
+		'Beliebt',
+		'Morgensonne',
+		'Abendsonne',
+		'Schattig',
+		'Technisch',
+		'Kraft',
+		'Ausdauer',
+		'Leisten',
+		'Löcher',
+		'Riss',
+		'Platte',
+		'Überhang',
+		'Weite Haken',
+		'Abgespeckt',
+		'Klassiker',
+		'Boulder-Start'
 	];
 
 	const securityOptions = ['Sehr Gut', 'Gut', 'Mittel', 'Alpine'];
-	const rockTypes = ['limestone', 'granite', 'gneiss', 'dolomite', 'sandstone', 'basalt', 'tuff', 'rhyolite', 'quartzite', 'conglomerate', 'schist', 'slate'];
-	const commonEquipment = ['Expressschlingen', 'Friends', 'Keile', 'Seil', 'Helm', 'Eisschrauben', 'Eisgeräte'];
+	const rockTypes = [
+		'limestone',
+		'granite',
+		'gneiss',
+		'dolomite',
+		'sandstone',
+		'basalt',
+		'tuff',
+		'rhyolite',
+		'quartzite',
+		'conglomerate',
+		'schist',
+		'slate'
+	];
+	const commonEquipment = [
+		'Expressschlingen',
+		'Friends',
+		'Keile',
+		'Seil',
+		'Helm',
+		'Eisschrauben',
+		'Eisgeräte'
+	];
+
+	function slugifyName(value, fallback = 'new-crag') {
+		return (value || fallback).trim().toLowerCase().replace(/\s+/g, '-');
+	}
+
+	function getCragId(crag) {
+		return crag.id || crag.path?.split('/').filter(Boolean).at(-1) || slugifyName(crag.name);
+	}
+
+	function getTopoId(crag, sector = null) {
+		const cragId = getCragId(crag);
+		return sector?.id ? `${cragId}:${sector.id}` : cragId;
+	}
 
 	onMount(() => {
 		const coords = $state.snapshot(cragEditorState.crag.geometry.coordinates);
@@ -78,7 +150,11 @@
 				return;
 			}
 
-			if (activeTool === 'track' && currentTrackPoints.length === 0 && map.getLayer('tracks-line-saved')) {
+			if (
+				activeTool === 'track' &&
+				currentTrackPoints.length === 0 &&
+				map.getLayer('tracks-line-saved')
+			) {
 				const features = map.queryRenderedFeatures(e.point, { layers: ['tracks-line-saved'] });
 				const trackIndex = Number(features[0]?.properties?.trackIndex);
 				if (Number.isInteger(trackIndex)) {
@@ -88,7 +164,10 @@
 			}
 
 			if (map.getLayer('detection-points')) {
-				const bbox = [[e.point.x - 30, e.point.y - 30], [e.point.x + 30, e.point.y + 30]];
+				const bbox = [
+					[e.point.x - 30, e.point.y - 30],
+					[e.point.x + 30, e.point.y + 30]
+				];
 				const features = map.queryRenderedFeatures(bbox, { layers: ['detection-points'] });
 				if (features.length > 0) {
 					const closest = features.reduce((prev, curr) => {
@@ -97,7 +176,7 @@
 						return currDist < prevDist ? curr : prev;
 					});
 					const assetId = closest.properties.id;
-					const asset = detectedAssets.find(a => a.id === assetId);
+					const asset = detectedAssets.find((a) => a.id === assetId);
 					if (asset) {
 						addDetectedAsset(asset);
 						return;
@@ -111,7 +190,7 @@
 			}
 
 			if (activeTool === 'position') {
-				setSelectedPosition(lngLat);
+				if (!selectedSectorId) setCragPosition(lngLat);
 			} else if (activeTool === 'transit') {
 				addTransitPoint(lngLat);
 			} else if (activeTool === 'parking') {
@@ -134,20 +213,26 @@
 		window.addEventListener('keydown', handleKeyDown);
 		return () => {
 			window.removeEventListener('keydown', handleKeyDown);
+			clearTimeout(vertexDeleteUndoTimer);
 			if (map) map.remove();
 		};
 	});
 
 	$effect(() => {
 		if (!isMapLoaded || !map) return;
-		syncTrackData();
+		syncEditorData();
 	});
 
 	$effect(() => {
 		if (!isMapLoaded || !map) return;
 		JSON.stringify(cragEditorState.crag.sectors || []);
 		selectedSectorId;
-		untrack(() => syncSectorMarkers());
+		selectedSectorVertex;
+		draggingSectorMarkerId;
+		untrack(() => {
+			if (!draggingSectorMarkerId) syncSectorMarkers();
+			syncEditorData();
+		});
 	});
 
 	$effect(() => {
@@ -168,7 +253,7 @@
 		if (source) {
 			source.setData({
 				type: 'FeatureCollection',
-				features: detectedAssets.map(a => ({
+				features: detectedAssets.map((a) => ({
 					type: 'Feature',
 					geometry: { type: 'Point', coordinates: a.coordinates },
 					properties: { type: a.type, id: a.id }
@@ -189,12 +274,27 @@
 
 	function snapToNearestWay(point, originalLngLat) {
 		if (!map) return originalLngLat;
-		const layers = ['Path', 'Track', 'Minor road', 'Minor road outline', 'Main road', 'Highway', 'Road construction', 'snap-helper'].filter(id => map.getLayer(id));
-		const features = map.queryRenderedFeatures([[point.x - 20, point.y - 20], [point.x + 20, point.y + 20]], { layers });
+		const layers = [
+			'Path',
+			'Track',
+			'Minor road',
+			'Minor road outline',
+			'Main road',
+			'Highway',
+			'Road construction',
+			'snap-helper'
+		].filter((id) => map.getLayer(id));
+		const features = map.queryRenderedFeatures(
+			[
+				[point.x - 20, point.y - 20],
+				[point.x + 20, point.y + 20]
+			],
+			{ layers }
+		);
 		if (features.length === 0) return originalLngLat;
 		let closestPoint = null;
 		let minDistance = Infinity;
-		features.forEach(feature => {
+		features.forEach((feature) => {
 			if (feature.geometry.type === 'LineString' || feature.geometry.type === 'MultiLineString') {
 				const snapped = turf.nearestPointOnLine(feature, turf.point(originalLngLat));
 				const dist = turf.distance(turf.point(originalLngLat), snapped);
@@ -296,18 +396,36 @@
 		const features = map.querySourceFeatures('maptiler_planet', { sourceLayer: 'poi' });
 		const suggestions = [];
 		const seen = new Set();
-		features.forEach(f => {
+		features.forEach((f) => {
 			const props = f.properties;
 			const cls = props.class || '';
 			const sub = props.subclass || '';
-			let assetCoords = f.geometry.type === 'Point' ? f.geometry.coordinates : turf.centroid(f).geometry.coordinates;
+			let assetCoords =
+				f.geometry.type === 'Point'
+					? f.geometry.coordinates
+					: turf.centroid(f).geometry.coordinates;
 			const key = `${props.name || 'unnamed'}-${assetCoords[0].toFixed(4)},${assetCoords[1].toFixed(4)}`;
 			if (seen.has(key)) return;
 			seen.add(key);
 			let type = null;
 			if (cls === 'parking' || sub === 'parking') type = 'parking';
-			else if (cls === 'bus' || cls === 'bus_stop' || sub === 'bus_stop' || sub === 'bus_station' || cls === 'transit' || sub === 'transit') type = 'bus';
-			else if (cls === 'railway' || cls === 'station' || cls === 'subway' || sub === 'station' || sub === 'halt') type = 'train';
+			else if (
+				cls === 'bus' ||
+				cls === 'bus_stop' ||
+				sub === 'bus_stop' ||
+				sub === 'bus_station' ||
+				cls === 'transit' ||
+				sub === 'transit'
+			)
+				type = 'bus';
+			else if (
+				cls === 'railway' ||
+				cls === 'station' ||
+				cls === 'subway' ||
+				sub === 'station' ||
+				sub === 'halt'
+			)
+				type = 'train';
 			if (type) {
 				if (filterType === 'parking' && type !== 'parking') return;
 				if (filterType === 'transit' && type !== 'bus' && type !== 'train') return;
@@ -320,7 +438,10 @@
 					coordinates: assetCoords,
 					distance
 				};
-				const exists = [...cragEditorState.transit, ...cragEditorState.parking].some(item => turf.distance(turf.point(item.coordinates), turf.point(asset.coordinates)) < 0.01);
+				const exists = [...cragEditorState.transit, ...cragEditorState.parking].some(
+					(item) =>
+						turf.distance(turf.point(item.coordinates), turf.point(asset.coordinates)) < 0.01
+				);
 				if (!exists) suggestions.push(asset);
 			}
 		});
@@ -353,22 +474,18 @@
 			cragEditorState.transit = [...cragEditorState.transit, point];
 			createTransitMarker(point);
 		}
-		detectedAssets = detectedAssets.filter(a => a.id !== asset.id);
+		detectedAssets = detectedAssets.filter((a) => a.id !== asset.id);
 	}
 
 	function setCragPositionFromSearch(coordinates) {
 		if (!coordinates) return;
-		setSelectedPosition(coordinates);
+		setCragPosition(coordinates);
 		if (activeTool === 'parking' || activeTool === 'transit') {
 			scanNearbyAssets(activeTool === 'parking' ? 'parking' : 'transit');
 		}
 	}
 
-	function setSelectedPosition(coordinates) {
-		if (selectedSectorId) {
-			updateSectorCoordinates(selectedSectorId, coordinates);
-			return;
-		}
+	function setCragPosition(coordinates) {
 		cragEditorState.crag.geometry.coordinates = coordinates;
 		if (cragMarker) cragMarker.setLngLat(coordinates);
 	}
@@ -378,46 +495,64 @@
 			if (sector.id !== id) return sector;
 			return {
 				...sector,
-				geometry: {
-					type: 'Point',
-					...(sector.geometry || {}),
+				geometry: translateGeometryTo(
+					sector.geometry || { type: 'Point', coordinates },
 					coordinates
-				}
+				)
+			};
+		});
+	}
+
+	function setSectorGeometryType(id, type) {
+		cragEditorState.crag.sectors = (cragEditorState.crag.sectors || []).map((sector) => {
+			if (sector.id !== id || sector.geometry?.type === type) return sector;
+			const center = getGeometryCenter(sector.geometry) ||
+				cragEditorState.crag.geometry?.coordinates || [0, 0];
+			return {
+				...sector,
+				geometry:
+					type === 'Polygon'
+						? createPolygonAround(center)
+						: { type: 'Point', coordinates: [...center] }
 			};
 		});
 	}
 
 	function initMarkersAndLayers() {
 		if (!map) return;
-		if (!map.getSource('maptiler_planet')) map.addSource('maptiler_planet', {
-			type: 'vector',
-			url: 'https://api.maptiler.com/tiles/v3/tiles.json?key=ic9EbrsUoaMeSBLjjuEO'
-		});
-		if (!map.getLayer('snap-helper')) map.addLayer({
-			id: 'snap-helper',
-			type: 'line',
-			source: 'maptiler_planet',
-			'source-layer': 'transportation',
-			paint: { 'line-opacity': 0 },
-			layout: { 'visibility': 'visible' }
-		});
-		if (!map.getSource('detection-highlights')) map.addSource('detection-highlights', {
-			type: 'geojson',
-			data: { type: 'FeatureCollection', features: [] }
-		});
-		if (!map.getLayer('detection-points')) map.addLayer({
-			id: 'detection-points',
-			type: 'circle',
-			source: 'detection-highlights',
-			paint: {
-				'circle-radius': 12,
-				'circle-color': '#0075de',
-				'circle-opacity': 0.3,
-				'circle-stroke-width': 2,
-				'circle-stroke-color': '#0075de',
-				'circle-stroke-opacity': 0.7
-			}
-		});
+		if (!map.getSource('maptiler_planet'))
+			map.addSource('maptiler_planet', {
+				type: 'vector',
+				url: 'https://api.maptiler.com/tiles/v3/tiles.json?key=ic9EbrsUoaMeSBLjjuEO'
+			});
+		if (!map.getLayer('snap-helper'))
+			map.addLayer({
+				id: 'snap-helper',
+				type: 'line',
+				source: 'maptiler_planet',
+				'source-layer': 'transportation',
+				paint: { 'line-opacity': 0 },
+				layout: { visibility: 'visible' }
+			});
+		if (!map.getSource('detection-highlights'))
+			map.addSource('detection-highlights', {
+				type: 'geojson',
+				data: { type: 'FeatureCollection', features: [] }
+			});
+		if (!map.getLayer('detection-points'))
+			map.addLayer({
+				id: 'detection-points',
+				type: 'circle',
+				source: 'detection-highlights',
+				paint: {
+					'circle-radius': 12,
+					'circle-color': '#0075de',
+					'circle-opacity': 0.3,
+					'circle-stroke-width': 2,
+					'circle-stroke-color': '#0075de',
+					'circle-stroke-opacity': 0.7
+				}
+			});
 
 		const markerPos = $state.snapshot(cragEditorState.crag.geometry.coordinates);
 		const el = document.createElement('div');
@@ -427,7 +562,9 @@
 		el.style.backgroundImage = `url(${base}/icons/sports-climbing.png)`;
 		el.style.backgroundSize = 'cover';
 		if (cragMarker) cragMarker.remove();
-		cragMarker = new maplibregl.Marker({ element: el, draggable: true }).setLngLat(markerPos).addTo(map);
+		cragMarker = new maplibregl.Marker({ element: el, draggable: true })
+			.setLngLat(markerPos)
+			.addTo(map);
 		cragMarker.on('dragstart', () => {
 			detectedAssets = [];
 			if (hoverMarker) hoverMarker.remove();
@@ -435,51 +572,134 @@
 		cragMarker.on('dragend', () => {
 			const pos = cragMarker.getLngLat();
 			cragEditorState.crag.geometry.coordinates = [pos.lng, pos.lat];
-			if (activeTool === 'parking' || activeTool === 'transit') scanNearbyAssets(activeTool === 'parking' ? 'parking' : 'transit');
+			if (activeTool === 'parking' || activeTool === 'transit')
+				scanNearbyAssets(activeTool === 'parking' ? 'parking' : 'transit');
 		});
 		syncSectorMarkers();
 
-		transitMarkers.forEach(m => m.marker.remove());
+		transitMarkers.forEach((m) => m.marker.remove());
 		transitMarkers = [];
-		cragEditorState.transit.forEach(p => createTransitMarker(p));
-		parkingMarkers.forEach(m => m.marker.remove());
+		cragEditorState.transit.forEach((p) => createTransitMarker(p));
+		parkingMarkers.forEach((m) => m.marker.remove());
 		parkingMarkers = [];
-		cragEditorState.parking.forEach(p => createParkingMarker(p));
+		cragEditorState.parking.forEach((p) => createParkingMarker(p));
 
-		if (!map.getSource('crag-editor-data')) map.addSource('crag-editor-data', {
-			type: 'geojson',
-			data: { type: 'FeatureCollection', features: [] }
-		});
-		if (!map.getLayer('tracks-line-saved')) map.addLayer({
-			id: 'tracks-line-saved',
-			type: 'line',
-			source: 'crag-editor-data',
-			filter: ['==', ['get', 'state'], 'saved'],
-			layout: { 'line-join': 'round', 'line-cap': 'round' },
-			paint: { 'line-color': '#31302e', 'line-width': 4 }
-		});
-		if (!map.getLayer('tracks-line-drawing')) map.addLayer({
-			id: 'tracks-line-drawing',
-			type: 'line',
-			source: 'crag-editor-data',
-			filter: ['==', ['get', 'state'], 'drawing'],
-			layout: { 'line-join': 'round', 'line-cap': 'round' },
-			paint: { 'line-color': '#0075de', 'line-width': 3, 'line-dasharray': [2, 1] }
-		});
-		if (!map.getLayer('tracks-points-drawing')) map.addLayer({
-			id: 'tracks-points-drawing',
-			type: 'circle',
-			source: 'crag-editor-data',
-			filter: ['all', ['==', ['get', 'type'], 'Point'], ['==', ['get', 'state'], 'drawing']],
-			paint: {
-				'circle-radius': 5,
-				'circle-color': '#ffffff',
-				'circle-stroke-width': 2,
-				'circle-stroke-color': '#0075de'
-			}
-		});
+		if (!map.getSource('crag-editor-data'))
+			map.addSource('crag-editor-data', {
+				type: 'geojson',
+				data: { type: 'FeatureCollection', features: [] }
+			});
+		if (!map.getLayer('tracks-line-saved'))
+			map.addLayer({
+				id: 'tracks-line-saved',
+				type: 'line',
+				source: 'crag-editor-data',
+				filter: ['==', ['get', 'state'], 'saved'],
+				layout: { 'line-join': 'round', 'line-cap': 'round' },
+				paint: { 'line-color': '#31302e', 'line-width': 4 }
+			});
+		if (!map.getLayer('tracks-line-drawing'))
+			map.addLayer({
+				id: 'tracks-line-drawing',
+				type: 'line',
+				source: 'crag-editor-data',
+				filter: ['==', ['get', 'state'], 'drawing'],
+				layout: { 'line-join': 'round', 'line-cap': 'round' },
+				paint: { 'line-color': '#0075de', 'line-width': 3, 'line-dasharray': [2, 1] }
+			});
+		if (!map.getLayer('tracks-points-drawing'))
+			map.addLayer({
+				id: 'tracks-points-drawing',
+				type: 'circle',
+				source: 'crag-editor-data',
+				filter: ['all', ['==', ['get', 'type'], 'Point'], ['==', ['get', 'state'], 'drawing']],
+				paint: {
+					'circle-radius': 5,
+					'circle-color': '#ffffff',
+					'circle-stroke-width': 2,
+					'circle-stroke-color': '#0075de'
+				}
+			});
+		if (!map.getLayer('sector-polygons-fill'))
+			map.addLayer(
+				{
+					id: 'sector-polygons-fill',
+					type: 'fill',
+					source: 'crag-editor-data',
+					filter: ['==', ['get', 'feature'], 'sector'],
+					paint: {
+						'fill-color': ['case', ['==', ['get', 'selected'], true], '#0075de', '#31302e'],
+						'fill-opacity': ['case', ['==', ['get', 'selected'], true], 0.22, 0.12]
+					}
+				},
+				'tracks-line-saved'
+			);
+		if (!map.getLayer('sector-polygons-outline'))
+			map.addLayer(
+				{
+					id: 'sector-polygons-outline',
+					type: 'line',
+					source: 'crag-editor-data',
+					filter: ['==', ['get', 'feature'], 'sector'],
+					layout: { 'line-join': 'round', 'line-cap': 'round' },
+					paint: {
+						'line-color': ['case', ['==', ['get', 'selected'], true], '#0075de', '#31302e'],
+						'line-width': ['case', ['==', ['get', 'selected'], true], 3, 2],
+						'line-opacity': 0.9
+					}
+				},
+				'tracks-line-saved'
+			);
+		if (!map.getLayer('sector-vertex-midpoints'))
+			map.addLayer({
+				id: 'sector-vertex-midpoints',
+				type: 'circle',
+				source: 'crag-editor-data',
+				filter: ['==', ['get', 'feature'], 'sector-midpoint'],
+				paint: {
+					'circle-radius': 5,
+					'circle-color': '#ffffff',
+					'circle-stroke-width': 2,
+					'circle-stroke-color': '#0075de',
+					'circle-opacity': 0.85
+				}
+			});
+		if (!map.getLayer('sector-vertices'))
+			map.addLayer({
+				id: 'sector-vertices',
+				type: 'circle',
+				source: 'crag-editor-data',
+				filter: ['==', ['get', 'feature'], 'sector-vertex'],
+				paint: {
+					'circle-radius': 7,
+					'circle-color': '#0075de',
+					'circle-stroke-width': 2,
+					'circle-stroke-color': '#ffffff'
+				}
+			});
+		if (!map.getLayer('sector-vertex-delete'))
+			map.addLayer({
+				id: 'sector-vertex-delete',
+				type: 'symbol',
+				source: 'crag-editor-data',
+				filter: ['==', ['get', 'feature'], 'sector-vertex-delete'],
+				layout: {
+					'text-field': '×',
+					'text-font': ['Noto Sans Bold'],
+					'text-size': 17,
+					'text-offset': [0.85, -0.85],
+					'text-allow-overlap': true,
+					'text-ignore-placement': true
+				},
+				paint: {
+					'text-color': '#ffffff',
+					'text-halo-color': '#dc2626',
+					'text-halo-width': 6
+				}
+			});
 		initTrackPointDragHandlers();
-		syncTrackData();
+		initSectorEditHandlers();
+		syncEditorData();
 	}
 
 	function initTrackPointDragHandlers() {
@@ -487,7 +707,8 @@
 		areTrackPointDragHandlersReady = true;
 
 		map.on('mouseenter', 'tracks-points-drawing', () => {
-			if (activeTool === 'track' && trackDraftMode === 'editing') map.getCanvas().style.cursor = 'move';
+			if (activeTool === 'track' && trackDraftMode === 'editing')
+				map.getCanvas().style.cursor = 'move';
 		});
 		map.on('mouseleave', 'tracks-points-drawing', () => {
 			if (draggingTrackPointIndex === null) map.getCanvas().style.cursor = '';
@@ -517,25 +738,236 @@
 		});
 	}
 
-	function syncTrackData() {
+	function initSectorEditHandlers() {
+		if (!map || areSectorEditHandlersReady) return;
+		areSectorEditHandlersReady = true;
+
+		map.on('click', 'sector-polygons-fill', (e) => {
+			const sectorId = e.features?.[0]?.properties?.id;
+			if (!sectorId) return;
+			suppressNextMapClick = true;
+			selectedSectorId = sectorId;
+			selectedSectorVertex = null;
+			activeTab = 'sectors';
+			activeTool = 'position';
+		});
+		map.on('mouseenter', 'sector-polygons-fill', () => {
+			if (activeTool === 'position') map.getCanvas().style.cursor = 'pointer';
+		});
+		map.on('mouseleave', 'sector-polygons-fill', () => {
+			if (!draggingSectorVertex) map.getCanvas().style.cursor = '';
+		});
+		map.on('mouseenter', 'sector-vertices', () => {
+			if (activeTool === 'position') map.getCanvas().style.cursor = 'move';
+		});
+		map.on('mouseleave', 'sector-vertices', () => {
+			if (!draggingSectorVertex) map.getCanvas().style.cursor = '';
+		});
+		map.on('mouseenter', 'sector-vertex-midpoints', () => {
+			if (activeTool === 'position') map.getCanvas().style.cursor = 'copy';
+		});
+		map.on('mouseleave', 'sector-vertex-midpoints', () => {
+			if (!draggingSectorVertex) map.getCanvas().style.cursor = '';
+		});
+		map.on('mouseenter', 'sector-vertex-delete', () => {
+			if (activeTool === 'position') map.getCanvas().style.cursor = 'pointer';
+		});
+		map.on('mouseleave', 'sector-vertex-delete', () => {
+			if (!draggingSectorVertex) map.getCanvas().style.cursor = '';
+		});
+		map.on('click', 'sector-vertex-delete', (e) => {
+			deleteSelectedSectorVertex(e);
+		});
+		map.on('touchstart', 'sector-vertex-delete', (e) => {
+			deleteSelectedSectorVertex(e);
+		});
+		map.on('mousedown', 'sector-vertices', (e) => {
+			startSectorVertexDrag(e);
+		});
+		map.on('touchstart', 'sector-vertices', (e) => {
+			startSectorVertexDrag(e);
+		});
+		map.on('mousedown', 'sector-vertex-midpoints', (e) => {
+			startSectorMidpointDrag(e);
+		});
+		map.on('touchstart', 'sector-vertex-midpoints', (e) => {
+			startSectorMidpointDrag(e);
+		});
+		map.on('mousemove', (e) => {
+			moveSectorVertexDrag(e);
+		});
+		map.on('touchmove', (e) => {
+			moveSectorVertexDrag(e);
+		});
+		map.on('mouseup', endSectorVertexDrag);
+		map.on('touchend', endSectorVertexDrag);
+		map.on('touchcancel', endSectorVertexDrag);
+	}
+
+	function getMapEventLngLat(event) {
+		const lngLat = event?.lngLat || event?.lngLats?.[0];
+		if (!lngLat) return null;
+		return [lngLat.lng, lngLat.lat];
+	}
+
+	function startSectorVertexDrag(event) {
+		if (activeTool !== 'position') return;
+		const properties = event.features?.[0]?.properties || {};
+		const sectorId = properties.sectorId;
+		const vertexIndex = Number(properties.vertexIndex);
+		if (!sectorId || !Number.isInteger(vertexIndex)) return;
+		event.preventDefault();
+		selectedSectorId = sectorId;
+		selectedSectorVertex = { sectorId, vertexIndex };
+		draggingSectorVertex = { sectorId, vertexIndex };
+		map.dragPan.disable();
+		map.touchZoomRotate.disable();
+		map.getCanvas().style.cursor = 'move';
+	}
+
+	function startSectorMidpointDrag(event) {
+		if (activeTool !== 'position') return;
+		const lngLat = getMapEventLngLat(event);
+		if (!lngLat) return;
+		const properties = event.features?.[0]?.properties || {};
+		const sectorId = properties.sectorId;
+		const insertIndex = Number(properties.insertIndex);
+		if (!sectorId || !Number.isInteger(insertIndex)) return;
+		event.preventDefault();
+		selectedSectorId = sectorId;
+		selectedSectorVertex = { sectorId, vertexIndex: insertIndex };
+		updateSectorGeometry(sectorId, (geometry) =>
+			insertGeometryVertex(geometry, insertIndex, lngLat)
+		);
+		draggingSectorVertex = { sectorId, vertexIndex: insertIndex };
+		map.dragPan.disable();
+		map.touchZoomRotate.disable();
+		map.getCanvas().style.cursor = 'move';
+	}
+
+	function moveSectorVertexDrag(event) {
+		if (!draggingSectorVertex) return;
+		const lngLat = getMapEventLngLat(event);
+		if (!lngLat) return;
+		event.preventDefault();
+		updateSectorGeometry(draggingSectorVertex.sectorId, (geometry) =>
+			moveGeometryVertex(geometry, draggingSectorVertex.vertexIndex, lngLat)
+		);
+	}
+
+	function endSectorVertexDrag() {
+		if (!draggingSectorVertex) return;
+		draggingSectorVertex = null;
+		suppressNextMapClick = true;
+		map.dragPan.enable();
+		map.touchZoomRotate.enable();
+		map.getCanvas().style.cursor = '';
+	}
+
+	function cloneGeometry(geometry) {
+		return geometry ? JSON.parse(JSON.stringify(geometry)) : geometry;
+	}
+
+	function deleteSelectedSectorVertex(event) {
+		if (activeTool !== 'position') return;
+		const properties = event.features?.[0]?.properties || {};
+		const sectorId = properties.sectorId;
+		const vertexIndex = Number(properties.vertexIndex);
+		if (!sectorId || !Number.isInteger(vertexIndex)) return;
+		event.preventDefault();
+		suppressNextMapClick = true;
+		selectedSectorId = sectorId;
+		selectedSectorVertex = null;
+		const sector = (cragEditorState.crag.sectors || []).find((item) => item.id === sectorId);
+		if (!sector?.geometry) return;
+		vertexDeleteUndo = {
+			sectorId,
+			geometry: cloneGeometry(sector.geometry)
+		};
+		clearTimeout(vertexDeleteUndoTimer);
+		vertexDeleteUndoTimer = setTimeout(() => {
+			vertexDeleteUndo = null;
+		}, 6000);
+		updateSectorGeometry(sectorId, (geometry) => removeGeometryVertex(geometry, vertexIndex));
+	}
+
+	function undoSectorVertexDelete() {
+		if (!vertexDeleteUndo) return;
+		const { sectorId, geometry } = vertexDeleteUndo;
+		updateSectorGeometry(sectorId, () => cloneGeometry(geometry));
+		selectedSectorId = sectorId;
+		selectedSectorVertex = null;
+		vertexDeleteUndo = null;
+		clearTimeout(vertexDeleteUndoTimer);
+	}
+
+	function syncEditorData() {
 		const source = map?.getSource('crag-editor-data');
 		if (!source) return;
 		const features = [];
+		const sectors = $state.snapshot(cragEditorState.crag.sectors) || [];
 		const savedTracks = $state.snapshot(cragEditorState.tracks) || [];
 		const drawingPoints = $state.snapshot(currentTrackPoints) || [];
-		savedTracks.forEach((t, index) => {
-			if (editingTrackIndex === index) return;
-			if (t.coordinates?.length > 1) features.push({
+		sectors.forEach((sector) => {
+			if (sector.geometry?.type !== 'Polygon') return;
+			const isSelected = selectedSectorId === sector.id;
+			features.push({
 				type: 'Feature',
-				geometry: { type: 'LineString', coordinates: t.coordinates },
-				properties: { name: t.name, state: 'saved', trackIndex: index }
+				geometry: sector.geometry,
+				properties: {
+					feature: 'sector',
+					id: sector.id || '',
+					name: sector.name || '',
+					selected: isSelected
+				}
+			});
+			if (!isSelected) return;
+			const path = getGeometryPath(sector.geometry);
+			const editablePath = getEditablePath(path, { closed: true });
+			editablePath.forEach((point, vertexIndex) => {
+				const isSelectedVertex =
+					selectedSectorVertex?.sectorId === sector.id &&
+					selectedSectorVertex?.vertexIndex === vertexIndex;
+				features.push({
+					type: 'Feature',
+					geometry: { type: 'Point', coordinates: point },
+					properties: { feature: 'sector-vertex', sectorId: sector.id, vertexIndex }
+				});
+				if (isSelectedVertex && editablePath.length > 3) {
+					features.push({
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: point },
+						properties: { feature: 'sector-vertex-delete', sectorId: sector.id, vertexIndex }
+					});
+				}
+			});
+			getPathMidpoints(path, { closed: true }).forEach((midpoint) => {
+				features.push({
+					type: 'Feature',
+					geometry: { type: 'Point', coordinates: midpoint.point },
+					properties: {
+						feature: 'sector-midpoint',
+						sectorId: sector.id,
+						insertIndex: midpoint.insertIndex
+					}
+				});
 			});
 		});
-		if (drawingPoints.length > 1) features.push({
-			type: 'Feature',
-			geometry: { type: 'LineString', coordinates: drawingPoints },
-			properties: { name: 'Drawing', state: 'drawing' }
+		savedTracks.forEach((t, index) => {
+			if (editingTrackIndex === index) return;
+			if (t.coordinates?.length > 1)
+				features.push({
+					type: 'Feature',
+					geometry: { type: 'LineString', coordinates: t.coordinates },
+					properties: { name: t.name, state: 'saved', trackIndex: index }
+				});
 		});
+		if (drawingPoints.length > 1)
+			features.push({
+				type: 'Feature',
+				geometry: { type: 'LineString', coordinates: drawingPoints },
+				properties: { name: 'Drawing', state: 'drawing' }
+			});
 		drawingPoints.forEach((p, pointIndex) => {
 			features.push({
 				type: 'Feature',
@@ -544,6 +976,13 @@
 			});
 		});
 		source.setData({ type: 'FeatureCollection', features });
+	}
+
+	function updateSectorGeometry(id, updater) {
+		cragEditorState.crag.sectors = (cragEditorState.crag.sectors || []).map((sector) => {
+			if (sector.id !== id) return sector;
+			return { ...sector, geometry: updater(sector.geometry) };
+		});
 	}
 
 	function addTransitPoint(lngLat) {
@@ -560,11 +999,13 @@
 		el.style.height = '24px';
 		el.style.backgroundImage = `url(${base}/icons/${point.type}.png)`;
 		el.style.backgroundSize = 'cover';
-		const marker = new maplibregl.Marker({ element: el, draggable: true }).setLngLat(point.coordinates).addTo(map);
+		const marker = new maplibregl.Marker({ element: el, draggable: true })
+			.setLngLat(point.coordinates)
+			.addTo(map);
 		marker.on('dragend', () => {
 			const pos = marker.getLngLat();
 			const list = $state.snapshot(cragEditorState.transit);
-			const idx = list.findIndex(p => p.id === point.id);
+			const idx = list.findIndex((p) => p.id === point.id);
 			if (idx !== -1) cragEditorState.transit[idx].coordinates = [pos.lng, pos.lat];
 		});
 		transitMarkers.push({ id: point.id, marker });
@@ -584,11 +1025,13 @@
 		el.style.height = '24px';
 		el.style.backgroundImage = `url(${base}/icons/parking.png)`;
 		el.style.backgroundSize = 'cover';
-		const marker = new maplibregl.Marker({ element: el, draggable: true }).setLngLat(point.coordinates).addTo(map);
+		const marker = new maplibregl.Marker({ element: el, draggable: true })
+			.setLngLat(point.coordinates)
+			.addTo(map);
 		marker.on('dragend', () => {
 			const pos = marker.getLngLat();
 			const list = $state.snapshot(cragEditorState.parking);
-			const idx = list.findIndex(p => p.id === point.id);
+			const idx = list.findIndex((p) => p.id === point.id);
 			if (idx !== -1) cragEditorState.parking[idx].coordinates = [pos.lng, pos.lat];
 		});
 		parkingMarkers.push({ id: point.id, marker });
@@ -596,50 +1039,59 @@
 
 	function syncSectorMarkers() {
 		if (!map) return;
-		sectorMarkers.forEach(m => m.marker.remove());
+		sectorMarkers.forEach((m) => m.marker.remove());
 		sectorMarkers = [];
 		(cragEditorState.crag.sectors || []).forEach((sector) => {
-			const coordinates = sector.geometry?.coordinates;
+			const coordinates = getGeometryCenter(sector.geometry);
 			if (!Array.isArray(coordinates) || coordinates.length < 2) return;
 			const el = document.createElement('button');
 			el.type = 'button';
 			el.className = `sector-marker ${selectedSectorId === sector.id ? 'is-selected' : ''}`;
 			el.title = sector.name || sector.id || 'Sector';
-			el.innerHTML = `<span>${sector.sort || 'S'}</span>`;
+			el.innerHTML = `<span>${sector.id || 'S'}</span>`;
 			el.addEventListener('click', (event) => {
 				event.stopPropagation();
 				selectedSectorId = sector.id;
 				activeTab = 'sectors';
 				activeTool = 'position';
 			});
-			const marker = new maplibregl.Marker({ element: el, draggable: true }).setLngLat(coordinates).addTo(map);
+			const marker = new maplibregl.Marker({ element: el, draggable: true })
+				.setLngLat(coordinates)
+				.addTo(map);
 			marker.on('dragstart', () => {
+				draggingSectorMarkerId = sector.id;
 				selectedSectorId = sector.id;
 				activeTab = 'sectors';
+			});
+			marker.on('drag', () => {
+				const pos = marker.getLngLat();
+				updateSectorCoordinates(sector.id, [pos.lng, pos.lat]);
 			});
 			marker.on('dragend', () => {
 				const pos = marker.getLngLat();
 				updateSectorCoordinates(sector.id, [pos.lng, pos.lat]);
+				draggingSectorMarkerId = null;
+				suppressNextMapClick = true;
 			});
 			sectorMarkers.push({ id: sector.id, marker });
 		});
 	}
 
 	function removeTransit(id) {
-		cragEditorState.transit = cragEditorState.transit.filter(p => p.id !== id);
-		const m = transitMarkers.find(m => m.id === id);
+		cragEditorState.transit = cragEditorState.transit.filter((p) => p.id !== id);
+		const m = transitMarkers.find((m) => m.id === id);
 		if (m) {
 			m.marker.remove();
-			transitMarkers = transitMarkers.filter(tm => tm.id !== id);
+			transitMarkers = transitMarkers.filter((tm) => tm.id !== id);
 		}
 	}
 
 	function removeParking(id) {
-		cragEditorState.parking = cragEditorState.parking.filter(p => p.id !== id);
-		const m = parkingMarkers.find(m => m.id === id);
+		cragEditorState.parking = cragEditorState.parking.filter((p) => p.id !== id);
+		const m = parkingMarkers.find((m) => m.id === id);
 		if (m) {
 			m.marker.remove();
-			parkingMarkers = parkingMarkers.filter(tm => tm.id !== id);
+			parkingMarkers = parkingMarkers.filter((tm) => tm.id !== id);
 		}
 	}
 
@@ -664,10 +1116,13 @@
 				return;
 			}
 
-			const nextTracks = [...cragEditorState.tracks, {
-				name: 'Transit Track ' + (cragEditorState.tracks.length + 1),
-				coordinates
-			}];
+			const nextTracks = [
+				...cragEditorState.tracks,
+				{
+					name: 'Transit Track ' + (cragEditorState.tracks.length + 1),
+					coordinates
+				}
+			];
 			cragEditorState.tracks = nextTracks;
 			editTrack(nextTracks.length - 1, nextTracks);
 		}
@@ -677,7 +1132,7 @@
 		const track = tracks[index];
 		if (!track?.coordinates?.length) return;
 		editingTrackIndex = index;
-		currentTrackPoints = track.coordinates.map(point => [...point]);
+		currentTrackPoints = track.coordinates.map((point) => [...point]);
 		routeDraftWaypoints = [];
 		trackDraftMode = 'editing';
 		activeTool = 'track';
@@ -694,7 +1149,10 @@
 
 	function fitTrackBounds(points) {
 		if (!map || points.length === 0) return;
-		const bounds = points.reduce((b, p) => b.extend(p), new maplibregl.LngLatBounds(points[0], points[0]));
+		const bounds = points.reduce(
+			(b, p) => b.extend(p),
+			new maplibregl.LngLatBounds(points[0], points[0])
+		);
 		map.fitBounds(bounds, { padding: 80, maxZoom: 16 });
 	}
 
@@ -704,12 +1162,17 @@
 		const text = await file.text();
 		const parser = new DOMParser();
 		const xml = parser.parseFromString(text, 'text/xml');
-		const points = Array.from(xml.querySelectorAll('trkpt')).map(p => [parseFloat(p.getAttribute('lon')), parseFloat(p.getAttribute('lat'))]).filter(p => !isNaN(p[0]) && !isNaN(p[1]));
+		const points = Array.from(xml.querySelectorAll('trkpt'))
+			.map((p) => [parseFloat(p.getAttribute('lon')), parseFloat(p.getAttribute('lat'))])
+			.filter((p) => !isNaN(p[0]) && !isNaN(p[1]));
 		if (points.length > 1) {
-			const nextTracks = [...cragEditorState.tracks, {
-				name: file.name.replace('.gpx', ''),
-				coordinates: points
-			}];
+			const nextTracks = [
+				...cragEditorState.tracks,
+				{
+					name: file.name.replace('.gpx', ''),
+					coordinates: points
+				}
+			];
 			cragEditorState.tracks = nextTracks;
 			editTrack(nextTracks.length - 1, nextTracks);
 		}
@@ -717,31 +1180,32 @@
 
 	async function saveToServer() {
 		if (!authState.requireAuth(() => saveToServer())) return;
-		
+
 		const savePath = cragEditorState.crag.path;
 		if (!savePath) {
 			saveStatus = 'error';
 			saveError = $_('save.save_path_required');
 			return;
 		}
-		
+
 		saveStatus = 'saving';
 		saveError = '';
-		
+
 		try {
-			const baseName = (cragEditorState.crag.name || 'new-crag').trim().toLowerCase().replace(/\s+/g, '-');
-			
+			const baseName = slugifyName(cragEditorState.crag.name);
+			cragEditorState.crag.id = cragEditorState.crag.id || baseName;
+
 			// Save main crag JSON
 			await writeJson(`${savePath}/${baseName}.json`, {
 				type: 'Feature',
 				properties: {
 					...$state.snapshot(cragEditorState.crag),
-					id: baseName,
+					id: cragEditorState.crag.id,
 					updated: new Date().toISOString().split('T')[0]
 				},
 				geometry: cragEditorState.crag.geometry
 			});
-			
+
 			// Save transit points
 			for (let i = 0; i < cragEditorState.transit.length; i++) {
 				const t = cragEditorState.transit[i];
@@ -751,7 +1215,7 @@
 					geometry: { type: 'Point', coordinates: t.coordinates }
 				});
 			}
-			
+
 			// Save parking spots
 			for (let i = 0; i < cragEditorState.parking.length; i++) {
 				const p = cragEditorState.parking[i];
@@ -761,7 +1225,7 @@
 					geometry: { type: 'Point', coordinates: p.coordinates }
 				});
 			}
-			
+
 			// Save approach tracks
 			for (let i = 0; i < cragEditorState.tracks.length; i++) {
 				const t = cragEditorState.tracks[i];
@@ -771,9 +1235,11 @@
 					geometry: { type: 'LineString', coordinates: t.coordinates }
 				});
 			}
-			
+
 			saveStatus = 'success';
-			setTimeout(() => { if (saveStatus === 'success') saveStatus = 'idle'; }, 3000);
+			setTimeout(() => {
+				if (saveStatus === 'success') saveStatus = 'idle';
+			}, 3000);
 		} catch (err) {
 			console.error('Save failed:', err);
 			saveStatus = 'error';
@@ -785,31 +1251,48 @@
 		const crag = $state.snapshot(cragEditorState.crag);
 		const sector = (crag.sectors || []).find((item) => item.id === selectedSectorId);
 		const source = sector || crag;
-		const coordinates = source.geometry?.coordinates || crag.geometry?.coordinates || [];
+		const cragId = getCragId(crag);
+		const coordinates =
+			getGeometryCenter(source.geometry) || getGeometryCenter(crag.geometry) || [];
 		const today = new Date().toISOString().split('T')[0];
 		userState.reset();
 		userState.topo = {
 			...userState.topo,
+			id: getTopoId(crag, sector),
 			name: sector ? `${crag.name || ''} - ${sector.name || sector.id}` : crag.name || '',
-			crag_id: crag.id || '',
+			crag_id: cragId,
 			sector_id: sector?.id || '',
-			description: source.description_de || source.description_en || crag.description_de || crag.description_en || '',
+			description:
+				source.description_de ||
+				source.description_en ||
+				crag.description_de ||
+				crag.description_en ||
+				'',
 			rock: source.rock_type || crag.rock_type || userState.topo.rock,
-			tags: [...(crag.tags || []), ...(crag.type || []), ...(sector?.tags || []), ...(sector?.type || [])],
+			tags: [
+				...(crag.tags || []),
+				...(crag.type || []),
+				...(sector?.tags || []),
+				...(sector?.type || [])
+			],
 			date: crag.date || today,
 			updated: today,
-			coordinates: [
-				coordinates?.[1] ?? 0,
-				coordinates?.[0] ?? 0
-			],
-			editorMode: '2d'
+			coordinates: [coordinates?.[1] ?? 0, coordinates?.[0] ?? 0],
+			editorMode: '2d',
+			_entryPath: sector ? getSectorEntryPath(crag.path || '', sector) : crag.path || '',
+			_topoFileName: `${pathBasename(
+				sector ? getSectorEntryPath(crag.path || '', sector) : crag.path || ''
+			)}-topo.json`
 		};
 		userState.ui.workspace = 'topos/2d/new';
 		goto(`${base}/topos/2d/new`);
 	}
 
 	function addEquipmentItem() {
-		cragEditorState.crag.equipment = [...cragEditorState.crag.equipment, { name: 'Expressschlingen', amount: 12 }];
+		cragEditorState.crag.equipment = [
+			...cragEditorState.crag.equipment,
+			{ name: 'Expressschlingen', amount: 12 }
+		];
 	}
 
 	function removeEquipmentItem(idx) {
@@ -839,7 +1322,7 @@
 					coordinates: [...cragEditorState.crag.geometry.coordinates]
 				},
 				topo: { site: '', link: '' },
-				assets: { topos: [], images: [], models: [] }
+				assets: { topos: [], images: [], models: [], approaches: [] }
 			}
 		];
 		selectedSectorId = id;
@@ -852,7 +1335,9 @@
 		const source = sectors.find((sector) => sector.id === id);
 		if (!source) return;
 		const copyId = `${source.id || 'sector'}-copy`;
-		const uniqueId = sectors.some((sector) => sector.id === copyId) ? `${copyId}-${sectors.length + 1}` : copyId;
+		const uniqueId = sectors.some((sector) => sector.id === copyId)
+			? `${copyId}-${sectors.length + 1}`
+			: copyId;
 		cragEditorState.crag.sectors = [
 			...sectors,
 			{
@@ -867,7 +1352,9 @@
 	}
 
 	function removeSector(id) {
-		cragEditorState.crag.sectors = (cragEditorState.crag.sectors || []).filter((sector) => sector.id !== id);
+		cragEditorState.crag.sectors = (cragEditorState.crag.sectors || []).filter(
+			(sector) => sector.id !== id
+		);
 		if (selectedSectorId === id) selectedSectorId = null;
 	}
 
@@ -924,10 +1411,12 @@
 	onDuplicateSector={duplicateSector}
 	onRemoveSector={removeSector}
 	onMoveSector={moveSector}
+	onSetSectorGeometryType={setSectorGeometryType}
 	onFocusSector={(sector) => {
 		selectedSectorId = sector.id;
 		activeTool = 'position';
-		if (sector.geometry?.coordinates && map) map.easeTo({ center: sector.geometry.coordinates, zoom: Math.max(map.getZoom(), 15), duration: 400 });
+		const center = getGeometryCenter(sector.geometry);
+		if (center && map) map.easeTo({ center, zoom: Math.max(map.getZoom(), 15), duration: 400 });
 	}}
 	onSetHoverHighlight={setHoverHighlight}
 	onAddDetectedAsset={addDetectedAsset}
@@ -939,35 +1428,57 @@
 	onCancelTrackEdit={cancelTrackEdit}
 />
 
+{#if vertexDeleteUndo}
+	<div
+		class="fixed bottom-5 left-1/2 z-[70] flex -translate-x-1/2 items-center gap-3 rounded-sm border border-black/10 bg-near-black px-3 py-2 text-sm text-white shadow-lg"
+	>
+		<span>Vertex deleted</span>
+		<button
+			type="button"
+			class="rounded-sm bg-white/10 px-2 py-1 text-ui-label font-bold uppercase text-white hover:bg-white/20"
+			onclick={undoSectorVertexDelete}
+		>
+			Undo
+		</button>
+	</div>
+{/if}
+
 <style>
-    :global(.maplibregl-ctrl-bottom-right) {
-        bottom: 24px !important;
-        right: 24px !important;
-    }
+	:global(.maplibregl-ctrl-bottom-right) {
+		bottom: 24px !important;
+		right: 24px !important;
+	}
 
-    :global(.crag-marker), :global(.parking-marker), :global(.transit-marker), :global(.sector-marker) {
-        filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
-        cursor: move;
-    }
+	:global(.crag-marker),
+	:global(.parking-marker),
+	:global(.transit-marker),
+	:global(.sector-marker) {
+		filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
+		cursor: move;
+	}
 
-    :global(.sector-marker) {
-        width: 28px;
-        height: 28px;
-        border-radius: 999px;
-        border: 2px solid #ffffff;
-        background: #31302e;
-        color: #ffffff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 10px;
-        font-weight: 700;
-        line-height: 1;
-        padding: 0;
-    }
+	:global(.sector-marker) {
+		min-width: 28px;
+		max-width: 120px;
+		min-height: 28px;
+		border-radius: 999px;
+		border: 2px solid #ffffff;
+		background: #31302e;
+		color: #ffffff;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 11px;
+		font-weight: 700;
+		line-height: 1;
+		padding: 0 8px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
 
-    :global(.sector-marker.is-selected) {
-        background: #0075de;
-        box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.25);
-    }
+	:global(.sector-marker.is-selected) {
+		background: #0075de;
+		box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.25);
+	}
 </style>

@@ -159,27 +159,6 @@
 			<i class="fa-solid fa-eraser"></i>
 		</button>
 
-		<!-- Divider -->
-		{#if hasPendingChanges}
-			<div class="w-px h-6 bg-black/15 mx-0.5"></div>
-			<button
-				class="w-10 h-10 flex items-center justify-center rounded-sm bg-near-black text-white hover:bg-black shadow-sm transition-none"
-				onclick={handleFinish}
-				ontouchend={handleFinish}
-				title="{$_('ui.finish')} (N)"
-			>
-				<i class="fa-solid fa-check text-[10px]"></i>
-			</button>
-
-			<button
-				class="w-10 h-10 flex items-center justify-center rounded-sm bg-warm-white text-near-black border border-black/15 hover:bg-black/5 transition-none"
-				onclick={handleCancel}
-				ontouchend={handleCancel}
-				title="{$_('ui.cancel')} (Esc)"
-			>
-				<i class="fa-solid fa-xmark text-[10px]"></i>
-			</button>
-		{/if}
 	</div>
 
 	<!-- Symbol picker for mobile -->

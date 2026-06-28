@@ -2,6 +2,7 @@
 	import { _ } from 'svelte-i18n';
 	import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
+	import { getGeometryCenter } from '$lib/assets/js/sector-utils.js';
 
 	let {
 		inspectorShadow = true,
@@ -21,6 +22,7 @@
 		onRemoveSector = () => {},
 		onMoveSector = () => {},
 		onFocusSector = () => {},
+		onSetSectorGeometryType = () => {},
 		onSetHoverHighlight = () => {},
 		onAddDetectedAsset = () => {},
 		onRemoveTransit = () => {},
@@ -43,15 +45,17 @@
 		if (!sector.assets.topos) sector.assets.topos = [];
 		if (!sector.assets.images) sector.assets.images = [];
 		if (!sector.assets.models) sector.assets.models = [];
-	}
-
-	function parseAssetList(value) {
-		return value.split(',').map((item) => item.trim()).filter(Boolean);
+		if (!sector.assets.approaches) sector.assets.approaches = [];
 	}
 
 	function updateSelectedSectorId(sector, value) {
 		sector.id = value;
 		selectedSectorId = value;
+	}
+
+	function formatGeometryCenter(geometry) {
+		const center = getGeometryCenter(geometry);
+		return center ? `${center[1].toFixed(5)}, ${center[0].toFixed(5)}` : '';
 	}
 </script>
 
@@ -260,6 +264,20 @@
 								</div>
 							</div>
 
+							<div class="space-y-0.5">
+								<label class="text-ui-label block">Geometry</label>
+								<div class="grid grid-cols-2 gap-1 bg-black/5 rounded-sm p-0.5 border border-black/10">
+									{#each ['Point', 'Polygon'] as type}
+										<button
+											class="py-1 rounded-sm text-ui-label transition-none {sector.geometry?.type === type ? 'bg-white shadow-sm text-creator-blue' : 'text-warm-gray-500 hover:bg-black/5'}"
+											onclick={() => onSetSectorGeometryType(sector.id, type)}
+										>
+											{type}
+										</button>
+									{/each}
+								</div>
+							</div>
+
 							<div class="grid grid-cols-2 gap-2">
 								<div class="space-y-0.5">
 									<label class="text-ui-label block">Security</label>
@@ -307,33 +325,16 @@
 								<textarea bind:value={sector.approach_en} rows="2" class="input-studio w-full resize-none"></textarea>
 							</div>
 
-							<div class="grid grid-cols-2 gap-2 pt-2 border-t border-black/15">
-								<div class="space-y-0.5">
-									<label class="text-ui-label block">Topo Site</label>
-									<input type="text" bind:value={sector.topo.site} class="input-studio w-full" />
-								</div>
-								<div class="space-y-0.5">
-									<label class="text-ui-label block">Topo Link</label>
-									<input type="url" bind:value={sector.topo.link} class="input-studio w-full" />
-								</div>
-							</div>
-
-							<div class="space-y-0.5">
-								<label class="text-ui-label block">Topo Assets</label>
-								<input
-									type="text"
-									value={sector.assets.topos.join(', ')}
-									oninput={(e) => sector.assets.topos = parseAssetList(e.currentTarget.value)}
-									class="input-studio w-full font-mono"
-									placeholder="sector-topo.json"
-								/>
+							<div class="space-y-0.5 pt-2 border-t border-black/15">
+								<label class="text-ui-label block">Topo Link</label>
+								<input type="url" bind:value={sector.topo.link} class="input-studio w-full" />
 							</div>
 
 							<div class="flex items-center justify-between bg-white rounded-sm border border-black/15 p-2">
-								<span class="text-ui-label text-warm-gray-500 !m-0">Position</span>
-								{#if sector.geometry?.coordinates}
+								<span class="text-ui-label text-warm-gray-500 !m-0">{sector.geometry?.type === 'Polygon' ? 'Center' : 'Position'}</span>
+								{#if formatGeometryCenter(sector.geometry)}
 									<span class="font-mono text-micro-data text-creator-blue font-bold">
-										{sector.geometry.coordinates[1].toFixed(5)}, {sector.geometry.coordinates[0].toFixed(5)}
+										{formatGeometryCenter(sector.geometry)}
 									</span>
 								{:else}
 									<span class="text-micro-data text-warm-gray-400">Crag default</span>

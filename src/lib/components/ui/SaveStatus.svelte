@@ -6,18 +6,6 @@
 	 * States: 'idle' | 'saving' | 'success' | 'error'
 	 */
 	let { status = 'idle', errorMessage = '' } = $props();
-
-	let dismissTimer = $state(null);
-
-	$effect(() => {
-		if (status === 'success') {
-			clearTimeout(dismissTimer);
-			dismissTimer = setTimeout(() => {
-				// Parent is responsible for resetting status; this is just for visual auto-dismiss
-			}, 3000);
-		}
-		return () => clearTimeout(dismissTimer);
-	});
 </script>
 
 {#if status !== 'idle'}
@@ -31,7 +19,7 @@
 		{:else if status === 'error'}
 			<i class="fa-solid fa-circle-exclamation text-[9px]"></i>
 			<span class="text-[9px] font-bold uppercase tracking-tighter" title={errorMessage}>
-				{$_('save.failed')}
+				{errorMessage || $_('save.failed')}
 			</span>
 		{/if}
 	</div>

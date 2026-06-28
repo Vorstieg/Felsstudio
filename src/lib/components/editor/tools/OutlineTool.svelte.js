@@ -208,22 +208,9 @@ export class OutlineTool {
 		} else if (event.key === 'Escape') {
 			this.cancel();
 		} else if (event.key === 'Delete' || event.key === 'Backspace') {
-			if (this.currentPoints.length > 0) {
-				this.currentPoints.pop();
-				this.saveHistory();
-			}
+			this.undoLastPoint();
 		} else if (event.key === 'c' || event.key === 'C') {
-			// Close the current outline
-			if (this.currentPoints.length > 2) {
-				const firstPoint = this.currentPoints[0];
-				if (
-					this.currentPoints[this.currentPoints.length - 1][0] !== firstPoint[0] ||
-					this.currentPoints[this.currentPoints.length - 1][1] !== firstPoint[1]
-				) {
-					this.currentPoints = [...this.currentPoints, firstPoint];
-					this.saveHistory();
-				}
-			}
+			this.closeShape();
 		} else if (event.key === 'g' || event.key === 'G') {
 			// Toggle grid snapping
 			this.snapToGrid = !this.snapToGrid;
@@ -282,6 +269,23 @@ export class OutlineTool {
 
 	cancel() {
 		this.resetDrawingState();
+	}
+
+	undoLastPoint() {
+		if (this.currentPoints.length === 0) return;
+		this.currentPoints = this.currentPoints.slice(0, -1);
+		this.saveHistory();
+	}
+
+	closeShape() {
+		if (this.currentPoints.length <= 2) return;
+
+		const firstPoint = this.currentPoints[0];
+		const lastPoint = this.currentPoints[this.currentPoints.length - 1];
+		if (lastPoint?.[0] === firstPoint?.[0] && lastPoint?.[1] === firstPoint?.[1]) return;
+
+		this.currentPoints = [...this.currentPoints, firstPoint];
+		this.saveHistory();
 	}
 
 	resetDrawingState() {

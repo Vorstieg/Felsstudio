@@ -68,10 +68,7 @@ export class RouteTool {
 		} else if (event.key === 'Escape') {
 			this.cancel();
 		} else if (event.key === 'Delete' || event.key === 'Backspace') {
-			if (this.currentPoints.length > 0) {
-				this.currentPoints.pop();
-				this.saveHistory();
-			}
+			this.undoLastPoint();
 		}
 	}
 
@@ -159,5 +156,11 @@ export class RouteTool {
 
 	cancel() {
 		this.currentPoints = [];
+	}
+
+	undoLastPoint() {
+		if (this.currentPoints.length === 0) return;
+		this.currentPoints = this.currentPoints.slice(0, -1);
+		this.saveHistory();
 	}
 }
