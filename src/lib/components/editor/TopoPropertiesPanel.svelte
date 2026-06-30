@@ -42,6 +42,9 @@
 	let lastSelectedFpId = $state(null);
 	let lastSelectedTextId = $state(null);
 	let lastLockedClusterId = $state(null);
+	let showJsonEditor = $state(false);
+	let topoJsonText = $state('');
+	let topoJsonError = $state('');
 	let selectedTextLabel = $derived(
 		(userState.topo.textLabels || []).find((label) => label.id === userState.ui.selectedTextLabelId)
 	);
@@ -214,6 +217,57 @@
 		});
 	}
 
+	function formatTopoJson() {
+		topoJsonText = JSON.stringify($state.snapshot(userState.topo), null, 2);
+		topoJsonError = '';
+	}
+
+	function toggleJsonEditor() {
+		showJsonEditor = !showJsonEditor;
+		if (showJsonEditor) {
+			activeTab = 'info';
+			formatTopoJson();
+		}
+	}
+
+	function applyTopoJson() {
+		let parsed;
+		try {
+			parsed = JSON.parse(topoJsonText);
+		} catch (error) {
+			topoJsonError = error.message;
+			return;
+		}
+
+		if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
+			topoJsonError = 'Topo JSON must be an object.';
+			return;
+		}
+
+		const currentMode = userState.topo.editorMode;
+		userState.topo = {
+			...parsed,
+			routes: Array.isArray(parsed.routes) ? parsed.routes : [],
+			fixPoints: Array.isArray(parsed.fixPoints) ? parsed.fixPoints : [],
+			outlines: Array.isArray(parsed.outlines) ? parsed.outlines : [],
+			textLabels: Array.isArray(parsed.textLabels) ? parsed.textLabels : [],
+			tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+			coordinates: Array.isArray(parsed.coordinates) ? parsed.coordinates : [0, 0],
+			modelOffset: Array.isArray(parsed.modelOffset) ? parsed.modelOffset : [0, 0, 0],
+			scale: parsed.scale ?? 1,
+			image2D: parsed.image2D ?? null,
+			imageAspectRatio: parsed.imageAspectRatio ?? 1.5,
+			editorMode: parsed.editorMode || currentMode
+		};
+		userState.ui.selectedRouteId = null;
+		userState.ui.selectedFixpointId = null;
+		userState.ui.selectedTextLabelId = null;
+		userState.ui.selectedOutlineId = null;
+		drawingTarget = null;
+		topoJsonError = '';
+		formatTopoJson();
+	}
+
 	let activeTab = $state('info');
 	let isMobile = $state(false);
 
@@ -222,8 +276,18 @@
 		const handleResize = () => {
 			isMobile = isMobileViewport();
 		};
+		const handleKeyDown = (event) => {
+			if (event.ctrlKey && event.altKey && event.key.toLowerCase() === 'j') {
+				event.preventDefault();
+				toggleJsonEditor();
+			}
+		};
 		window.addEventListener('resize', handleResize);
-		return () => window.removeEventListener('resize', handleResize);
+		window.addEventListener('keydown', handleKeyDown);
+		return () => {
+			window.removeEventListener('resize', handleResize);
+			window.removeEventListener('keydown', handleKeyDown);
+		};
 	});
 
 	function switchTab(tab) {
@@ -243,12 +307,20 @@
 	<!-- Scrollable Content Area -->
 	<div class="panel flex flex-col flex-1 overflow-hidden shadow-panel">
 		<div
-			class="flex justify-between items-center border-b border-black/15 p-3 pb-2 mb-2 flex-shrink-0"
+			class="group flex justify-between items-center border-b border-black/15 p-3 pb-2 mb-2 flex-shrink-0"
 		>
 			<div>
 				<h1 class="text-section-title">{$_('ui.properties')}</h1>
 				<p class="text-ui-label !m-0">{$_('ui.topo_inspector')}</p>
 			</div>
+			<button
+				class="h-6 w-6 rounded-sm text-warm-gray-300 opacity-0 transition-none hover:bg-black/5 hover:text-near-black focus:opacity-100 group-hover:opacity-30"
+				onclick={toggleJsonEditor}
+				title="Edit topo JSON"
+				aria-label="Edit topo JSON"
+			>
+				<i class="fa-solid fa-code text-[10px]"></i>
+			</button>
 		</div>
 
 		<!-- Tab Bar -->
@@ -299,6 +371,40 @@
 				{#if activeTab === 'info'}
 					<div class="space-y-3">
 						<div class="space-y-2.5">
+							{#if showJsonEditor}
+								<div class="rounded-sm border border-black/15 bg-near-black p-2 shadow-sm">
+									<div class="mb-1.5 flex items-center justify-between gap-2">
+										<label for="topo-json-editor" class="text-ui-label block text-white/80">
+											Topo JSON
+										</label>
+										<div class="flex items-center gap-1">
+											<button
+												class="rounded-sm border border-white/15 bg-white/10 px-2 py-1 text-micro-data font-bold text-white/80 hover:bg-white/20"
+												onclick={formatTopoJson}
+											>
+												Format
+											</button>
+											<button
+												class="rounded-sm bg-white px-2 py-1 text-micro-data font-bold text-near-black hover:bg-warm-white"
+												onclick={applyTopoJson}
+											>
+												Apply
+											</button>
+										</div>
+									</div>
+									<textarea
+										id="topo-json-editor"
+										bind:value={topoJsonText}
+										spellcheck="false"
+										rows="14"
+										class="w-full resize-y rounded-sm border border-white/15 bg-black p-2 font-mono text-[11px] leading-relaxed text-white outline-none focus:border-white/40"
+									></textarea>
+									{#if topoJsonError}
+										<p class="mt-1.5 text-micro-data font-bold text-rose-300">{topoJsonError}</p>
+									{/if}
+								</div>
+							{/if}
+
 							<div class="space-y-0.5">
 								<label for="name" class="text-ui-label block">{$_('ui.name')}</label>
 								<input
@@ -1489,6 +1595,40 @@
 					{/if}
 				{:else}
 					<div class="space-y-4 pt-1">
+						{#if showJsonEditor}
+							<div class="rounded-sm border border-black/15 bg-near-black p-2 shadow-sm">
+								<div class="mb-1.5 flex items-center justify-between gap-2">
+									<label for="topo-json-editor-mobile" class="text-ui-label block text-white/80">
+										Topo JSON
+									</label>
+									<div class="flex items-center gap-1">
+										<button
+											class="rounded-sm border border-white/15 bg-white/10 px-2 py-1 text-micro-data font-bold text-white/80"
+											onclick={formatTopoJson}
+										>
+											Format
+										</button>
+										<button
+											class="rounded-sm bg-white px-2 py-1 text-micro-data font-bold text-near-black"
+											onclick={applyTopoJson}
+										>
+											Apply
+										</button>
+									</div>
+								</div>
+								<textarea
+									id="topo-json-editor-mobile"
+									bind:value={topoJsonText}
+									spellcheck="false"
+									rows="12"
+									class="w-full resize-y rounded-sm border border-white/15 bg-black p-2 font-mono text-[11px] leading-relaxed text-white outline-none"
+								></textarea>
+								{#if topoJsonError}
+									<p class="mt-1.5 text-micro-data font-bold text-rose-300">{topoJsonError}</p>
+								{/if}
+							</div>
+						{/if}
+
 						<div class="space-y-1.5 px-1">
 							<label for="name-mobile" class="label-studio">{$_('ui.name')}</label>
 							<input
