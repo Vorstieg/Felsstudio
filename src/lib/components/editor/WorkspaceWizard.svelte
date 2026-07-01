@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import { userState } from '$lib/state/editor.svelte.js';
-	import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+	import { createGltfLoader } from '$lib/assets/js/gltf-loader.js';
 	import { Box3, Vector3 } from 'three';
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
 	import { generate2DFromTopo } from '$lib/assets/js/topo-projection.js';
@@ -469,7 +469,7 @@
 	}
 
 	async function loadGlb(file) {
-		const loader = new GLTFLoader();
+		const loader = createGltfLoader();
 		const buffer = await file.arrayBuffer();
 		if (userState.ui.modelUrl) URL.revokeObjectURL(userState.ui.modelUrl);
 		userState.ui.modelUrl = URL.createObjectURL(file);

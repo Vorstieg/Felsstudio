@@ -2,7 +2,7 @@
 	import { Canvas, T } from '@threlte/core';
 	import { OrbitControls } from '@threlte/extras';
 	import { Vector3, WebGLRenderer, BufferAttribute } from 'three';
-	import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+	import { createGltfLoader } from '$lib/assets/js/gltf-loader.js';
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import { browser } from '$app/environment';
@@ -206,7 +206,7 @@
 
 	async function loadGlbFromUrl(url) {
 		isLoadingGltf = true;
-		const loader = new GLTFLoader();
+		const loader = createGltfLoader();
 		try {
 			const gltf = await loader.loadAsync(url);
 

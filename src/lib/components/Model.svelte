@@ -74,7 +74,7 @@
 <script>
 	import { T, useThrelte } from '@threlte/core';
 	import { interactivity, Text } from '@threlte/extras';
-	import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+	import { createGltfLoader } from '$lib/assets/js/gltf-loader.js';
 
 	interactivity();
 
@@ -125,7 +125,7 @@
 		
 		// Cache miss: Load the model fresh using GLTFLoader.
 		// The browser's HTTP cache will still prevent re-downloading if available.
-		const loader = new GLTFLoader();
+		const loader = createGltfLoader();
 		loader.load(
 			modelUrl,
 			(gltf) => {
