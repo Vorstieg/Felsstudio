@@ -28,9 +28,9 @@
 		selectedWorkspace = null;
 	}
 
-	function handleComplete() {
-		userState.ui.workspace = selectedWorkspace;
-		goto(`${base}/${selectedWorkspace}`);
+	function handleComplete(workspace = selectedWorkspace) {
+		userState.ui.workspace = workspace;
+		goto(`${base}/${workspace}`);
 	}
 
 	const workspaces = [
@@ -51,8 +51,9 @@
 			description: 'ui.interactive_desc',
 			icon: 'fa-cube',
 			color: 'bg-workspace-topo-3d',
-			newId: 'topos/3d/new',
-			editId: 'topos/3d/edit'
+			newId: 'topos/3d',
+			editId: null,
+			actionLabel: 'ui.new_or_edit'
 		},
 		{
 			id: 'topos-2d',

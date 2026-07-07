@@ -118,6 +118,7 @@
 		if (activeTool !== 'ai-bolts' || !userState.clustering.clusters) return [];
 		return userState.clustering.clusters.filter((c) => {
 			return !userState.topo.fixPoints.some((fp) => {
+				if (!Array.isArray(fp.position) || fp.position.length < 3) return false;
 				const dist = Math.sqrt(
 					Math.pow(fp.position[0] - c.anchor[0], 2) +
 						Math.pow(fp.position[1] - c.anchor[1], 2) +
@@ -427,28 +428,6 @@
 								/>
 							</div>
 
-							<div class="grid grid-cols-2 gap-2">
-								<div class="space-y-0.5">
-									<label for="crag-id" class="text-ui-label block">Crag ID</label>
-									<input
-										type="text"
-										id="crag-id"
-										bind:value={userState.topo.crag_id}
-										class="input-studio w-full font-mono"
-										placeholder="peilstein"
-									/>
-								</div>
-								<div class="space-y-0.5">
-									<label for="sector-id" class="text-ui-label block">Sector ID</label>
-									<input
-										type="text"
-										id="sector-id"
-										bind:value={userState.topo.sector_id}
-										class="input-studio w-full font-mono"
-										placeholder="hauptwand"
-									/>
-								</div>
-							</div>
 
 							<div class="space-y-0.5">
 								<label for="rock" class="text-ui-label block">{$_('ui.rock_type')}</label>

@@ -351,7 +351,7 @@
 	let visualFixPoints = $derived.by(() => {
 		const offset = userState.topo.modelOffset || [0, 0, 0];
 		return userState.topo.fixPoints
-			.filter((pt) => pt.position && topo3DFixpointTypes.has(pt.type))
+			.filter((pt) => Array.isArray(pt.position) && pt.position.length >= 3 && topo3DFixpointTypes.has(pt.type))
 			.map((pt) => ({
 				...pt,
 				rawPosition: [

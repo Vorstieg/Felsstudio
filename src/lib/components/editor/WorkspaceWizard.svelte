@@ -23,6 +23,7 @@
 	let loadMode = $state('entry');
 	let searchQuery = $state('');
 	let expandedCragPath = $state(null);
+	let selectedCreateEntry = $state(false);
 
 	// Files state
 	let glbFile = $state(null);
@@ -39,6 +40,7 @@
 	let loadedGltfScene = null;
 
 	let topoFiles = $state(new Set());
+	let glbFiles = $state(new Set());
 
 	onMount(async () => {
 		// Default modes for new paths
@@ -53,6 +55,11 @@
 					return parts.slice(0, -1).join('/');
 				});
 			topoFiles = new Set(topoPaths);
+			glbFiles = new Set(
+				allFiles
+					.filter((f) => f.type === 'file' && f.name.toLowerCase().endsWith('.glb'))
+					.map((f) => normalizeEntryPath(f.path))
+			);
 		} catch (err) {
 			console.error('Failed to load file listing from Felslager:', err);
 		}
@@ -164,7 +171,13 @@
 			const sectorTopoPath = getSectorTopoPath(path, sector);
 			const entryName = pathBasename(entryPath);
 			const topoPath = sectorTopoPath || `${entryPath}/${entryName}-topo.json`;
+			const topoDir = pathDirname(topoPath) || entryPath;
+			const topoBaseName = pathBasename(topoPath)
+				.replace(/-topo\.json$/i, '')
+				.replace(/\.json$/i, '');
+			const glbPath = normalizeEntryPath(`${topoDir}/${topoBaseName}.glb`);
 			const cragJsonPath = `${path}/${name}.json`;
+			let loadedTopo = workspace === 'topos/3d' && glbFiles.has(glbPath);
 
 			if (workspace.startsWith('crags/')) {
 				const { cragEditorState } = await import('$lib/state/crag-editor.svelte.js');
@@ -221,12 +234,12 @@
 				}
 				if (!userState.topo.id) userState.topo.id = getTopoId(crag, sector);
 				// Load GLB from Felslager
-				const glbUrl = fileUrl(`${path}/${name}.glb`);
+				const glbUrl = fileUrl(glbPath);
 				try {
 					const res = await fetch(glbUrl);
 					if (res.ok) {
 						const blob = await res.blob();
-						await loadGlb(new File([blob], `${name}.glb`));
+						await loadGlb(new File([blob], `${topoBaseName}.glb`));
 					}
 				} catch {
 					/* GLB may not exist */
@@ -237,19 +250,21 @@
 				try {
 					const topoData = await readJson(topoPath);
 					userState.topo = { ...userState.topo, ...topoData };
+					loadedTopo = workspace === 'topos/3d' ? loadedTopo : true;
 					if (!userState.topo.id) userState.topo.id = getTopoId(crag, sector);
 					initializeIdCounters(userState.topo);
 				} catch {
-					/* no topo yet */
+					seedTopoFromEntry(crag, sector);
 				}
-				if (workspace.includes('/3d/')) {
+				if (workspace.includes('/3d/') || workspace === 'topos/3d') {
 					userState.topo.editorMode = '3d';
-					const glbUrl = fileUrl(`${path}/${name}.glb`);
+					const glbUrl = fileUrl(glbPath);
 					try {
 						const res = await fetch(glbUrl);
 						if (res.ok) {
+							loadedTopo = workspace === 'topos/3d' ? true : loadedTopo;
 							const blob = await res.blob();
-							await loadGlb(new File([blob], `${name}.glb`));
+							await loadGlb(new File([blob], `${topoBaseName}.glb`));
 						}
 					} catch {
 						/* GLB may not exist */
@@ -276,7 +291,13 @@
 			userState.topo._entryPath = pathDirname(topoPath) || entryPath;
 			userState.topo._topoFileName = pathBasename(topoPath);
 
-			onComplete();
+			if (workspace === 'topos/3d' && !loadedTopo) {
+				selectedCreateEntry = true;
+				loadMode = 'file';
+				return;
+			}
+
+			onComplete(workspace === 'topos/3d' ? 'topos/3d/edit' : undefined);
 		} catch (err) {
 			console.error(err);
 			error = 'Failed to load entry: ' + err.message;
@@ -288,9 +309,12 @@
 	async function processFiles() {
 		isLoading = true;
 		error = null;
+		const preserveSeededTopo = workspace === 'topos/3d' && selectedCreateEntry;
+		const seededTopo = preserveSeededTopo ? { ...userState.topo } : null;
 		userState.reset();
+		if (seededTopo) userState.topo = { ...userState.topo, ...seededTopo };
 		try {
-			if (workspace === 'topos/3d/new') {
+			if (workspace === 'topos/3d/new' || workspace === 'topos/3d') {
 				userState.topo.editorMode = '3d';
 				if (zipFile) {
 					const zip = await JSZip.loadAsync(zipFile);
@@ -459,7 +483,7 @@
 					}
 				}
 			}
-			onComplete();
+			onComplete(workspace === 'topos/3d' ? 'topos/3d/new' : undefined);
 		} catch (err) {
 			console.error(err);
 			error = err.message;
@@ -524,7 +548,7 @@
 		</div>
 	{/if}
 
-	{#if loadMode === 'entry' && (workspace.includes('/edit') || workspace === 'topos/2d/new')}
+	{#if loadMode === 'entry' && (workspace.includes('/edit') || workspace === 'topos/2d/new' || workspace === 'topos/3d')}
 		<div class="space-y-3">
 			<div class="relative">
 				<i
@@ -579,6 +603,14 @@
 						</button>
 						{#if showSectorChoices && expandedCragPath === crag.properties.path}
 							<div class="border-t border-black/10 p-1.5 space-y-1 bg-warm-white/70">
+								<button
+									class="w-full px-2 py-1.5 rounded-sm text-left text-body-text bg-white border border-black/10 hover:border-creator-blue hover:text-creator-blue transition-none disabled:opacity-50"
+									onclick={() => loadFromEntry(crag)}
+									disabled={isLoading}
+								>
+									<span class="font-bold">{crag.properties.name}</span>
+									<span class="block text-micro-data text-warm-gray-400">Whole crag</span>
+								</button>
 								{#each sectors as sector}
 									<button
 										class="w-full px-2 py-1.5 rounded-sm text-left text-body-text bg-white border border-black/10 hover:border-creator-blue hover:text-creator-blue transition-none disabled:opacity-50"
@@ -603,7 +635,7 @@
 		</div>
 	{:else}
 		<div class="space-y-4">
-			{#if workspace === 'topos/3d/new'}
+			{#if workspace === 'topos/3d/new' || workspace === 'topos/3d'}
 				<div class="space-y-3">
 					<div class="p-3 border border-creator-blue/30 bg-creator-blue/5 rounded">
 						<div class="flex items-center gap-2 mb-2">
