@@ -36,13 +36,13 @@
 	const workspaces = [
 		{
 			id: 'crags',
-			name: 'ui.crag_studio', // I should add this key as well
+			name: 'ui.crag_studio',
 			label: 'ui.geospatial_registry',
 			description: 'ui.geospatial_desc',
 			icon: 'fa-map-location-dot',
 			color: 'bg-workspace-crag',
-			newId: 'crags/new',
-			editId: 'crags/edit'
+			newId: 'crags/edit',
+			editId: null
 		},
 		{
 			id: 'topos-3d',
@@ -79,7 +79,10 @@
 
 			<div class="grid grid-cols-1 md:grid-cols-3 gap-3">
 				{#each workspaces as ws}
-					<div class="panel p-4 flex flex-col h-full hover:border-creator-blue transition-none group cursor-default">
+					<button
+						class="panel p-4 flex flex-col h-full text-left hover:border-creator-blue transition-none group cursor-pointer"
+						onclick={() => handleSelect(ws.newId)}
+					>
 						<div class="w-8 h-8 rounded {ws.color} flex items-center justify-center text-white text-sm mb-4 shadow-sm">
 							<i class="fa-solid {ws.icon}"></i>
 						</div>
@@ -93,25 +96,7 @@
 						<p class="text-body-text text-warm-gray-500 leading-relaxed mb-6">
 							{$_(ws.description)}
 						</p>
-
-						<div class="mt-auto flex gap-2">
-							<button
-								class="flex-1 btn-primary"
-								onclick={() => handleSelect(ws.newId)}
-							>
-								{$_(ws.actionLabel || 'ui.create')}
-							</button>
-							{#if ws.editId}
-								<button
-									class="w-8 h-8 flex items-center justify-center bg-transparent border border-black/15 text-near-black rounded hover:bg-black/5 hover:border-black/30 transition-none"
-									onclick={() => handleSelect(ws.editId)}
-									title={$_('ui.edit_existing')}
-								>
-									<i class="fa-solid fa-pen text-[10px]"></i>
-								</button>
-							{/if}
-						</div>
-					</div>
+					</button>
 				{/each}
 			</div>
 

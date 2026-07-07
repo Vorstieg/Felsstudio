@@ -30,7 +30,6 @@
 	let projectFile = $state(null);
 	let zipFile = $state(null);
 	let jsonFile = $state(null);
-	let extraJsonFiles = $state([]); // For multiple crag files
 	let detectionsFile = $state(null);
 	let registrationFile = $state(null);
 	let gpsFile = $state(null);
@@ -43,9 +42,6 @@
 	let glbFiles = $state(new Set());
 
 	onMount(async () => {
-		// Default modes for new paths
-		if (workspace === 'crags/new') loadMode = 'file';
-
 		try {
 			const allFiles = await listDir('', { recursive: true });
 			const topoPaths = allFiles
@@ -449,39 +445,6 @@
 				await loadGlb(glbFile);
 				if (jsonFile) await loadTopoJson(jsonFile);
 				userState.topo.editorMode = '3d';
-			} else if (workspace.startsWith('crags/')) {
-				const { cragEditorState } = await import('$lib/state/crag-editor.svelte.js');
-				cragEditorState.reset();
-				const allFiles = [...(jsonFile ? [jsonFile] : []), ...extraJsonFiles];
-				if (workspace === 'crags/edit' && allFiles.length === 0 && loadMode === 'file')
-					throw new Error('At least one Crag JSON file is required');
-				for (const file of allFiles) {
-					const text = await file.text();
-					const data = JSON.parse(text);
-					const n = file.name.toLowerCase();
-					if (n.endsWith('-transit.json'))
-						cragEditorState.transit.push({
-							id: Math.random().toString(36).substr(2, 9),
-							name: data.properties?.name || 'Station',
-							type: data.properties?.type || 'bus',
-							coordinates: data.geometry?.coordinates || data.coordinates
-						});
-					else if (n.endsWith('-parking.json'))
-						cragEditorState.parking.push({
-							id: Math.random().toString(36).substr(2, 9),
-							coordinates: data.geometry?.coordinates || data.coordinates
-						});
-					else if (n.endsWith('-transit-track.json'))
-						cragEditorState.tracks.push({
-							id: Math.random().toString(36).substr(2, 9),
-							name: data.properties?.name || 'Track',
-							coordinates: data.geometry?.coordinates || data.coordinates
-						});
-					else {
-						Object.assign(cragEditorState.crag, data.properties || data);
-						if (data.geometry) cragEditorState.crag.geometry = data.geometry;
-					}
-				}
 			}
 			onComplete(workspace === 'topos/3d' ? 'topos/3d/new' : undefined);
 		} catch (err) {
@@ -531,7 +494,7 @@
 </script>
 
 <div class="space-y-4">
-	{#if workspace !== 'crags/new' && workspace !== 'topos/2d/new' && workspace.includes('/edit')}
+	{#if !workspace.startsWith('crags/') && workspace !== 'topos/2d/new' && workspace.includes('/edit')}
 		<div class="border border-black/15 rounded p-0.5 flex gap-0.5">
 			<button
 				class="flex-1 py-1.5 text-ui-label rounded-sm transition-none {loadMode === 'entry'
@@ -550,6 +513,11 @@
 
 	{#if loadMode === 'entry' && (workspace.includes('/edit') || workspace === 'topos/2d/new' || workspace === 'topos/3d')}
 		<div class="space-y-3">
+			{#if workspace === 'crags/edit'}
+				<button class="btn-primary w-full" onclick={() => onComplete('crags/new')}>
+					<i class="fa-solid fa-plus mr-2"></i>{$_('ui.new_crag')}
+				</button>
+			{/if}
 			<div class="relative">
 				<i
 					class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-warm-gray-300 text-[11px]"
@@ -710,42 +678,6 @@
 							class="input-studio w-full file:hidden cursor-pointer"
 						/>
 					</div>
-				</div>
-			{:else if workspace.startsWith('crags/')}
-				<div class="space-y-3">
-					<div class="p-4 border border-black/15 rounded bg-black/5 flex items-center gap-3">
-						<i class="fa-solid fa-map-location-dot text-xl text-warm-gray-500"></i>
-						<div>
-							<h4 class="text-section-title">
-								{workspace === 'crags/new' ? $_('ui.new_crag') : $_('ui.maintenance')}
-							</h4>
-							<p class="text-body-text text-warm-gray-500">{$_('ui.geospatial_config_desc')}</p>
-						</div>
-					</div>
-					{#if workspace === 'crags/edit'}
-						<div class="space-y-1">
-							<label class="text-ui-label">{$_('ui.crag_json_files')} *</label>
-							<input
-								type="file"
-								accept=".json"
-								multiple
-								onchange={(e) => (extraJsonFiles = Array.from(e.target.files))}
-								class="input-studio w-full file:hidden cursor-pointer"
-							/>
-						</div>
-						{#if extraJsonFiles.length > 0}
-							<div class="grid grid-cols-1 gap-1">
-								{#each extraJsonFiles as file}
-									<div
-										class="text-micro-data text-near-black bg-white px-2 py-1 rounded border border-black/15 flex items-center gap-2"
-									>
-										<i class="fa-solid fa-file-code text-warm-gray-400"></i>
-										{file.name}
-									</div>
-								{/each}
-							</div>
-						{/if}
-					{/if}
 				</div>
 			{/if}
 
