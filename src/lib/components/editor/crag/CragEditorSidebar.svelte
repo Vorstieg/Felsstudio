@@ -3,6 +3,7 @@
 	import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
 	import { getGeometryCenter } from '$lib/assets/js/sector-utils.js';
+	import CragHierarchyPlacement from './CragHierarchyPlacement.svelte';
 
 	let {
 		inspectorShadow = true,
@@ -36,6 +37,7 @@
 	let selectedSector = $derived(
 		(cragEditorState.crag.sectors || []).find((sector) => sector.id === selectedSectorId)
 	);
+
 
 	function ensureSectorCollections(sector) {
 		if (!sector.type) sector.type = [];
@@ -98,11 +100,7 @@
 																																																class="input-studio w-full"
 																																																placeholder="e.g. Efeugrat" />
 						</div>
-						<div class="space-y-0.5"><label class="text-ui-label block">Path Segment</label><input type="text"
-																																																	 bind:value={cragEditorState.crag.path}
-																																																	 class="input-studio w-full font-mono"
-																																																	 placeholder="e.g. lower-austria/mödling/efeugrat" />
-						</div>
+						<CragHierarchyPlacement />
 
 						<div class="grid grid-cols-2 gap-2">
 							<div class="space-y-0.5"><label class="text-ui-label block">Security</label><select

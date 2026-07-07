@@ -19,6 +19,7 @@
 		getGeometryCenter,
 		getSectorEntryPath,
 		pathBasename,
+		pathDirname,
 		translateGeometryTo
 	} from '$lib/assets/js/sector-utils.js';
 	import {
@@ -120,7 +121,26 @@
 	];
 
 	function slugifyName(value, fallback = 'new-crag') {
-		return (value || fallback).trim().toLowerCase().replace(/\s+/g, '-');
+		return (value || fallback)
+			.trim()
+			.toLowerCase()
+			.normalize('NFD')
+			.replace(/[\u0300-\u036f]/g, '')
+			.replace(/[^a-z0-9]+/g, '-')
+			.replace(/^-+|-+$/g, '') || fallback;
+	}
+
+	function normalizeSavePath(path = '') {
+		return String(path).replace(/^\/+|\/+$/g, '').replace(/\/+/g, '/');
+	}
+
+	function getCragEntryPath(crag) {
+		const slug = slugifyName(crag.name);
+		const currentPath = normalizeSavePath(crag.path || '');
+		if (!currentPath) return '';
+		if (pathBasename(currentPath) === slug) return currentPath;
+		const parent = pathDirname(currentPath) || currentPath;
+		return normalizeSavePath(`${parent}/${slug}`);
 	}
 
 	function getCragId(crag) {
@@ -1240,18 +1260,19 @@
 	async function saveToServer() {
 		if (!authState.requireAuth(() => saveToServer())) return;
 
-		const savePath = cragEditorState.crag.path;
+		const savePath = getCragEntryPath(cragEditorState.crag);
 		if (!savePath) {
 			saveStatus = 'error';
 			saveError = $_('save.save_path_required');
 			return;
 		}
+		cragEditorState.crag.path = savePath;
 
 		saveStatus = 'saving';
 		saveError = '';
 
 		try {
-			const baseName = slugifyName(cragEditorState.crag.name);
+			const baseName = pathBasename(savePath) || slugifyName(cragEditorState.crag.name);
 			cragEditorState.crag.id = cragEditorState.crag.id || baseName;
 
 			// Save main crag JSON
@@ -1308,6 +1329,17 @@
 
 	function createTopoFromCrag() {
 		const crag = $state.snapshot(cragEditorState.crag);
+		const entryPath = getCragEntryPath(crag);
+		if (!entryPath) {
+			saveStatus = 'error';
+			saveError = 'Choose a parent folder and enter a crag name before creating a topo.';
+			return;
+		}
+		crag.path = entryPath;
+		crag.id = crag.id || pathBasename(entryPath);
+		cragEditorState.crag.path = entryPath;
+		cragEditorState.crag.id = crag.id;
+
 		const sector = (crag.sectors || []).find((item) => item.id === selectedSectorId);
 		const source = sector || crag;
 		const cragId = getCragId(crag);
@@ -1338,10 +1370,8 @@
 			updated: today,
 			coordinates: [coordinates?.[1] ?? 0, coordinates?.[0] ?? 0],
 			editorMode: '2d',
-			_entryPath: sector ? getSectorEntryPath(crag.path || '', sector) : crag.path || '',
-			_topoFileName: `${pathBasename(
-				sector ? getSectorEntryPath(crag.path || '', sector) : crag.path || ''
-			)}-topo.json`
+			_entryPath: sector ? getSectorEntryPath(entryPath, sector) : entryPath,
+			_topoFileName: `${pathBasename(sector ? getSectorEntryPath(entryPath, sector) : entryPath)}-topo.json`
 		};
 		userState.ui.workspace = 'topos/2d/editor';
 		goto(`${base}/topos/2d/editor`);

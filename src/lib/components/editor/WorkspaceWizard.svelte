@@ -40,19 +40,11 @@
 	// Store the loaded GLTF scene for projection
 	let loadedGltfScene = null;
 
-	let topoFiles = $state(new Set());
 	let glbFiles = $state(new Set());
 
 	onMount(async () => {
 		try {
 			const allFiles = await listDir('', { recursive: true });
-			const topoPaths = allFiles
-				.filter((f) => f.type === 'file' && f.name.endsWith('-topo.json'))
-				.map((f) => {
-					const parts = f.path.split('/');
-					return parts.slice(0, -1).join('/');
-				});
-			topoFiles = new Set(topoPaths);
 			glbFiles = new Set(
 				allFiles
 					.filter((f) => f.type === 'file' && f.name.toLowerCase().endsWith('.glb'))
@@ -65,27 +57,21 @@
 
 	const filteredLocations = $derived(
 		locations.filter((l) => {
-			const sectors = l.properties.sectors || [];
-			const hasTopo =
-				topoFiles.has(l.properties.path) ||
-				sectors.some((sector) => topoFiles.has(getSectorEntryPath(l.properties.path, sector)));
-			let requirementMet = true;
-
-			if (workspace.includes('/edit') && workspace !== 'crags/editor') requirementMet = hasTopo;
-
 			const query = searchQuery.toLowerCase();
+			if (query === '') return true;
+
+			const sectors = l.properties.sectors || [];
 			const sectorMatch = sectors.some(
 				(sector) =>
 					(sector.name || '').toLowerCase().includes(query) ||
 					(sector.id || '').toLowerCase().includes(query) ||
 					(sector.type || []).includes(searchQuery)
 			);
+
 			return (
-				requirementMet &&
-				(searchQuery === '' ||
-					l.properties.name.toLowerCase().includes(query) ||
-					l.properties.path.toLowerCase().includes(query) ||
-					sectorMatch)
+				l.properties.name.toLowerCase().includes(query) ||
+				l.properties.path.toLowerCase().includes(query) ||
+				sectorMatch
 			);
 		})
 	);
