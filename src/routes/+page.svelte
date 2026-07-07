@@ -28,9 +28,17 @@
 		selectedWorkspace = null;
 	}
 
+	function getEditorRoute(workspace) {
+		if (workspace === 'topos/2d' || workspace?.startsWith('topos/2d/')) return 'topos/2d/editor';
+		if (workspace === 'topos/3d' || workspace?.startsWith('topos/3d/')) return 'topos/3d/editor';
+		if (workspace?.startsWith('crags/')) return 'crags/editor';
+		return workspace;
+	}
+
 	function handleComplete(workspace = selectedWorkspace) {
-		userState.ui.workspace = workspace;
-		goto(`${base}/${workspace}`);
+		const editorRoute = getEditorRoute(workspace);
+		userState.ui.workspace = editorRoute;
+		goto(`${base}/${editorRoute}`);
 	}
 
 	const workspaces = [
@@ -41,7 +49,7 @@
 			description: 'ui.geospatial_desc',
 			icon: 'fa-map-location-dot',
 			color: 'bg-workspace-crag',
-			newId: 'crags/edit',
+			newId: 'crags/editor',
 			editId: null
 		},
 		{
@@ -51,7 +59,7 @@
 			description: 'ui.interactive_desc',
 			icon: 'fa-cube',
 			color: 'bg-workspace-topo-3d',
-			newId: 'topos/3d',
+			newId: 'topos/3d/editor',
 			editId: null,
 			actionLabel: 'ui.new_or_edit'
 		},
@@ -62,7 +70,7 @@
 			description: 'ui.schematic_desc',
 			icon: 'fa-layer-group',
 			color: 'bg-workspace-topo-2d',
-			newId: 'topos/2d/new',
+			newId: 'topos/2d/editor',
 			editId: null,
 			actionLabel: 'ui.new_or_edit'
 		}
@@ -131,7 +139,7 @@
                                         }
 
                                         userState.ui.activeDraftId = draft.id;
-                                        userState.ui.workspace = topo.editorMode === '2d' ? 'topos/2d/edit' : 'topos/3d/edit';
+                                        userState.ui.workspace = topo.editorMode === '2d' ? 'topos/2d/editor' : 'topos/3d/editor';
                                         goto(`${base}/${userState.ui.workspace}`);
                                     } else {
                                         // Session data missing from IndexedDB (e.g. browser cleared storage)

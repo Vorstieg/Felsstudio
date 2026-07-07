@@ -2,6 +2,26 @@ import { storage } from '$lib/assets/js/storage-utils.js';
 import { topoStore } from '$lib/assets/js/db.js';
 
 const STORAGE_KEY = 'topo_drafts_v1';
+const LATEST_STORAGE_PREFIX = 'topo_latest_draft_';
+const LATEST_INDEXEDDB_PREFIX = 'latest-';
+
+function isBlankTopoSession(session) {
+	const topo = session?.topo || session;
+	return (
+		!topo?.name &&
+		!topo?.crag_id &&
+		!topo?.sector_id &&
+		!topo?.description &&
+		!topo?.image2D &&
+		(topo?.routes || []).length === 0 &&
+		(topo?.fixPoints || []).length === 0 &&
+		(topo?.outlines || []).length === 0 &&
+		(topo?.textLabels || []).length === 0 &&
+		!session?.glbBlob &&
+		!session?.glbArrayBuffer &&
+		(session?.clustering?.rawHits || []).length === 0
+	);
+}
 
 export const draftsState = $state({
 	drafts: [],
@@ -16,7 +36,8 @@ export const draftsState = $state({
 
 	async save(topo, id = null, extra = {}) {
 		const timestamp = new Date().toISOString();
-		const draftId = id || topo.id || `draft-${Date.now()}`;
+		const editorMode = topo.editorMode || 'topo';
+		const draftId = id || (topo.id ? `${editorMode}-${topo.id}` : `draft-${editorMode}-${Date.now()}`);
 
 		const draftIndex = this.drafts.findIndex((d) => d.id === draftId);
 
@@ -24,6 +45,7 @@ export const draftsState = $state({
 		const metadata = {
 			id: draftId,
 			name: topo.name || 'Unnamed Topo',
+			editorMode,
 			updated: timestamp
 		};
 
@@ -32,9 +54,6 @@ export const draftsState = $state({
 		} else {
 			this.drafts.unshift(metadata);
 		}
-
-		// Save metadata to localStorage
-		storage.set(STORAGE_KEY, this.drafts);
 
 		const extraToSave = { ...extra };
 		if (extraToSave.glbBlob instanceof Blob) {
@@ -81,6 +100,11 @@ export const draftsState = $state({
 			updated: timestamp
 		};
 		await topoStore.set(sessionToSave);
+		await topoStore.set({ ...sessionToSave, id: `${LATEST_INDEXEDDB_PREFIX}${editorMode}`, sourceDraftId: draftId });
+
+		// Save metadata only after IndexedDB has the full session, so reload never points at a missing draft.
+		storage.set(STORAGE_KEY, this.drafts);
+		storage.set(`${LATEST_STORAGE_PREFIX}${editorMode}`, draftId);
 
 		return draftId;
 	},
@@ -88,7 +112,53 @@ export const draftsState = $state({
 	async delete(id) {
 		this.drafts = this.drafts.filter((d) => d.id !== id);
 		storage.set(STORAGE_KEY, this.drafts);
+		for (const mode of ['2d', '3d']) {
+			if (storage.get(`${LATEST_STORAGE_PREFIX}${mode}`, null) === id) {
+				storage.remove(`${LATEST_STORAGE_PREFIX}${mode}`);
+			}
+		}
 		await topoStore.delete(id);
+		for (const mode of ['2d', '3d']) {
+			const latest = await topoStore.get(`${LATEST_INDEXEDDB_PREFIX}${mode}`);
+			if (latest?.sourceDraftId === id) await topoStore.delete(`${LATEST_INDEXEDDB_PREFIX}${mode}`);
+		}
+	},
+
+	getLatestMetadata() {
+		return [...this.drafts].sort((a, b) => new Date(b.updated) - new Date(a.updated))[0] || null;
+	},
+
+	async getLatest(editorMode = null) {
+		const latestId = editorMode ? storage.get(`${LATEST_STORAGE_PREFIX}${editorMode}`, null) : null;
+		if (latestId) {
+			const session = await this.getById(latestId);
+			const sessionMode = session?.topo?.editorMode || session?.editorMode;
+			if (session && !isBlankTopoSession(session) && (!editorMode || sessionMode === editorMode)) {
+				return { id: latestId, session };
+			}
+		}
+
+		if (editorMode) {
+			const session = await this.getById(`${LATEST_INDEXEDDB_PREFIX}${editorMode}`);
+			const sessionMode = session?.topo?.editorMode || session?.editorMode;
+			if (session && !isBlankTopoSession(session) && sessionMode === editorMode) {
+				return { id: session.sourceDraftId || `${LATEST_INDEXEDDB_PREFIX}${editorMode}`, session };
+			}
+		}
+
+		const sortedDrafts = [...this.drafts].sort((a, b) => new Date(b.updated) - new Date(a.updated));
+
+		for (const draft of sortedDrafts) {
+			if (editorMode && draft.editorMode && draft.editorMode !== editorMode) continue;
+
+			const session = await this.getById(draft.id);
+			const sessionMode = session?.topo?.editorMode || session?.editorMode || draft.editorMode;
+			if (session && !isBlankTopoSession(session) && (!editorMode || sessionMode === editorMode)) {
+				return { id: draft.id, session };
+			}
+		}
+
+		return null;
 	},
 
 	async getById(id) {

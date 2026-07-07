@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import { userState } from '$lib/state/editor.svelte.js';
+	import { draftsState } from '$lib/state/drafts.svelte.js';
 	import { createGltfLoader } from '$lib/assets/js/gltf-loader.js';
 	import { Box3, Vector3 } from 'three';
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
@@ -20,7 +21,6 @@
 
 	let isLoading = $state(false);
 	let error = $state(null);
-	let loadMode = $state('entry');
 	let searchQuery = $state('');
 	let expandedCragPath = $state(null);
 	let selectedCreateEntry = $state(false);
@@ -69,7 +69,7 @@
 				sectors.some((sector) => topoFiles.has(getSectorEntryPath(l.properties.path, sector)));
 			let requirementMet = true;
 
-			if (workspace.includes('/edit') && workspace !== 'crags/edit') requirementMet = hasTopo;
+			if (workspace.includes('/edit') && workspace !== 'crags/editor') requirementMet = hasTopo;
 
 			const query = searchQuery.toLowerCase();
 			const sectorMatch = sectors.some(
@@ -90,6 +90,18 @@
 
 	function isTopoWorkspace() {
 		return workspace.startsWith('topos/');
+	}
+
+	async function persistTopoSessionImmediately() {
+		if (!isTopoWorkspace()) return;
+
+		draftsState.init();
+		const id = await draftsState.save(userState.topo, userState.ui.activeDraftId, {
+			clustering: $state.snapshot(userState.clustering),
+			glbBlob: userState.ui.glbBlob
+		});
+		userState.ui.activeDraftId = id;
+		userState.ui.lastSaved = new Date().toISOString();
 	}
 
 	function normalizeEntryPath(path = '') {
@@ -173,7 +185,7 @@
 				.replace(/\.json$/i, '');
 			const glbPath = normalizeEntryPath(`${topoDir}/${topoBaseName}.glb`);
 			const cragJsonPath = `${path}/${name}.json`;
-			let loadedTopo = workspace === 'topos/3d' && glbFiles.has(glbPath);
+			let loadedTopo = workspace === 'topos/3d/editor' && glbFiles.has(glbPath);
 
 			if (workspace.startsWith('crags/')) {
 				const { cragEditorState } = await import('$lib/state/crag-editor.svelte.js');
@@ -221,7 +233,7 @@
 				} catch {
 					/* directory listing may fail */
 				}
-			} else if (workspace === 'topos/2d/new') {
+			} else if (workspace === 'topos/2d/editor') {
 				seedTopoFromEntry(crag, sector);
 				try {
 					userState.topo = { ...userState.topo, ...(await readJson(topoPath)) };
@@ -246,19 +258,19 @@
 				try {
 					const topoData = await readJson(topoPath);
 					userState.topo = { ...userState.topo, ...topoData };
-					loadedTopo = workspace === 'topos/3d' ? loadedTopo : true;
+					loadedTopo = workspace === 'topos/3d/editor' ? loadedTopo : true;
 					if (!userState.topo.id) userState.topo.id = getTopoId(crag, sector);
 					initializeIdCounters(userState.topo);
 				} catch {
 					seedTopoFromEntry(crag, sector);
 				}
-				if (workspace.includes('/3d/') || workspace === 'topos/3d') {
+				if (workspace.includes('/3d/')) {
 					userState.topo.editorMode = '3d';
 					const glbUrl = fileUrl(glbPath);
 					try {
 						const res = await fetch(glbUrl);
 						if (res.ok) {
-							loadedTopo = workspace === 'topos/3d' ? true : loadedTopo;
+							loadedTopo = workspace === 'topos/3d/editor' ? true : loadedTopo;
 							const blob = await res.blob();
 							await loadGlb(new File([blob], `${topoBaseName}.glb`));
 						}
@@ -287,13 +299,13 @@
 			userState.topo._entryPath = pathDirname(topoPath) || entryPath;
 			userState.topo._topoFileName = pathBasename(topoPath);
 
-			if (workspace === 'topos/3d' && !loadedTopo) {
+			if (workspace === 'topos/3d/editor' && !loadedTopo) {
 				selectedCreateEntry = true;
-				loadMode = 'file';
 				return;
 			}
 
-			onComplete(workspace === 'topos/3d' ? 'topos/3d/edit' : undefined);
+			await persistTopoSessionImmediately();
+			onComplete(workspace === 'topos/3d/editor' ? 'topos/3d/editor' : undefined);
 		} catch (err) {
 			console.error(err);
 			error = 'Failed to load entry: ' + err.message;
@@ -305,12 +317,12 @@
 	async function processFiles() {
 		isLoading = true;
 		error = null;
-		const preserveSeededTopo = workspace === 'topos/3d' && selectedCreateEntry;
+		const preserveSeededTopo = workspace === 'topos/3d/editor' && selectedCreateEntry;
 		const seededTopo = preserveSeededTopo ? { ...userState.topo } : null;
 		userState.reset();
 		if (seededTopo) userState.topo = { ...userState.topo, ...seededTopo };
 		try {
-			if (workspace === 'topos/3d/new' || workspace === 'topos/3d') {
+			if (workspace === 'topos/3d/editor') {
 				userState.topo.editorMode = '3d';
 				if (zipFile) {
 					const zip = await JSZip.loadAsync(zipFile);
@@ -440,13 +452,14 @@
 						}
 					}
 				}
-			} else if (workspace === 'topos/3d/edit') {
+			} else if (workspace === 'topos/3d/editor') {
 				if (!glbFile) throw new Error('GLB is required');
 				await loadGlb(glbFile);
 				if (jsonFile) await loadTopoJson(jsonFile);
 				userState.topo.editorMode = '3d';
 			}
-			onComplete(workspace === 'topos/3d' ? 'topos/3d/new' : undefined);
+			await persistTopoSessionImmediately();
+			onComplete(workspace === 'topos/3d/editor' ? 'topos/3d/editor' : undefined);
 		} catch (err) {
 			console.error(err);
 			error = err.message;
@@ -494,27 +507,82 @@
 </script>
 
 <div class="space-y-4">
-	{#if !workspace.startsWith('crags/') && workspace !== 'topos/2d/new' && workspace.includes('/edit')}
-		<div class="border border-black/15 rounded p-0.5 flex gap-0.5">
+	{#if selectedCreateEntry && workspace === 'topos/3d/editor'}
+		<div class="space-y-4">
 			<button
-				class="flex-1 py-1.5 text-ui-label rounded-sm transition-none {loadMode === 'entry'
-					? 'bg-white shadow-sm text-creator-blue'
-					: 'text-warm-gray-500 hover:bg-black/5'}"
-				onclick={() => (loadMode = 'entry')}>{$_('ui.database')}</button
+				class="text-ui-label text-warm-gray-500 hover:text-creator-blue transition-none"
+				onclick={() => (selectedCreateEntry = false)}
 			>
-			<button
-				class="flex-1 py-1.5 text-ui-label rounded-sm transition-none {loadMode === 'file'
-					? 'bg-white shadow-sm text-creator-blue'
-					: 'text-warm-gray-500 hover:bg-black/5'}"
-				onclick={() => (loadMode = 'file')}>{$_('ui.local_files')}</button
-			>
-		</div>
-	{/if}
+				<i class="fa-solid fa-arrow-left mr-1"></i>{$_('ui.back_to_launcher')}
+			</button>
 
-	{#if loadMode === 'entry' && (workspace.includes('/edit') || workspace === 'topos/2d/new' || workspace === 'topos/3d')}
+			<div class="space-y-3">
+				<div class="p-3 border border-creator-blue/30 bg-creator-blue/5 rounded">
+					<div class="flex items-center gap-2 mb-2">
+						<i class="fa-solid fa-file-zipper text-creator-blue text-[11px]"></i>
+						<p class="text-ui-label text-creator-blue">{$_('ui.zip_bundle_recommendation')}</p>
+					</div>
+					<label class="block">
+						<input
+							type="file"
+							accept=".zip"
+							onchange={(e) => (zipFile = e.target.files[0])}
+							class="block w-full text-body-text text-near-black file:mr-2 file:py-1 file:px-2 file:rounded file:border file:border-black/15 file:text-ui-label file:bg-white hover:file:bg-black/5 file:transition-none file:cursor-pointer"
+						/>
+					</label>
+				</div>
+
+				<div class="flex items-center gap-3">
+					<div class="h-px flex-1 bg-black/10"></div>
+					<span class="text-micro-data text-warm-gray-400">{$_('ui.or')}</span>
+					<div class="h-px flex-1 bg-black/10"></div>
+				</div>
+
+				<div class="grid grid-cols-1 gap-2">
+					<div class="space-y-1">
+						<label class="text-ui-label">{$_('ui.glb_model')}</label>
+						<input
+							type="file"
+							accept=".glb"
+							onchange={(e) => (glbFile = e.target.files[0])}
+							class="input-studio w-full file:hidden cursor-pointer"
+						/>
+					</div>
+					<div class="space-y-1">
+						<label class="text-ui-label">{$_('ui.project_json')}</label>
+						<input
+							type="file"
+							accept=".json"
+							onchange={(e) => (projectFile = e.target.files[0])}
+							class="input-studio w-full file:hidden cursor-pointer"
+						/>
+					</div>
+					<div class="space-y-1">
+						<label class="text-ui-label">{$_('ui.crops_directory')}</label>
+						<input
+							type="file"
+							multiple
+							webkitdirectory
+							directory
+							onchange={(e) => (cropFolderFiles = Array.from(e.target.files))}
+							class="input-studio w-full file:hidden cursor-pointer"
+						/>
+					</div>
+				</div>
+			</div>
+
+			<button onclick={processFiles} disabled={isLoading} class="btn-primary w-full mt-2">
+				{#if isLoading}
+					<i class="fa-solid fa-spinner fa-spin mr-2"></i> {$_('ui.initializing')}
+				{:else}
+					{$_('ui.launch_workspace')}
+				{/if}
+			</button>
+		</div>
+	{:else if workspace.includes('/edit') || workspace === 'topos/2d/editor' || workspace === 'topos/3d/editor'}
 		<div class="space-y-3">
-			{#if workspace === 'crags/edit'}
-				<button class="btn-primary w-full" onclick={() => onComplete('crags/new')}>
+			{#if workspace === 'crags/editor'}
+				<button class="btn-primary w-full" onclick={() => onComplete('crags/editor')}>
 					<i class="fa-solid fa-plus mr-2"></i>{$_('ui.new_crag')}
 				</button>
 			{/if}
@@ -601,100 +669,12 @@
 				{/each}
 			</div>
 		</div>
-	{:else}
-		<div class="space-y-4">
-			{#if workspace === 'topos/3d/new' || workspace === 'topos/3d'}
-				<div class="space-y-3">
-					<div class="p-3 border border-creator-blue/30 bg-creator-blue/5 rounded">
-						<div class="flex items-center gap-2 mb-2">
-							<i class="fa-solid fa-file-zipper text-creator-blue text-[11px]"></i>
-							<p class="text-ui-label text-creator-blue">{$_('ui.zip_bundle_recommendation')}</p>
-						</div>
-						<label class="block">
-							<input
-								type="file"
-								accept=".zip"
-								onchange={(e) => (zipFile = e.target.files[0])}
-								class="block w-full text-body-text text-near-black file:mr-2 file:py-1 file:px-2 file:rounded file:border file:border-black/15 file:text-ui-label file:bg-white hover:file:bg-black/5 file:transition-none file:cursor-pointer"
-							/>
-						</label>
-					</div>
-
-					<div class="flex items-center gap-3">
-						<div class="h-px flex-1 bg-black/10"></div>
-						<span class="text-micro-data text-warm-gray-400">{$_('ui.or')}</span>
-						<div class="h-px flex-1 bg-black/10"></div>
-					</div>
-
-					<div class="grid grid-cols-1 gap-2">
-						<div class="space-y-1">
-							<label class="text-ui-label">{$_('ui.glb_model')}</label>
-							<input
-								type="file"
-								accept=".glb"
-								onchange={(e) => (glbFile = e.target.files[0])}
-								class="input-studio w-full file:hidden cursor-pointer"
-							/>
-						</div>
-						<div class="space-y-1">
-							<label class="text-ui-label">{$_('ui.project_json')}</label>
-							<input
-								type="file"
-								accept=".json"
-								onchange={(e) => (projectFile = e.target.files[0])}
-								class="input-studio w-full file:hidden cursor-pointer"
-							/>
-						</div>
-						<div class="space-y-1">
-							<label class="text-ui-label">{$_('ui.crops_directory')}</label>
-							<input
-								type="file"
-								multiple
-								webkitdirectory
-								directory
-								onchange={(e) => (cropFolderFiles = Array.from(e.target.files))}
-								class="input-studio w-full file:hidden cursor-pointer"
-							/>
-						</div>
-					</div>
-				</div>
-			{:else if workspace === 'topos/3d/edit'}
-				<div class="grid grid-cols-1 gap-3">
-					<div class="space-y-1">
-						<label class="text-ui-label">{$_('ui.glb_model')} *</label>
-						<input
-							type="file"
-							accept=".glb"
-							onchange={(e) => (glbFile = e.target.files[0])}
-							class="input-studio w-full file:hidden cursor-pointer"
-						/>
-					</div>
-					<div class="space-y-1">
-						<label class="text-ui-label">{$_('ui.load_json')} *</label>
-						<input
-							type="file"
-							accept=".json"
-							onchange={(e) => (jsonFile = e.target.files[0])}
-							class="input-studio w-full file:hidden cursor-pointer"
-						/>
-					</div>
-				</div>
-			{/if}
-
-			{#if error}<div
-					class="p-2 bg-rose-50 text-rose-700 rounded text-body-text font-medium border border-rose-200 flex items-center gap-2"
-				>
-					<i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
-					{error}
-				</div>{/if}
-
-			<button onclick={processFiles} disabled={isLoading} class="btn-primary w-full mt-2">
-				{#if isLoading}
-					<i class="fa-solid fa-spinner fa-spin mr-2"></i> {$_('ui.initializing')}
-				{:else}
-					{$_('ui.launch_workspace')}
-				{/if}
-			</button>
-		</div>
 	{/if}
+
+	{#if error}<div
+			class="p-2 bg-rose-50 text-rose-700 rounded text-body-text font-medium border border-rose-200 flex items-center gap-2"
+		>
+			<i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
+			{error}
+		</div>{/if}
 </div>

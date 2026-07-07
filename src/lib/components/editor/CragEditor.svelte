@@ -28,6 +28,7 @@
 		removeGeometryVertex
 	} from '$lib/assets/js/geometry-path-adapters.js';
 	import { getEditablePath, getPathMidpoints } from '$lib/assets/js/path-geometry.js';
+	import { storage } from '$lib/assets/js/storage-utils.js';
 
 	let { inspectorShadow = true } = $props();
 
@@ -63,7 +64,10 @@
 	let areTrackPointDragHandlersReady = false;
 	let areSectorEditHandlersReady = false;
 	let suppressNextMapClick = false;
+	let canAutosaveSession = $state(false);
+	let autosaveSessionTimeout;
 
+	const CRAG_SESSION_KEY = 'crag_editor_latest_session_v1';
 	const cragTypes = ['sports-climbing', 'multi-pitch', 'bouldering', 'trad'];
 
 	const availableTags = [
@@ -128,7 +132,43 @@
 		return sector?.id ? `${cragId}:${sector.id}` : cragId;
 	}
 
+	function isBlankCragSession() {
+		return (
+			!cragEditorState.crag.id &&
+			!cragEditorState.crag.name &&
+			!cragEditorState.crag.path &&
+			!cragEditorState.crag.description_de &&
+			!cragEditorState.crag.description_en &&
+			(cragEditorState.crag.equipment || []).length === 0 &&
+			(cragEditorState.crag.sectors || []).length === 0 &&
+			(cragEditorState.transit || []).length === 0 &&
+			(cragEditorState.parking || []).length === 0 &&
+			(cragEditorState.tracks || []).length === 0
+		);
+	}
+
+	function restoreLatestCragSession() {
+		const session = storage.get(CRAG_SESSION_KEY, null);
+		if (!session) return;
+
+		cragEditorState.crag = session.crag || cragEditorState.crag;
+		cragEditorState.transit = session.transit || [];
+		cragEditorState.parking = session.parking || [];
+		cragEditorState.tracks = session.tracks || [];
+	}
+
+	function saveLatestCragSession() {
+		storage.set(CRAG_SESSION_KEY, {
+			crag: $state.snapshot(cragEditorState.crag),
+			transit: $state.snapshot(cragEditorState.transit),
+			parking: $state.snapshot(cragEditorState.parking),
+			tracks: $state.snapshot(cragEditorState.tracks),
+			updated: new Date().toISOString()
+		});
+	}
+
 	onMount(() => {
+		if (isBlankCragSession()) restoreLatestCragSession();
 		const coords = $state.snapshot(cragEditorState.crag.geometry.coordinates);
 		map = new maplibregl.Map({
 			container: mapElement,
@@ -143,6 +183,8 @@
 			isMapLoaded = true;
 			initMarkersAndLayers();
 		});
+
+		canAutosaveSession = true;
 
 		map.on('click', async (e) => {
 			if (suppressNextMapClick) {
@@ -214,8 +256,25 @@
 		return () => {
 			window.removeEventListener('keydown', handleKeyDown);
 			clearTimeout(vertexDeleteUndoTimer);
+			clearTimeout(autosaveSessionTimeout);
 			if (map) map.remove();
 		};
+	});
+
+	$effect(() => {
+		if (!canAutosaveSession) return;
+
+		const sessionString = JSON.stringify({
+			crag: cragEditorState.crag,
+			transit: cragEditorState.transit,
+			parking: cragEditorState.parking,
+			tracks: cragEditorState.tracks
+		});
+
+		if (sessionString) {
+			clearTimeout(autosaveSessionTimeout);
+			autosaveSessionTimeout = setTimeout(saveLatestCragSession, 1000);
+		}
 	});
 
 	$effect(() => {
@@ -1284,8 +1343,8 @@
 				sector ? getSectorEntryPath(crag.path || '', sector) : crag.path || ''
 			)}-topo.json`
 		};
-		userState.ui.workspace = 'topos/2d/new';
-		goto(`${base}/topos/2d/new`);
+		userState.ui.workspace = 'topos/2d/editor';
+		goto(`${base}/topos/2d/editor`);
 	}
 
 	function addEquipmentItem() {

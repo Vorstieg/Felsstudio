@@ -38,18 +38,43 @@
 	let saveError = $state('');
 
 	function getInitialEditorMode() {
-		return workspace.startsWith('2d') ? '2d' : '3d';
+		return workspace.includes('/2d') || workspace.startsWith('2d') ? '2d' : '3d';
 	}
 
 	function getInitialActiveTool() {
-		return workspace === '3d-create' || userState.clustering.rawHits.length > 0 ? 'ai-bolts' : null;
+		return getInitialEditorMode() === '3d' || userState.clustering.rawHits.length > 0 ? 'ai-bolts' : null;
 	}
 
 	function getInitialWorkspace() {
 		return workspace;
 	}
 
-	userState.topo.editorMode = getInitialEditorMode();
+	function isBlankTopoSession() {
+		return (
+			!userState.topo.name &&
+			!userState.topo.crag_id &&
+			!userState.topo.sector_id &&
+			!userState.topo.description &&
+			!userState.topo.image2D &&
+			(userState.topo.routes || []).length === 0 &&
+			(userState.topo.fixPoints || []).length === 0 &&
+			(userState.topo.outlines || []).length === 0 &&
+			(userState.topo.textLabels || []).length === 0 &&
+			!userState.ui.glbBlob &&
+			!userState.ui.modelUrl &&
+			(userState.clustering.rawHits || []).length === 0
+		);
+	}
+
+	const initialEditorMode = getInitialEditorMode();
+	userState.topo.editorMode = initialEditorMode;
+	if (
+		(userState.ui.activeDraftId?.startsWith('2d-') && initialEditorMode !== '2d') ||
+		(userState.ui.activeDraftId?.startsWith('3d-') && initialEditorMode !== '3d')
+	) {
+		userState.reset();
+		userState.topo.editorMode = initialEditorMode;
+	}
 	userState.ui.workspace = getInitialWorkspace();
 
 	let activeTool = $state(getInitialActiveTool());
@@ -58,6 +83,7 @@
 	let editorInternal = $state();
 	let drawingTarget = $state(null);
 	let hasPendingChanges = $state(false);
+	let canAutosave = $state(false);
 	const fixpointSymbols = topoSymbols.filter((symbol) => symbol.type === 'fixpoint');
 
 	// Lasso state
@@ -166,8 +192,17 @@
 		}
 	});
 
-	onMount(() => {
+	onMount(async () => {
 		draftsState.init();
+
+		if (!userState.ui.activeDraftId && (workspace.endsWith('edit') || isBlankTopoSession())) {
+			const latest = await draftsState.getLatest(getInitialEditorMode());
+			if (latest) {
+				restoreSession(latest.session, latest.id);
+				activeTool = getInitialActiveTool();
+			}
+		}
+
 		initializeIdCounters(userState.topo);
 
 		// Initialize mobile detection (client-side only)
@@ -184,6 +219,8 @@
 			loadGlbFromUrl(userState.ui.modelUrl);
 		}
 
+		canAutosave = true;
+
 		const handleKeyDown = (e) => {
 			if (activeTool === 'crop') {
 				if (e.key === 'Delete' || e.key === 'Del') applyLassoCut();
@@ -198,11 +235,32 @@
 		window.addEventListener('keydown', handleKeyDown);
 		window.addEventListener('keyup', handleKeyUp);
 		return () => {
+			clearTimeout(saveTimeout);
 			window.removeEventListener('resize', handleResize);
 			window.removeEventListener('keydown', handleKeyDown);
 			window.removeEventListener('keyup', handleKeyUp);
 		};
 	});
+
+	function restoreSession(session, id) {
+		userState.reset();
+
+		// Handle legacy drafts vs new session structure
+		const topo = session.topo || session;
+		userState.topo = topo;
+
+		if (session.clustering) {
+			userState.clustering = { ...userState.clustering, ...session.clustering };
+		}
+
+		if (session.glbBlob) {
+			userState.ui.glbBlob = session.glbBlob;
+			userState.ui.modelUrl = URL.createObjectURL(session.glbBlob);
+		}
+
+		userState.ui.activeDraftId = id;
+		userState.ui.workspace = topo.editorMode === '2d' ? 'topos/2d/editor' : 'topos/3d/editor';
+	}
 
 	async function loadGlbFromUrl(url) {
 		isLoadingGltf = true;
@@ -237,6 +295,8 @@
 	// --- Auto-save logic ---
 	let saveTimeout;
 	$effect(() => {
+		if (!canAutosave) return;
+
 		const topoString = JSON.stringify({
 			routes: userState.topo.routes,
 			fixPoints: userState.topo.fixPoints,
@@ -254,6 +314,8 @@
 		if (topoString) {
 			clearTimeout(saveTimeout);
 			saveTimeout = setTimeout(async () => {
+				if (isBlankTopoSession()) return;
+
 				const id = await draftsState.save(userState.topo, userState.ui.activeDraftId, {
 					clustering: $state.snapshot(userState.clustering),
 					glbBlob: userState.ui.glbBlob
@@ -765,7 +827,7 @@
 	{/if}
 </div>
 
-{#if userState.topo.editorMode === '3d' && activeTool === 'ai-bolts' && (workspace.includes('create') || userState.clustering.rawHits.length > 0)}
+{#if userState.topo.editorMode === '3d' && activeTool === 'ai-bolts' && (workspace.includes('create') || workspace === 'topos/3d/editor' || userState.clustering.rawHits.length > 0)}
 	<HitInspector />
 {/if}
 
