@@ -16,6 +16,8 @@
 	} from '$lib/assets/js/sector-utils.js';
 	import JSZip from 'jszip';
 	import { listDir, readJson, fileUrl } from '$lib/api/felslager.js';
+	import EntryPicker from './wizard/EntryPicker.svelte';
+	import Topo3DUploadForm from './wizard/Topo3DUploadForm.svelte';
 
 	let { workspace, onComplete, locations = [] } = $props();
 
@@ -508,167 +510,26 @@
 
 <div class="space-y-4">
 	{#if selectedCreateEntry && workspace === 'topos/3d/editor'}
-		<div class="space-y-4">
-			<button
-				class="text-ui-label text-warm-gray-500 hover:text-creator-blue transition-none"
-				onclick={() => (selectedCreateEntry = false)}
-			>
-				<i class="fa-solid fa-arrow-left mr-1"></i>{$_('ui.back_to_launcher')}
-			</button>
-
-			<div class="space-y-3">
-				<div class="p-3 border border-creator-blue/30 bg-creator-blue/5 rounded">
-					<div class="flex items-center gap-2 mb-2">
-						<i class="fa-solid fa-file-zipper text-creator-blue text-[11px]"></i>
-						<p class="text-ui-label text-creator-blue">{$_('ui.zip_bundle_recommendation')}</p>
-					</div>
-					<label class="block">
-						<input
-							type="file"
-							accept=".zip"
-							onchange={(e) => (zipFile = e.target.files[0])}
-							class="block w-full text-body-text text-near-black file:mr-2 file:py-1 file:px-2 file:rounded file:border file:border-black/15 file:text-ui-label file:bg-white hover:file:bg-black/5 file:transition-none file:cursor-pointer"
-						/>
-					</label>
-				</div>
-
-				<div class="flex items-center gap-3">
-					<div class="h-px flex-1 bg-black/10"></div>
-					<span class="text-micro-data text-warm-gray-400">{$_('ui.or')}</span>
-					<div class="h-px flex-1 bg-black/10"></div>
-				</div>
-
-				<div class="grid grid-cols-1 gap-2">
-					<div class="space-y-1">
-						<label class="text-ui-label">{$_('ui.glb_model')}</label>
-						<input
-							type="file"
-							accept=".glb"
-							onchange={(e) => (glbFile = e.target.files[0])}
-							class="input-studio w-full file:hidden cursor-pointer"
-						/>
-					</div>
-					<div class="space-y-1">
-						<label class="text-ui-label">{$_('ui.project_json')}</label>
-						<input
-							type="file"
-							accept=".json"
-							onchange={(e) => (projectFile = e.target.files[0])}
-							class="input-studio w-full file:hidden cursor-pointer"
-						/>
-					</div>
-					<div class="space-y-1">
-						<label class="text-ui-label">{$_('ui.crops_directory')}</label>
-						<input
-							type="file"
-							multiple
-							webkitdirectory
-							directory
-							onchange={(e) => (cropFolderFiles = Array.from(e.target.files))}
-							class="input-studio w-full file:hidden cursor-pointer"
-						/>
-					</div>
-				</div>
-			</div>
-
-			<button onclick={processFiles} disabled={isLoading} class="btn-primary w-full mt-2">
-				{#if isLoading}
-					<i class="fa-solid fa-spinner fa-spin mr-2"></i> {$_('ui.initializing')}
-				{:else}
-					{$_('ui.launch_workspace')}
-				{/if}
-			</button>
-		</div>
+		<Topo3DUploadForm
+			bind:zipFile
+			bind:glbFile
+			bind:projectFile
+			bind:cropFolderFiles
+			{isLoading}
+			onBack={() => (selectedCreateEntry = false)}
+			onSubmit={processFiles}
+		/>
 	{:else if workspace.includes('/edit') || workspace === 'topos/2d/editor' || workspace === 'topos/3d/editor'}
-		<div class="space-y-3">
-			{#if workspace === 'crags/editor'}
-				<button class="btn-primary w-full" onclick={() => onComplete('crags/editor')}>
-					<i class="fa-solid fa-plus mr-2"></i>{$_('ui.new_crag')}
-				</button>
-			{/if}
-			<div class="relative">
-				<i
-					class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-warm-gray-300 text-[11px]"
-				></i>
-				<input
-					type="text"
-					placeholder={$_('ui.search_crags')}
-					bind:value={searchQuery}
-					class="input-studio w-full !pl-8"
-				/>
-			</div>
-			<div class="max-h-64 overflow-y-auto space-y-1 pr-1 custom-scrollbar relative">
-				{#if isLoading}
-					<div
-						class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center rounded"
-					>
-						<div class="flex flex-col items-center gap-2">
-							<i class="fa-solid fa-spinner fa-spin text-creator-blue text-xl"></i>
-							<span class="text-micro-data font-bold text-near-black uppercase tracking-widest"
-								>{$_('ui.initializing')}</span
-							>
-						</div>
-					</div>
-				{/if}
-				{#each filteredLocations as crag}
-					{@const sectors = crag.properties.sectors || []}
-					{@const showSectorChoices = isTopoWorkspace() && sectors.length > 0}
-					<div
-						class="bg-white rounded border border-transparent hover:border-black/15 transition-none"
-					>
-						<button
-							class="w-full p-2.5 text-left hover:bg-black/5 rounded transition-none group flex items-center justify-between disabled:opacity-50"
-							onclick={() =>
-								showSectorChoices
-									? (expandedCragPath =
-											expandedCragPath === crag.properties.path ? null : crag.properties.path)
-									: loadFromEntry(crag)}
-							disabled={isLoading}
-						>
-							<div>
-								<div class="text-body-text font-bold group-hover:text-creator-blue transition-none">
-									{crag.properties.name}
-								</div>
-								<div class="text-micro-data text-warm-gray-400">{crag.properties.path}</div>
-							</div>
-							<i
-								class="fa-solid {showSectorChoices && expandedCragPath === crag.properties.path
-									? 'fa-chevron-down'
-									: 'fa-chevron-right'} text-warm-gray-300 text-[10px] group-hover:text-creator-blue transition-none"
-							></i>
-						</button>
-						{#if showSectorChoices && expandedCragPath === crag.properties.path}
-							<div class="border-t border-black/10 p-1.5 space-y-1 bg-warm-white/70">
-								<button
-									class="w-full px-2 py-1.5 rounded-sm text-left text-body-text bg-white border border-black/10 hover:border-creator-blue hover:text-creator-blue transition-none disabled:opacity-50"
-									onclick={() => loadFromEntry(crag)}
-									disabled={isLoading}
-								>
-									<span class="font-bold">{crag.properties.name}</span>
-									<span class="block text-micro-data text-warm-gray-400">Whole crag</span>
-								</button>
-								{#each sectors as sector}
-									<button
-										class="w-full px-2 py-1.5 rounded-sm text-left text-body-text bg-white border border-black/10 hover:border-creator-blue hover:text-creator-blue transition-none disabled:opacity-50"
-										onclick={() => loadFromEntry(crag, sector)}
-										disabled={isLoading}
-									>
-										<span class="font-bold">{sector.name || sector.id}</span>
-										<span class="block text-micro-data text-warm-gray-400"
-											>{sector.assets?.topos?.[0] || 'No topo asset'}</span
-										>
-									</button>
-								{/each}
-							</div>
-						{/if}
-					</div>
-				{:else}
-					<div class="text-center py-6 text-body-text text-warm-gray-500">
-						{$_('ui.no_entries_found')}
-					</div>
-				{/each}
-			</div>
-		</div>
+		<EntryPicker
+			{workspace}
+			{onComplete}
+			{filteredLocations}
+			{isLoading}
+			bind:searchQuery
+			bind:expandedCragPath
+			{loadFromEntry}
+			{isTopoWorkspace}
+		/>
 	{/if}
 
 	{#if error}<div
