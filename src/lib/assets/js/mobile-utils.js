@@ -20,6 +20,24 @@ export function getTouchTargetSize(baseSize) {
 }
 
 /**
+ * Map marker/icon size that remains finger-draggable on touch screens.
+ * @param {number} baseSize
+ * @returns {number}
+ */
+export function getMapMarkerSize(baseSize = 32) {
+	return isTouchDevice() ? Math.max(baseSize, 44) : baseSize;
+}
+
+/**
+ * Pixel query radius for touch hit testing map features.
+ * @param {number} baseRadius
+ * @returns {number}
+ */
+export function getMapHitRadius(baseRadius = 20) {
+	return isTouchDevice() ? Math.max(baseRadius, 36) : baseRadius;
+}
+
+/**
  * Get appropriate hit area size for routes/paths
  * @param {number} baseSize - Base size for non-touch devices
  * @returns {number} Adjusted size for touch devices

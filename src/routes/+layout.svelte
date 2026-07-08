@@ -9,6 +9,8 @@
 	import en from '$lib/i18n/locales/en.json';
 	import de from '$lib/i18n/locales/de.json';
 	import AuthPrompt from '$lib/components/ui/AuthPrompt.svelte';
+	import { initViewport } from '$lib/state/viewport.svelte.js';
+	import { onMount } from 'svelte';
 
 	addMessages('en', en);
 	addMessages('de', de);
@@ -16,6 +18,10 @@
 	init({
 		fallbackLocale: 'de',
 		initialLocale: getLocaleFromNavigator()
+	});
+
+	onMount(() => {
+		return initViewport();
 	});
 
 	/** @type {{children?: import('svelte').Snippet}} */

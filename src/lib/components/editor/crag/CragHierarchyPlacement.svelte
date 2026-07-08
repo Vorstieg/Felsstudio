@@ -3,15 +3,17 @@
 	import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
 	import { listDir } from '$lib/api/felslager.js';
 	import { normalizeEntryPath } from '$lib/assets/js/sector-utils.js';
-	import TreeFolderSelector from './TreeFolderSelector.svelte';
+	import CragHierarchyModal from './CragHierarchyModal.svelte';
 
 	let knownFolders = $state(new Set());
 	let hierarchyError = $state('');
 	let parentPath = $state('');
 	let cragSlug = $state('');
 	let lastBuiltPath = '';
+	let showModal = $state(false);
 
 	const finalPath = $derived(normalizePath([parentPath, cragSlug].filter(Boolean).join('/')));
+	const breadcrumbParts = $derived(getBreadcrumbParts(finalPath));
 
 	onMount(loadHierarchyOptions);
 
@@ -38,6 +40,12 @@
 
 	function normalizePath(path = '') {
 		return String(path).replace(/^\/+|\/+$/g, '').replace(/\/+/g, '/');
+	}
+
+	function getBreadcrumbParts(path = '') {
+		const normalized = normalizePath(path);
+		if (!normalized) return [];
+		return normalized.split('/').filter(Boolean);
 	}
 
 	function pathDirname(path = '') {
@@ -90,14 +98,51 @@
 </script>
 
 <div class="space-y-2 rounded-sm border border-black/10 bg-black/[0.03] p-2">
-	<div>
-		<label class="text-ui-label block">Hierarchy Placement</label>
-		<p class="text-micro-data text-warm-gray-400">Choose the parent folder. The crag folder is generated from the name.</p>
+	<div class="flex items-start justify-between gap-2">
+		<div>
+			<span class="text-ui-label block">Hierarchy Placement</span>
+			<p class="text-micro-data text-warm-gray-400">Choose the parent folder. The crag folder is generated from the name.</p>
+		</div>
 	</div>
 
-	<TreeFolderSelector {knownFolders} bind:selectedPath={parentPath} />
+	<button
+		type="button"
+		onclick={() => showModal = true}
+		class="w-full text-left rounded-sm border border-black/15 bg-white p-2 shadow-sm hover:border-creator-blue/40 hover:bg-creator-blue/[0.02] transition-none group"
+	>
+		<div class="flex items-center justify-between gap-2">
+			<div class="min-w-0 flex-1">
+				{#if breadcrumbParts.length === 0}
+					<span class="text-micro-data text-warm-gray-400 italic">No folder selected</span>
+				{:else}
+					<div class="flex flex-wrap items-center gap-1 text-[12px] font-mono font-medium text-near-black">
+						{#each breadcrumbParts as part, i}
+							{#if i > 0}
+								<i class="fa-solid fa-chevron-right text-[9px] text-warm-gray-300"></i>
+							{/if}
+							<span class={i === breadcrumbParts.length - 1 ? 'text-creator-blue font-bold' : ''}>{part}</span>
+						{/each}
+					</div>
+				{/if}
+			</div>
+			<span class="text-ui-label text-creator-blue group-hover:text-creator-blue-active whitespace-nowrap">
+				<i class="fa-solid fa-pen text-[10px] mr-1"></i>Edit
+			</span>
+		</div>
+	</button>
 
 	{#if hierarchyError}
 		<p class="text-[10px] text-amber-600 font-bold">{hierarchyError}</p>
 	{/if}
 </div>
+
+{#if showModal}
+	<CragHierarchyModal
+		bind:parentPath
+		bind:cragSlug
+		cragName={cragEditorState.crag.name}
+		{knownFolders}
+		{hierarchyError}
+		onClose={() => showModal = false}
+	/>
+{/if}

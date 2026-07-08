@@ -1,0 +1,17 @@
+{
+	"name": "Felsstudio",
+	"short_name": "Felsstudio",
+	"description": "Climbing topos, crags, and route information.",
+	"start_url": ".",
+	"scope": ".",
+	"display": "standalone",
+	"background_color": "#ffffff",
+	"theme_color": "#0f172a",
+	"icons": [
+		{
+			"src": "favicon.png",
+			"sizes": "32x32",
+			"type": "image/png"
+		}
+	]
+}
