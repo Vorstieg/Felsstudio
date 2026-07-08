@@ -14,7 +14,6 @@
 		onHandleTrackConfirm = () => {},
 		onCancelTrackEdit = () => {},
 		onGpxUpload = () => {},
-		onCreateTopo = () => {},
 		onExport = () => {},
 		status = 'idle',
 		errorMessage = ''
@@ -100,12 +99,6 @@
 			{#if isRoutingTrack}
 				<span class="text-[10px] font-bold uppercase tracking-widest text-creator-blue">Routing</span>
 			{/if}
-
-			<button
-				class="bg-black/5 text-near-black px-3 py-1.5 rounded-sm text-[11px] font-bold border border-black/15 hover:bg-black/10 transition-none uppercase tracking-widest"
-				onclick={onCreateTopo}>
-				2D Topo
-			</button>
 
 			<SaveStatus {status} {errorMessage} />
 			<button
