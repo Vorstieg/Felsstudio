@@ -2,38 +2,47 @@
 	import { userState } from '$lib/state/editor.svelte.js';
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
 	import { _ } from 'svelte-i18n';
-	import {
-		availableRouteTags,
-		calculateBoltAmount,
-		calculateRouteLength,
-		convertRouteType
-	} from '$lib/assets/js/topo-utils.js';
-	import { getGradeLabel, standardGrades, uiaaMap } from '$lib/assets/js/grades.js';
+	import { availableRouteTags, calculateRouteLength, convertRouteType } from '$lib/assets/js/topo-utils.js';
+	import GradeSelector from './GradeSelector.svelte';
 	import { snapToBiggestHeight } from '$lib/assets/js/resize.js';
 	import {
+		addGpxAsset,
 		createVariant,
 		getGpxAssets,
-		routeLineStyles,
-		setGpxAssets
+		removeGpxAsset,
+		routeLineStyles
 	} from './topo-properties-utils.js';
+	import RouteLength from '$lib/components/editor/topo-properties/RouteLength.svelte';
+	import BoltCount from '$lib/components/editor/topo-properties/BoltCount.svelte';
 
 	let {
 		routes = [],
 		drawingTarget = $bindable(null),
 		activeTool = $bindable('route'),
-		mobile = false
+		mobile = false,
+		onGpxUpload = null
 	} = $props();
 
 	function selectRoute(route) {
 		if (userState.ui.selectedRouteId === route.id) {
 			userState.ui.selectedRouteId = null;
+			userState.ui.selectedGpxIndex = null;
 			drawingTarget = null;
 			return;
 		}
 
 		userState.ui.selectedRouteId = route.id;
+		userState.ui.selectedGpxIndex = null;
 		userState.ui.selectedFixpointId = null;
-		drawingTarget = route.type !== 'multi-pitch' ? { type: 'route', id: route.id } : null;
+		drawingTarget = route.type !== 'multi-pitch' && !isTrackOnlyRoute(route) ? { type: 'route', id: route.id } : null;
+		if (mobile) snapToBiggestHeight();
+	}
+
+	function selectGpxAsset(route, index) {
+		userState.ui.selectedRouteId = route.id;
+		userState.ui.selectedGpxIndex = index;
+		userState.ui.selectedFixpointId = null;
+		drawingTarget = null;
 		if (mobile) snapToBiggestHeight();
 	}
 
@@ -44,6 +53,7 @@
 		userState.topo.routes.splice(index, 1);
 		if (userState.ui.selectedRouteId === route.id) {
 			userState.ui.selectedRouteId = null;
+			userState.ui.selectedGpxIndex = null;
 			drawingTarget = null;
 		}
 	}
@@ -101,6 +111,10 @@
 			route.fixPoints.push(fixpointId);
 		}
 	}
+
+	function isTrackOnlyRoute(route) {
+		return route.geometryMode === 'track' || route.type === 'alpine-tour';
+	}
 </script>
 
 {#if routes.length === 0}
@@ -113,14 +127,12 @@
 	<div
 		id={'route-' + route.id}
 		class={mobile
-			? `panel p-3 border-2 ${
-					userState.ui.selectedRouteId === route.id
+			? `panel p-3 border-2 $
+					{userState.ui.selectedRouteId === route.id
 						? 'border-creator-blue ring-4 ring-creator-blue/5'
-						: 'border-transparent'
-				}`
-			: `panel-inner p-2.5 relative overflow-visible transition-none border ${
-					userState.ui.selectedRouteId === route.id ? 'border-creator-blue' : 'border-black/10'
-				}`}
+						: 'border-transparent'}`
+			: `panel-inner p-2.5 relative overflow-visible transition-none border $
+					{userState.ui.selectedRouteId === route.id ? 'border-creator-blue' : 'border-black/10'}`}
 	>
 		<div
 			class={mobile
@@ -131,38 +143,34 @@
 			<div class={mobile ? 'flex items-center gap-3 min-w-0 flex-1' : 'flex items-center gap-2'}>
 				<div
 					class={mobile
-						? `w-8 h-8 rounded-sm transition-none flex items-center justify-center text-xs font-black transition-colors shadow-sm ${
-								userState.ui.selectedRouteId === route.id
-									? 'bg-creator-blue text-white'
-									: 'bg-warm-gray-100 text-warm-gray-500'
-							}`
-						: `w-5 h-5 rounded-sm flex items-center justify-center text-micro-data font-bold shadow-sm transition-none ${
-								userState.ui.selectedRouteId === route.id
-									? 'bg-creator-blue text-white'
-									: 'bg-black/5 text-warm-gray-500'
-							}`}
+						? `w-8 h-8 rounded-sm transition-none flex items-center justify-center text-xs font-black transition-colors shadow-sm $
+							{userState.ui.selectedRouteId === route.id
+								? 'bg-creator-blue text-white'
+								: 'bg-warm-gray-100 text-warm-gray-500'}`
+						: `w-5 h-5 rounded-sm flex items-center justify-center text-micro-data font-bold shadow-sm transition-none $
+							{userState.ui.selectedRouteId === route.id
+								? 'bg-creator-blue text-white'
+								: 'bg-black/5 text-warm-gray-500'}`}
 				>
 					{i + 1}
 				</div>
 				<div class="min-w-0">
 					<h3
 						class={mobile
-							? `font-black text-sm truncate ${
-									userState.ui.selectedRouteId === route.id
-										? 'text-creator-blue'
-										: 'text-near-black'
-								}`
-							: `text-body-text font-bold ${
-									userState.ui.selectedRouteId === route.id
-										? 'text-creator-blue'
-										: 'text-near-black'
-								}`}
+							? `font-black text-sm truncate $
+								{userState.ui.selectedRouteId === route.id
+									? 'text-creator-blue'
+									: 'text-near-black'}`
+							: `text-body-text font-bold $
+								{userState.ui.selectedRouteId === route.id
+									? 'text-creator-blue'
+									: 'text-near-black'}`}
 					>
 						{route.name || `${$_('ui.route')} ${i + 1}`}
 					</h3>
 					{#if mobile}
 						<div class="text-[10px] text-warm-gray-400 font-bold uppercase tracking-wider">
-							{#if route.grade}{getGradeLabel(route.grade, route._gradeScale || 'french')} ·{/if}
+							{#if route.grade}{route.grade} ·{/if}
 							{#if route.length}{route.length}m ·{/if}{$_(`types.${route.type}`)}
 						</div>
 					{/if}
@@ -202,97 +210,94 @@
 							<option value="bouldering">B</option>
 							<option value="trad">T</option>
 							<option value="multi-pitch">MP</option>
+							<option value="alpine-tour">HT</option>
+							<option value="via-ferrata">KS</option>
 						</select>
 					</div>
 				</div>
 
 				<div class={mobile ? 'grid grid-cols-2 gap-2' : 'space-y-0.5'}>
-					<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
-						<label class="text-ui-label block">Line style</label>
-						<select
-							value={route.lineStyle || 'red'}
-							onchange={(event) => (route.lineStyle = event.currentTarget.value)}
-							class="input-studio w-full appearance-none"
-						>
-							{#each routeLineStyles as style}
-								<option value={style.id}>{style.label}</option>
-							{/each}
-						</select>
-					</div>
+					{#if !isTrackOnlyRoute(route)}
+						<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
+							<label class="text-ui-label block">Line style</label>
+							<select
+								value={route.lineStyle || 'red'}
+								onchange={(event) => (route.lineStyle = event.currentTarget.value)}
+								class="input-studio w-full appearance-none"
+							>
+								{#each routeLineStyles as style}
+									<option value={style.id}>{style.label}</option>
+								{/each}
+							</select>
+						</div>
+					{/if}
 
 					{#if route.type !== 'multi-pitch'}
-						<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
-							<label class="text-ui-label block">{$_('topo.grade')}</label>
-							<div class="flex gap-1">
-								<select bind:value={route._gradeScale} class={mobile ? 'input-studio w-16 font-bold' : 'input-studio w-12 font-bold'}>
-									<option value="french">FR</option>
-									<option value="uiaa">UIAA</option>
-								</select>
-								<select bind:value={route.grade} class="input-studio min-w-0 flex-1">
-									{#each standardGrades as grade}
-										{#if route._gradeScale !== 'uiaa' || uiaaMap[grade]}
-											<option value={grade}>{getGradeLabel(grade, route._gradeScale)}</option>
-										{/if}
-									{/each}
-								</select>
-							</div>
-						</div>
+						<GradeSelector route="route" bind:grade={route.grade} bind:scale={route._gradeScale} />
 					{/if}
 				</div>
 
-				<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
-					<label class="text-ui-label block">GPX Assets</label>
-					<input
-						type="text"
-						value={getGpxAssets(route).join(', ')}
-						oninput={(event) => setGpxAssets(route, event.currentTarget.value)}
-						class="input-studio w-full font-mono"
-						placeholder="routes/route-name.gpx"
-					/>
+				<div class={mobile ? 'space-y-1' : 'space-y-1'}>
+					<div class="flex items-center justify-between gap-2">
+						<label class="text-ui-label block">GPX Tracks</label>
+						<div class="flex items-center gap-1">
+							{#if onGpxUpload}
+								<label
+									class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-warm-gray-500 hover:bg-creator-blue hover:text-white transition-none cursor-pointer">
+									Import
+									<input type="file" accept=".gpx,application/gpx+xml" class="hidden"
+									       onchange={(event) => onGpxUpload(route, event)} />
+								</label>
+							{/if}
+							<button
+								class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-warm-gray-500 hover:bg-creator-blue hover:text-white transition-none"
+								onclick={() => {
+									addGpxAsset(route);
+									selectGpxAsset(route, (route.assets?.gpx || []).length - 1);
+								}}
+							>
+								+ Add
+							</button>
+						</div>
+					</div>
+					{#if getGpxAssets(route).length === 0}
+						<p class="text-micro-data text-warm-gray-400">No GPX tracks attached.</p>
+					{/if}
+					<div class="space-y-1">
+						{#each route.assets?.gpx || [] as gpx, gpxIndex}
+							<div
+								class={`grid grid-cols-12 gap-1 rounded-sm border p-1 cursor-pointer ${userState.ui.selectedRouteId === route.id && userState.ui.selectedGpxIndex === gpxIndex ? 'border-creator-blue bg-creator-blue/5' : 'border-black/10 bg-white'}`}
+								onclick={() => selectGpxAsset(route, gpxIndex)}
+							>
+								<select bind:value={gpx.role}
+								        class="col-span-4 rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none">
+									<option value="approach">Approach</option>
+									<option value="main">Main</option>
+									<option value="descent">Descent</option>
+									<option value="variant">Variant</option>
+								</select>
+								<input bind:value={gpx.label}
+								       class="col-span-7 rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none"
+								       placeholder="Label" />
+								<button
+									onclick={(event) => { event.stopPropagation(); removeGpxAsset(route, gpxIndex); if (userState.ui.selectedRouteId === route.id && userState.ui.selectedGpxIndex === gpxIndex) userState.ui.selectedGpxIndex = null; }}
+									class="col-span-1 text-warm-gray-300 hover:text-rose-600 transition-none">
+									<i class="fa-solid fa-xmark text-[10px]"></i>
+								</button>
+							</div>
+						{/each}
+					</div>
 				</div>
+
 
 				{#if route.type !== 'multi-pitch'}
 					<div class="grid grid-cols-2 gap-2">
 						<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
-							<label class="text-ui-label block">{$_('ui.length')}</label>
-							<div class="flex items-center gap-1">
-								<div class="relative min-w-0 flex-1">
-									<input
-										type="number"
-										bind:value={route.length}
-										class="input-studio w-full !pr-5"
-									/>
-									<span class="absolute right-1.5 top-2 text-micro-data">m</span>
-								</div>
-								<button
-									class={mobile
-										? 'h-9 w-9 flex-shrink-0 rounded-sm border border-black/10 bg-black/5 text-warm-gray-500'
-										: 'w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-sm bg-black/5 hover:bg-creator-blue hover:text-white transition-none border border-black/10'}
-									onclick={() => (route.length = calculateRouteLength(route, userState.topo.scale))}
-									title={$_('ui.length')}
-									aria-label={$_('ui.length')}
-								>
-									<i class="fa-solid fa-calculator text-[10px]"></i>
-								</button>
-							</div>
+							<RouteLength bind:length={route.length} route={route} toposcale={userState.topo.scale}></RouteLength>
 						</div>
 						{#if route.type === 'sports-climbing'}
 							<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
-								<label class="text-ui-label block">{$_('topo.protection')}</label>
-								<div class="flex items-center gap-1">
-									<input type="number" bind:value={route.boltAmount} class="input-studio min-w-0 flex-1" />
-									<button
-										class={mobile
-											? 'h-9 w-9 flex-shrink-0 rounded-sm border border-black/10 bg-black/5 text-warm-gray-500'
-											: 'w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-sm bg-black/5 hover:bg-creator-blue hover:text-white transition-none border border-black/10'}
-										onclick={() =>
-											(route.boltAmount = calculateBoltAmount(route, userState.topo.fixPoints))}
-										title={$_('topo.protection')}
-										aria-label={$_('topo.protection')}
-									>
-										<i class="fa-solid fa-calculator text-[10px]"></i>
-									</button>
-								</div>
+								<BoltCount bind:length={route.boltAmount} route={route} toposcale={userState.topo.fixPoints} />
 							</div>
 						{/if}
 					</div>
@@ -307,61 +312,43 @@
 								>
 									{$_('ui.add_pitch')}
 								</button>
-								<select
-									bind:value={route._gradeScale}
-									class="rounded-sm border border-black/15 bg-white px-1 py-1 text-micro-data outline-none"
-								>
-									<option value="french">FR</option>
-									<option value="uiaa">UIAA</option>
-								</select>
 							</div>
 						</div>
 
 						{#each route.pitches || [] as pitch, idx}
-							<div class="grid grid-cols-12 gap-1 rounded-sm border border-black/10 bg-white p-1">
-								<div class="col-span-1 flex items-center justify-center">
-									<span class="text-micro-data font-bold">{idx + 1}</span>
+							<div class="gap-1 rounded-sm border border-black/10 bg-white p-1">
+								<div class="flex items-center justify-between w-full">
+									<span>{ `${$_('ui.pitch')} ${idx + 1}`}</span>
+
+									<div class="flex gap-2">
+										<button
+											class="text-creator-blue"
+											onclick={() => drawPitch(route, pitch)}
+											title={$_('ui.draw_pitch')}
+											aria-label={$_('ui.draw_pitch')}
+										>
+											<i class="fa-solid fa-pencil text-[9px]"></i>
+										</button>
+										<button
+											class="text-rose-500"
+											onclick={() => removePitch(route, pitch, idx)}
+											title={$_('ui.delete_pitch')}
+											aria-label={$_('ui.delete_pitch')}
+										>
+											<i class="fa-solid fa-trash-can text-[9px]"></i>
+										</button>
+									</div>
 								</div>
-								<select
-									bind:value={pitch.grade}
-									class="col-span-4 rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none"
-								>
-									<option value="">Grade</option>
-									{#each standardGrades as grade}
-										{#if route._gradeScale !== 'uiaa' || uiaaMap[grade]}
-											<option value={grade}>{getGradeLabel(grade, route._gradeScale)}</option>
-										{/if}
-									{/each}
-								</select>
-								<input
-									type="number"
-									bind:value={pitch.length}
-									class="col-span-3 rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none"
-								/>
-								<button
-									class="col-span-1 text-warm-gray-300"
-									onclick={() => (pitch.length = calculateRouteLength(pitch, userState.topo.scale))}
-									title={$_('ui.length')}
-									aria-label={$_('ui.length')}
-								>
-									<i class="fa-solid fa-calculator text-[9px]"></i>
-								</button>
-								<button
-									class="col-span-1 text-creator-blue"
-									onclick={() => drawPitch(route, pitch)}
-									title={$_('ui.draw_pitch')}
-									aria-label={$_('ui.draw_pitch')}
-								>
-									<i class="fa-solid fa-pencil text-[9px]"></i>
-								</button>
-								<button
-									class="col-span-1 text-rose-500"
-									onclick={() => removePitch(route, pitch, idx)}
-									title={$_('ui.delete_pitch')}
-									aria-label={$_('ui.delete_pitch')}
-								>
-									<i class="fa-solid fa-trash-can text-[9px]"></i>
-								</button>
+								<GradeSelector route="route" bind:grade={pitch.grade} bind:scale={pitch._gradeScale} mobile="false" />
+								<div class="grid grid-cols-2 gap-2">
+									<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
+										<RouteLength bind:length={route.length} route={route}
+										             toposcale={userState.topo.scale}></RouteLength>
+									</div>
+									<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
+										<BoltCount bind:length={route.boltAmount} route={route} toposcale={userState.topo.fixPoints} />
+									</div>
+								</div>
 								<select
 									value={pitch.lineStyle || ''}
 									onchange={(event) => (pitch.lineStyle = event.currentTarget.value)}
@@ -372,13 +359,6 @@
 										<option value={style.id}>{style.label}</option>
 									{/each}
 								</select>
-								<input
-									type="text"
-									value={getGpxAssets(pitch).join(', ')}
-									oninput={(event) => setGpxAssets(pitch, event.currentTarget.value)}
-									class="col-span-12 rounded-sm border border-black/15 bg-white px-1 py-1 text-micro-data font-mono outline-none"
-									placeholder="routes/route-name-pitch.gpx"
-								/>
 							</div>
 						{/each}
 
@@ -393,39 +373,46 @@
 								</button>
 							</div>
 							{#each route.variants || [] as variant, idx}
-								<div class="grid grid-cols-12 gap-1 rounded-sm border border-black/10 bg-white p-1">
-									<input
-										bind:value={variant.name}
-										placeholder={$_('ui.variant_name_placeholder')}
-										class="col-span-5 rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none"
-									/>
-									<select
-										bind:value={variant.grade}
-										class="col-span-4 rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none"
-									>
-										<option value="">Grade</option>
-										{#each standardGrades as grade}
-											{#if route._gradeScale !== 'uiaa' || uiaaMap[grade]}
-												<option value={grade}>{getGradeLabel(grade, route._gradeScale)}</option>
-											{/if}
-										{/each}
-									</select>
-									<button
-										class="col-span-1 text-creator-blue"
-										onclick={() => drawVariant(route, variant)}
-										title={$_('ui.draw_variant')}
-										aria-label={$_('ui.draw_variant')}
-									>
-										<i class="fa-solid fa-pencil text-[9px]"></i>
-									</button>
-									<button
-										class="col-span-1 text-rose-500"
-										onclick={() => removeVariant(route, variant, idx)}
-										title={$_('ui.delete_variant')}
-										aria-label={$_('ui.delete_variant')}
-									>
-										<i class="fa-solid fa-trash-can text-[9px]"></i>
-									</button>
+								<div class="gap-1 rounded-sm border border-black/10 bg-white p-1 items-center">
+									<div class="flex items-center justify-between w-full">
+										<input
+											bind:value={variant.name}
+											placeholder={$_('ui.variant_name_placeholder')}
+											class="col-span-5 rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none"
+										/>
+										<div class="flex gap-2">
+											<button
+												class="col-span-1 text-creator-blue flex justify-center"
+												onclick={() => drawVariant(route, variant)}
+												title={$_('ui.draw_variant')}
+												aria-label={$_('ui.draw_variant')}
+											>
+												<i class="fa-solid fa-pencil text-[9px]"></i>
+											</button>
+											<button
+												class="col-span-1 text-rose-500 flex justify-center"
+												onclick={() => removeVariant(route, variant, idx)}
+												title={$_('ui.delete_variant')}
+												aria-label={$_('ui.delete_variant')}
+											>
+												<i class="fa-solid fa-trash-can text-[9px]"></i>
+											</button>
+										</div>
+									</div>
+									<div class="col-span-5">
+										<GradeSelector route="route" bind:grade={variant.grade}
+										               bind:scale={variant._gradeScale}></GradeSelector>
+									</div>
+									<div class="grid grid-cols-2 gap-2">
+										<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
+											<RouteLength bind:length={variant.length} route={variant}
+											             toposcale={userState.topo.scale}></RouteLength>
+										</div>
+										<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
+											<BoltCount bind:length={variant.boltAmount} route={variant}
+											           toposcale={userState.topo.fixPoints} />
+										</div>
+									</div>
 									<select
 										value={variant.lineStyle || 'variant'}
 										onchange={(event) => (variant.lineStyle = event.currentTarget.value)}
@@ -435,19 +422,6 @@
 											<option value={style.id}>{style.label}</option>
 										{/each}
 									</select>
-									<input
-										type="number"
-										bind:value={variant.length}
-										class="col-span-4 rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none"
-									/>
-									<button
-										class="col-span-1 text-warm-gray-300"
-										onclick={() => (variant.length = calculateRouteLength(variant, userState.topo.scale))}
-										title={$_('ui.length')}
-										aria-label={$_('ui.length')}
-									>
-										<i class="fa-solid fa-calculator text-[9px]"></i>
-									</button>
 								</div>
 							{/each}
 						</div>

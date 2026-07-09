@@ -128,7 +128,9 @@ export function useCragSectorMapEditor({
 		event.originalEvent?.stopPropagation?.();
 		setSelectedSectorId(sectorId);
 		selectedSectorVertex = { sectorId, vertexIndex: insertIndex };
-		updateSectorGeometry(sectorId, (geometry) => insertGeometryVertex(geometry, insertIndex, lngLat));
+		updateSectorGeometry(sectorId, (geometry) =>
+			insertGeometryVertex(geometry, insertIndex, lngLat)
+		);
 		draggingSectorVertex = { sectorId, vertexIndex: insertIndex };
 		map.dragPan.disable();
 		map.touchZoomRotate.disable();
@@ -211,7 +213,9 @@ export function useCragSectorMapEditor({
 				setActiveTab('sectors');
 				setActiveTool('position');
 			});
-			const marker = new maplibregl.Marker({ element: el, draggable: true }).setLngLat(coordinates).addTo(map);
+			const marker = new maplibregl.Marker({ element: el, draggable: true })
+				.setLngLat(coordinates)
+				.addTo(map);
 			marker.on('dragstart', () => {
 				draggingSectorMarkerId = sector.id;
 				setSelectedSectorId(sector.id);
@@ -232,9 +236,15 @@ export function useCragSectorMapEditor({
 	}
 
 	return {
-		get selectedSectorVertex() { return selectedSectorVertex; },
-		get vertexDeleteUndo() { return vertexDeleteUndo; },
-		get draggingSectorMarkerId() { return draggingSectorMarkerId; },
+		get selectedSectorVertex() {
+			return selectedSectorVertex;
+		},
+		get vertexDeleteUndo() {
+			return vertexDeleteUndo;
+		},
+		get draggingSectorMarkerId() {
+			return draggingSectorMarkerId;
+		},
 		initSectorEditHandlers,
 		syncSectorMarkers,
 		undoSectorVertexDelete,

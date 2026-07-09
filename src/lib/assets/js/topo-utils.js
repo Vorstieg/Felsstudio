@@ -11,7 +11,14 @@ export const availableTopoTags = [
 	'Beliebt',
 	'Morgensonne',
 	'Abendsonne',
-	'Schattig'
+	'Schattig',
+	'Gletscher',
+	'Firn',
+	'Grat',
+	'Ausgesetzt',
+	'Steinschlag',
+	'Spaltengefahr',
+	'Klettersteig'
 ];
 
 export const availableRouteTags = [
@@ -26,8 +33,21 @@ export const availableRouteTags = [
 	'Weite Haken',
 	'Abgespeckt',
 	'Klassiker',
-	'Boulder-Start'
+	'Boulder-Start',
+	'Gletscher',
+	'Firn',
+	'Grat',
+	'Ausgesetzt',
+	'Steinschlag',
+	'Spaltengefahr',
+	'Klettersteig'
 ];
+
+export function getDefaultGeometryMode(type) {
+	if (type === 'alpine-tour') return 'track';
+	if (type === 'via-ferrata') return 'hybrid';
+	return 'topo';
+}
 
 export function convertRouteType(route, newType) {
 	const isMultiPitch = (type) =>
@@ -64,6 +84,14 @@ export function convertRouteType(route, newType) {
 		}
 		delete route.pitches;
 	}
+
+	route.geometryMode = getDefaultGeometryMode(newType);
+	route.topo = {
+		...(route.topo || {}),
+		enabled: route.geometryMode !== 'track'
+	};
+	if (!route.assets) route.assets = { gpx: [] };
+	if (!route.assets.gpx) route.assets.gpx = [];
 
 	// For now, if called from a simple select, we set it as a single-element array or update if it was an array
 	if (Array.isArray(route.type)) {

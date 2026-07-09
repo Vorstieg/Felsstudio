@@ -1,14 +1,22 @@
-import maplibregl from 'maplibre-gl';
 import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
+import { parseGpx } from '$lib/assets/js/gpx-utils.js';
+import { initMapPointDragHandlers } from '$lib/components/editor/map-point-drag-handlers.js';
+import { fitCoordinatesBounds } from '$lib/assets/js/track-geometry-utils.js';
 import {
 	appendNewTrack,
 	appendTrackPointToDraft,
 	buildRoutedDraft,
 	removeTrackByIndex,
 	updateTrackCoordinates
-} from '$lib/components/editor/crag/crag-editor-tracks.js';
+} from '$lib/components/editor/track/track-drawing.js';
 
-export function useCragTrackEditor({ getMap, getActiveTool, setActiveTool, setActiveTab, setSuppressNextMapClick }) {
+export function useCragTrackEditor({
+	getMap,
+	getActiveTool,
+	setActiveTool,
+	setActiveTab,
+	setSuppressNextMapClick
+}) {
 	let currentTrackPoints = $state([]);
 	let routeDraftWaypoints = $state([]);
 	let editingTrackIndex = $state(null);
@@ -77,7 +85,11 @@ export function useCragTrackEditor({ getMap, getActiveTool, setActiveTool, setAc
 
 		const coordinates = $state.snapshot(currentTrackPoints);
 		if (editingTrackIndex !== null) {
-			cragEditorState.tracks = updateTrackCoordinates(cragEditorState.tracks, editingTrackIndex, coordinates);
+			cragEditorState.tracks = updateTrackCoordinates(
+				cragEditorState.tracks,
+				editingTrackIndex,
+				coordinates
+			);
 			setActiveTab('registry');
 			setActiveTool('track');
 			fitTrackBounds(coordinates);
@@ -113,23 +125,18 @@ export function useCragTrackEditor({ getMap, getActiveTool, setActiveTool, setAc
 	}
 
 	function fitTrackBounds(points) {
-		const map = getMap();
-		if (!map || points.length === 0) return;
-		const bounds = points.reduce((b, p) => b.extend(p), new maplibregl.LngLatBounds(points[0], points[0]));
-		map.fitBounds(bounds, { padding: 80, maxZoom: 16 });
+		fitCoordinatesBounds(getMap(), points);
 	}
 
 	async function handleGpxUpload(event) {
 		const file = event.target.files[0];
 		if (!file) return;
-		const text = await file.text();
-		const parser = new DOMParser();
-		const xml = parser.parseFromString(text, 'text/xml');
-		const points = Array.from(xml.querySelectorAll('trkpt'))
-			.map((p) => [parseFloat(p.getAttribute('lon')), parseFloat(p.getAttribute('lat'))])
-			.filter((p) => !isNaN(p[0]) && !isNaN(p[1]));
+		const points = parseGpx(await file.text());
 		if (points.length > 1) {
-			const nextTracks = [...cragEditorState.tracks, { name: file.name.replace('.gpx', ''), coordinates: points }];
+			const nextTracks = [
+				...cragEditorState.tracks,
+				{ name: file.name.replace(/\.gpx$/i, ''), coordinates: points }
+			];
 			cragEditorState.tracks = nextTracks;
 			editTrack(nextTracks.length - 1, nextTracks);
 		}
@@ -140,43 +147,46 @@ export function useCragTrackEditor({ getMap, getActiveTool, setActiveTool, setAc
 		if (!map || areTrackPointDragHandlersReady) return;
 		areTrackPointDragHandlersReady = true;
 
-		map.on('mouseenter', 'tracks-points-drawing', () => {
-			if (getActiveTool() === 'track' && trackDraftMode === 'editing') map.getCanvas().style.cursor = 'move';
-		});
-		map.on('mouseleave', 'tracks-points-drawing', () => {
-			if (draggingTrackPointIndex === null) map.getCanvas().style.cursor = '';
-		});
-		map.on('mousedown', 'tracks-points-drawing', (e) => {
-			if (getActiveTool() !== 'track' || trackDraftMode !== 'editing') return;
-			const pointIndex = Number(e.features?.[0]?.properties?.pointIndex);
-			if (!Number.isInteger(pointIndex)) return;
-			e.preventDefault();
-			draggingTrackPointIndex = pointIndex;
-			map.dragPan.disable();
-			map.getCanvas().style.cursor = 'move';
-		});
-		map.on('mousemove', (e) => {
-			if (draggingTrackPointIndex === null) return;
-			const points = $state.snapshot(currentTrackPoints);
-			if (!points[draggingTrackPointIndex]) return;
-			points[draggingTrackPointIndex] = [e.lngLat.lng, e.lngLat.lat];
-			currentTrackPoints = points;
-		});
-		map.on('mouseup', () => {
-			if (draggingTrackPointIndex === null) return;
-			draggingTrackPointIndex = null;
-			setSuppressNextMapClick(true);
-			map.dragPan.enable();
-			map.getCanvas().style.cursor = '';
+		initMapPointDragHandlers({
+			map,
+			layers: ['tracks-points-drawing'],
+			canDrag: () => getActiveTool() === 'track' && trackDraftMode === 'editing',
+			getDragState: (event) => {
+				const pointIndex = Number(event.features?.[0]?.properties?.pointIndex);
+				return Number.isInteger(pointIndex) ? { pointIndex } : null;
+			},
+			onDragStart: ({ pointIndex }) => {
+				draggingTrackPointIndex = pointIndex;
+			},
+			onDragMove: ({ pointIndex }, event) => {
+				const points = $state.snapshot(currentTrackPoints);
+				if (!points[pointIndex]) return;
+				points[pointIndex] = [event.lngLat.lng, event.lngLat.lat];
+				currentTrackPoints = points;
+			},
+			onDragEnd: () => {
+				draggingTrackPointIndex = null;
+				setSuppressNextMapClick(true);
+			}
 		});
 	}
 
 	return {
-		get currentTrackPoints() { return currentTrackPoints; },
-		get editingTrackIndex() { return editingTrackIndex; },
-		get trackDraftMode() { return trackDraftMode; },
-		get isSnappingEnabled() { return isSnappingEnabled; },
-		get isRoutingTrack() { return isRoutingTrack; },
+		get currentTrackPoints() {
+			return currentTrackPoints;
+		},
+		get editingTrackIndex() {
+			return editingTrackIndex;
+		},
+		get trackDraftMode() {
+			return trackDraftMode;
+		},
+		get isSnappingEnabled() {
+			return isSnappingEnabled;
+		},
+		get isRoutingTrack() {
+			return isRoutingTrack;
+		},
 		addTrackPoint,
 		handleTrackConfirm,
 		startRoutingDraft,

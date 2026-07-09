@@ -52,6 +52,15 @@
 			icon: 'fa-folder-tree',
 			color: 'bg-workspace-felslager',
 			wizardRoute: 'felslager/edit'
+		},
+		{
+			id: 'gpx-routes',
+			name: 'ui.gpx_studio',
+			label: 'ui.track_based_routes',
+			description: 'ui.gpx_desc',
+			icon: 'fa-route',
+			color: 'bg-workspace-crag',
+			wizardRoute: 'topos/gpx/select'
 		}
 	];
 </script>
@@ -63,7 +72,7 @@
 			<p class="text-ui-label text-warm-gray-500">{$_('ui.select_environment')}</p>
 		</div>
 
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+		<div class="grid grid-cols-1 md:grid-cols-5 gap-3">
 			{#each workspaces as ws}
 				<button
 					class="panel p-4 flex flex-col h-full text-left hover:border-creator-blue transition-none group cursor-pointer"
@@ -121,7 +130,11 @@
 
 									userState.ui.activeDraftId = draft.id;
 									userState.ui.workspace =
-										topo.editorMode === '2d' ? 'topos/2d/editor' : 'topos/3d/editor';
+										topo.editorMode === 'gpx'
+											? 'topos/gpx/editor'
+											: topo.editorMode === '2d'
+												? 'topos/2d/editor'
+												: 'topos/3d/editor';
 									goto(`${base}/${userState.ui.workspace}`);
 								} else {
 									brokenDraftId = draft.id;

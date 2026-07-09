@@ -12,7 +12,12 @@ export async function getRoutedSegment(from, to) {
 	}
 }
 
-export async function appendTrackPointToDraft({ trackDraftMode, waypoints = [], points = [], lngLat }) {
+export async function appendTrackPointToDraft({
+	trackDraftMode,
+	waypoints = [],
+	points = [],
+	lngLat
+}) {
 	if (trackDraftMode === 'editing') {
 		return { waypoints, points: [...points, lngLat] };
 	}

@@ -166,7 +166,10 @@
 			const entryPath = sector ? getSectorEntryPath(path, sector) : path;
 			const sectorTopoPath = getSectorTopoPath(path, sector);
 			const entryName = pathBasename(entryPath);
-			const topoPath = sectorTopoPath || `${entryPath}/${entryName}-topo.json`;
+			const topoPath =
+				workspace === 'topos/gpx/editor'
+					? `${entryPath}/${entryName}-routes.json`
+					: sectorTopoPath || `${entryPath}/${entryName}-topo.json`;
 			const topoDir = pathDirname(topoPath) || entryPath;
 			const topoBaseName = pathBasename(topoPath)
 				.replace(/-topo\.json$/i, '')
@@ -223,6 +226,16 @@
 				} catch {
 					/* directory listing may fail */
 				}
+			} else if (workspace === 'topos/gpx/editor') {
+				try {
+					const topoData = await readJson(topoPath);
+					userState.topo = { ...userState.topo, ...topoData };
+					if (!userState.topo.id) userState.topo.id = getTopoId(crag, sector);
+					initializeIdCounters(userState.topo);
+				} catch {
+					seedTopoFromEntry(crag, sector);
+				}
+				userState.topo.editorMode = 'gpx';
 			} else if (workspace === 'topos/2d/editor') {
 				seedTopoFromEntry(crag, sector);
 				try {
@@ -442,12 +455,7 @@
 						}
 					}
 				}
-			} else if (workspace === 'topos/3d/editor') {
-				if (!glbFile) throw new Error('GLB is required');
-				await loadGlb(glbFile);
-				if (jsonFile) await loadTopoJson(jsonFile);
-				userState.topo.editorMode = '3d';
-			}
+            }
 			await persistTopoSessionImmediately();
 			onComplete(workspace === 'topos/3d/editor' ? 'topos/3d/editor' : undefined);
 		} catch (err) {

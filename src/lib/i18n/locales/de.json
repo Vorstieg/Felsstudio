@@ -33,7 +33,9 @@
 		"sports-climbing": "Sportklettern",
 		"bouldering": "Bouldern",
 		"multi-pitch": "Mehrseillängen",
-		"trad": "Traditionell"
+		"trad": "Traditionell",
+		"alpine-tour": "Hochtour",
+		"via-ferrata": "Klettersteig"
 	},
 	"rock_types": {
 		"granite": "Granit",
@@ -171,10 +173,19 @@
 		"Abgespeckt": "Abgespeckt",
 		"Klassiker": "Klassiker",
 		"Boulder-Start": "Boulder-Start",
+		"Gletscher": "Gletscher",
+		"Firn": "Firn",
+		"Grat": "Grat",
+		"Ausgesetzt": "Ausgesetzt",
+		"Steinschlag": "Steinschlag",
+		"Spaltengefahr": "Spaltengefahr",
+		"Klettersteig": "Klettersteig",
 		"sports-climbing": "Sportklettern",
 		"bouldering": "Bouldern",
 		"multi-pitch": "Mehrseillängen",
-		"trad": "Traditionell"
+		"trad": "Traditionell",
+		"alpine-tour": "Hochtour",
+		"via-ferrata": "Klettersteig"
 	},
 	"ui": {
 		"remove": "Entfernen",
@@ -373,6 +384,7 @@
 		"description_placeholder": "Erzähl uns etwas über diesen Felsen...",
 		"meters_placeholder": "m",
 		"pitches": "Seillängen",
+		"pitch": "Seillänge",
 		"add_pitch": "+ Hinzufügen",
 		"delete_pitch": "Seillänge löschen",
 		"draw_pitch": "Seillänge zeichnen",
@@ -412,7 +424,10 @@
 		"angle": "Winkel",
 		"source_image": "Quellbild",
 		"show_camera_trail": "Kamera-Pfad anzeigen",
-		"ai_suggestions_title": "KI Vorschläge"
+		"ai_suggestions_title": "KI Vorschläge",
+		"gpx_studio": "GPX Studio",
+		"track_based_routes": "Track-basierte Touren",
+		"gpx_desc": "Hochtouren und Klettersteige über GPX-Tracks verwalten."
 	},
 	"auth": {
 		"title": "Authentifizierung erforderlich",
@@ -432,5 +447,14 @@
 		"save_path_placeholder": "europe/austria/mödling/efeugrat",
 		"save_path_required": "Speicherpfad ist erforderlich",
 		"upload_assets": "Assets hochladen"
+	},
+	"grade": {
+		"system": {
+			"french": "Französisch",
+			"uiaa": "UIAA",
+			"sac": "SAC",
+			"huelser": "Hülser",
+			"schall": "Schall"
+		}
 	}
 }

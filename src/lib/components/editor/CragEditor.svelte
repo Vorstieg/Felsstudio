@@ -541,7 +541,7 @@
 	function safeFileName(name = 'image') {
 		const extension = name.includes('.') ? `.${name.split('.').pop()}` : '';
 		const base = name.replace(/\.[^/.]+$/, '') || 'image';
-		return `${base.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'image'}${extension.toLowerCase()}`;
+		return `${slugifyName(base) || 'image'}${extension.toLowerCase()}`;
 	}
 
 	function addCragImages(files = []) {

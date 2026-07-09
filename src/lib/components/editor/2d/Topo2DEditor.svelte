@@ -4,12 +4,12 @@
 	import { onMount } from 'svelte';
 	import { zoom as d3Zoom } from 'd3-zoom';
 	import { select } from 'd3-selection';
-	import { RouteTool } from './tools/RouteTool.svelte.js';
-	import { SymbolTool } from './tools/SymbolTool.svelte.js';
-	import { EraserTool } from './tools/EraserTool.svelte.js';
-	import { OutlineTool } from './tools/OutlineTool.svelte.js';
-	import { SelectTool } from './tools/SelectTool.svelte.js';
-	import { TextTool } from './tools/TextTool.svelte.js';
+	import { RouteTool } from '../tools/RouteTool.svelte.js';
+	import { SymbolTool } from '../tools/SymbolTool.svelte.js';
+	import { EraserTool } from '../tools/EraserTool.svelte.js';
+	import { OutlineTool } from '../tools/OutlineTool.svelte.js';
+	import { SelectTool } from '../tools/SelectTool.svelte.js';
+	import { TextTool } from '../tools/TextTool.svelte.js';
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
 	import { topoSymbols } from '$lib/assets/js/topo-utils.js';
 	import {

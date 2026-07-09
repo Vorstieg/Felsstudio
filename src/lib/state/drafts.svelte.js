@@ -37,7 +37,8 @@ export const draftsState = $state({
 	async save(topo, id = null, extra = {}) {
 		const timestamp = new Date().toISOString();
 		const editorMode = topo.editorMode || 'topo';
-		const draftId = id || (topo.id ? `${editorMode}-${topo.id}` : `draft-${editorMode}-${Date.now()}`);
+		const draftId =
+			id || (topo.id ? `${editorMode}-${topo.id}` : `draft-${editorMode}-${Date.now()}`);
 
 		const draftIndex = this.drafts.findIndex((d) => d.id === draftId);
 
@@ -100,7 +101,11 @@ export const draftsState = $state({
 			updated: timestamp
 		};
 		await topoStore.set(sessionToSave);
-		await topoStore.set({ ...sessionToSave, id: `${LATEST_INDEXEDDB_PREFIX}${editorMode}`, sourceDraftId: draftId });
+		await topoStore.set({
+			...sessionToSave,
+			id: `${LATEST_INDEXEDDB_PREFIX}${editorMode}`,
+			sourceDraftId: draftId
+		});
 
 		// Save metadata only after IndexedDB has the full session, so reload never points at a missing draft.
 		storage.set(STORAGE_KEY, this.drafts);
@@ -112,13 +117,13 @@ export const draftsState = $state({
 	async delete(id) {
 		this.drafts = this.drafts.filter((d) => d.id !== id);
 		storage.set(STORAGE_KEY, this.drafts);
-		for (const mode of ['2d', '3d']) {
+		for (const mode of ['2d', '3d', 'gpx']) {
 			if (storage.get(`${LATEST_STORAGE_PREFIX}${mode}`, null) === id) {
 				storage.remove(`${LATEST_STORAGE_PREFIX}${mode}`);
 			}
 		}
 		await topoStore.delete(id);
-		for (const mode of ['2d', '3d']) {
+		for (const mode of ['2d', '3d', 'gpx']) {
 			const latest = await topoStore.get(`${LATEST_INDEXEDDB_PREFIX}${mode}`);
 			if (latest?.sourceDraftId === id) await topoStore.delete(`${LATEST_INDEXEDDB_PREFIX}${mode}`);
 		}

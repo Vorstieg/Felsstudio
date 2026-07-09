@@ -24,14 +24,44 @@ export function parseAssetList(value) {
 export function getGpxAssets(item) {
 	const gpx = item.assets?.gpx;
 	if (!gpx) return [];
-	return Array.isArray(gpx) ? gpx : [gpx];
+	const list = Array.isArray(gpx) ? gpx : [gpx];
+	return list.map((asset) => {
+		if (typeof asset === 'string') return { role: 'main', label: '', path: asset };
+		return { role: asset.role || 'main', label: asset.label || '', path: asset.path || '' };
+	});
 }
 
 export function setGpxAssets(item, value) {
 	item.assets = {
 		...(item.assets || {}),
-		gpx: parseAssetList(value)
+		gpx: parseAssetList(value).map((path) => ({ role: 'main', label: '', path }))
 	};
+}
+
+export function ensureGpxAssets(item) {
+	item.assets = item.assets || {};
+	const gpx = item.assets.gpx;
+	const list = gpx ? (Array.isArray(gpx) ? gpx : [gpx]) : [];
+	item.assets.gpx = list.map((asset) => {
+		if (typeof asset === 'string') return { role: 'main', label: '', path: asset };
+		asset.role = asset.role || 'main';
+		asset.label = asset.label || '';
+		asset.path = asset.path || '';
+		return asset;
+	});
+	return item.assets.gpx;
+}
+
+export function addGpxAsset(item) {
+	const gpx = ensureGpxAssets(item);
+	gpx.push({ role: 'main', label: '', path: '' });
+	item.assets.gpx = [...gpx];
+}
+
+export function removeGpxAsset(item, index) {
+	const gpx = ensureGpxAssets(item);
+	gpx.splice(index, 1);
+	item.assets.gpx = [...gpx];
 }
 
 export function createVariant(route) {

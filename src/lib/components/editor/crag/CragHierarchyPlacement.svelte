@@ -4,6 +4,7 @@
 	import { listDir } from '$lib/api/felslager.js';
 	import { normalizeEntryPath } from '$lib/assets/js/sector-utils.js';
 	import CragHierarchyModal from './CragHierarchyModal.svelte';
+	import { slugifyName, normalizePath } from '$lib/components/editor/crag/crag-editor-paths.js';
 
 	let knownFolders = $state(new Set());
 	let hierarchyError = $state('');
@@ -38,10 +39,6 @@
 		}
 	}
 
-	function normalizePath(path = '') {
-		return String(path).replace(/^\/+|\/+$/g, '').replace(/\/+/g, '/');
-	}
-
 	function getBreadcrumbParts(path = '') {
 		const normalized = normalizePath(path);
 		if (!normalized) return [];
@@ -55,16 +52,6 @@
 
 	function pathBasename(path = '') {
 		return normalizePath(path).split('/').filter(Boolean).at(-1) || '';
-	}
-
-	function slugifyName(value, fallback = 'new-crag') {
-		return (value || fallback)
-			.trim()
-			.toLowerCase()
-			.normalize('NFD')
-			.replace(/[\u0300-\u036f]/g, '')
-			.replace(/[^a-z0-9]+/g, '-')
-			.replace(/^-+|-+$/g, '') || fallback;
 	}
 
 	function syncFromCragPath(path) {
@@ -101,7 +88,8 @@
 	<div class="flex items-start justify-between gap-2">
 		<div>
 			<span class="text-ui-label block">Hierarchy Placement</span>
-			<p class="text-micro-data text-warm-gray-400">Choose the parent folder. The crag folder is generated from the name.</p>
+			<p class="text-micro-data text-warm-gray-400">Choose the parent folder. The crag folder is generated from the
+				name.</p>
 		</div>
 	</div>
 

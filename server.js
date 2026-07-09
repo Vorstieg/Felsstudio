@@ -36,7 +36,7 @@ const server = http.createServer((req, res) => {
 	}
 
 	const ext = path.extname(filePath).toLowerCase();
-	
+
 	fs.stat(filePath, (err, stats) => {
 		if (err || !stats.isFile()) {
 			// File not found or is a directory, serve SvelteKit static fallback for SPA routing
@@ -55,7 +55,7 @@ const server = http.createServer((req, res) => {
 
 		const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 		res.writeHead(200, { 'Content-Type': contentType });
-		
+
 		// Stream file for efficiency
 		const stream = fs.createReadStream(filePath);
 		stream.pipe(res);

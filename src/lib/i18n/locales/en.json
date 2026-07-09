@@ -32,7 +32,9 @@
 		"sports-climbing": "Sports Climbing",
 		"bouldering": "Bouldering",
 		"multi-pitch": "Multi-pitch",
-		"trad": "Trad"
+		"trad": "Trad",
+		"alpine-tour": "Alpine tour",
+		"via-ferrata": "Via ferrata"
 	},
 	"rock_types": {
 		"granite": "Granite",
@@ -169,7 +171,20 @@
 		"Weite Haken": "Runout",
 		"Abgespeckt": "Polished",
 		"Klassiker": "Classic",
-		"Boulder-Start": "Boulder Start"
+		"Boulder-Start": "Boulder Start",
+		"Gletscher": "Glacier",
+		"Firn": "Firn",
+		"Grat": "Ridge",
+		"Ausgesetzt": "Exposed",
+		"Steinschlag": "Rockfall",
+		"Spaltengefahr": "Crevasse risk",
+		"Klettersteig": "Via ferrata",
+		"sports-climbing": "Sports Climbing",
+		"bouldering": "Bouldering",
+		"multi-pitch": "Multi-pitch",
+		"trad": "Trad",
+		"alpine-tour": "Alpine tour",
+		"via-ferrata": "Via ferrata"
 	},
 	"ui": {
 		"remove": "Remove",
@@ -368,6 +383,7 @@
 		"description_placeholder": "Tell us about this crag...",
 		"meters_placeholder": "m",
 		"pitches": "Pitches",
+		"pitch": "Pitch",
 		"add_pitch": "+ Add",
 		"delete_pitch": "Delete pitch",
 		"draw_pitch": "Draw pitch",
@@ -407,7 +423,10 @@
 		"angle": "Angle",
 		"source_image": "Source Image",
 		"show_camera_trail": "Show Camera Trail",
-		"ai_suggestions_title": "AI Suggestions"
+		"ai_suggestions_title": "AI Suggestions",
+		"gpx_studio": "GPX Studio",
+		"track_based_routes": "Track-based routes",
+		"gpx_desc": "Manage alpine tours and via ferratas using GPX tracks."
 	},
 	"auth": {
 		"title": "Authentication Required",
@@ -427,5 +446,14 @@
 		"save_path_placeholder": "europe/austria/mödling/efeugrat",
 		"save_path_required": "Save path is required",
 		"upload_assets": "Upload Assets"
+	},
+	"grade": {
+		"system": {
+			"french": "Französisch",
+			"uiaa": "UIAA",
+			"sac": "SAC",
+			"huelser": "Hülser",
+			"schall": "Schall"
+		}
 	}
 }

@@ -30,7 +30,7 @@ const fetchCrags = async ({ offset = 0, limit = cragsPerPage, search = '' } = {}
 			entryFiles.map(async (file) => {
 				try {
 					const data = await readJson(file.path);
-					data.properties ||= {};
+					data.properties = data.properties || {};
 					data.properties.path = pathDirname(normalizeEntryPath(file.path));
 					data.properties.filePath = file.path;
 					return data;

@@ -12,17 +12,19 @@ export function slugifyName(value, fallback = 'new-crag') {
 	);
 }
 
-export function normalizeSavePath(path = '') {
-	return String(path).replace(/^\/+|\/+$/g, '').replace(/\/+/g, '/');
+export function normalizePath(path = '') {
+	return String(path)
+		.replace(/^\/+|\/+$/g, '')
+		.replace(/\/+/g, '/');
 }
 
 export function getCragEntryPath(crag) {
 	const slug = slugifyName(crag.name);
-	const currentPath = normalizeSavePath(crag.path || '');
+	const currentPath = normalizePath(crag.path || '');
 	if (!currentPath) return '';
 	if (pathBasename(currentPath) === slug) return currentPath;
 	const parent = pathDirname(currentPath) || currentPath;
-	return normalizeSavePath(`${parent}/${slug}`);
+	return normalizePath(`${parent}/${slug}`);
 }
 
 export function getCragId(crag) {

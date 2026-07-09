@@ -24,7 +24,11 @@ export function distancePx(a, b, canvasSize = {}) {
 	return Math.sqrt(dx * dx + dy * dy);
 }
 
-export function createRectanglePoints(start, end, { center = false, square = false, canvasSize } = {}) {
+export function createRectanglePoints(
+	start,
+	end,
+	{ center = false, square = false, canvasSize } = {}
+) {
 	const { baseWidth, baseHeight } = normalizeCanvasSize(canvasSize);
 	let minX;
 	let maxX;
@@ -76,10 +80,7 @@ export function createCirclePoints(center, radius2D, canvasSize = {}, segments =
 
 	for (let i = 0; i < segments; i++) {
 		const angle = (i / segments) * Math.PI * 2;
-		points.push([
-			center[0] + radius2D * Math.cos(angle),
-			center[1] + radiusY * Math.sin(angle)
-		]);
+		points.push([center[0] + radius2D * Math.cos(angle), center[1] + radiusY * Math.sin(angle)]);
 	}
 
 	points.push(points[0]);
@@ -108,7 +109,11 @@ function perpendicularDistancePx(point, lineStart, lineEnd, canvasSize) {
 	return Math.abs(dy * x - dx * y + x2 * y1 - y2 * x1) / Math.sqrt(dx * dx + dy * dy);
 }
 
-export function simplifyPoints(points, tolerancePx = DEFAULT_FREEHAND_SMOOTHING_PX, canvasSize = {}) {
+export function simplifyPoints(
+	points,
+	tolerancePx = DEFAULT_FREEHAND_SMOOTHING_PX,
+	canvasSize = {}
+) {
 	if (!points || points.length <= 2 || tolerancePx <= 0) return points || [];
 
 	let maxDistance = 0;
@@ -154,7 +159,12 @@ export function getOutlinePoints(outline, canvasSize = {}) {
 	}
 
 	if (shape.type === OUTLINE_SHAPE_TYPES.CIRCLE) {
-		return createCirclePoints(shape.center2D, shape.radius2D, canvasSize, shape.segments || CIRCLE_SEGMENTS);
+		return createCirclePoints(
+			shape.center2D,
+			shape.radius2D,
+			canvasSize,
+			shape.segments || CIRCLE_SEGMENTS
+		);
 	}
 
 	return shape.points2D || outline?.points2D || [];
@@ -165,7 +175,10 @@ export function translateOutline(outline, deltaX, deltaY, canvasSize = {}) {
 		outline.shape.start2D = [outline.shape.start2D[0] + deltaX, outline.shape.start2D[1] + deltaY];
 		outline.shape.end2D = [outline.shape.end2D[0] + deltaX, outline.shape.end2D[1] + deltaY];
 	} else if (outline.shape?.type === OUTLINE_SHAPE_TYPES.CIRCLE) {
-		outline.shape.center2D = [outline.shape.center2D[0] + deltaX, outline.shape.center2D[1] + deltaY];
+		outline.shape.center2D = [
+			outline.shape.center2D[0] + deltaX,
+			outline.shape.center2D[1] + deltaY
+		];
 	} else if (outline.shape?.points2D) {
 		outline.shape.points2D = translatePath(outline.shape.points2D, [deltaX, deltaY]);
 	} else if (outline.points2D) {
@@ -189,7 +202,8 @@ export function setOutlinePoint(outline, pointIndex, point, canvasSize = {}) {
 		};
 	} else if (outline.shape?.type === OUTLINE_SHAPE_TYPES.CIRCLE) {
 		const center = outline.shape.center2D;
-		outline.shape.radius2D = distancePx(center, point, canvasSize) / normalizeCanvasSize(canvasSize).baseWidth;
+		outline.shape.radius2D =
+			distancePx(center, point, canvasSize) / normalizeCanvasSize(canvasSize).baseWidth;
 	} else if (outline.shape?.points2D) {
 		outline.shape.points2D = points;
 	}

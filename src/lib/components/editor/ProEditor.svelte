@@ -23,8 +23,8 @@
 	import { topoSymbols } from '$lib/assets/js/topo-utils.js';
 
 	// 2D Editor imports
-	import Topo2DEditor from '$lib/components/editor/Topo2DEditor.svelte';
-	import ToolPalette2D from '$lib/components/editor/ToolPalette2D.svelte';
+	import Topo2DEditor from '$lib/components/editor/2d/Topo2DEditor.svelte';
+	import ToolPalette2D from '$lib/components/editor/2d/ToolPalette2D.svelte';
 	import OutlineToolOptions from '$lib/components/editor/tools/OutlineToolOptions.svelte';
 
 	import { generateSymbolId, initializeIdCounters } from '$lib/assets/js/id-utils.js';

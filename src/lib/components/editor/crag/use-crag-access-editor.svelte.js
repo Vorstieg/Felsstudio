@@ -36,17 +36,23 @@ export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 			const props = feature.properties;
 			const cls = props.class || '';
 			const sub = props.subclass || '';
-			const assetCoords = feature.geometry.type === 'Point'
-				? feature.geometry.coordinates
-				: turf.centroid(feature).geometry.coordinates;
+			const assetCoords =
+				feature.geometry.type === 'Point'
+					? feature.geometry.coordinates
+					: turf.centroid(feature).geometry.coordinates;
 			const key = `${props.name || 'unnamed'}-${assetCoords[0].toFixed(4)},${assetCoords[1].toFixed(4)}`;
 			if (seen.has(key)) return;
 			seen.add(key);
 
 			let type = null;
 			if (cls === 'parking' || sub === 'parking') type = 'parking';
-			else if (['bus', 'bus_stop', 'transit'].includes(cls) || ['bus_stop', 'bus_station', 'transit'].includes(sub)) type = 'bus';
-			else if (['railway', 'station', 'subway'].includes(cls) || ['station', 'halt'].includes(sub)) type = 'train';
+			else if (
+				['bus', 'bus_stop', 'transit'].includes(cls) ||
+				['bus_stop', 'bus_station', 'transit'].includes(sub)
+			)
+				type = 'bus';
+			else if (['railway', 'station', 'subway'].includes(cls) || ['station', 'halt'].includes(sub))
+				type = 'train';
 			if (!type) return;
 			if (filterType === 'parking' && type !== 'parking') return;
 			if (filterType === 'transit' && type !== 'bus' && type !== 'train') return;
@@ -120,7 +126,7 @@ export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 		el.style.border = '4px solid #0075de';
 		el.style.backgroundColor = 'rgba(0, 117, 222, 0.2)';
 		el.style.boxShadow = '0 0 15px rgba(0, 117, 222, 0.3)';
-		el.innerHTML = `<div class="w-full h-full flex items-center justify-center text-creator-blue"><i class="fa-solid ${asset.type === 'parking' ? 'fa-square-parking' : (asset.type === 'bus' ? 'fa-bus' : 'fa-train')} text-xl"></i></div>`;
+		el.innerHTML = `<div class="w-full h-full flex items-center justify-center text-creator-blue"><i class="fa-solid ${asset.type === 'parking' ? 'fa-square-parking' : asset.type === 'bus' ? 'fa-bus' : 'fa-train'} text-xl"></i></div>`;
 		hoverMarker = new maplibregl.Marker({ element: el }).setLngLat(asset.coordinates).addTo(map);
 		map.easeTo({ center: asset.coordinates, duration: 400 });
 	}
@@ -148,9 +154,15 @@ export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 		const map = getMap();
 		if (!map) return;
 		const marker = new maplibregl.Marker({
-			element: createIconMarkerElement({ className: 'transit-marker group cursor-move', iconUrl: `${base}/icons/${point.type}.png`, size: getMapMarkerSize(24) }),
+			element: createIconMarkerElement({
+				className: 'transit-marker group cursor-move',
+				iconUrl: `${base}/icons/${point.type}.png`,
+				size: getMapMarkerSize(24)
+			}),
 			draggable: true
-		}).setLngLat(point.coordinates).addTo(map);
+		})
+			.setLngLat(point.coordinates)
+			.addTo(map);
 		marker.on('dragend', () => {
 			const pos = marker.getLngLat();
 			const list = $state.snapshot(cragEditorState.transit);
@@ -171,9 +183,15 @@ export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 		const map = getMap();
 		if (!map) return;
 		const marker = new maplibregl.Marker({
-			element: createIconMarkerElement({ className: 'parking-marker cursor-move', iconUrl: `${base}/icons/parking.png`, size: getMapMarkerSize(24) }),
+			element: createIconMarkerElement({
+				className: 'parking-marker cursor-move',
+				iconUrl: `${base}/icons/parking.png`,
+				size: getMapMarkerSize(24)
+			}),
 			draggable: true
-		}).setLngLat(point.coordinates).addTo(map);
+		})
+			.setLngLat(point.coordinates)
+			.addTo(map);
 		marker.on('dragend', () => {
 			const pos = marker.getLngLat();
 			const list = $state.snapshot(cragEditorState.parking);
@@ -212,12 +230,15 @@ export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 
 	function scanForActiveTool() {
 		const tool = getActiveTool();
-		if (tool === 'parking' || tool === 'transit') scanNearbyAssets(tool === 'parking' ? 'parking' : 'transit');
+		if (tool === 'parking' || tool === 'transit')
+			scanNearbyAssets(tool === 'parking' ? 'parking' : 'transit');
 		else clearDetectedAssets();
 	}
 
 	return {
-		get detectedAssets() { return detectedAssets; },
+		get detectedAssets() {
+			return detectedAssets;
+		},
 		scanNearbyAssets,
 		scanForActiveTool,
 		clearDetectedAssets,

@@ -28,6 +28,7 @@ export const userState = $state({
 	ui: {
 		workspace: null, // '3d-create' | '3d-edit' | '2d-create' | '2d-edit'
 		selectedRouteId: null, // ID of the route currently selected for editing
+		selectedGpxIndex: null, // Index of the GPX asset currently selected within selectedRouteId
 		selectedOutlineId: null, // ID of the rock outline currently selected for editing
 		selectedFixpointId: null,
 		selectedTextLabelId: null,
@@ -112,6 +113,7 @@ export const userState = $state({
 		this.ui.modelUrl = null;
 		this.ui.glbBlob = null;
 		this.ui.selectedTextLabelId = null;
+		this.ui.selectedGpxIndex = null;
 		this.clustering.rawHits = [];
 		this.clustering.clusters = [];
 		this.clustering.cameraPositions = {};

@@ -7,7 +7,14 @@ export const cragsPerPage = 50;
 
 export const maptilerApiKey = 'ic9EbrsUoaMeSBLjjuEO';
 
-export const types = ['sports-climbing', 'bouldering', 'multi-pitch', 'trad'];
+export const types = [
+	'sports-climbing',
+	'bouldering',
+	'multi-pitch',
+	'trad',
+	'alpine-tour',
+	'via-ferrata'
+];
 
 export const securityRatings = new Map([
 	['Alpine', 1],

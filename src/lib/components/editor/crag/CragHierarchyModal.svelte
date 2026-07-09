@@ -20,10 +20,6 @@
 		modalCard?.focus();
 	});
 
-	function normalizePath(path = '') {
-		return String(path).replace(/^\/+|\/+$/g, '').replace(/\/+/g, '/');
-	}
-
 	function getBreadcrumbParts(path = '') {
 		const normalized = normalizePath(path);
 		if (!normalized) return [];

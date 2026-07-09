@@ -27,12 +27,7 @@ export function normalizePath(points = [], { closed = isClosedPath(points) } = {
 	return closed ? closePath(next) : next;
 }
 
-export function movePathVertex(
-	points,
-	index,
-	position,
-	{ closed = isClosedPath(points) } = {}
-) {
+export function movePathVertex(points, index, position, { closed = isClosedPath(points) } = {}) {
 	const next = normalizePath(points, { closed });
 	const editableLength = closed ? next.length - 1 : next.length;
 	if (editableLength === 0) return next;
@@ -43,12 +38,7 @@ export function movePathVertex(
 	return next;
 }
 
-export function insertPathVertex(
-	points,
-	index,
-	position,
-	{ closed = isClosedPath(points) } = {}
-) {
+export function insertPathVertex(points, index, position, { closed = isClosedPath(points) } = {}) {
 	const editable = getEditablePath(points, { closed });
 	const insertIndex = Math.max(0, Math.min(index, editable.length));
 	editable.splice(insertIndex, 0, [...position]);
@@ -71,10 +61,7 @@ export function removePathVertex(
 
 export function translatePath(points, delta, { closed = isClosedPath(points) } = {}) {
 	return normalizePath(
-		getEditablePath(points, { closed }).map((point) => [
-			point[0] + delta[0],
-			point[1] + delta[1]
-		]),
+		getEditablePath(points, { closed }).map((point) => [point[0] + delta[0], point[1] + delta[1]]),
 		{ closed }
 	);
 }

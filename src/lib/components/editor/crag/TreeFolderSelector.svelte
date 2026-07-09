@@ -12,10 +12,6 @@
 	const selectedExists = $derived(!selectedPath || allFolders.includes(normalizePath(selectedPath)));
 	const visibleFolders = $derived(getVisibleFolders());
 
-	function normalizePath(path = '') {
-		return String(path).replace(/^\/+|\/+$/g, '').replace(/\/+/g, '/');
-	}
-
 	function pathBasename(path = '') {
 		return normalizePath(path).split('/').filter(Boolean).at(-1) || '';
 	}

@@ -136,6 +136,28 @@ export class RouteTool {
 					}
 				]
 			});
+		} else if (this.mode === 'alpine-tour') {
+			userState.topo.routes.push({
+				id: routeId,
+				points2D,
+				points: [],
+				tags: [],
+				name: `Route ${userState.topo.routes.length + 1}`,
+				hochtourGrade: 'PD',
+				lineStyle: 'red',
+				type: 'alpine-tour'
+			});
+		} else if (this.mode === 'via-ferrata') {
+			userState.topo.routes.push({
+				id: routeId,
+				points2D,
+				points: [],
+				tags: [],
+				name: `Route ${userState.topo.routes.length + 1}`,
+				viaFerrataGrade: 'K3',
+				lineStyle: 'red',
+				type: 'via-ferrata'
+			});
 		} else {
 			userState.topo.routes.push({
 				id: routeId,
@@ -144,6 +166,7 @@ export class RouteTool {
 				tags: [],
 				name: `Route ${userState.topo.routes.length + 1}`,
 				grade: '5a',
+				_gradeScale: 'french',
 				lineStyle: 'red',
 				type: 'sports-climbing'
 			});

@@ -90,40 +90,153 @@ export function ensureCragEditorLayers(map) {
 			}
 		});
 	if (!map.getLayer('sector-polygons-fill'))
-		map.addLayer({ id: 'sector-polygons-fill', type: 'fill', source: 'crag-editor-data', filter: ['==', ['get', 'feature'], 'sector'], paint: { 'fill-color': ['case', ['==', ['get', 'selected'], true], '#0075de', '#31302e'], 'fill-opacity': ['case', ['==', ['get', 'selected'], true], 0.22, 0.12] } }, 'tracks-line-saved');
+		map.addLayer(
+			{
+				id: 'sector-polygons-fill',
+				type: 'fill',
+				source: 'crag-editor-data',
+				filter: ['==', ['get', 'feature'], 'sector'],
+				paint: {
+					'fill-color': ['case', ['==', ['get', 'selected'], true], '#0075de', '#31302e'],
+					'fill-opacity': ['case', ['==', ['get', 'selected'], true], 0.22, 0.12]
+				}
+			},
+			'tracks-line-saved'
+		);
 	if (!map.getLayer('sector-polygons-outline'))
-		map.addLayer({ id: 'sector-polygons-outline', type: 'line', source: 'crag-editor-data', filter: ['==', ['get', 'feature'], 'sector'], layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': ['case', ['==', ['get', 'selected'], true], '#0075de', '#31302e'], 'line-width': ['case', ['==', ['get', 'selected'], true], 3, 2], 'line-opacity': 0.9 } }, 'tracks-line-saved');
+		map.addLayer(
+			{
+				id: 'sector-polygons-outline',
+				type: 'line',
+				source: 'crag-editor-data',
+				filter: ['==', ['get', 'feature'], 'sector'],
+				layout: { 'line-join': 'round', 'line-cap': 'round' },
+				paint: {
+					'line-color': ['case', ['==', ['get', 'selected'], true], '#0075de', '#31302e'],
+					'line-width': ['case', ['==', ['get', 'selected'], true], 3, 2],
+					'line-opacity': 0.9
+				}
+			},
+			'tracks-line-saved'
+		);
 	if (!map.getLayer('sector-vertex-midpoints'))
-		map.addLayer({ id: 'sector-vertex-midpoints', type: 'circle', source: 'crag-editor-data', filter: ['==', ['get', 'feature'], 'sector-midpoint'], paint: { 'circle-radius': midpointRadius, 'circle-color': '#ffffff', 'circle-stroke-width': 2, 'circle-stroke-color': '#0075de', 'circle-opacity': 0.85 } });
+		map.addLayer({
+			id: 'sector-vertex-midpoints',
+			type: 'circle',
+			source: 'crag-editor-data',
+			filter: ['==', ['get', 'feature'], 'sector-midpoint'],
+			paint: {
+				'circle-radius': midpointRadius,
+				'circle-color': '#ffffff',
+				'circle-stroke-width': 2,
+				'circle-stroke-color': '#0075de',
+				'circle-opacity': 0.85
+			}
+		});
 	if (!map.getLayer('sector-vertices'))
-		map.addLayer({ id: 'sector-vertices', type: 'circle', source: 'crag-editor-data', filter: ['==', ['get', 'feature'], 'sector-vertex'], paint: { 'circle-radius': vertexRadius, 'circle-color': '#0075de', 'circle-stroke-width': 2, 'circle-stroke-color': '#ffffff' } });
+		map.addLayer({
+			id: 'sector-vertices',
+			type: 'circle',
+			source: 'crag-editor-data',
+			filter: ['==', ['get', 'feature'], 'sector-vertex'],
+			paint: {
+				'circle-radius': vertexRadius,
+				'circle-color': '#0075de',
+				'circle-stroke-width': 2,
+				'circle-stroke-color': '#ffffff'
+			}
+		});
 	if (!map.getLayer('sector-vertex-delete'))
-		map.addLayer({ id: 'sector-vertex-delete', type: 'symbol', source: 'crag-editor-data', filter: ['==', ['get', 'feature'], 'sector-vertex-delete'], layout: { 'text-field': '×', 'text-font': ['Noto Sans Bold'], 'text-size': deleteTextSize, 'text-offset': [0.85, -0.85], 'text-allow-overlap': true, 'text-ignore-placement': true }, paint: { 'text-color': '#ffffff', 'text-halo-color': '#dc2626', 'text-halo-width': 6 } });
+		map.addLayer({
+			id: 'sector-vertex-delete',
+			type: 'symbol',
+			source: 'crag-editor-data',
+			filter: ['==', ['get', 'feature'], 'sector-vertex-delete'],
+			layout: {
+				'text-field': '×',
+				'text-font': ['Noto Sans Bold'],
+				'text-size': deleteTextSize,
+				'text-offset': [0.85, -0.85],
+				'text-allow-overlap': true,
+				'text-ignore-placement': true
+			},
+			paint: { 'text-color': '#ffffff', 'text-halo-color': '#dc2626', 'text-halo-width': 6 }
+		});
 }
 
-export function buildEditorFeatureCollection({ sectors = [], savedTracks = [], drawingPoints = [], selectedSectorId = null, selectedSectorVertex = null, editingTrackIndex = null }) {
+export function buildEditorFeatureCollection({
+	sectors = [],
+	savedTracks = [],
+	drawingPoints = [],
+	selectedSectorId = null,
+	selectedSectorVertex = null,
+	editingTrackIndex = null
+}) {
 	const features = [];
 	sectors.forEach((sector) => {
 		if (sector.geometry?.type !== 'Polygon') return;
 		const isSelected = selectedSectorId === sector.id;
-		features.push({ type: 'Feature', geometry: sector.geometry, properties: { feature: 'sector', id: sector.id || '', name: sector.name || '', selected: isSelected } });
+		features.push({
+			type: 'Feature',
+			geometry: sector.geometry,
+			properties: {
+				feature: 'sector',
+				id: sector.id || '',
+				name: sector.name || '',
+				selected: isSelected
+			}
+		});
 		if (!isSelected) return;
 		const path = getGeometryPath(sector.geometry);
 		const editablePath = getEditablePath(path, { closed: true });
 		editablePath.forEach((point, vertexIndex) => {
-			const isSelectedVertex = selectedSectorVertex?.sectorId === sector.id && selectedSectorVertex?.vertexIndex === vertexIndex;
-			features.push({ type: 'Feature', geometry: { type: 'Point', coordinates: point }, properties: { feature: 'sector-vertex', sectorId: sector.id, vertexIndex } });
-			if (isSelectedVertex && editablePath.length > 3) features.push({ type: 'Feature', geometry: { type: 'Point', coordinates: point }, properties: { feature: 'sector-vertex-delete', sectorId: sector.id, vertexIndex } });
+			const isSelectedVertex =
+				selectedSectorVertex?.sectorId === sector.id &&
+				selectedSectorVertex?.vertexIndex === vertexIndex;
+			features.push({
+				type: 'Feature',
+				geometry: { type: 'Point', coordinates: point },
+				properties: { feature: 'sector-vertex', sectorId: sector.id, vertexIndex }
+			});
+			if (isSelectedVertex && editablePath.length > 3)
+				features.push({
+					type: 'Feature',
+					geometry: { type: 'Point', coordinates: point },
+					properties: { feature: 'sector-vertex-delete', sectorId: sector.id, vertexIndex }
+				});
 		});
 		getPathMidpoints(path, { closed: true }).forEach((midpoint) => {
-			features.push({ type: 'Feature', geometry: { type: 'Point', coordinates: midpoint.point }, properties: { feature: 'sector-midpoint', sectorId: sector.id, insertIndex: midpoint.insertIndex } });
+			features.push({
+				type: 'Feature',
+				geometry: { type: 'Point', coordinates: midpoint.point },
+				properties: {
+					feature: 'sector-midpoint',
+					sectorId: sector.id,
+					insertIndex: midpoint.insertIndex
+				}
+			});
 		});
 	});
 	savedTracks.forEach((track, index) => {
 		if (editingTrackIndex === index || !(track.coordinates?.length > 1)) return;
-		features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: track.coordinates }, properties: { name: track.name, state: 'saved', trackIndex: index } });
+		features.push({
+			type: 'Feature',
+			geometry: { type: 'LineString', coordinates: track.coordinates },
+			properties: { name: track.name, state: 'saved', trackIndex: index }
+		});
 	});
-	if (drawingPoints.length > 1) features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: drawingPoints }, properties: { name: 'Drawing', state: 'drawing' } });
-	drawingPoints.forEach((point, pointIndex) => features.push({ type: 'Feature', geometry: { type: 'Point', coordinates: point }, properties: { type: 'Point', state: 'drawing', pointIndex } }));
+	if (drawingPoints.length > 1)
+		features.push({
+			type: 'Feature',
+			geometry: { type: 'LineString', coordinates: drawingPoints },
+			properties: { name: 'Drawing', state: 'drawing' }
+		});
+	drawingPoints.forEach((point, pointIndex) =>
+		features.push({
+			type: 'Feature',
+			geometry: { type: 'Point', coordinates: point },
+			properties: { type: 'Point', state: 'drawing', pointIndex }
+		})
+	);
 	return { type: 'FeatureCollection', features };
 }

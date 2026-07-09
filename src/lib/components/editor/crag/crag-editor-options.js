@@ -1,6 +1,13 @@
 export const CRAG_SESSION_KEY = 'crag_editor_latest_session_v1';
 
-export const cragTypes = ['sports-climbing', 'multi-pitch', 'bouldering', 'trad'];
+export const cragTypes = [
+	'sports-climbing',
+	'multi-pitch',
+	'bouldering',
+	'trad',
+	'alpine-tour',
+	'via-ferrata'
+];
 
 export const availableTags = [
 	'Kinderfreundlich',
@@ -23,7 +30,14 @@ export const availableTags = [
 	'Weite Haken',
 	'Abgespeckt',
 	'Klassiker',
-	'Boulder-Start'
+	'Boulder-Start',
+	'Gletscher',
+	'Firn',
+	'Grat',
+	'Ausgesetzt',
+	'Steinschlag',
+	'Spaltengefahr',
+	'Klettersteig'
 ];
 
 export const securityOptions = ['Sehr Gut', 'Gut', 'Mittel', 'Alpine'];
@@ -50,5 +64,10 @@ export const commonEquipment = [
 	'Seil',
 	'Helm',
 	'Eisschrauben',
-	'Eisgeräte'
+	'Eisgeräte',
+	'Steigeisen',
+	'Pickel',
+	'Gletscherausrüstung',
+	'Klettersteigset',
+	'Klettersteighandschuhe'
 ];
