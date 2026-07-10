@@ -7,7 +7,7 @@
 	let {
 		map = $bindable(),
 		isMapLoaded = $bindable(false),
-		mapStyle = 'transport',
+		mapStyle = 'terrain',
 		initialCoordinates = [0, 0],
 		onStyleLoad = () => {},
 		onMapClick = () => {}

@@ -25,7 +25,7 @@
 
 				map = new maplibregl.Map({
 					container: mapContainer,
-					style: '/satellite.json',
+					style: '/terrain.json',
 					center: center,
 					zoom: 18,
                     attributionControl: false

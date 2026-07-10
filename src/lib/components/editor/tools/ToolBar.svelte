@@ -125,7 +125,7 @@
 				<SaveStatus status={save.status} errorMessage={save.errorMessage} />
 				<button
 					type="button"
-					class="bg-creator-blue px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white shadow-sm transition-none hover:bg-creator-blue-active disabled:opacity-40 md:px-4"
+					class="bg-creator-blue rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white shadow-sm transition-none hover:bg-creator-blue-active disabled:opacity-40 md:px-4"
 					onclick={() => run(save)}
 					disabled={save.disabled || save.status === 'saving'}
 					>{save.label || $_('save.save_to_server')}</button

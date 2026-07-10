@@ -20,10 +20,15 @@ export function resize(element) {
 
 	function calculateTargetHeights() {
 		const screenHeight = window.innerHeight;
-		targetHeights = [screenHeight * 0.18, screenHeight * 0.5, screenHeight];
+		targetHeights = [screenHeight * 0.14, screenHeight * 0.5, screenHeight * 0.9];
 
-		minHeight = screenHeight * 0.18;
+		minHeight = screenHeight * 0.14;
 		maxTop = screenHeight - minHeight;
+
+		// If it hasn't been explicitly dragged yet, keep the CSS variable in sync with window.innerHeight
+		if (isMobile() && (!element.style.height || element.style.height === '')) {
+			document.body.style.setProperty('--info-panel-height', `${targetHeights[1]}px`);
+		}
 	}
 
 	function calculateClosestHeight(currentHeight, direction) {
@@ -58,6 +63,7 @@ export function resize(element) {
 
 		const currentTop = parseFloat(element.style.top);
 		const currentHeight = parseFloat(element.style.height);
+		let currentBottom = currentTop + currentHeight;
 
 		let direction = 0;
 		if (lastY !== null && initialPos !== null) {
@@ -68,8 +74,9 @@ export function resize(element) {
 
 		element.style.transition =
 			'top 0.2s ease-out, height 0.2s ease-out, border-radius 0.2s ease-out';
+		document.body.style.setProperty('--info-panel-transition', 'bottom 0.2s ease-out');
 
-		if (closestHeight === targetHeights[targetHeights.length - 1]) {
+		if (closestHeight === window.innerHeight) {
 			// Full height
 			element.style.top = `0`;
 			element.style.borderRadius = `0`;
@@ -81,11 +88,14 @@ export function resize(element) {
 			element.style.height = `${closestHeight}px`;
 		}
 
+		document.body.style.setProperty('--info-panel-height', `${closestHeight}px`);
+
 		// Ensure no inline margin overrides class styles on mobile (we want 0)
 		element.style.marginInline = '';
 
 		setTimeout(() => {
 			element.style.transition = '';
+			document.body.style.setProperty('--info-panel-transition', 'none');
 		}, 200);
 	}
 
@@ -110,6 +120,7 @@ export function resize(element) {
 		lastTimestamp = Date.now();
 		active.classList.add('selected');
 		element.style.transition = 'border-radius 0.2s ease-out';
+		document.body.style.setProperty('--info-panel-transition', 'none');
 
 		// On interaction, ensure we are in partial-height style (rounded top only)
 		element.style.borderRadius = `1.5rem 1.5rem 0 0`;
@@ -118,6 +129,7 @@ export function resize(element) {
 
 		setTimeout(() => {
 			element.style.transition = '';
+			document.body.style.setProperty('--info-panel-transition', 'none');
 		}, 200);
 	}
 
@@ -145,32 +157,133 @@ export function resize(element) {
 
 		element.style.top = `${newTop}px`;
 		element.style.height = `${newHeight}px`;
+		document.body.style.setProperty('--info-panel-height', `${newHeight}px`);
 		lastY = currentY;
 	}
 
+	let contentDragActive = false;
+	let contentInitialY = null;
+	let scrollContainer = null;
+	let initialScrollTop = 0;
+
+	function findScrollContainer(target) {
+		let curr = target;
+		while (curr && curr !== element && curr !== document.body) {
+			const overflowY = window.getComputedStyle(curr).overflowY;
+			if (overflowY === 'auto' || overflowY === 'scroll') {
+				if (curr.scrollHeight > curr.clientHeight) {
+					return curr;
+				}
+			}
+			curr = curr.parentNode;
+		}
+		return null;
+	}
+
+	function onContentTouchStart(event) {
+		if (!isMobile() || active) return;
+		if (event.target.closest('.grabber')) return;
+
+		contentInitialY = getEventY(event);
+		scrollContainer = findScrollContainer(event.target);
+		initialScrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+		contentDragActive = false;
+	}
+
+	function onContentTouchMove(event) {
+		if (!isMobile() || contentInitialY === null || active === event.target) return;
+		if (event.target.closest('.grabber')) return;
+
+		const currentY = getEventY(event);
+		const deltaY = currentY - contentInitialY;
+		const currentHeight = parseFloat(element.style.height || 0);
+		const maxHeight = targetHeights[targetHeights.length - 1];
+
+		if (!contentDragActive) {
+			let shouldDragPanel = false;
+
+			if (deltaY < -5) {
+				// Swipe UP (scroll down)
+				if (Math.abs(currentHeight - maxHeight) > 5) {
+					shouldDragPanel = true;
+				}
+			} else if (deltaY > 5) {
+				// Swipe DOWN (scroll up)
+				if (initialScrollTop <= 0) {
+					shouldDragPanel = true;
+				}
+			}
+
+			if (shouldDragPanel) {
+				contentDragActive = true;
+				active = element;
+				const rect = element.getBoundingClientRect();
+				initialRect = { top: rect.top, height: rect.height };
+				initialPos = { y: contentInitialY };
+				lastY = contentInitialY;
+				lastTimestamp = Date.now();
+
+				element.style.transition = 'border-radius 0.2s ease-out';
+				document.body.style.setProperty('--info-panel-transition', 'none');
+				element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+				element.style.marginInline = '';
+			}
+		}
+
+		if (contentDragActive) {
+			if (event.cancelable) event.preventDefault();
+			onMove(event);
+		}
+	}
+
+	function onContentTouchEnd(event) {
+		if (contentDragActive) {
+			onMouseup();
+			contentDragActive = false;
+		}
+		contentInitialY = null;
+		scrollContainer = null;
+	}
+
 	calculateTargetHeights();
+	// Initialize the CSS variable so floating buttons start at the exact correct pixel height, not the CSS fallback
+	if (isMobile()) {
+		document.body.style.setProperty('--info-panel-height', `${targetHeights[1]}px`);
+		element.style.top = `${window.innerHeight - targetHeights[1]}px`;
+		element.style.height = `${targetHeights[1]}px`;
+		element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+	}
+
 	element.appendChild(top);
 	top.addEventListener('mousedown', onMousedown);
 	top.addEventListener('touchstart', onMousedown);
 
-	window.addEventListener('mousemove', onMove);
-	window.addEventListener('touchmove', onMove);
+	window.addEventListener('mousemove', onMove, { passive: false });
+	window.addEventListener('touchmove', onMove, { passive: false });
 	window.addEventListener('mouseup', onMouseup);
 	window.addEventListener('touchend', onMouseup);
 	window.addEventListener('resize', calculateTargetHeights);
+
+	element.addEventListener('touchstart', onContentTouchStart, { passive: true });
+	element.addEventListener('touchmove', onContentTouchMove, { passive: false });
+	element.addEventListener('touchend', onContentTouchEnd);
 
 	snapToBiggestHeight = () => {
 		if (!isMobile()) return;
 
 		element.style.transition =
 			'top 0.2s ease-out, height 0.2s ease-out, border-radius 0.2s ease-out';
+		document.body.style.setProperty('--info-panel-transition', 'bottom 0.2s ease-out');
 		element.style.marginInline = ''; // Clear inline margin
-		element.style.top = `0`;
-		element.style.borderRadius = `0`;
-		element.style.height = `${window.innerHeight}px`;
+		const biggestHeight = targetHeights[targetHeights.length - 1];
+		element.style.top = `${window.innerHeight - biggestHeight}px`;
+		element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+		element.style.height = `${biggestHeight}px`;
+		document.body.style.setProperty('--info-panel-height', `${biggestHeight}px`);
 
 		setTimeout(() => {
 			element.style.transition = '';
+			document.body.style.setProperty('--info-panel-transition', 'none');
 		}, 200);
 	};
 
@@ -181,9 +294,15 @@ export function resize(element) {
 			window.removeEventListener('mouseup', onMouseup);
 			window.removeEventListener('touchend', onMouseup);
 			window.removeEventListener('resize', calculateTargetHeights);
+			
+			element.removeEventListener('touchstart', onContentTouchStart);
+			element.removeEventListener('touchmove', onContentTouchMove);
+			element.removeEventListener('touchend', onContentTouchEnd);
+
 			if (element.contains(top)) {
 				element.removeChild(top);
 			}
+			document.body.style.removeProperty('--info-panel-height');
 		}
 	};
 }
