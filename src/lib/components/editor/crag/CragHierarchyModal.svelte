@@ -1,5 +1,6 @@
 <script>
 	import { onMount } from 'svelte';
+	import { normalizePath } from '$lib/components/editor/crag/crag-editor-paths.js';
 	import TreeFolderSelector from './TreeFolderSelector.svelte';
 
 	let {

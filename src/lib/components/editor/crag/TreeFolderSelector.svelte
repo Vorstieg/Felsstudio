@@ -1,4 +1,6 @@
 <script>
+	import { normalizePath } from '$lib/components/editor/crag/crag-editor-paths.js';
+
 	let { knownFolders = new Set(), selectedPath = $bindable('') } = $props();
 
 	let search = $state('');
