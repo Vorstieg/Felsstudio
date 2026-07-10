@@ -1,6 +1,5 @@
 <script>
 	import { calculateRouteLength } from '$lib/assets/js/topo-utils.js';
-	import { userState } from '$lib/state/editor.svelte.js';
 	import { _ } from 'svelte-i18n';
 
 	let { route, length = $bindable(), topoScale } = $props();

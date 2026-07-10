@@ -117,13 +117,13 @@ export const draftsState = $state({
 	async delete(id) {
 		this.drafts = this.drafts.filter((d) => d.id !== id);
 		storage.set(STORAGE_KEY, this.drafts);
-		for (const mode of ['2d', '3d', 'gpx']) {
+		for (const mode of ['2d', '3d', 'path']) {
 			if (storage.get(`${LATEST_STORAGE_PREFIX}${mode}`, null) === id) {
 				storage.remove(`${LATEST_STORAGE_PREFIX}${mode}`);
 			}
 		}
 		await topoStore.delete(id);
-		for (const mode of ['2d', '3d', 'gpx']) {
+		for (const mode of ['2d', '3d', 'path']) {
 			const latest = await topoStore.get(`${LATEST_INDEXEDDB_PREFIX}${mode}`);
 			if (latest?.sourceDraftId === id) await topoStore.delete(`${LATEST_INDEXEDDB_PREFIX}${mode}`);
 		}

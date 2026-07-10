@@ -90,8 +90,8 @@ export function convertRouteType(route, newType) {
 		...(route.topo || {}),
 		enabled: route.geometryMode !== 'track'
 	};
-	if (!route.assets) route.assets = { gpx: [] };
-	if (!route.assets.gpx) route.assets.gpx = [];
+	if (!route.assets) route.assets = { paths: [] };
+	if (!route.assets.paths) route.assets.paths = [];
 
 	// For now, if called from a simple select, we set it as a single-element array or update if it was an array
 	if (Array.isArray(route.type)) {

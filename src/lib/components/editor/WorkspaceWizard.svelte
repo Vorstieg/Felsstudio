@@ -1,6 +1,5 @@
 <script>
 	import { onMount } from 'svelte';
-	import { _ } from 'svelte-i18n';
 	import { userState } from '$lib/state/editor.svelte.js';
 	import { draftsState } from '$lib/state/drafts.svelte.js';
 	import { createGltfLoader } from '$lib/assets/js/gltf-loader.js';
@@ -8,14 +7,9 @@
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
 	import { generate2DFromTopo } from '$lib/assets/js/topo-projection.js';
 	import { parseRegistrationCsv, projectHits } from '$lib/assets/js/hit-projection.js';
-	import {
-		getGeometryCenter,
-		getSectorEntryPath,
-		pathBasename,
-		pathDirname
-	} from '$lib/assets/js/sector-utils.js';
+	import { getGeometryCenter, getSectorEntryPath, pathBasename, pathDirname } from '$lib/assets/js/sector-utils.js';
 	import JSZip from 'jszip';
-	import { listDir, readJson, fileUrl } from '$lib/api/felslager.js';
+	import { fileUrl, listDir, readJson } from '$lib/api/felslager.js';
 	import EntryPicker from './wizard/EntryPicker.svelte';
 	import Topo3DUploadForm from './wizard/Topo3DUploadForm.svelte';
 
@@ -84,11 +78,10 @@
 		if (!isTopoWorkspace()) return;
 
 		draftsState.init();
-		const id = await draftsState.save(userState.topo, userState.ui.activeDraftId, {
+		userState.ui.activeDraftId = await draftsState.save(userState.topo, userState.ui.activeDraftId, {
 			clustering: $state.snapshot(userState.clustering),
 			glbBlob: userState.ui.glbBlob
 		});
-		userState.ui.activeDraftId = id;
 		userState.ui.lastSaved = new Date().toISOString();
 	}
 
@@ -167,8 +160,8 @@
 			const sectorTopoPath = getSectorTopoPath(path, sector);
 			const entryName = pathBasename(entryPath);
 			const topoPath =
-				workspace === 'topos/gpx/editor'
-					? `${entryPath}/${entryName}-routes.json`
+				workspace === 'topos/path/editor'
+					? `${entryPath}/${entryName}-topo.json`
 					: sectorTopoPath || `${entryPath}/${entryName}-topo.json`;
 			const topoDir = pathDirname(topoPath) || entryPath;
 			const topoBaseName = pathBasename(topoPath)
@@ -178,13 +171,11 @@
 			const cragJsonPath = `${path}/${name}.json`;
 			let loadedTopo = workspace === 'topos/3d/editor' && glbFiles.has(glbPath);
 
-			const apiPath = (p) => `entries/${p}`;
-
 			if (workspace.startsWith('crags/')) {
 				const { cragEditorState } = await import('$lib/state/crag-editor.svelte.js');
 				cragEditorState.reset();
 				try {
-					const cragData = await readJson(apiPath(cragJsonPath));
+					const cragData = await readJson(cragJsonPath);
 					Object.assign(cragEditorState.crag, cragData.properties);
 					cragEditorState.crag.geometry = cragData.geometry;
 				} catch {
@@ -194,12 +185,12 @@
 
 				// Load related files (transit, parking, tracks)
 				try {
-					const dirFiles = await listDir(apiPath(path));
+					const dirFiles = await listDir(path);
 					for (const f of dirFiles) {
 						if (f.type !== 'file' || !f.name.endsWith('.json') || f.name === `${name}.json`)
 							continue;
 						try {
-							const data = await readJson(`${apiPath(path)}/${f.name}`);
+							const data = await readJson(`${path}/${f.name}`);
 							if (f.name.includes('-transit-track')) {
 								cragEditorState.tracks.push({
 									id: Math.random().toString(36).substr(2, 9),
@@ -226,7 +217,7 @@
 				} catch {
 					/* directory listing may fail */
 				}
-			} else if (workspace === 'topos/gpx/editor') {
+			} else if (workspace === 'topos/path/editor') {
 				try {
 					const topoData = await readJson(topoPath);
 					userState.topo = { ...userState.topo, ...topoData };
@@ -235,11 +226,11 @@
 				} catch {
 					seedTopoFromEntry(crag, sector);
 				}
-				userState.topo.editorMode = 'gpx';
+				userState.topo.editorMode = 'path';
 			} else if (workspace === 'topos/2d/editor') {
 				seedTopoFromEntry(crag, sector);
 				try {
-					userState.topo = { ...userState.topo, ...(await readJson(apiPath(topoPath))) };
+					userState.topo = { ...userState.topo, ...(await readJson(topoPath)) };
 				} catch {
 					/* no topo yet */
 				}
@@ -259,7 +250,7 @@
 				userState.topo.editorMode = '2d';
 			} else {
 				try {
-					const topoData = await readJson(apiPath(topoPath));
+					const topoData = await readJson(topoPath);
 					userState.topo = { ...userState.topo, ...topoData };
 					loadedTopo = workspace === 'topos/3d/editor' ? loadedTopo : true;
 					if (!userState.topo.id) userState.topo.id = getTopoId(crag, sector);
@@ -286,9 +277,9 @@
 					const imgNames = [`${name}.jpg`, `${name}.png`, 'topo.jpg'];
 					for (const imgName of imgNames) {
 						try {
-							const res = await fetch(fileUrl(`${apiPath(path)}/${imgName}`));
+							const res = await fetch(fileUrl(`${path}/${imgName}`));
 							if (res.ok) {
-								userState.topo.image2D = fileUrl(`${apiPath(path)}/${imgName}`);
+								userState.topo.image2D = fileUrl(`${path}/${imgName}`);
 								break;
 							}
 						} catch {
@@ -455,7 +446,7 @@
 						}
 					}
 				}
-            }
+			}
 			await persistTopoSessionImmediately();
 			onComplete(workspace === 'topos/3d/editor' ? 'topos/3d/editor' : undefined);
 		} catch (err) {
@@ -497,10 +488,10 @@
 		userState.topo = { ...userState.topo, ...parsed };
 		initializeIdCounters(userState.topo);
 	}
+
 	async function loadGps(file) {
 		const text = await file.text();
-		const parsed = JSON.parse(text);
-		userState.clustering.gpsData = parsed;
+		userState.clustering.gpsData = JSON.parse(text);
 	}
 </script>
 
@@ -528,10 +519,12 @@
 		/>
 	{/if}
 
-	{#if error}<div
+	{#if error}
+		<div
 			class="p-2 bg-rose-50 text-rose-700 rounded text-body-text font-medium border border-rose-200 flex items-center gap-2"
 		>
 			<i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
 			{error}
-		</div>{/if}
+		</div>
+	{/if}
 </div>

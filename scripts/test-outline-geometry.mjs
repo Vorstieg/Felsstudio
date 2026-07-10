@@ -7,7 +7,7 @@ import {
 	movePathVertex,
 	removePathVertex,
 	translatePath
-} from '../src/lib/assets/js/path-geometry.js';
+} from '$lib/assets/js/path-geometry.js';
 
 const open = [
 	[0, 0],

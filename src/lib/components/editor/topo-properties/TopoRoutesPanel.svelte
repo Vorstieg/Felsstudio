@@ -2,14 +2,14 @@
 	import { userState } from '$lib/state/editor.svelte.js';
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
 	import { _ } from 'svelte-i18n';
-	import { availableRouteTags, calculateRouteLength, convertRouteType } from '$lib/assets/js/topo-utils.js';
+	import { availableRouteTags, convertRouteType } from '$lib/assets/js/topo-utils.js';
 	import GradeSelector from './GradeSelector.svelte';
 	import { snapToBiggestHeight } from '$lib/assets/js/resize.js';
 	import {
-		addGpxAsset,
+		addPathAsset,
 		createVariant,
-		getGpxAssets,
-		removeGpxAsset,
+		getPathAssets,
+		removePathAsset,
 		routeLineStyles
 	} from './topo-properties-utils.js';
 	import RouteLength from '$lib/components/editor/topo-properties/RouteLength.svelte';
@@ -20,29 +20,31 @@
 		drawingTarget = $bindable(null),
 		activeTool = $bindable('route'),
 		mobile = false,
-		onGpxUpload = null
+		onPathUpload = null,
+		onPathSelect = null
 	} = $props();
 
 	function selectRoute(route) {
 		if (userState.ui.selectedRouteId === route.id) {
 			userState.ui.selectedRouteId = null;
-			userState.ui.selectedGpxIndex = null;
+			userState.ui.selectedPathIndex = null;
 			drawingTarget = null;
 			return;
 		}
 
 		userState.ui.selectedRouteId = route.id;
-		userState.ui.selectedGpxIndex = null;
+		userState.ui.selectedPathIndex = null;
 		userState.ui.selectedFixpointId = null;
 		drawingTarget = route.type !== 'multi-pitch' && !isTrackOnlyRoute(route) ? { type: 'route', id: route.id } : null;
 		if (mobile) snapToBiggestHeight();
 	}
 
-	function selectGpxAsset(route, index) {
+	function selectPathAsset(route, index) {
 		userState.ui.selectedRouteId = route.id;
-		userState.ui.selectedGpxIndex = index;
+		userState.ui.selectedPathIndex = index;
 		userState.ui.selectedFixpointId = null;
 		drawingTarget = null;
+		onPathSelect?.(route, index);
 		if (mobile) snapToBiggestHeight();
 	}
 
@@ -53,7 +55,7 @@
 		userState.topo.routes.splice(index, 1);
 		if (userState.ui.selectedRouteId === route.id) {
 			userState.ui.selectedRouteId = null;
-			userState.ui.selectedGpxIndex = null;
+			userState.ui.selectedPathIndex = null;
 			drawingTarget = null;
 		}
 	}
@@ -239,48 +241,48 @@
 
 				<div class={mobile ? 'space-y-1' : 'space-y-1'}>
 					<div class="flex items-center justify-between gap-2">
-						<label class="text-ui-label block">GPX Tracks</label>
+						<label class="text-ui-label block">Paths</label>
 						<div class="flex items-center gap-1">
-							{#if onGpxUpload}
+							{#if onPathUpload}
 								<label
 									class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-warm-gray-500 hover:bg-creator-blue hover:text-white transition-none cursor-pointer">
 									Import
 									<input type="file" accept=".gpx,application/gpx+xml" class="hidden"
-									       onchange={(event) => onGpxUpload(route, event)} />
+									       onchange={(event) => onPathUpload(route, event)} />
 								</label>
 							{/if}
 							<button
 								class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-warm-gray-500 hover:bg-creator-blue hover:text-white transition-none"
 								onclick={() => {
-									addGpxAsset(route);
-									selectGpxAsset(route, (route.assets?.gpx || []).length - 1);
+									addPathAsset(route);
+									selectPathAsset(route, (route.assets?.paths || []).length - 1);
 								}}
 							>
 								+ Add
 							</button>
 						</div>
 					</div>
-					{#if getGpxAssets(route).length === 0}
-						<p class="text-micro-data text-warm-gray-400">No GPX tracks attached.</p>
+					{#if getPathAssets(route).length === 0}
+						<p class="text-micro-data text-warm-gray-400">No paths attached.</p>
 					{/if}
 					<div class="space-y-1">
-						{#each route.assets?.gpx || [] as gpx, gpxIndex}
+						{#each route.assets?.paths || [] as pathAsset, pathIndex}
 							<div
-								class={`grid grid-cols-12 gap-1 rounded-sm border p-1 cursor-pointer ${userState.ui.selectedRouteId === route.id && userState.ui.selectedGpxIndex === gpxIndex ? 'border-creator-blue bg-creator-blue/5' : 'border-black/10 bg-white'}`}
-								onclick={() => selectGpxAsset(route, gpxIndex)}
+								class={`grid grid-cols-12 gap-1 rounded-sm border p-1 cursor-pointer ${userState.ui.selectedRouteId === route.id && userState.ui.selectedPathIndex === pathIndex ? 'border-creator-blue bg-creator-blue/5' : 'border-black/10 bg-white'}`}
+								onclick={() => selectPathAsset(route, pathIndex)}
 							>
-								<select bind:value={gpx.role}
+								<select bind:value={pathAsset.role}
 								        class="col-span-4 rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none">
 									<option value="approach">Approach</option>
 									<option value="main">Main</option>
 									<option value="descent">Descent</option>
 									<option value="variant">Variant</option>
 								</select>
-								<input bind:value={gpx.label}
+								<input bind:value={pathAsset.label}
 								       class="col-span-7 rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none"
 								       placeholder="Label" />
 								<button
-									onclick={(event) => { event.stopPropagation(); removeGpxAsset(route, gpxIndex); if (userState.ui.selectedRouteId === route.id && userState.ui.selectedGpxIndex === gpxIndex) userState.ui.selectedGpxIndex = null; }}
+									onclick={(event) => { event.stopPropagation(); removePathAsset(route, pathIndex); if (userState.ui.selectedRouteId === route.id && userState.ui.selectedPathIndex === pathIndex) userState.ui.selectedPathIndex = null; }}
 									class="col-span-1 text-warm-gray-300 hover:text-rose-600 transition-none">
 									<i class="fa-solid fa-xmark text-[10px]"></i>
 								</button>

@@ -21,47 +21,51 @@ export function parseAssetList(value) {
 		.filter(Boolean);
 }
 
-export function getGpxAssets(item) {
-	const gpx = item.assets?.gpx;
-	if (!gpx) return [];
-	const list = Array.isArray(gpx) ? gpx : [gpx];
+export function getPathAssets(item) {
+	const paths = item.assets?.paths;
+	if (!paths) return [];
+	const list = Array.isArray(paths) ? paths : [paths];
 	return list.map((asset) => {
-		if (typeof asset === 'string') return { role: 'main', label: '', path: asset };
-		return { role: asset.role || 'main', label: asset.label || '', path: asset.path || '' };
+		return {
+			role: asset.role || 'main',
+			label: asset.label || '',
+			path: asset.path || null
+		};
 	});
 }
 
-export function setGpxAssets(item, value) {
+export function setPathAssets(item, value) {
 	item.assets = {
 		...(item.assets || {}),
-		gpx: parseAssetList(value).map((path) => ({ role: 'main', label: '', path }))
+		paths: parseAssetList(value).map(() => ({ role: 'main', label: '', path: null }))
 	};
 }
 
-export function ensureGpxAssets(item) {
+export function ensurePathAssets(item) {
 	item.assets = item.assets || {};
-	const gpx = item.assets.gpx;
-	const list = gpx ? (Array.isArray(gpx) ? gpx : [gpx]) : [];
-	item.assets.gpx = list.map((asset) => {
-		if (typeof asset === 'string') return { role: 'main', label: '', path: asset };
-		asset.role = asset.role || 'main';
-		asset.label = asset.label || '';
-		asset.path = asset.path || '';
-		return asset;
+	const paths = item.assets.paths;
+	const list = paths ? (Array.isArray(paths) ? paths : [paths]) : [];
+	item.assets.paths = list.map((asset) => {
+		return {
+			...asset,
+			role: asset.role || 'main',
+			label: asset.label || '',
+			path: asset.path || null
+		};
 	});
-	return item.assets.gpx;
+	return item.assets.paths;
 }
 
-export function addGpxAsset(item) {
-	const gpx = ensureGpxAssets(item);
-	gpx.push({ role: 'main', label: '', path: '' });
-	item.assets.gpx = [...gpx];
+export function addPathAsset(item) {
+	const paths = ensurePathAssets(item);
+	paths.push({ role: 'main', label: '', path: null });
+	item.assets.paths = [...paths];
 }
 
-export function removeGpxAsset(item, index) {
-	const gpx = ensureGpxAssets(item);
-	gpx.splice(index, 1);
-	item.assets.gpx = [...gpx];
+export function removePathAsset(item, index) {
+	const paths = ensurePathAssets(item);
+	paths.splice(index, 1);
+	item.assets.paths = [...paths];
 }
 
 export function createVariant(route) {

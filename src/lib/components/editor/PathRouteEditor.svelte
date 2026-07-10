@@ -7,7 +7,7 @@
 	import { draftsState } from '$lib/state/drafts.svelte.js';
 	import { viewport } from '$lib/state/viewport.svelte.js';
 	import { generateRouteId } from '$lib/assets/js/id-utils.js';
-	import { readFile, writeFile, writeJson } from '$lib/api/felslager.js';
+	import { writeJson } from '$lib/api/felslager.js';
 	import { authState } from '$lib/api/auth.svelte.js';
 	import SaveStatus from '$lib/components/ui/SaveStatus.svelte';
 	import TopoRoutesPanel from '$lib/components/editor/topo-properties/TopoRoutesPanel.svelte';
@@ -15,7 +15,7 @@
 	import MapSearch from '$lib/components/editor/MapSearch.svelte';
 	import { initMapPointDragHandlers } from '$lib/components/editor/map-point-drag-handlers.js';
 	import { useTrackDrawing } from '$lib/components/editor/track/use-track-drawing.svelte.js';
-	import { parseGpx, gpxXmlFromCoordinates	 } from '$lib/assets/js/gpx-utils.js';
+	import { coordinatesToPathGeoJson, parseGpx, pathGeoJsonToCoordinates } from '$lib/assets/js/route-path-utils.js';
 	import {
 		fitCoordinatesBounds,
 		reverseCoordinates,
@@ -23,7 +23,6 @@
 		trimCoordinatesEnd,
 		trimCoordinatesStart
 	} from '$lib/assets/js/track-geometry-utils.js';
-	import { slugifyName } from '$lib/components/editor/crag/crag-editor-paths.js';
 
 	let saveStatus = $state('idle');
 	let saveError = $state('');
@@ -51,16 +50,16 @@
 
 	const routeMainCoordinates = new WeakMap();
 	const assetCoordinates = new Map();
-	let gpxAssetKeyCounter = 1;
+	let pathAssetKeyCounter = 1;
 	let isPersistingDraft = false;
 
 	const trackDrawing = useTrackDrawing({
 		initialMode: 'routing',
 		onPointsChange: (coordinates) => {
 			if (!selectedRoute) return;
-			const asset = selectedGpxAsset || createGpxAsset(selectedRoute, selectedRoute.name || 'Track');
+			const asset = selectedPathAsset || createPathAsset(selectedRoute, selectedRoute.name || 'Track');
 			setAssetCoordinates(asset, coordinates);
-			markRouteGpxStale(selectedRoute);
+			syncRoutePathData(selectedRoute);
 			if (coordinates[0]) userState.topo.coordinates = coordinates[0];
 			scheduleMapSync();
 		}
@@ -70,7 +69,7 @@
 	let selectedRoute = $derived(
 		(userState.topo.routes || []).find((route) => route.id === userState.ui.selectedRouteId)
 	);
-	let selectedGpxAsset = $derived(selectedRoute?.assets?.gpx?.[userState.ui.selectedGpxIndex ?? -1] || null);
+	let selectedPathAsset = $derived(selectedRoute?.assets?.paths?.[userState.ui.selectedPathIndex ?? -1] || null);
 	let isExpanded = $derived(viewport.isExpanded);
 
 	onMount(() => {
@@ -80,14 +79,14 @@
 		};
 		void (async () => {
 			draftsState.init();
-			if (!userState.ui.activeDraftId && isBlankGpxSession(userState.topo)) {
-				const latest = await draftsState.getLatest('gpx');
+			if (!userState.ui.activeDraftId && isBlankPathSession(userState.topo)) {
+				const latest = await draftsState.getLatest('path');
 				if (latest) restoreSession(latest.session, latest.id);
 			}
-			userState.topo.editorMode = 'gpx';
-			userState.ui.workspace = 'topos/gpx/editor';
+			userState.topo.editorMode = 'path';
+			userState.ui.workspace = 'topos/path/editor';
 			if (!Array.isArray(userState.topo.routes)) userState.topo.routes = [];
-			await loadExistingGpxAssets();
+			await loadEmbeddedPaths();
 			await persistDraftImmediately();
 			if (!disposed) canAutosave = true;
 		})();
@@ -109,34 +108,32 @@
 			geometryMode: 'track',
 			tags: [],
 			track: { coordinates: [] },
-			assets: { gpx: [{ role: 'main', label: '', path: '' }] },
+			assets: { paths: [{ role: 'main', label: '', path: null }] },
 			topo: { enabled: false, topoId: null }
 		};
 		userState.topo.routes = [...(userState.topo.routes || []), route];
 		userState.ui.selectedRouteId = route.id;
-		userState.ui.selectedGpxIndex = 0;
+		userState.ui.selectedPathIndex = 0;
 		activeTool = 'draw';
 		drawMode = 'routing';
 		trackDrawing.clear(drawMode);
 		scheduleMapSync();
 	}
 
-	function ensureGpxRouteShape(route) {
+	function ensurePathRouteShape(route) {
 		if (!route) return;
 		if (!route.track) route.track = { coordinates: [], pointCount: 0 };
 		if (!Array.isArray(route.track.coordinates)) route.track.coordinates = [];
 		if (!Number.isFinite(route.track.pointCount)) route.track.pointCount = route.track.coordinates.length;
 		if (!route.geometryMode) route.geometryMode = 'track';
 		if (!route.topo) route.topo = { enabled: false, topoId: null };
-		if (!route.assets) route.assets = { gpx: [] };
-		if (!Array.isArray(route.assets.gpx)) route.assets.gpx = route.assets.gpx ? [route.assets.gpx] : [];
-		if (route.assets.gpx.some((asset) => typeof asset === 'string')) {
-			route.assets.gpx = route.assets.gpx.map((asset) =>
-				typeof asset === 'string'
-					? { role: 'main', label: pathBasename(asset).replace(/\.gpx$/i, ''), path: asset }
-					: asset
-			);
-		}
+		if (!route.assets) route.assets = { paths: [] };
+		if (!Array.isArray(route.assets.paths)) route.assets.paths = route.assets.paths ? [route.assets.paths] : [];
+		route.assets.paths = route.assets.paths.map((asset) => ({
+			role: asset.role || 'main',
+			label: asset.label || '',
+			path: asset.path || null
+		}));
 	}
 
 	function cloneCoordinates(coordinates = []) {
@@ -144,10 +141,10 @@
 	}
 
 	function setRouteMainCoordinates(route, coordinates = []) {
-		ensureGpxRouteShape(route);
+		ensurePathRouteShape(route);
 		routeMainCoordinates.set(route, coordinates);
 		route.track.pointCount = coordinates.length;
-		// Keep large GPX arrays out of Svelte state. They are persisted from the
+		// Keep large path arrays out of Svelte state. They are persisted from the
 		// non-reactive geometry store on save instead.
 		route.track.coordinates = [];
 	}
@@ -155,43 +152,39 @@
 	function getRouteMainCoordinates(route) {
 		if (!route) return [];
 		if (routeMainCoordinates.has(route)) return routeMainCoordinates.get(route) || [];
-		ensureGpxRouteShape(route);
-		const coordinates = Array.isArray(route.track.coordinates) ? cloneCoordinates(route.track.coordinates) : [];
-		setRouteMainCoordinates(route, coordinates);
-		return coordinates;
+		return Array.isArray(route.track?.coordinates) ? cloneCoordinates(route.track.coordinates) : [];
 	}
 
 	function ensureAssetKey(asset) {
 		if (!asset) return null;
-		asset._gpxKey = asset._gpxKey || `gpx-${Date.now()}-${gpxAssetKeyCounter++}`;
-		return asset._gpxKey;
+		asset._pathKey = asset._pathKey || `path-${Date.now()}-${pathAssetKeyCounter++}`;
+		return asset._pathKey;
 	}
 
 	function assetCoordinateKey(asset) {
-		return asset?._gpxKey || null;
+		return asset?._pathKey || null;
 	}
 
 	function setAssetCoordinates(asset, coordinates = []) {
 		if (!asset) return;
-		assetCoordinates.set(ensureAssetKey(asset), coordinates);
+		assetCoordinates.set(ensureAssetKey(asset), cloneCoordinates(coordinates));
 		asset._pointCount = coordinates.length;
+		asset.path = coordinates.length > 1 ? coordinatesToPathGeoJson(coordinates) : null;
 		delete asset._coordinates;
 		geometryRevision += 1;
 	}
 
-	function createGpxAsset(route, label = 'Track', content = null) {
-		ensureGpxRouteShape(route);
-		const slugifiedLabel = slugifyName(label);
-		const asset = { role: 'main', label: slugifiedLabel, path: slugifiedLabel };
-		if (content) asset._content = content;
-		route.assets.gpx = [...(route.assets.gpx || []), asset];
+	function createPathAsset(route, label = 'Track') {
+		ensurePathRouteShape(route);
+		const asset = { role: 'main', label: String(label || 'Track'), path: null };
+		route.assets.paths = [...(route.assets.paths || []), asset];
 		userState.ui.selectedRouteId = route.id;
-		userState.ui.selectedGpxIndex = route.assets.gpx.length - 1;
+		userState.ui.selectedPathIndex = route.assets.paths.length - 1;
 		return asset;
 	}
 
-	function selectedGpxCoordinates() {
-		return getAssetCoordinates(selectedGpxAsset);
+	function selectedPathCoordinates() {
+		return getAssetCoordinates(selectedPathAsset);
 	}
 
 	function getAssetCoordinates(asset) {
@@ -201,11 +194,14 @@
 		return Array.isArray(asset._coordinates) ? cloneCoordinates(asset._coordinates) : [];
 	}
 
-	function gpxSegmentsForRoute(route) {
+	function assetHasCoordinates(asset) {
+		return getAssetCoordinates(asset).length > 1 || pathGeoJsonToCoordinates(asset?.path).length > 1;
+	}
+
+	function pathSegmentsForRoute(route) {
 		if (!route) return [];
-		ensureGpxRouteShape(route);
 		const assetSegments = [];
-		for (const [segmentIndex, asset] of (route.assets?.gpx || []).entries()) {
+		for (const [segmentIndex, asset] of (route.assets?.paths || []).entries()) {
 			const coordinates = getAssetCoordinates(asset);
 			if (coordinates.length > 1) assetSegments.push({ segmentIndex, coordinates });
 		}
@@ -214,28 +210,31 @@
 	}
 
 	function firstRouteCoordinates(route) {
-		if (route?.id === selectedRoute?.id && selectedGpxAsset) return selectedGpxCoordinates();
-		return gpxSegmentsForRoute(route)[0]?.coordinates || [];
+		if (route?.id === selectedRoute?.id && selectedPathAsset) return selectedPathCoordinates();
+		return pathSegmentsForRoute(route)[0]?.coordinates || [];
 	}
 
-	function markRouteGpxStale(route) {
-		for (const asset of route?.assets?.gpx || []) delete asset._content;
+	function syncRoutePathData(route) {
+		for (const asset of route?.assets?.paths || []) {
+			const coordinates = getAssetCoordinates(asset);
+			asset.path = coordinates.length > 1 ? coordinatesToPathGeoJson(coordinates) : null;
+		}
 	}
 
-	function isBlankGpxSession(topo) {
+	function isBlankPathSession(topo) {
 		return !topo?.name && !topo?._entryPath && (topo?.routes || []).length === 0;
 	}
 
 	function restoreSession(session, id) {
 		userState.reset();
-		const topo = session.topo || session;
-		userState.topo = topo;
+		userState.topo = session.topo || session;
 		userState.ui.activeDraftId = id;
-		userState.ui.workspace = 'topos/gpx/editor';
+		userState.ui.workspace = 'topos/path/editor';
 		for (const route of userState.topo.routes || []) {
-			ensureGpxRouteShape(route);
-			for (const asset of route.assets.gpx || []) {
+			ensurePathRouteShape(route);
+			for (const asset of route.assets.paths || []) {
 				if (Array.isArray(asset._coordinates)) setAssetCoordinates(asset, cloneCoordinates(asset._coordinates));
+				else if (asset.path) setAssetCoordinates(asset, pathGeoJsonToCoordinates(asset.path));
 			}
 		}
 	}
@@ -243,26 +242,27 @@
 	function topoSnapshotForDraft() {
 		const topo = $state.snapshot(userState.topo);
 		for (const route of topo.routes || []) {
-			ensureGpxRouteShape(route);
-			for (const asset of route.assets.gpx || []) {
+			ensurePathRouteShape(route);
+			for (const [index, asset] of (route.assets.paths || []).entries()) {
 				const sourceRoute = (userState.topo.routes || []).find((item) => item.id === route.id);
-				const index = route.assets.gpx.indexOf(asset);
-				const sourceAsset = sourceRoute?.assets?.gpx?.[index];
+				const sourceAsset = sourceRoute?.assets?.paths?.[index];
 				const coordinates = getAssetCoordinates(sourceAsset);
-				if (coordinates.length > 0) asset._coordinates = cloneCoordinates(coordinates);
+				if (coordinates.length > 0) {
+					asset._coordinates = cloneCoordinates(coordinates);
+					asset.path = coordinatesToPathGeoJson(coordinates);
+				}
 			}
 		}
 		return topo;
 	}
 
 	async function persistDraftImmediately() {
-		if (isPersistingDraft || isBlankGpxSession(userState.topo)) return;
+		if (isPersistingDraft || isBlankPathSession(userState.topo)) return;
 		isPersistingDraft = true;
 		try {
 			const snapshot = topoSnapshotForDraft();
-			snapshot.editorMode = 'gpx';
-			const id = await draftsState.save(snapshot, userState.ui.activeDraftId);
-			userState.ui.activeDraftId = id;
+			snapshot.editorMode = 'path';
+			userState.ui.activeDraftId = await draftsState.save(snapshot, userState.ui.activeDraftId);
 			userState.ui.lastSaved = new Date().toISOString();
 		} finally {
 			isPersistingDraft = false;
@@ -286,18 +286,18 @@
 			return;
 		}
 		if (activeTool === 'select' && map) {
-			const features = map.queryRenderedFeatures(event.point, { layers: ['gpx-route-points', 'gpx-route-lines'] });
+			const features = map.queryRenderedFeatures(event.point, { layers: ['path-route-points', 'path-route-lines'] });
 			const feature = features.find((item) => item.properties?.routeId);
 			if (feature) {
 				userState.ui.selectedRouteId = feature.properties.routeId;
-				userState.ui.selectedGpxIndex = Number(feature.properties.segmentIndex) || 0;
+				userState.ui.selectedPathIndex = Number(feature.properties.segmentIndex) || 0;
 				trimPointIndex = Number(feature.properties.index) || 0;
 			}
 			return;
 		}
 		if (activeTool !== 'draw') return;
 		if (!selectedRoute) return;
-		ensureGpxRouteShape(selectedRoute);
+		ensurePathRouteShape(selectedRoute);
 		trackDrawing.mode = drawMode;
 		await trackDrawing.addPoint([event.lngLat.lng, event.lngLat.lat]);
 	}
@@ -319,7 +319,7 @@
 
 	function startDrawing() {
 		if (!selectedRoute) return;
-		const asset = selectedGpxAsset || createGpxAsset(selectedRoute, selectedRoute.name || 'Track');
+		const asset = selectedPathAsset || createPathAsset(selectedRoute, selectedRoute.name || 'Track');
 		trackDrawing.setPoints(getAssetCoordinates(asset), drawMode);
 		activeTool = 'draw';
 	}
@@ -327,8 +327,8 @@
 	function clearTrack() {
 		if (!selectedRoute) return;
 		trackDrawing.clear(drawMode);
-		if (selectedGpxAsset) setAssetCoordinates(selectedGpxAsset, []);
-		markRouteGpxStale(selectedRoute);
+		if (selectedPathAsset) setAssetCoordinates(selectedPathAsset, []);
+		syncRoutePathData(selectedRoute);
 		trimPointIndex = 0;
 		scheduleMapSync();
 	}
@@ -346,21 +346,21 @@
 
 	function reverseSelectedTrack() {
 		if (!canEditSelectedTrack()) return;
-		const coordinates = reverseCoordinates(selectedGpxCoordinates());
-		setAssetCoordinates(selectedGpxAsset, coordinates);
-		markRouteGpxStale(selectedRoute);
+		const coordinates = reverseCoordinates(selectedPathCoordinates());
+		setAssetCoordinates(selectedPathAsset, coordinates);
+		syncRoutePathData(selectedRoute);
 		trimPointIndex = Math.max(0, coordinates.length - 1 - normalizedTrimIndex());
 		scheduleMapSync();
 	}
 
 	function trimSelectedTrackStart() {
 		if (!canEditSelectedTrack()) return;
-		const coordinates = selectedGpxCoordinates();
+		const coordinates = selectedPathCoordinates();
 		const index = normalizedTrimIndex();
 		if (index <= 0 || coordinates.length - index < 2) return;
 		const trimmed = trimCoordinatesStart(coordinates, index);
-		setAssetCoordinates(selectedGpxAsset, trimmed);
-		markRouteGpxStale(selectedRoute);
+		setAssetCoordinates(selectedPathAsset, trimmed);
+		syncRoutePathData(selectedRoute);
 		trimPointIndex = 0;
 		userState.topo.coordinates = trimmed[0];
 		scheduleMapSync();
@@ -368,19 +368,19 @@
 
 	function trimSelectedTrackEnd() {
 		if (!canEditSelectedTrack()) return;
-		const coordinates = selectedGpxCoordinates();
+		const coordinates = selectedPathCoordinates();
 		const index = normalizedTrimIndex();
 		if (index >= coordinates.length - 1 || index < 1) return;
 		const trimmed = trimCoordinatesEnd(coordinates, index);
-		setAssetCoordinates(selectedGpxAsset, trimmed);
-		markRouteGpxStale(selectedRoute);
+		setAssetCoordinates(selectedPathAsset, trimmed);
+		syncRoutePathData(selectedRoute);
 		trimPointIndex = trimmed.length - 1;
 		scheduleMapSync();
 	}
 
 	function simplifySelectedTrack() {
-		if (!canEditSelectedTrack() || !selectedGpxAsset) return;
-		const coordinates = selectedGpxCoordinates();
+		if (!canEditSelectedTrack() || !selectedPathAsset) return;
+		const coordinates = selectedPathCoordinates();
 		const tolerance = Math.max(1, Number(simplifyToleranceMeters) || 0);
 		const simplified = simplifyTrackCoordinates(coordinates, tolerance);
 
@@ -389,8 +389,8 @@
 			return;
 		}
 
-		setAssetCoordinates(selectedGpxAsset, simplified);
-		markRouteGpxStale(selectedRoute);
+		setAssetCoordinates(selectedPathAsset, simplified);
+		syncRoutePathData(selectedRoute);
 		trimPointIndex = Math.min(trimPointIndex, simplified.length - 1);
 		simplifySummary = `${coordinates.length} → ${simplified.length} points at ${tolerance} m tolerance.`;
 		scheduleMapSync();
@@ -452,10 +452,10 @@
 
 	function confirmCut() {
 		if (!selectedRoute || !pendingCut) return;
-		ensureGpxRouteShape(selectedRoute);
-		const segmentLabel = `${selectedRoute.name || 'Track'} segment ${(selectedRoute.assets.gpx || []).length + 1}`;
-		const selectedIndex = userState.ui.selectedGpxIndex ?? 0;
-		const firstAsset = selectedGpxAsset || selectedRoute.assets.gpx[selectedIndex] || {
+		ensurePathRouteShape(selectedRoute);
+		const segmentLabel = `${selectedRoute.name || 'Track'} segment ${(selectedRoute.assets.paths || []).length + 1}`;
+		const selectedIndex = userState.ui.selectedPathIndex ?? 0;
+		const firstAsset = selectedPathAsset || selectedRoute.assets.paths[selectedIndex] || {
 			role: 'main',
 			label: selectedRoute.name || 'Track',
 			path: ''
@@ -463,12 +463,11 @@
 		const nextAsset = { role: firstAsset.role || 'main', label: segmentLabel, path: segmentLabel };
 		setAssetCoordinates(firstAsset, pendingCut.startCoordinates);
 		setAssetCoordinates(nextAsset, pendingCut.endCoordinates);
-		delete firstAsset._content;
-		selectedRoute.assets.gpx = [
-			...(selectedRoute.assets.gpx || []).slice(0, selectedIndex),
+		selectedRoute.assets.paths = [
+			...(selectedRoute.assets.paths || []).slice(0, selectedIndex),
 			firstAsset,
 			nextAsset,
-			...(selectedRoute.assets.gpx || []).slice(selectedIndex + 1)
+			...(selectedRoute.assets.paths || []).slice(selectedIndex + 1)
 		];
 		trimPointIndex = 0;
 		activeTool = 'select';
@@ -498,21 +497,21 @@
 	}
 
 	function coordinatesForSegment(route, segmentIndex) {
-		const asset = route?.assets?.gpx?.[segmentIndex];
+		const asset = route?.assets?.paths?.[segmentIndex];
 		const coordinates = getAssetCoordinates(asset);
 		return coordinates.length > 0 ? coordinates : getRouteMainCoordinates(route);
 	}
 
 	function moveSelectedRoutePoint(segmentIndex, pointIndex, coordinate) {
 		if (!selectedRoute) return false;
-		const asset = selectedRoute.assets?.gpx?.[segmentIndex];
+		const asset = selectedRoute.assets?.paths?.[segmentIndex];
 		const assetSegment = getAssetCoordinates(asset);
 		const coordinates = assetSegment.length > 0 ? assetSegment : getRouteMainCoordinates(selectedRoute);
 		if (!coordinates[pointIndex]) return false;
 		coordinates[pointIndex] = coordinate;
 		if (assetSegment.length > 0) setAssetCoordinates(asset, coordinates);
 		else setRouteMainCoordinates(selectedRoute, coordinates);
-		markRouteGpxStale(selectedRoute);
+		syncRoutePathData(selectedRoute);
 		rebuildPendingCut();
 		return true;
 	}
@@ -553,7 +552,7 @@
 	}
 
 	function syncDragOverlayData() {
-		const source = map?.getSource('gpx-route-drag-overlay');
+		const source = map?.getSource('path-route-drag-overlay');
 		if (!source) return;
 		source.setData(dragOverlayFeatures(activeTrackDragState));
 	}
@@ -585,7 +584,7 @@
 	}
 
 	function syncCutOverlayData() {
-		const source = map?.getSource('gpx-cut-overlay');
+		const source = map?.getSource('path-cut-overlay');
 		if (!source) return;
 		source.setData(cutOverlayFeatures());
 	}
@@ -604,17 +603,17 @@
 
 		initMapPointDragHandlers({
 			map,
-			layers: ['gpx-route-points', 'gpx-cut-points'],
+			layers: ['path-route-points', 'path-cut-points'],
 			canDrag: (event, layerId) => {
 				const feature = event?.features?.[0];
-				return layerId === 'gpx-route-points'
+				return layerId === 'path-route-points'
 					? Boolean(feature?.properties?.selected)
 					: Boolean(feature?.properties?.cut);
 			},
 			getDragState: (event, layerId) => {
 				const feature = event.features?.[0];
 				if (!feature) return null;
-				if (layerId === 'gpx-cut-points') return { type: 'cut', pointId: feature.properties.id };
+				if (layerId === 'path-cut-points') return { type: 'cut', pointId: feature.properties.id };
 				return {
 					type: 'track',
 					segmentIndex: Number(feature.properties.segmentIndex) || 0,
@@ -640,7 +639,7 @@
 					pendingCut = null;
 					syncCutOverlayData();
 				} else if (activeTrackDragState) {
-					// Do not mutate the full GPX coordinate array while dragging. Only the
+					// Do not mutate the full path coordinate array while dragging. Only the
 					// lightweight overlay source changes on pointer move.
 					activeTrackDragState.coordinate = coordinate;
 					syncDragOverlayData();
@@ -673,6 +672,15 @@
 		fitCoordinatesBounds(map, coordinates, { maxZoom: 15 });
 	}
 
+	function focusSelectedPath(route, pathIndex) {
+		const asset = route?.assets?.paths?.[pathIndex];
+		const coordinates = getAssetCoordinates(asset);
+		if (!map || coordinates.length < 2) return;
+		const runFit = () => fitRouteBounds(coordinates);
+		if (map.loaded?.()) requestAnimationFrame(runFit);
+		else map.once('idle', runFit);
+	}
+
 	function preferredRouteCoordinates() {
 		const selectedCoordinates = firstRouteCoordinates(selectedRoute);
 		if (selectedCoordinates.length > 1) return selectedCoordinates;
@@ -693,7 +701,7 @@
 		else map.once('idle', runFit);
 	}
 
-	async function handleGpxUpload(route, event) {
+	async function handlePathUpload(route, event) {
 		const file = event.currentTarget.files?.[0];
 		event.currentTarget.value = '';
 		if (!file || !route) return;
@@ -701,14 +709,27 @@
 		try {
 			const fileText = await file.text();
 			const coordinates = parseGpx(fileText);
-			if (coordinates.length < 2) throw new Error('GPX file does not contain a usable track.');
+			if (coordinates.length < 2) throw new Error('GPX file does not contain a usable path.');
 
 			userState.ui.selectedRouteId = route.id;
-			ensureGpxRouteShape(route);
-			const label = route.name || file.name.replace(/\.gpx$/i, '');
+			ensurePathRouteShape(route);
+			const label = route.name || file.name.replace(/\.[^.]+$/i, '');
 			route.name = route.name || label;
-			const asset = createGpxAsset(route, label, fileText);
+			const selectedIndex = userState.ui.selectedRouteId === route.id ? (userState.ui.selectedPathIndex ?? -1) : -1;
+			const selectedAsset = selectedIndex >= 0 ? route.assets.paths?.[selectedIndex] : null;
+			let asset = selectedAsset && !assetHasCoordinates(selectedAsset) ? selectedAsset : null;
+			let assetIndex = selectedIndex;
+			if (!asset) {
+				assetIndex = (route.assets.paths || []).findIndex((item) => !assetHasCoordinates(item));
+				asset = assetIndex >= 0 ? route.assets.paths[assetIndex] : null;
+			}
+			if (!asset) {
+				asset = createPathAsset(route, label);
+				assetIndex = (route.assets.paths || []).length - 1;
+			}
+			asset.label = asset.label || label;
 			setAssetCoordinates(asset, coordinates);
+			userState.ui.selectedPathIndex = assetIndex >= 0 ? assetIndex : userState.ui.selectedPathIndex;
 			userState.topo.coordinates = coordinates[0];
 			trimPointIndex = 0;
 			activeTool = 'select';
@@ -733,13 +754,13 @@
 	}
 
 	function lineFeature(route, segmentIndex, segment, selected, part = null) {
-		const gpx = route.assets?.gpx?.[segmentIndex];
+		const pathAsset = route.assets?.paths?.[segmentIndex];
 		return {
 			type: 'Feature',
 			properties: {
 				id: `${route.id}:${segmentIndex}`,
 				routeId: route.id,
-				name: gpx?.label || route.name || route.id,
+				name: pathAsset?.label || route.name || route.id,
 				segmentIndex,
 				selected,
 				...(part ? { part } : {})
@@ -766,8 +787,8 @@
 	function routeFeatures() {
 		const features = [];
 		for (const route of userState.topo.routes || []) {
-			for (const { segmentIndex, coordinates: segment } of gpxSegmentsForRoute(route)) {
-				const selected = route.id === userState.ui.selectedRouteId && segmentIndex === (userState.ui.selectedGpxIndex ?? -1);
+			for (const { segmentIndex, coordinates: segment } of pathSegmentsForRoute(route)) {
+				const selected = route.id === userState.ui.selectedRouteId && segmentIndex === (userState.ui.selectedPathIndex ?? -1);
 				features.push(...routeLineFeatures(route, segmentIndex, segment, selected));
 				if (!selected) continue;
 				for (const [index, coordinate] of visiblePointEntries(segment)) {
@@ -789,20 +810,20 @@
 
 	function initMap(loadedMap = map) {
 		map = loadedMap;
-		if (!map.getSource('gpx-routes')) {
-			map.addSource('gpx-routes', { type: 'geojson', data: routeFeatures() });
+		if (!map.getSource('path-routes')) {
+			map.addSource('path-routes', { type: 'geojson', data: routeFeatures() });
 		}
-		if (!map.getSource('gpx-route-drag-overlay')) {
-			map.addSource('gpx-route-drag-overlay', { type: 'geojson', data: dragOverlayFeatures(null) });
+		if (!map.getSource('path-route-drag-overlay')) {
+			map.addSource('path-route-drag-overlay', { type: 'geojson', data: dragOverlayFeatures(null) });
 		}
-		if (!map.getSource('gpx-cut-overlay')) {
-			map.addSource('gpx-cut-overlay', { type: 'geojson', data: cutOverlayFeatures() });
+		if (!map.getSource('path-cut-overlay')) {
+			map.addSource('path-cut-overlay', { type: 'geojson', data: cutOverlayFeatures() });
 		}
-		if (!map.getLayer('gpx-route-lines')) {
+		if (!map.getLayer('path-route-lines')) {
 			map.addLayer({
-				id: 'gpx-route-lines',
+				id: 'path-route-lines',
 				type: 'line',
-				source: 'gpx-routes',
+				source: 'path-routes',
 				filter: ['all', ['==', ['geometry-type'], 'LineString'], ['!=', ['get', 'cutPreview'], true]],
 				paint: {
 					'line-color': ['case', ['==', ['get', 'selected'], true], '#2563eb', '#dc2626'],
@@ -811,11 +832,11 @@
 				}
 			});
 		}
-		if (!map.getLayer('gpx-cut-line')) {
+		if (!map.getLayer('path-cut-line')) {
 			map.addLayer({
-				id: 'gpx-cut-line',
+				id: 'path-cut-line',
 				type: 'line',
-				source: 'gpx-cut-overlay',
+				source: 'path-cut-overlay',
 				filter: ['==', ['get', 'cutPreview'], true],
 				paint: {
 					'line-color': '#f59e0b',
@@ -824,11 +845,11 @@
 				}
 			});
 		}
-		if (!map.getLayer('gpx-cut-points')) {
+		if (!map.getLayer('path-cut-points')) {
 			map.addLayer({
-				id: 'gpx-cut-points',
+				id: 'path-cut-points',
 				type: 'circle',
-				source: 'gpx-cut-overlay',
+				source: 'path-cut-overlay',
 				filter: ['any', ['==', ['get', 'cut'], true], ['==', ['get', 'cutIntersection'], true]],
 				paint: {
 					'circle-radius': ['case', ['==', ['get', 'cutIntersection'], true], 6, 7],
@@ -838,11 +859,11 @@
 				}
 			});
 		}
-		if (!map.getLayer('gpx-route-points')) {
+		if (!map.getLayer('path-route-points')) {
 			map.addLayer({
-				id: 'gpx-route-points',
+				id: 'path-route-points',
 				type: 'circle',
-				source: 'gpx-routes',
+				source: 'path-routes',
 				filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['get', 'cut'], true], ['!=', ['get', 'cutIntersection'], true]],
 				paint: {
 					'circle-radius': ['case', ['==', ['get', 'selected'], true], 5, 3],
@@ -852,20 +873,20 @@
 				}
 			});
 		}
-		if (!map.getLayer('gpx-route-drag-lines')) {
+		if (!map.getLayer('path-route-drag-lines')) {
 			map.addLayer({
-				id: 'gpx-route-drag-lines',
+				id: 'path-route-drag-lines',
 				type: 'line',
-				source: 'gpx-route-drag-overlay',
+				source: 'path-route-drag-overlay',
 				filter: ['==', ['geometry-type'], 'LineString'],
 				paint: { 'line-color': '#2563eb', 'line-width': 6, 'line-opacity': 1 }
 			});
 		}
-		if (!map.getLayer('gpx-route-drag-point')) {
+		if (!map.getLayer('path-route-drag-point')) {
 			map.addLayer({
-				id: 'gpx-route-drag-point',
+				id: 'path-route-drag-point',
 				type: 'circle',
-				source: 'gpx-route-drag-overlay',
+				source: 'path-route-drag-overlay',
 				filter: ['==', ['geometry-type'], 'Point'],
 				paint: {
 					'circle-radius': 5,
@@ -884,7 +905,7 @@
 
 	function syncMapData(force = false) {
 		if (activeTrackDragState && !force) return;
-		const source = map?.getSource('gpx-routes');
+		const source = map?.getSource('path-routes');
 		if (!source) return;
 		source.setData(routeFeatures());
 	}
@@ -901,12 +922,14 @@
 	function routeListSignature() {
 		return (userState.topo.routes || [])
 			.map((route) => {
-				const assets = Array.isArray(route.assets?.gpx) ? route.assets.gpx : route.assets?.gpx ? [route.assets.gpx] : [];
+				const assets = Array.isArray(route.assets?.paths)
+					? route.assets.paths
+					: route.assets?.paths
+						? [route.assets.paths]
+						: [];
 				const assetSignature = assets
 					.map((asset) =>
-						typeof asset === 'string'
-							? asset
-							: `${asset.role || ''}:${asset.label || ''}:${asset.path || ''}:${asset._pointCount || 0}`
+						`${asset.role || ''}:${asset.label || ''}:${asset.path?.coordinates?.length || 0}:${asset._pointCount || 0}`
 					)
 					.join(',');
 				return `${route.id}:${route.name || ''}:${route.track?.pointCount || 0}:${assetSignature}`;
@@ -917,7 +940,7 @@
 	$effect(() => {
 		routeListSignature();
 		userState.ui.selectedRouteId;
-		userState.ui.selectedGpxIndex;
+		userState.ui.selectedPathIndex;
 		if (!isMapLoaded || !map) return;
 		untrack(scheduleMapSync);
 	});
@@ -925,12 +948,12 @@
 	let lastFocusedSelectionKey = null;
 	$effect(() => {
 		const routeId = userState.ui.selectedRouteId;
-		const gpxIndex = userState.ui.selectedGpxIndex;
+		const pathIndex = userState.ui.selectedPathIndex;
 		geometryRevision;
 		if (!isMapLoaded || !map || !routeId) return;
-		const selectionKey = `${routeId}:${gpxIndex ?? ''}`;
+		const selectionKey = `${routeId}:${pathIndex ?? ''}`;
 		if (selectionKey === lastFocusedSelectionKey) return;
-		const coordinates = selectedGpxCoordinates().length > 1 ? selectedGpxCoordinates() : firstRouteCoordinates(selectedRoute);
+		const coordinates = selectedPathCoordinates().length > 1 ? selectedPathCoordinates() : firstRouteCoordinates(selectedRoute);
 		if (coordinates.length < 2) return;
 		lastFocusedSelectionKey = selectionKey;
 		const runFit = () => fitRouteBounds(coordinates);
@@ -944,7 +967,7 @@
 		userState.topo.name;
 		userState.topo._entryPath;
 		userState.topo.coordinates;
-		if (!canAutosave || isBlankGpxSession(userState.topo)) return;
+		if (!canAutosave || isBlankPathSession(userState.topo)) return;
 		clearTimeout(saveTimeout);
 		saveTimeout = setTimeout(() => {
 			void persistDraftImmediately();
@@ -969,31 +992,20 @@
 		return String(path).split('/').filter(Boolean).at(-1) || '';
 	}
 
-	async function loadExistingGpxAssets() {
-		const basePath = userState.topo._entryPath;
+	async function loadEmbeddedPaths() {
 		pendingInitialFit = true;
-		if (!basePath) {
-			fitLoadedRoutesIfNeeded();
-			return;
-		}
 		for (const route of userState.topo.routes || []) {
-			ensureGpxRouteShape(route);
-			for (const asset of route.assets.gpx || []) {
-				if (!asset.path || getAssetCoordinates(asset).length > 0) continue;
-				try {
-					const text = await (await readFile(`${basePath}/${asset.path}`)).text();
-					const coordinates = parseGpx(text);
-					if (coordinates.length > 1) setAssetCoordinates(asset, coordinates);
-				} catch {
-					// Missing GPX files are non-fatal; keep the route JSON editable.
-				}
+			ensurePathRouteShape(route);
+			for (const asset of route.assets.paths || []) {
+				const coordinates = pathGeoJsonToCoordinates(asset.path);
+				if (coordinates.length > 1) setAssetCoordinates(asset, coordinates);
 			}
 		}
 		if (!userState.ui.selectedRouteId) {
-			const firstRoute = (userState.topo.routes || []).find((route) => (route.assets?.gpx || []).length > 0);
+			const firstRoute = (userState.topo.routes || []).find((route) => (route.assets?.paths || []).length > 0);
 			if (firstRoute) {
 				userState.ui.selectedRouteId = firstRoute.id;
-				userState.ui.selectedGpxIndex = 0;
+				userState.ui.selectedPathIndex = 0;
 			}
 		}
 		scheduleMapSync(true);
@@ -1013,41 +1025,32 @@
 		try {
 			userState.topo.date = userState.topo.date || new Date().toISOString().split('T')[0];
 			userState.topo.updated = new Date().toISOString().split('T')[0];
-			const baseName = pathBasename(savePath) || slugifyName(userState.topo.name, 'routes');
-			const fileName = userState.topo._topoFileName || `${baseName}-routes.json`;
-
-			for (const route of userState.topo.routes || []) {
-				ensureGpxRouteShape(route);
-
-				for (const asset of route.assets.gpx || []) {
-					const coordinates = getAssetCoordinates(asset);
-					if (coordinates.length < 2) continue;
-					const label = asset.label || route.name || 'Track';
-					const slugifiedLabel = slugifyName(label);
-					asset.label = slugifiedLabel;
-					asset.path = slugifiedLabel;
-					const content = asset._content || gpxXmlFromCoordinates(slugifiedLabel, coordinates);
-					await writeFile(`${savePath}/${asset.path}`, content, 'application/gpx+xml');
-				}
-			}
+			const baseName = pathBasename(savePath) || 'topo';
+			const fileName = userState.topo._topoFileName || `${baseName}-topo.json`;
 
 			const data = JSON.parse(JSON.stringify(userState.topo));
 			delete data._entryPath;
 			delete data._topoFileName;
-			data.editorMode = 'gpx';
-			data.routes = (data.routes || []).map((route) => {
+			data.editorMode = 'path';
+			data.routes = (data.routes || []).map((route, routeIndex) => {
+				const sourceRoute = (userState.topo.routes || [])[routeIndex];
+				const sourceAssets = Array.isArray(sourceRoute?.assets?.paths) ? sourceRoute.assets.paths : [];
+				const paths = sourceAssets
+					.map((asset, assetIndex) => {
+						const coordinates = getAssetCoordinates(sourceAssets[assetIndex]);
+						if (coordinates.length < 2) return null;
+						return {
+							role: asset.role || 'main',
+							label: String(asset.label || sourceRoute?.name || 'Track'),
+							path: coordinatesToPathGeoJson(coordinates)
+						};
+					})
+					.filter(Boolean);
 				delete route.track;
 				delete route.points;
 				delete route.points2D;
-				if (route.assets?.gpx) {
-					route.assets.gpx = route.assets.gpx.map((asset) => {
-						delete asset._content;
-						delete asset._coordinates;
-						delete asset._pointCount;
-						delete asset._gpxKey;
-						return asset;
-					});
-				}
+				route.assets = { ...(route.assets || {}), paths };
+				delete route.assets.gpx;
 				return route;
 			});
 			await writeJson(`${savePath}/${fileName.endsWith('.json') ? fileName : fileName + '.json'}`, data);
@@ -1079,7 +1082,7 @@
 			onclick={() => goto(base + '/')} title={$_('ui.back_to_launcher')}>
 			<i class="fa-solid fa-arrow-left text-[11px]"></i>
 		</button>
-		<div class="ml-1 mr-3 hidden sm:block"><h1 class="text-section-title leading-none">{$_('ui.gpx_studio')}</h1></div>
+		<div class="ml-1 mr-3 hidden sm:block"><h1 class="text-section-title leading-none">{$_('ui.path_studio')}</h1></div>
 		<div class="w-px h-5 bg-black/15 mx-1 hidden sm:block"></div>
 		<button
 			class="px-3 py-1.5 rounded-sm text-ui-label {activeTool === 'select' ? 'bg-creator-blue text-white' : 'text-warm-gray-500 hover:bg-black/5'}"
@@ -1089,7 +1092,7 @@
 		<button
 			class="px-3 py-1.5 rounded-sm text-ui-label {activeTool === 'draw' ? 'bg-creator-blue text-white' : 'text-warm-gray-500 hover:bg-black/5'}"
 			onclick={startDrawing} disabled={!selectedRoute}>
-			<i class="fa-solid fa-route mr-1"></i>Draw GPX
+			<i class="fa-solid fa-route mr-1"></i>Draw Path
 		</button>
 		<button
 			class="px-3 py-1.5 rounded-sm text-ui-label {activeTool === 'cut' ? 'bg-creator-blue text-white' : 'text-warm-gray-500 hover:bg-black/5'}"
@@ -1125,13 +1128,13 @@
 	class="fixed top-14 right-2 z-50 w-96 max-w-[calc(100vw-1rem)] max-h-[calc(100vh-4rem)] overflow-hidden panel flex flex-col shadow-panel">
 	<div class="border-b border-black/15 p-3 pb-2 flex-shrink-0">
 		<h2 class="text-section-title">Routes</h2>
-		<p class="text-ui-label !m-0">Draw or attach GPX tracks for Hochtouren and Klettersteige.</p>
+		<p class="text-ui-label !m-0">Draw or attach path segments for Hochtouren and Klettersteige.</p>
 	</div>
 	<div class="p-3 border-b border-black/10 space-y-2">
 		<div class="grid grid-cols-2 gap-2">
 			<input bind:value={userState.topo.name} class="input-studio w-full" placeholder="Area / tour group name" />
 			<input bind:value={userState.topo._entryPath} class="input-studio w-full font-mono"
-			       placeholder="entries/area/name" />
+			       placeholder="area/name" />
 		</div>
 		<div class="flex gap-1">
 			<button class="px-2 py-1 rounded-sm bg-creator-blue text-white text-ui-label"
@@ -1192,10 +1195,10 @@
 				<input bind:value={simplifyToleranceMeters} type="number" min="1" step="1" class="input-studio w-full"
 				       placeholder="Tolerance (m)" disabled={!canEditSelectedTrack()} />
 				<button class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
-				        onclick={simplifySelectedTrack} disabled={!canEditSelectedTrack()}>Simplify GPX
+				        onclick={simplifySelectedTrack} disabled={!canEditSelectedTrack()}>Simplify path
 				</button>
 			</div>
-			<div class="text-[10px] text-warm-gray-400">Removes redundant points from the selected GPX segment using the
+			<div class="text-[10px] text-warm-gray-400">Removes redundant points from the selected path segment using the
 				tolerance in meters.
 			</div>
 			{#if simplifySummary}
@@ -1208,7 +1211,8 @@
 			routes={userState.topo.routes}
 			bind:drawingTarget
 			bind:activeTool
-			onGpxUpload={handleGpxUpload}
+			onPathUpload={handlePathUpload}
+			onPathSelect={focusSelectedPath}
 		/>
 	</div>
 </div>
@@ -1216,7 +1220,7 @@
 {#if activeTool === 'draw'}
 	<div
 		class="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-sm border border-black/10 bg-near-black px-3 py-2 text-sm text-white shadow-lg">
-		{isRoutingTrack ? 'Routing GPX segment…' : drawMode === 'routing' ? 'Routing drawing: click waypoints; paths are routed between them.' : 'Freestyle drawing: click points; straight GPX lines are appended.'}
+		{isRoutingTrack ? 'Routing path segment…' : drawMode === 'routing' ? 'Routing drawing: click waypoints; paths are routed between them.' : 'Freestyle drawing: click points; straight path lines are appended.'}
 	</div>
 {/if}
 
@@ -1225,7 +1229,7 @@
 		class="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-sm border border-black/10 bg-near-black px-3 py-2 text-sm text-white shadow-lg">
 		{#if pendingCut}
 			<div class="flex items-center gap-3">
-				<span>Cut line intersects the track. Confirm to create a new GPX segment in this route.</span>
+				<span>Cut line intersects the track. Confirm to create a new path segment in this route.</span>
 				<button class="rounded-sm bg-creator-blue px-2 py-1 text-ui-label text-white" onclick={confirmCut}>Confirm cut
 				</button>
 				<button class="rounded-sm border border-white/30 px-2 py-1 text-ui-label text-white" onclick={cancelCut}>

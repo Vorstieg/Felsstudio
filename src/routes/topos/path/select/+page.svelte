@@ -5,8 +5,8 @@
 </script>
 
 <WizardRouteShell
-	workspace="topos/gpx/editor"
-	titleKey="ui.gpx_studio"
+	workspace="topos/path/editor"
+	titleKey="ui.path_studio"
 	actionLabelKey="ui.new_or_edit"
 	locations={data.locations}
 />

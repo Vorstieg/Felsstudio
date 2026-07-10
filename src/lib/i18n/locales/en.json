@@ -424,9 +424,9 @@
 		"source_image": "Source Image",
 		"show_camera_trail": "Show Camera Trail",
 		"ai_suggestions_title": "AI Suggestions",
-		"gpx_studio": "GPX Studio",
+		"path_studio": "Path Studio",
 		"track_based_routes": "Track-based routes",
-		"gpx_desc": "Manage alpine tours and via ferratas using GPX tracks."
+		"path_desc": "Manage alpine tours and via ferratas using embedded route paths."
 	},
 	"auth": {
 		"title": "Authentication Required",

@@ -1,7 +1,7 @@
 <script>
 	import { Canvas, T } from '@threlte/core';
 	import { OrbitControls } from '@threlte/extras';
-	import { Vector3, WebGLRenderer, BufferAttribute } from 'three';
+	import { Vector3, WebGLRenderer } from 'three';
 	import { createGltfLoader } from '$lib/assets/js/gltf-loader.js';
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
@@ -19,7 +19,6 @@
 	import { userState } from '$lib/state/editor.svelte.js';
 	import { draftsState } from '$lib/state/drafts.svelte.js';
 	import { isMobileViewport } from '$lib/assets/js/mobile-utils.js';
-	import { prepareOutlinesForExport } from '$lib/assets/js/outline-geometry.js';
 	import { topoSymbols } from '$lib/assets/js/topo-utils.js';
 
 	// 2D Editor imports
@@ -28,7 +27,7 @@
 	import OutlineToolOptions from '$lib/components/editor/tools/OutlineToolOptions.svelte';
 
 	import { generateSymbolId, initializeIdCounters } from '$lib/assets/js/id-utils.js';
-	import { writeJson, writeFile } from '$lib/api/felslager.js';
+	import { writeFile, writeJson } from '$lib/api/felslager.js';
 	import { authState } from '$lib/api/auth.svelte.js';
 	import SaveStatus from '$lib/components/ui/SaveStatus.svelte';
 
@@ -186,8 +185,6 @@
 	// Keep OrbitControls in sync with tween
 	$effect(() => {
 		if (controlsRef && userState.clustering.lockedClusterId) {
-			const _ = $cameraPosStore;
-			const __ = $targetPosStore;
 			controlsRef.update();
 		}
 	});
@@ -462,7 +459,7 @@
 	async function combinedExport() {
 		// Require authentication
 		if (!authState.requireAuth(() => combinedExport())) return;
-		
+
 		// Require a save path
 		let savePath = userState.topo._entryPath;
 		if (!savePath) {
@@ -470,14 +467,9 @@
 			saveError = 'No save path set. Set it in the Properties panel.';
 			return;
 		}
-		
-		if (!savePath.startsWith('entries/')) {
-			savePath = `entries/${savePath}`;
-		}
-		
 		saveStatus = 'saving';
 		saveError = '';
-		
+
 		try {
 			if (userState.topo.editorMode === '3d' && modelComponent) {
 				await modelComponent.bakeTransforms();
@@ -488,7 +480,7 @@
 
 			const { baseName, topoFileName } = getExportNames(savePath);
 			let topoToSave = JSON.parse(JSON.stringify(userState.topo));
-			
+
 			// Remove internal UI fields before saving
 			delete topoToSave._entryPath;
 			delete topoToSave._topoFileName;
@@ -526,9 +518,11 @@
 					'model/gltf-binary'
 				);
 			}
-			
+
 			saveStatus = 'success';
-			setTimeout(() => { if (saveStatus === 'success') saveStatus = 'idle'; }, 3000);
+			setTimeout(() => {
+				if (saveStatus === 'success') saveStatus = 'idle';
+			}, 3000);
 		} catch (err) {
 			console.error('Save failed:', err);
 			saveStatus = 'error';
@@ -570,8 +564,8 @@
 							title={$_('ui.ai-bolts')}
 						>
 							<i class="fa-solid fa-wand-magic-sparkles"></i><span class="hidden md:inline"
-								>{$_('ui.ai-bolts')}</span
-							>
+						>{$_('ui.ai-bolts')}</span
+						>
 						</button>
 					{/if}
 					<button
@@ -593,8 +587,8 @@
 						title={$_('ui.multipitch')}
 					>
 						<i class="fa-solid fa-timeline"></i><span class="hidden md:inline"
-							>{$_('ui.multipitch')}</span
-						>
+					>{$_('ui.multipitch')}</span
+					>
 					</button>
 					<button
 						class={`flex items-center gap-2 py-1.5 px-3 rounded-sm text-ui-label transition-none ${activeTool === 'fixpoint' ? 'bg-creator-blue text-white' : 'bg-transparent text-warm-gray-500 hover:bg-black/5'}`}
@@ -605,8 +599,8 @@
 						title={$_('ui.fixpoint')}
 					>
 						<i class="fa-solid fa-circle-dot"></i><span class="hidden md:inline"
-							>{$_('ui.fixpoint')}</span
-						>
+					>{$_('ui.fixpoint')}</span
+					>
 					</button>
 					<button
 						class={`flex items-center gap-2 py-1.5 px-3 rounded-sm text-ui-label transition-none ${activeTool === 'crop' ? 'bg-creator-blue text-white shadow-sm' : 'bg-transparent text-warm-gray-500 hover:bg-black/5'}`}
@@ -618,7 +612,7 @@
 						title={$_('ui.crop')}
 					>
 						<i class="fa-solid fa-scissors"></i><span class="hidden md:inline">{$_('ui.crop')}</span
-						>
+					>
 					</button>
 				</div>
 
@@ -633,7 +627,7 @@
 						class="w-3 h-3 rounded-sm border border-black/15 text-creator-blue focus:ring-1 focus:ring-creator-blue transition-none"
 					/>
 					<span class="text-ui-label text-warm-gray-500 group-hover:text-near-black transition-none"
-						>{$_('ui.show_camera_trail')}</span
+					>{$_('ui.show_camera_trail')}</span
 					>
 				</label>
 			</div>
@@ -671,10 +665,10 @@
 <!-- Floating Hint Panels for 3D Mode -->
 {#if userState.topo.editorMode === '3d' && activeTool && activeTool !== 'ai-bolts'}
 	<div
-		class="fixed top-[56px] left-2 flex items-center gap-3 p-1.5 bg-white rounded-sm border border-black/15 shadow-modal z-[100]"
+		class="fixed top-14 left-2 flex items-center gap-3 p-1.5 bg-white rounded-sm border border-black/15 shadow-modal z-100"
 	>
 		<div class="px-2 py-0.5 border-r border-black/10">
-			<p class="text-ui-label text-near-black !m-0">{$_(`ui.${activeTool}`)}</p>
+			<p class="text-ui-label text-near-black m-0!">{$_(`ui.${activeTool}`)}</p>
 		</div>
 		<div class="flex items-center gap-4 px-1 text-warm-gray-500">
 			{#if activeTool === 'route'}
@@ -682,21 +676,21 @@
 					<span>{$_('ui.set_vertex')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Dbl Click</kbd
+					>Dbl Click</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.undo_vertex')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Backspace</kbd
+					>Backspace</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.finalize')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Enter</kbd
+					>Enter</kbd
 					>
 				</div>
 			{:else if activeTool === 'multipitch'}
@@ -704,28 +698,28 @@
 					<span>{$_('ui.vertex')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Dbl Click</kbd
+					>Dbl Click</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.undo_vertex')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Backspace</kbd
+					>Backspace</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.place_belay')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>B</kbd
+					>B</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.finalize')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Enter</kbd
+					>Enter</kbd
 					>
 				</div>
 			{:else if activeTool === 'fixpoint'}
@@ -733,7 +727,7 @@
 					<span>{$_('ui.place_point')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Dbl Click</kbd
+					>Dbl Click</kbd
 					>
 				</div>
 				<div class="w-px h-4 bg-black/10 mx-1"></div>
@@ -755,7 +749,7 @@
 									: 'opacity-70'}"
 							/>
 							<span class="text-[9px] font-bold uppercase tracking-tighter"
-								>{$_(`topo.fixpoints.${symbol.id}`)}</span
+							>{$_(`topo.fixpoints.${symbol.id}`)}</span
 							>
 						</button>
 					{/each}
@@ -765,28 +759,28 @@
 					<span>Select Area</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Shift + Drag</kbd
+					>Shift + Drag</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>Select Islands</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>C</kbd
+					>C</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>Apply Cut</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Delete</kbd
+					>Delete</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>Reset</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Esc</kbd
+					>Esc</kbd
 					>
 				</div>
 			{/if}
@@ -796,7 +790,7 @@
 
 {#if activeTool === 'crop'}
 	<div
-		class="fixed inset-0 z-[200] touch-none select-none bg-indigo-500/5 transition-opacity {isShiftPressed
+		class="fixed inset-0 z-200 touch-none select-none bg-indigo-500/5 transition-opacity {isShiftPressed
 			? 'opacity-100 cursor-crosshair'
 			: 'opacity-0 pointer-events-none'}"
 		style="pointer-events: {isShiftPressed ? 'all' : 'none'};"
@@ -823,8 +817,8 @@
 <!-- Sidebar Area for Children -->
 <div
 	class="fixed {activeTool && activeTool !== 'ai-bolts'
-		? 'top-[100px]'
-		: 'top-[56px]'} left-2 z-40 flex flex-col w-80 max-h-[calc(100vh-8rem)] overflow-y-auto custom-scrollbar"
+		? 'top-25'
+		: 'top-14'} left-2 z-40 flex flex-col w-80 max-h-[calc(100vh-8rem)] overflow-y-auto custom-scrollbar"
 >
 	{#if userState.topo.editorMode === '3d' && activeTool === 'ai-bolts'}
 		{@render children?.()}
@@ -852,7 +846,7 @@
 </div>
 
 {#if browser && userState.topo.editorMode === '2d' && ['route', 'multipitch', 'outline'].includes(activeTool)}
-	<div class="fixed bottom-16 left-2 right-2 z-[101] md:bottom-auto md:right-auto md:top-[100px]">
+	<div class="fixed bottom-16 left-2 right-2 z-101 md:bottom-auto md:right-auto md:top-25">
 		<OutlineToolOptions
 			outlineTool={editor2D?.getCurrentTool?.()}
 			{activeTool}
@@ -934,70 +928,3 @@
 		}}
 	/>
 {/if}
-
-<style>
-	:global(.route-label) {
-		background-color: white;
-		color: #0075de;
-		padding: 2px 10px;
-		border-radius: 4px;
-		font-size: 11px;
-		font-weight: 800;
-		font-family: 'Atkinson Hyperlegible', sans-serif;
-		white-space: nowrap;
-		text-align: center;
-		cursor: pointer;
-		border: 1.5px solid rgba(0, 117, 222, 0.4);
-		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-		transition: all 0.15s ease-out;
-		user-select: none;
-		display: flex;
-		align-items: center;
-		gap: 6px;
-	}
-
-	:global(.route-label::before) {
-		content: '';
-		display: block;
-		width: 6px;
-		height: 6px;
-		background-color: #0075de;
-		border-radius: 50%;
-	}
-
-	:global(.route-label:hover) {
-		transform: translateY(-1px) scale(1.05);
-		border-color: rgba(0, 117, 222, 0.8);
-		box-shadow: 0 4px 12px rgba(0, 117, 222, 0.2);
-	}
-
-	:global(.route-label.selected) {
-		background-color: #0075de;
-		color: white;
-		border-color: #0056b3;
-		box-shadow: 0 4px 16px rgba(0, 117, 222, 0.4);
-	}
-
-	:global(.route-label.selected::before) {
-		background-color: white;
-	}
-
-	:global(.fixpoint-label) {
-		background-color: rgba(255, 255, 255, 0.9);
-		backdrop-filter: blur(4px);
-		color: #000;
-		padding: 0px;
-		border-radius: 50%;
-		font-size: 10px;
-		font-weight: 900;
-		font-family: 'Inter', sans-serif;
-		text-align: center;
-		pointer-events: none;
-		width: 18px;
-		height: 18px;
-		line-height: 18px;
-		margin-top: -30px;
-		border: 2px solid #0075de;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-	}
-</style>

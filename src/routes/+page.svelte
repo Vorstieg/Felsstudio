@@ -54,13 +54,13 @@
 			wizardRoute: 'felslager/edit'
 		},
 		{
-			id: 'gpx-routes',
-			name: 'ui.gpx_studio',
+			id: 'path-routes',
+			name: 'ui.path_studio',
 			label: 'ui.track_based_routes',
-			description: 'ui.gpx_desc',
+			description: 'ui.path_desc',
 			icon: 'fa-route',
 			color: 'bg-workspace-crag',
-			wizardRoute: 'topos/gpx/select'
+			wizardRoute: 'topos/path/select'
 		}
 	];
 </script>
@@ -130,8 +130,8 @@
 
 									userState.ui.activeDraftId = draft.id;
 									userState.ui.workspace =
-										topo.editorMode === 'gpx'
-											? 'topos/gpx/editor'
+										topo.editorMode === 'path'
+											? 'topos/path/editor'
 											: topo.editorMode === '2d'
 												? 'topos/2d/editor'
 												: 'topos/3d/editor';

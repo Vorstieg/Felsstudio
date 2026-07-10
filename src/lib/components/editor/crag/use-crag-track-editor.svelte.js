@@ -1,5 +1,5 @@
 import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
-import { parseGpx } from '$lib/assets/js/gpx-utils.js';
+import { parseGpx } from '$lib/assets/js/route-path-utils.js';
 import { initMapPointDragHandlers } from '$lib/components/editor/map-point-drag-handlers.js';
 import { fitCoordinatesBounds } from '$lib/assets/js/track-geometry-utils.js';
 import {

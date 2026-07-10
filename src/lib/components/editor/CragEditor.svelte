@@ -3,7 +3,6 @@
 	import maplibregl from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import * as turf from '@turf/turf';
-	import { _ } from 'svelte-i18n';
 	import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
 	import { viewport } from '$lib/state/viewport.svelte.js';
 	import { base } from '$app/paths';
@@ -356,7 +355,8 @@
 				map.easeTo({ center: coordinates, zoom: Math.max(map.getZoom(), 15), duration: 500 });
 				if (activeTool === 'position' && !selectedSectorId) setCragPosition(coordinates);
 			},
-			() => {},
+			() => {
+			},
 			{ enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
 		);
 	}
@@ -450,10 +450,6 @@
 			return;
 		}
 		cragEditorState.crag.path = savePath;
-
-		if (!savePath.startsWith('entries/')) {
-			savePath = `entries/${savePath}`;
-		}
 
 		saveStatus = 'saving';
 		saveError = '';
@@ -663,43 +659,3 @@
 	{vertexDeleteUndo}
 	onUndoSectorVertexDelete={undoSectorVertexDelete}
 />
-
-<style>
-    :global(.maplibregl-ctrl-bottom-right) {
-        bottom: 24px !important;
-        right: 24px !important;
-    }
-
-    :global(.crag-marker),
-    :global(.parking-marker),
-    :global(.transit-marker),
-    :global(.sector-marker) {
-        filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
-        cursor: move;
-    }
-
-    :global(.sector-marker) {
-        min-width: 44px;
-        max-width: 140px;
-        min-height: 44px;
-        border-radius: 999px;
-        border: 2px solid #ffffff;
-        background: #31302e;
-        color: #ffffff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
-        font-weight: 700;
-        line-height: 1;
-        padding: 0 8px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    :global(.sector-marker.is-selected) {
-        background: #0075de;
-        box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.25);
-    }
-</style>

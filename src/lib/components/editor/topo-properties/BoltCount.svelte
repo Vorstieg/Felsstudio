@@ -1,6 +1,5 @@
 <script>
-	import { calculateBoltAmount, calculateRouteLength } from '$lib/assets/js/topo-utils.js';
-	import { userState } from '$lib/state/editor.svelte.js';
+	import { calculateBoltAmount } from '$lib/assets/js/topo-utils.js';
 	import { _ } from 'svelte-i18n';
 
 	let { route, boltCount = $bindable(), fixPoints } = $props();

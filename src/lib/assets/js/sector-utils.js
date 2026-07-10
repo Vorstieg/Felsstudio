@@ -52,12 +52,6 @@ export function getSectorEntryPath(parentPath, sector = {}) {
 	return resolveEntryPath(parentPath, sector.path, sector.id);
 }
 
-export function getAssetPath(parentPath, sector, asset) {
-	if (!asset) return null;
-	const basePath = sector ? getSectorEntryPath(parentPath, sector) : parentPath;
-	return `/src/entries/${basePath}/${asset}`;
-}
-
 export function normalizeSectorFeature(feature, filePath = '') {
 	const properties = { ...(feature?.properties || {}) };
 	const derivedPath = filePath

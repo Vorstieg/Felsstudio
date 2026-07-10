@@ -425,9 +425,9 @@
 		"source_image": "Quellbild",
 		"show_camera_trail": "Kamera-Pfad anzeigen",
 		"ai_suggestions_title": "KI Vorschläge",
-		"gpx_studio": "GPX Studio",
+		"path_studio": "Path Studio",
 		"track_based_routes": "Track-basierte Touren",
-		"gpx_desc": "Hochtouren und Klettersteige über GPX-Tracks verwalten."
+		"path_desc": "Hochtouren und Klettersteige mit eingebetteten Routenpfaden verwalten."
 	},
 	"auth": {
 		"title": "Authentifizierung erforderlich",
