@@ -11,8 +11,8 @@ jobs:
       - name: Deploy to production
         run: |
           cd /home/vorstieg/felsstudio
-          git restore package-lock.json
           git pull origin main
+          rm -rf node_modules package-lock.json
           npm install
           npm run build
           PM2_HOME=/home/vorstieg/.pm2 pm2 restart felsstudio
