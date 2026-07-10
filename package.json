@@ -38,7 +38,6 @@
 		"@threlte/core": "^8.0.1",
 		"@threlte/extras": "^9.0.1",
 		"@turf/turf": "^7.3.4",
-		"crag-reviw-nlog": "file:../Felsverzeichnis",
 		"d3-selection": "^3.0.0",
 		"d3-zoom": "^3.0.0",
 		"jszip": "^3.10.1",
