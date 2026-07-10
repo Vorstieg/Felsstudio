@@ -130,9 +130,7 @@
 		id={'route-' + route.id}
 		class={mobile
 			? `panel p-3 border-2 $
-					{userState.ui.selectedRouteId === route.id
-						? 'border-creator-blue ring-4 ring-creator-blue/5'
-						: 'border-transparent'}`
+					'border-transparent'}`
 			: `panel-inner p-2.5 relative overflow-visible transition-none border $
 					{userState.ui.selectedRouteId === route.id ? 'border-creator-blue' : 'border-black/10'}`}
 	>

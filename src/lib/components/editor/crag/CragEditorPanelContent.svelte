@@ -8,6 +8,7 @@
 
 	let {
 		inspectorShadow = true,
+		showTabs = true,
 		activeTab = $bindable('info'),
 		detectedAssets = [],
 		editingTrackIndex = null,
@@ -91,6 +92,7 @@
 	}
 </script>
 
+{#if showTabs}
 <div class="bg-black/5 rounded-sm p-0.5 border border-black/10 flex gap-0.5 mx-3 mb-2 flex-shrink-0">
 	<button
 		class="flex-1 px-2 py-1.5 rounded-sm text-ui-label transition-none {activeTab === 'info' ? 'bg-white shadow-sm text-near-black' : 'text-warm-gray-500 hover:bg-black/5'}"
@@ -107,6 +109,7 @@
 		class="ml-1 text-micro-data text-warm-gray-400">{cragEditorState.crag.sectors?.length || 0}</span>
 	</button>
 </div>
+{/if}
 
 <div class="overflow-y-auto flex-1 p-3 pt-0 custom-scrollbar bg-transparent">
 	{#if activeTab === 'info'}

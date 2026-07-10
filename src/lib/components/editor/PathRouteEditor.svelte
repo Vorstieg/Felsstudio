@@ -10,6 +10,7 @@
 	import { writeJson } from '$lib/api/felslager.js';
 	import { authState } from '$lib/api/auth.svelte.js';
 	import ToolBar from '$lib/components/editor/tools/ToolBar.svelte';
+	import DetailsComponent from '$lib/components/editor/DetailsComponent.svelte';
 	import TopoRoutesPanel from '$lib/components/editor/topo-properties/TopoRoutesPanel.svelte';
 	import CragEditorMap from '$lib/components/editor/crag/CragEditorMap.svelte';
 	import MapSearch from '$lib/components/editor/MapSearch.svelte';
@@ -1229,13 +1230,8 @@
 	</div>
 {/if}
 
-<div
-	class="fixed top-14 right-2 z-50 w-96 max-w-[calc(100vw-1rem)] max-h-[calc(100vh-4rem)] overflow-hidden panel flex flex-col shadow-panel"
->
-	<div class="border-b border-black/15 p-3 pb-2 flex-shrink-0">
-		<h2 class="text-section-title">Routes</h2>
-		<p class="text-ui-label !m-0">Draw or attach path segments for Hochtouren and Klettersteige.</p>
-	</div>
+<DetailsComponent title="Routes" subtitle="Draw or attach path segments for Hochtouren and Klettersteige." width="24rem">
+	{#snippet children({ mobile })}
 	<div class="p-3 border-b border-black/10 space-y-2">
 		<div class="grid grid-cols-2 gap-2">
 			<input
@@ -1367,7 +1363,7 @@
 			{/if}
 		</div>
 	</div>
-	<div class="overflow-y-auto custom-scrollbar p-2.5 flex-1">
+	<div class="custom-scrollbar p-2.5">
 		<TopoRoutesPanel
 			routes={userState.topo.routes}
 			bind:drawingTarget
@@ -1376,7 +1372,8 @@
 			onPathSelect={focusSelectedPath}
 		/>
 	</div>
-</div>
+	{/snippet}
+</DetailsComponent>
 
 {#if activeTool === 'draw'}
 	<div

@@ -83,8 +83,7 @@
 	</div>
 {/if}
 
-{#if isExpanded}
-	<CragEditorSidebar
+<CragEditorSidebar
 		{inspectorShadow}
 		bind:activeTab
 		{detectedAssets}
@@ -116,43 +115,6 @@
 		{onFinalizeTrack}
 		{onCancelTrackEdit}
 	/>
-{/if}
-
-{#if isCompact || isMedium}
-	{#if CragEditorBottomSheet}
-		<CragEditorBottomSheet
-			bind:activeTab
-			{detectedAssets}
-			{editingTrackIndex}
-			{cragTypes}
-			{availableTags}
-			{securityOptions}
-			{rockTypes}
-			{commonEquipment}
-			bind:selectedSectorId
-			{saveStatus}
-			{onAddEquipmentItem}
-			{onRemoveEquipmentItem}
-			{onAddCragImages}
-			{onRemoveCragImage}
-			{onAddSector}
-			{onDuplicateSector}
-			{onRemoveSector}
-			{onMoveSector}
-			{onSetSectorGeometryType}
-			{onFocusSector}
-			{onSetHoverHighlight}
-			{onClearDetectedAssets}
-			{onAddDetectedAsset}
-			{onRemoveTransit}
-			{onRemoveParking}
-			{onEditTrack}
-			{onRemoveTrack}
-			{onFinalizeTrack}
-			{onCancelTrackEdit}
-		/>
-	{/if}
-{/if}
 
 {#if vertexDeleteUndo}
 	<div

@@ -2,8 +2,7 @@
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import { userState } from '$lib/state/editor.svelte.js';
-	import { isMobileViewport } from '$lib/assets/js/mobile-utils.js';
-	import { resize } from '$lib/assets/js/resize.js';
+	import DetailsComponent from './DetailsComponent.svelte';
 	import TopoInfoPanel from './topo-properties/TopoInfoPanel.svelte';
 	import TopoRoutesPanel from './topo-properties/TopoRoutesPanel.svelte';
 	import TopoFixpointsPanel from './topo-properties/TopoFixpointsPanel.svelte';
@@ -15,7 +14,6 @@
 	} = $props();
 
 	let activeTab = $state('info');
-	let isMobile = $state(false);
 	let lastSelectedId = $state(null);
 	let lastSelectedFpId = $state(null);
 	let lastSelectedTextId = $state(null);
@@ -84,10 +82,6 @@
 	});
 
 	onMount(() => {
-		isMobile = isMobileViewport();
-		const handleResize = () => {
-			isMobile = isMobileViewport();
-		};
 		const handleKeyDown = (event) => {
 			if (event.ctrlKey && event.altKey && event.key.toLowerCase() === 'j') {
 				event.preventDefault();
@@ -95,10 +89,8 @@
 			}
 		};
 
-		window.addEventListener('resize', handleResize);
 		window.addEventListener('keydown', handleKeyDown);
 		return () => {
-			window.removeEventListener('resize', handleResize);
 			window.removeEventListener('keydown', handleKeyDown);
 		};
 	});
@@ -165,69 +157,26 @@
 		topoJsonError = '';
 		formatTopoJson();
 	}
+
+	let tabs = $derived([
+		{ id: 'info', label: $_('menu.info'), icon: 'fa-circle-info' },
+		{ id: 'routes', label: $_('topo.routes'), icon: 'fa-route', count: routes.length },
+		{
+			id: 'fixpoints',
+			label: $_('ui.fixpoints'),
+			icon: 'fa-location-dot',
+			count: userState.topo.fixPoints.length
+		}
+	]);
 </script>
 
-<div
-	class="hidden md:flex fixed top-14 right-2 z-50 w-80 flex-col"
-	style="max-height: calc(100vh - {userState.clustering.lockedClusterId
-		? '8.5rem'
-		: '4rem'}); transition: max-height 0.2s ease-out;"
->
-	<div class="panel flex flex-col flex-1 overflow-hidden shadow-panel">
-		<div
-			class="group flex justify-between items-center border-b border-black/15 p-3 pb-2 mb-2 flex-shrink-0"
-		>
-			<div>
-				<h1 class="text-section-title">{$_('ui.properties')}</h1>
-				<p class="text-ui-label !m-0">{$_('ui.topo_inspector')}</p>
-			</div>
-			<button
-				class="h-6 w-6 rounded-sm text-warm-gray-300 opacity-0 transition-none hover:bg-black/5 hover:text-near-black focus:opacity-100 group-hover:opacity-30"
-				onclick={toggleJsonEditor}
-				title="Edit topo JSON"
-				aria-label="Edit topo JSON"
-			>
-				<i class="fa-solid fa-code text-[10px]"></i>
-			</button>
-		</div>
-
-		<div
-			class="bg-black/5 rounded-sm p-0.5 border border-black/10 flex gap-0.5 mx-3 mb-2 flex-shrink-0"
-		>
-			<button
-				class="flex-1 px-2 py-1.5 rounded-sm text-ui-label transition-none whitespace-nowrap {activeTab ===
-				'info'
-					? 'bg-white shadow-sm text-near-black'
-					: 'text-warm-gray-500 hover:bg-black/5'}"
-				onclick={() => switchTab('info')}
-			>
-				{$_('menu.info')}
-			</button>
-			<button
-				class="flex-1 px-2 py-1.5 rounded-sm text-ui-label transition-none whitespace-nowrap {activeTab ===
-				'routes'
-					? 'bg-white shadow-sm text-near-black'
-					: 'text-warm-gray-500 hover:bg-black/5'}"
-				onclick={() => switchTab('routes')}
-			>
-				{$_('topo.routes')}
-				<span class="ml-1 text-micro-data text-warm-gray-400">{routes.length}</span>
-			</button>
-			<button
-				class="flex-1 px-2 py-1.5 rounded-sm text-ui-label transition-none whitespace-nowrap {activeTab ===
-				'fixpoints'
-					? 'bg-white shadow-sm text-near-black'
-					: 'text-warm-gray-500 hover:bg-black/5'}"
-				onclick={() => switchTab('fixpoints')}
-			>
-				{$_('ui.fixpoints')}
-				<span class="ml-1 text-micro-data text-warm-gray-400">{userState.topo.fixPoints.length}</span>
-			</button>
-		</div>
-
-		<div class="overflow-y-auto flex-1 p-2.5 pt-0 custom-scrollbar bg-transparent">
-			<div class="flex flex-col gap-2.5 pb-2">
-				{#if activeTab === 'info'}
+<DetailsComponent title={$_('ui.properties')} subtitle={$_('ui.topo_inspector')} {tabs} bind:activeTab onTabChange={switchTab} width="20rem">
+	{#snippet headerActions()}
+		<button class="h-6 w-6 rounded-sm text-warm-gray-300 hover:bg-black/5 hover:text-near-black" onclick={toggleJsonEditor} title="Edit topo JSON" aria-label="Edit topo JSON"><i class="fa-solid fa-code text-[10px]"></i></button>
+	{/snippet}
+	{#snippet children({ mobile })}
+		<div class="flex flex-col gap-2.5 pb-2">
+			{#if activeTab === 'info'}
 					<TopoInfoPanel
 						bind:showMapModal
 						showJsonEditor={showJsonEditor}
@@ -235,82 +184,13 @@
 						topoJsonError={topoJsonError}
 						onformatjson={formatTopoJson}
 						onapplyjson={applyTopoJson}
+						{mobile}
 					/>
-				{:else if activeTab === 'routes'}
-					<TopoRoutesPanel {routes} bind:drawingTarget bind:activeTool />
-				{:else if activeTab === 'fixpoints'}
-					<TopoFixpointsPanel {aiSuggestions} />
-				{/if}
-			</div>
+			{:else if activeTab === 'routes'}
+				<TopoRoutesPanel {routes} bind:drawingTarget bind:activeTool {mobile} />
+			{:else if activeTab === 'fixpoints'}
+				<TopoFixpointsPanel {aiSuggestions} {mobile} />
+			{/if}
 		</div>
-	</div>
-</div>
-
-{#if isMobile}
-	<div
-		use:resize
-		class="fixed left-0 right-0 top-1/2 bottom-0 z-40 bg-white rounded-t-[2rem] shadow-modal border-t border-black/10 overflow-hidden"
-	>
-		<div class="bg-warm-gray-200 h-1.5 w-12 rounded-sm self-center mt-3 mx-auto"></div>
-		<div class="relative z-20 flex gap-1 p-2 border-b border-black/5 bg-warm-white/50 mt-2">
-			<button
-				class="flex-1 py-2.5 rounded-sm transition-none text-xs font-bold transition-all {activeTab ===
-				'info'
-					? 'bg-creator-blue text-white'
-					: 'text-warm-gray-400'}"
-				onclick={() => switchTab('info')}
-				><i class="fa-solid fa-circle-info"></i></button
-			>
-			<button
-				class="flex-1 py-2.5 rounded-sm transition-none text-xs font-bold transition-all {activeTab ===
-				'routes'
-					? 'bg-creator-blue text-white'
-					: 'text-warm-gray-400'}"
-				onclick={() => switchTab('routes')}
-				><i class="fa-solid fa-route"></i><span class="ml-1.5 text-[10px]">{routes.length}</span
-				></button
-			>
-			<button
-				class="flex-1 py-2.5 rounded-sm transition-none text-xs font-bold transition-all {activeTab ===
-				'fixpoints'
-					? 'bg-creator-blue text-white'
-					: 'text-warm-gray-400'}"
-				onclick={() => switchTab('fixpoints')}
-				><i class="fa-solid fa-location-dot"></i><span class="ml-1.5 text-[10px]"
-					>{userState.topo.fixPoints.length}</span
-				></button
-			>
-		</div>
-		<div class="overflow-y-auto custom-scrollbar" style="height: calc(100% - 100px);">
-			<div class="p-4 space-y-3">
-				{#if activeTab === 'routes'}
-					<TopoRoutesPanel {routes} bind:drawingTarget bind:activeTool mobile={true} />
-				{:else if activeTab === 'fixpoints'}
-					<TopoFixpointsPanel {aiSuggestions} mobile={true} />
-				{:else}
-					<TopoInfoPanel
-						bind:showMapModal
-						showJsonEditor={showJsonEditor}
-						bind:topoJsonText
-						topoJsonError={topoJsonError}
-						onformatjson={formatTopoJson}
-						onapplyjson={applyTopoJson}
-						mobile={true}
-					/>
-				{/if}
-			</div>
-		</div>
-	</div>
-{/if}
-
-<style>
-	:global(.grabber.top) {
-		height: 28px;
-		width: 100%;
-		position: absolute;
-		top: 0;
-		left: 0;
-		cursor: pointer;
-		z-index: 10;
-	}
-</style>
+	{/snippet}
+</DetailsComponent>
