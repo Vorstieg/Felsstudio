@@ -42,11 +42,14 @@
 		const exporter = new GLTFExporter();
 		const sceneClone = gltfScene.clone();
 
-		const scale = userState.topo.scale || 1;
-		sceneClone.scale.set(scale, scale, scale);
+		const scaleArray = userState.topo.modelScale || [1, 1, 1];
+		sceneClone.scale.set(scaleArray[0], scaleArray[1], scaleArray[2]);
 
 		const offset = userState.topo.modelOffset || [0, 0, 0];
 		sceneClone.position.set(offset[0], offset[1], offset[2]);
+
+		const rot = userState.topo.modelRotation || [0, 0, 0];
+		sceneClone.rotation.set(rot[0], rot[1], rot[2]);
 
 		sceneClone.updateMatrixWorld(true);
 
@@ -83,6 +86,131 @@
 
 	export function previewLassoCut(points) {
 		editorInternal?.previewLassoCut(points);
+	}
+
+	export function bakeTransforms() {
+		if (!gltfScene) return false;
+
+		const scaleArray = userState.topo.modelScale || [1, 1, 1];
+		const offset = userState.topo.modelOffset || [0, 0, 0];
+		const rot = userState.topo.modelRotation || [0, 0, 0];
+
+		// Only bake if there's an actual transformation
+		if (
+			scaleArray[0] === 1 && scaleArray[1] === 1 && scaleArray[2] === 1 &&
+			offset[0] === 0 && offset[1] === 0 && offset[2] === 0 &&
+			rot[0] === 0 && rot[1] === 0 && rot[2] === 0
+		) {
+			return false;
+		}
+
+		const bakeMatrix = new THREE.Matrix4();
+		bakeMatrix.compose(
+			new THREE.Vector3(0, 0, 0), // NEVER bake translation!
+			new THREE.Quaternion().setFromEuler(new THREE.Euler(rot[0], rot[1], rot[2])),
+			new THREE.Vector3(scaleArray[0], scaleArray[1], scaleArray[2])
+		);
+
+		// Temporarily detach gltfScene from its parent so matrixWorld only contains local transforms
+		const parent = gltfScene.parent;
+		if (parent) parent.remove(gltfScene);
+
+		// Update all world matrices first
+		gltfScene.updateMatrixWorld(true);
+
+		// Transform the geometry and flatten the scene graph
+		gltfScene.traverse((child) => {
+			if (child.isMesh && child.geometry) {
+				// 1. Bake the mesh's existing world transform into its geometry
+				child.geometry.applyMatrix4(child.matrixWorld);
+				// 2. Apply the new rotation/scale
+				child.geometry.applyMatrix4(bakeMatrix);
+				
+				// 3. Reset local transforms
+				child.position.set(0, 0, 0);
+				child.rotation.set(0, 0, 0);
+				child.scale.set(1, 1, 1);
+				child.quaternion.identity();
+				child.updateMatrix();
+
+				child.geometry.computeVertexNormals();
+				if (child.geometry.boundsTree) child.geometry.computeBoundsTree();
+			} else if (child.isGroup || child.type === 'Object3D' || child.type === 'Scene') {
+				// Reset group transforms as well, since they are now baked into the mesh children
+				child.position.set(0, 0, 0);
+				child.rotation.set(0, 0, 0);
+				child.scale.set(1, 1, 1);
+				child.quaternion.identity();
+				child.updateMatrix();
+			}
+		});
+		
+		// Reattach to parent
+		if (parent) parent.add(gltfScene);
+
+		// Transform all routes
+		(userState.topo.routes || []).forEach(route => {
+			if (route.points) {
+				route.points.forEach(p => {
+					const vec = new THREE.Vector3(p[0], p[1], p[2]).applyMatrix4(bakeMatrix);
+					p[0] = Number(vec.x.toFixed(4));
+					p[1] = Number(vec.y.toFixed(4));
+					p[2] = Number(vec.z.toFixed(4));
+				});
+			}
+			if (route.pitches) {
+				route.pitches.forEach(pitch => {
+					if (pitch.points) {
+						pitch.points.forEach(p => {
+							const vec = new THREE.Vector3(p[0], p[1], p[2]).applyMatrix4(bakeMatrix);
+							p[0] = Number(vec.x.toFixed(4));
+							p[1] = Number(vec.y.toFixed(4));
+							p[2] = Number(vec.z.toFixed(4));
+						});
+					}
+				});
+			}
+		});
+
+		// Transform all fixpoints
+		(userState.topo.fixPoints || []).forEach(fp => {
+			if (fp.position) {
+				const vec = new THREE.Vector3(fp.position[0], fp.position[1], fp.position[2]).applyMatrix4(bakeMatrix);
+				fp.position[0] = Number(vec.x.toFixed(4));
+				fp.position[1] = Number(vec.y.toFixed(4));
+				fp.position[2] = Number(vec.z.toFixed(4));
+			}
+		});
+
+		// Reset state transformations
+		userState.topo.modelRotation = [0, 0, 0];
+		userState.topo.modelScale = [1, 1, 1];
+		userState.topo.modelOffset = [0, 0, 0];
+
+		// Persist new GLB blob
+		const exporter = new GLTFExporter();
+		const exportClone = gltfScene.clone();
+		exportClone.position.set(0, 0, 0);
+		exportClone.rotation.set(0, 0, 0);
+		exportClone.scale.set(1, 1, 1);
+		exportClone.updateMatrixWorld(true);
+
+		return new Promise((resolve) => {
+			exporter.parse(
+				exportClone,
+				(glb) => {
+					const blob = new Blob([glb], { type: 'application/octet-stream' });
+					userState.ui.glbBlob = blob;
+					userState.ui.modelRevision++;
+					resolve(true);
+				},
+				(err) => {
+					console.error(err);
+					resolve(false);
+				},
+				{ binary: true }
+			);
+		});
 	}
 
 	export function applyLassoCut() {
@@ -166,6 +294,20 @@
 		});
 
 		selectedIndicesMap = new Map();
+
+		// Check if we need to bake existing transforms first
+		const scaleArray = userState.topo.modelScale || [1, 1, 1];
+		const offset = userState.topo.modelOffset || [0, 0, 0];
+		const rot = userState.topo.modelRotation || [0, 0, 0];
+		
+		if (
+			scaleArray[0] !== 1 || scaleArray[1] !== 1 || scaleArray[2] !== 1 ||
+			offset[0] !== 0 || offset[1] !== 0 || offset[2] !== 0 ||
+			rot[0] !== 0 || rot[1] !== 0 || rot[2] !== 0
+		) {
+			bakeTransforms();
+			return;
+		}
 
 		// PERSIST
 		const exporter = new GLTFExporter();
@@ -313,7 +455,6 @@
 
 	// --- State Sync ---
 	let visualRoutes = $derived.by(() => {
-		const offset = userState.topo.modelOffset || [0, 0, 0];
 		return userState.topo.routes.flatMap((route) => {
 			const processPoints = (points, subId, label) => {
 				let normal = null;
@@ -323,7 +464,7 @@
 					displacement = normal.clone().multiplyScalar(0.05);
 				}
 				const vecPoints = (points || []).map((p) =>
-					new Vector3(p[0] + offset[0], p[1] + offset[1], p[2] + offset[2]).add(displacement)
+					new Vector3(p[0], p[1], p[2]).add(displacement)
 				);
 				const curve =
 					vecPoints.length >= 2 ? new CatmullRomCurve3(vecPoints, false, 'catmullrom', 0) : null;
@@ -349,15 +490,14 @@
 	});
 
 	let visualFixPoints = $derived.by(() => {
-		const offset = userState.topo.modelOffset || [0, 0, 0];
 		return userState.topo.fixPoints
 			.filter((pt) => Array.isArray(pt.position) && pt.position.length >= 3 && topo3DFixpointTypes.has(pt.type))
 			.map((pt) => ({
 				...pt,
 				rawPosition: [
-					pt.position[0] + offset[0],
-					pt.position[1] + offset[1],
-					pt.position[2] + offset[2]
+					pt.position[0],
+					pt.position[1],
+					pt.position[2]
 				],
 				isAssigned: userState.ui.selectedRouteId
 					? userState.topo.routes
@@ -371,28 +511,25 @@
 		const clusterId = userState.clustering.lockedClusterId;
 		const cluster = userState.clustering.clusters.find((c) => c.id === clusterId);
 		if (!cluster) return [];
-		const offset = userState.topo.modelOffset || [0, 0, 0];
 		return cluster.members.map((h, i) => ({
 			id: `hit-${clusterId}-${i}`,
-			pos: [h.pos[0] + offset[0], h.pos[1] + offset[1], h.pos[2] + offset[2]],
+			pos: [h.pos[0], h.pos[1], h.pos[2]],
 			color: cluster.color
 		}));
 	});
 
 	let visualCameras = $derived.by(() => {
 		if (!userState.clustering.showCameraTrail) return [];
-		const offset = userState.topo.modelOffset || [0, 0, 0];
 		return Object.entries(userState.clustering.cameraPositions).map(([idx, pos]) => ({
 			id: `cam-${idx}`,
-			pos: [pos[0] + offset[0], pos[1] + offset[1], pos[2] + offset[2]]
+			pos: [pos[0], pos[1], pos[2]]
 		}));
 	});
 
 	let visualClusters = $derived.by(() => {
-		const offset = userState.topo.modelOffset || [0, 0, 0];
 		return userState.clustering.clusters.map((c) => ({
 			...c,
-			anchor: [c.anchor[0] + offset[0], c.anchor[1] + offset[1], c.anchor[2] + offset[2]]
+			anchor: [c.anchor[0], c.anchor[1], c.anchor[2]]
 		}));
 	});
 
@@ -424,7 +561,12 @@
 	const { size } = useThrelte();
 </script>
 
-<T.Group>
+<T.Group
+	position={userState.topo.modelOffset || [0, 0, 0]}
+	rotation={userState.topo.modelRotation || [0, 0, 0]}
+	scale={userState.topo.modelScale || [1, 1, 1]}
+	{...props}
+>
 	{#if gltfScene}
 		<T
 			is={gltfScene}
@@ -432,8 +574,6 @@
 			ondblclick={(e) => interaction.handleMeshDblClick(e, activeTool)}
 			onpointermove={(e) => interaction.handleMeshPointerMove(e, activeTool)}
 			dispose={null}
-			position={userState.topo.modelOffset || [0, 0, 0]}
-			{...props}
 		/>
 	{/if}
 

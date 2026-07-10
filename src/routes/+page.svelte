@@ -43,6 +43,15 @@
 			icon: 'fa-layer-group',
 			color: 'bg-workspace-topo-2d',
 			wizardRoute: 'topos/2d/select'
+		},
+		{
+			id: 'felslager',
+			name: 'ui.felslager_studio',
+			label: 'ui.data_management',
+			description: 'ui.data_management_desc',
+			icon: 'fa-folder-tree',
+			color: 'bg-workspace-felslager',
+			wizardRoute: 'felslager/edit'
 		}
 	];
 </script>
@@ -54,7 +63,7 @@
 			<p class="text-ui-label text-warm-gray-500">{$_('ui.select_environment')}</p>
 		</div>
 
-		<div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
 			{#each workspaces as ws}
 				<button
 					class="panel p-4 flex flex-col h-full text-left hover:border-creator-blue transition-none group cursor-pointer"
@@ -84,7 +93,7 @@
 				<div class="flex justify-between items-center mb-4">
 					<p class="text-ui-label text-warm-gray-500">{$_('ui.resume_sessions')}</p>
 					<span class="text-micro-data text-warm-gray-300"
-						>{draftsState.drafts.length} {$_('ui.drafts_found')}</span
+					>{draftsState.drafts.length} {$_('ui.drafts_found')}</span
 					>
 				</div>
 				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -145,9 +154,9 @@
 							</h4>
 							<p class="text-micro-data text-warm-gray-400">
 								{$_('ui.modified')} {new Date(draft.updated).toLocaleString([], {
-									dateStyle: 'short',
-									timeStyle: 'short'
-								})}
+								dateStyle: 'short',
+								timeStyle: 'short'
+							})}
 							</p>
 							{#if brokenDraftId === draft.id}
 								<div
@@ -163,8 +172,8 @@
 											draftsState.delete(draft.id);
 											brokenDraftId = null;
 										}}
-										>Remove</button
-									>
+									>Remove
+									</button>
 								</div>
 							{/if}
 						</div>

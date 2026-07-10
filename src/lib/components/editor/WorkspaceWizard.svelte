@@ -175,11 +175,13 @@
 			const cragJsonPath = `${path}/${name}.json`;
 			let loadedTopo = workspace === 'topos/3d/editor' && glbFiles.has(glbPath);
 
+			const apiPath = (p) => `entries/${p}`;
+
 			if (workspace.startsWith('crags/')) {
 				const { cragEditorState } = await import('$lib/state/crag-editor.svelte.js');
 				cragEditorState.reset();
 				try {
-					const cragData = await readJson(cragJsonPath);
+					const cragData = await readJson(apiPath(cragJsonPath));
 					Object.assign(cragEditorState.crag, cragData.properties);
 					cragEditorState.crag.geometry = cragData.geometry;
 				} catch {
@@ -189,12 +191,12 @@
 
 				// Load related files (transit, parking, tracks)
 				try {
-					const dirFiles = await listDir(path);
+					const dirFiles = await listDir(apiPath(path));
 					for (const f of dirFiles) {
 						if (f.type !== 'file' || !f.name.endsWith('.json') || f.name === `${name}.json`)
 							continue;
 						try {
-							const data = await readJson(f.path);
+							const data = await readJson(`${apiPath(path)}/${f.name}`);
 							if (f.name.includes('-transit-track')) {
 								cragEditorState.tracks.push({
 									id: Math.random().toString(36).substr(2, 9),
@@ -224,7 +226,7 @@
 			} else if (workspace === 'topos/2d/editor') {
 				seedTopoFromEntry(crag, sector);
 				try {
-					userState.topo = { ...userState.topo, ...(await readJson(topoPath)) };
+					userState.topo = { ...userState.topo, ...(await readJson(apiPath(topoPath))) };
 				} catch {
 					/* no topo yet */
 				}
@@ -244,7 +246,7 @@
 				userState.topo.editorMode = '2d';
 			} else {
 				try {
-					const topoData = await readJson(topoPath);
+					const topoData = await readJson(apiPath(topoPath));
 					userState.topo = { ...userState.topo, ...topoData };
 					loadedTopo = workspace === 'topos/3d/editor' ? loadedTopo : true;
 					if (!userState.topo.id) userState.topo.id = getTopoId(crag, sector);
@@ -271,9 +273,9 @@
 					const imgNames = [`${name}.jpg`, `${name}.png`, 'topo.jpg'];
 					for (const imgName of imgNames) {
 						try {
-							const res = await fetch(fileUrl(`${path}/${imgName}`));
+							const res = await fetch(fileUrl(`${apiPath(path)}/${imgName}`));
 							if (res.ok) {
-								userState.topo.image2D = fileUrl(`${path}/${imgName}`);
+								userState.topo.image2D = fileUrl(`${apiPath(path)}/${imgName}`);
 								break;
 							}
 						} catch {

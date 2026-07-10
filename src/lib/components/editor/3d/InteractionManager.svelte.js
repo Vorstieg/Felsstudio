@@ -120,11 +120,11 @@ export class Topo3DInteractionManager {
 		if (!isMeshInLoadedScene || !event.point || !event.face?.normal) return;
 
 		if (activeTool === 'fixpoint') {
-			const modelOffset = new Vector3(...this.modelPosition);
+			const localPoint = this.gltfScene.worldToLocal(event.point.clone());
 			const symbolType = userState.ui.selectedSymbol || 'bolt';
 			userState.topo.fixPoints.push({
 				id: generateSymbolId(),
-				position: event.point.clone().sub(modelOffset).toArray(),
+				position: localPoint.toArray().map((c) => Number(c.toFixed(4))),
 				type: symbolType
 			});
 			return;
@@ -315,13 +315,10 @@ export class Topo3DInteractionManager {
 				allPointsWithNormals.push({ point: snapPoint, normal: new Vector3(0, 1, 0) });
 			}
 
-			const finalPoints = allPointsWithNormals.map((p) =>
-				p.point
-					.clone()
-					.sub(modelOffset)
-					.toArray()
-					.map((c) => Number(c.toFixed(2)))
-			);
+			const finalPoints = allPointsWithNormals.map((p) => {
+				const localPoint = this.gltfScene.worldToLocal(p.point.clone());
+				return localPoint.toArray().map((c) => Number(c.toFixed(4)));
+			});
 
 			if (activeTool === 'multipitch') {
 				let route = userState.topo.routes.find(
@@ -438,14 +435,10 @@ export class Topo3DInteractionManager {
 		});
 		if (allPointsWithNormals.length === 0) return;
 
-		const modelOffset = new Vector3(...this.modelPosition);
-		const finalPoints = allPointsWithNormals.map((p) =>
-			p.point
-				.clone()
-				.sub(modelOffset)
-				.toArray()
-				.map((c) => Number(c.toFixed(2)))
-		);
+		const finalPoints = allPointsWithNormals.map((p) => {
+			const localPoint = this.gltfScene.worldToLocal(p.point.clone());
+			return localPoint.toArray().map((c) => Number(c.toFixed(4)));
+		});
 
 		let route = userState.topo.routes.find(
 			(r) => r.id === (this.localDrawingState?.routeId || userState.ui.selectedRouteId)
@@ -457,9 +450,11 @@ export class Topo3DInteractionManager {
 
 		const anchorId = generateId('anchor');
 		const lastPoint = allPointsWithNormals[allPointsWithNormals.length - 1];
+		const localAnchor = this.gltfScene.worldToLocal(lastPoint.point.clone());
+		
 		userState.topo.fixPoints.push({
 			id: anchorId,
-			position: lastPoint.point.clone().sub(modelOffset).toArray(),
+			position: localAnchor.toArray().map((c) => Number(c.toFixed(4))),
 			type: 'belay'
 		});
 
@@ -500,14 +495,10 @@ export class Topo3DInteractionManager {
 				if (segment.pointsData?.length > 0) allPointsWithNormals.push(...segment.pointsData);
 			});
 			if (allPointsWithNormals.length > 0) {
-				const modelOffset = new Vector3(...this.modelPosition);
-				const finalPoints = allPointsWithNormals.map((p) =>
-					p.point
-						.clone()
-						.sub(modelOffset)
-						.toArray()
-						.map((c) => Number(c.toFixed(2)))
-				);
+				const finalPoints = allPointsWithNormals.map((p) => {
+					const localPoint = this.gltfScene.worldToLocal(p.point.clone());
+					return localPoint.toArray().map((c) => Number(c.toFixed(4)));
+				});
 				const averageNormal = new Vector3();
 				allPointsWithNormals.forEach((pd) => averageNormal.add(pd.normal));
 				averageNormal.normalize();

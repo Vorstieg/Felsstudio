@@ -443,13 +443,17 @@
 	async function saveToServer() {
 		if (!authState.requireAuth(() => saveToServer())) return;
 
-		const savePath = getCragEntryPath(cragEditorState.crag);
+		let savePath = getCragEntryPath(cragEditorState.crag);
 		if (!savePath) {
 			saveStatus = 'error';
-			saveError = $_('save.save_path_required');
+			saveError = 'No path set for this crag.';
 			return;
 		}
 		cragEditorState.crag.path = savePath;
+
+		if (!savePath.startsWith('entries/')) {
+			savePath = `entries/${savePath}`;
+		}
 
 		saveStatus = 'saving';
 		saveError = '';

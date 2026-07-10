@@ -21,6 +21,7 @@
 	--color-workspace-crag: #ff64c8;
 	--color-workspace-topo-3d: #391c57;
 	--color-workspace-topo-2d: #2a9d99;
+	--color-workspace-felslager: #f59e0b;
 
 	/* Sharp, tight shadows for a dense UI */
 	--shadow-panel: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);

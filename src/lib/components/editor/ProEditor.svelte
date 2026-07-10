@@ -464,17 +464,25 @@
 		if (!authState.requireAuth(() => combinedExport())) return;
 		
 		// Require a save path
-		const savePath = userState.topo._entryPath;
+		let savePath = userState.topo._entryPath;
 		if (!savePath) {
 			saveStatus = 'error';
 			saveError = 'No save path set. Set it in the Properties panel.';
 			return;
 		}
 		
+		if (!savePath.startsWith('entries/')) {
+			savePath = `entries/${savePath}`;
+		}
+		
 		saveStatus = 'saving';
 		saveError = '';
 		
 		try {
+			if (userState.topo.editorMode === '3d' && modelComponent) {
+				await modelComponent.bakeTransforms();
+			}
+
 			userState.topo.date = userState.topo.date || new Date().toISOString().split('T')[0];
 			userState.topo.updated = new Date().toISOString().split('T')[0];
 
@@ -484,10 +492,6 @@
 			// Remove internal UI fields before saving
 			delete topoToSave._entryPath;
 			delete topoToSave._topoFileName;
-
-			// Reset modelOffset to [0, 0, 0] in the exported topo.json file,
-			// because the exported GLB model has been centered to [0, 0, 0] as well.
-			topoToSave.modelOffset = [0, 0, 0];
 
 			if (workspace === '3d-create') {
 				// Convert visible clusters to fixPoints
@@ -892,8 +896,6 @@
 				<Model
 					bind:this={modelComponent}
 					gltfScene={loadedGltfScene}
-					position={modelPositionOffset}
-					scale={userState.topo.scale}
 					{activeTool}
 					{drawingTarget}
 					{element}
@@ -923,15 +925,12 @@
 {#if showMapModal}
 	<MapModal
 		bind:coordinates={userState.topo.coordinates}
-		bind:wallAzimuth={userState.topo.wallAzimuth}
 		bind:altitude={userState.topo.altitude}
-		bind:scale={userState.topo.scale}
 		gltfScene={loadedGltfScene}
-		modelOffset={userState.topo.modelOffset}
+		bind:modelRotation={userState.topo.modelRotation}
+		bind:modelScale={userState.topo.modelScale}
 		onClose={() => {
 			showMapModal = false;
-			// Force refresh of model offset in 3D view
-			modelPositionOffset = [...userState.topo.modelOffset];
 		}}
 	/>
 {/if}

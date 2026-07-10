@@ -1,17 +1,15 @@
 <script>
-	import { onMount, onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import maplibregl from 'maplibre-gl';
-	import 'maplibre-gl/dist/maplibre-gl.css';
 	import * as THREE from 'three';
 	import { base } from '$app/paths';
 
 	let { 
 		coordinates = $bindable([0, 0]), 
-		wallAzimuth = $bindable(0), 
 		altitude = $bindable(0),
-		scale = $bindable(1),
 		gltfScene,
-		modelOffset,
+		modelRotation = $bindable(),
+		modelScale = $bindable(),
 		onClose 
 	} = $props();
 
@@ -19,9 +17,106 @@
 	let map;
 	let customLayer;
 	let isPinned = $state(false);
-	let relativeAltitude = $state(0);
-	let isAltitudeInitialized = false;
 	
+	let uniformScale = $state(modelScale?.[0] || 1);
+	function updateScale() {
+		modelScale = [uniformScale, uniformScale, uniformScale];
+		if (map) map.triggerRepaint();
+	}
+	
+	// CSS 3D Gizmo State
+	let gizmoX = $state(-1000);
+	let gizmoY = $state(-1000);
+	let mapPitch = $state(0);
+	let mapBearing = $state(0);
+	let mapZoom = $state(18);
+	
+	let activeDragAxis = null;
+	let dragStartX = 0;
+	let dragStartY = 0;
+	let initialCoordinates = [0, 0];
+	let initialAltitude = 0;
+	let initialRotation = [0, 0, 0];
+	
+	function startDrag(e, axis) {
+		e.preventDefault();
+		e.stopPropagation();
+		activeDragAxis = axis;
+		dragStartX = e.clientX;
+		dragStartY = e.clientY;
+		initialCoordinates = [...coordinates];
+		initialAltitude = altitude;
+		initialRotation = modelRotation ? [...modelRotation] : [0, 0, 0];
+		
+		if (!modelRotation) modelRotation = [0, 0, 0];
+		
+		window.addEventListener('pointermove', onDrag);
+		window.addEventListener('pointerup', endDrag);
+		if (map) {
+			map.dragPan.disable();
+			map.scrollZoom.disable();
+			map.dragRotate.disable();
+		}
+	}
+	
+	function onDrag(e) {
+		if (!activeDragAxis) return;
+		
+		const deltaX = e.clientX - dragStartX;
+		const deltaY = e.clientY - dragStartY;
+		
+		// Base scaling factor mapped to the exact map zoom level (tuned down)
+		const baseScale = 0.05 / Math.pow(2, (mapZoom - 18));
+		
+		if (activeDragAxis === 'y') {
+			// Green Arrow (Altitude)
+			const altPitchFactor = 1 / Math.max(0.1, Math.sin(mapPitch * Math.PI / 180));
+			altitude = initialAltitude - deltaY * baseScale * altPitchFactor;
+		} 
+		else if (activeDragAxis === 'x' || activeDragAxis === 'z') {
+			// Ground movements
+			const pitchFactor = 1 / Math.max(0.1, Math.cos(mapPitch * Math.PI / 180));
+			const compensatedDeltaY = deltaY * pitchFactor;
+			
+			const angle = mapBearing * (Math.PI / 180);
+			const cos = Math.cos(angle);
+			const sin = Math.sin(angle);
+			
+			const groundDeltaX = deltaX * cos + compensatedDeltaY * sin;
+			const groundDeltaY = -deltaX * sin + compensatedDeltaY * cos;
+			
+			// Approximate meters to decimal degrees
+			const metersPerDegreeLat = 111320;
+			const metersPerDegreeLng = 111320 * Math.cos(initialCoordinates[1] * Math.PI / 180);
+			
+			if (activeDragAxis === 'x') {
+				const deltaLng = (groundDeltaX * baseScale) / metersPerDegreeLng;
+				coordinates = [initialCoordinates[0] + deltaLng, coordinates[1]];
+			} else if (activeDragAxis === 'z') {
+				// Positive groundDeltaY moves SOUTH (negative latitude change)
+				const deltaLat = (groundDeltaY * baseScale) / metersPerDegreeLat;
+				coordinates = [coordinates[0], initialCoordinates[1] - deltaLat];
+			}
+		} 
+		else if (activeDragAxis === 'ry') {
+			const deltaAngle = deltaX * (Math.PI / 180);
+			modelRotation = [modelRotation[0], initialRotation[1] + deltaAngle, modelRotation[2]];
+		}
+		
+		if (map) map.triggerRepaint();
+	}
+	
+	function endDrag() {
+		activeDragAxis = null;
+		window.removeEventListener('pointermove', onDrag);
+		window.removeEventListener('pointerup', endDrag);
+		if (map) {
+			map.dragPan.enable();
+			map.scrollZoom.enable();
+			map.dragRotate.enable();
+		}
+	}
+
 	let initialCenter = (coordinates[0] === 0 && coordinates[1] === 0) ? [16.37, 48.20] : coordinates;
 	
 	if (coordinates[0] === 0 && coordinates[1] === 0) {
@@ -49,21 +144,15 @@
 			antialias: true
 		});
 
-		map.on('move', () => {
-			if (!isPinned) {
-				const center = map.getCenter();
-				coordinates = [center.lng, center.lat];
-			}
-		});
+		// Removed custom DOM drag/rotate handlers as requested
 
-		// --- Custom Layer Setup ---
 		customLayer = {
 			id: '3d-model',
 			type: 'custom',
 			renderingMode: '3d',
 			onAdd: function (map, gl) {
 				console.log('Custom Layer onAdd triggered');
-				this.camera = new THREE.Camera();
+				this.camera = new THREE.PerspectiveCamera();
 				this.scene = new THREE.Scene();
 
 				// Lights
@@ -84,10 +173,14 @@
 				if (gltfScene) {
 					console.log('Adding GLTF Scene to Map');
 					const model = gltfScene.clone();
-					const offset = modelOffset || [0, 0, 0];
-					// Center model
-					model.position.set(-offset[0], -offset[1], -offset[2]);
+					model.position.set(0, 0, 0);
+					const rot = modelRotation || [0, 0, 0];
+					model.rotation.set(rot[0], rot[1], rot[2]);
+					const scl = modelScale || [1, 1, 1];
+					model.scale.set(scl[0], scl[1], scl[2]);
 					this.modelGroup.add(model);
+
+					// TransformControls deleted in favor of CSS 3D Gizmo
 				} else {
 					console.warn('No GLTF Scene provided to MapModal');
 				}
@@ -103,43 +196,23 @@
 			},
 			render: function (gl, args) {
 				const elevation = map.queryTerrainElevation(coordinates) || 0;
-				
-				// Initialize relative altitude from existing absolute altitude if loaded
-				if (!isAltitudeInitialized && altitude !== 0) {
-					relativeAltitude = altitude - elevation;
-					isAltitudeInitialized = true;
-				}
-
-				// Calculate absolute altitude based on current elevation + relative adjustment
-				const modelAltitude = elevation + relativeAltitude;
-				
-				// Update bound prop with absolute value
-				altitude = modelAltitude;
+				// The altitude is bound and modified directly by the vertical dragger.
+				const modelAltitude = altitude;
 				
 				// Rotation:
 				// X: 90 deg to flip Y-up (GLTF) to Z-up (MapLibre)
-				// Y: -wallAzimuth (Compass degrees to radians, counter-clockwise around Up-axis)
-				const modelRotate = [Math.PI / 2, -wallAzimuth * Math.PI / 180, 0];
+				const modelRotate = [Math.PI / 2, 0, 0];
 
 				const modelAsMercatorCoordinate = maplibregl.MercatorCoordinate.fromLngLat(
 					coordinates,
 					modelAltitude
 				);
 
-				// Scale to maintain meter size, multiplied by visual scale
-				const finalScale = modelAsMercatorCoordinate.meterInMercatorCoordinateUnits() * scale;
+				const finalScale = modelAsMercatorCoordinate.meterInMercatorCoordinateUnits();
 
 				const rotationX = new THREE.Matrix4().makeRotationAxis(
 					new THREE.Vector3(1, 0, 0),
 					modelRotate[0]
-				);
-				const rotationY = new THREE.Matrix4().makeRotationAxis(
-					new THREE.Vector3(0, 1, 0),
-					modelRotate[1]
-				);
-				const rotationZ = new THREE.Matrix4().makeRotationAxis(
-					new THREE.Vector3(0, 0, 1),
-					modelRotate[2]
 				);
 
 				const m = new THREE.Matrix4().fromArray(args.defaultProjectionData.mainMatrix);
@@ -156,16 +229,107 @@
 							finalScale
 						)
 					)
-					.multiply(rotationX)
-					.multiply(rotationY)
-					.multiply(rotationZ);
-
+					.multiply(rotationX);
+				
+				this.lMatrix = l;
 				this.camera.projectionMatrix = m.multiply(l);
+				
+				// Sync screen coordinates and 3D perspective for DOM gizmo!
+				if (mapContainer) {
+					const modelPos = new THREE.Vector3(0, 0, 0);
+					
+					// Apply l and m manually to project correctly
+					const mCopy = new THREE.Matrix4().fromArray(args.defaultProjectionData.mainMatrix);
+					const projection = mCopy.multiply(l);
+					modelPos.applyMatrix4(projection);
+					
+					gizmoX = (modelPos.x + 1) / 2 * mapContainer.offsetWidth;
+					gizmoY = (-modelPos.y + 1) / 2 * mapContainer.offsetHeight;
+					
+					const tr = map.transform;
+					mapPitch = tr.pitch;
+					mapBearing = tr.bearing;
+					mapZoom = map.getZoom();
+				}
+
+				// 100% PERFECT PHYSICAL CLONE OF MAPLIBRE CAMERA INTO THREE.JS
+				if (this.dummyCamera) {
+					const tr = map.transform;
+					
+					// 1. Sync Aspect Ratio
+					this.dummyCamera.aspect = tr.width / tr.height;
+					
+					// 2. Sync FOV (MapLibre's tr._fov is in radians, ThreeJS is in degrees)
+					const fov = tr._fov !== undefined ? tr._fov : 0.6435011087932844;
+					this.dummyCamera.fov = fov * (180 / Math.PI);
+					this.dummyCamera.updateProjectionMatrix();
+
+					// 3. Sync Position (Translate Mercator to Model Space)
+					let camMercator;
+					if (typeof map.getFreeCameraOptions === 'function') {
+						const fco = map.getFreeCameraOptions();
+						camMercator = new THREE.Vector3(fco.position.x, fco.position.y, fco.position.z);
+					} else {
+						// Fallback if fco not available
+						const center = map.getCenter();
+						const centerMc = maplibregl.MercatorCoordinate.fromLngLat(center, 0);
+						const pitch = tr._pitch || 0;
+						const bearing = tr._bearing || 0;
+						const alt = tr.cameraToCenterDistance || 1000;
+						const worldSize = tr.worldSize || 512;
+						
+						const yOffset = -Math.cos(pitch) * alt;
+						const zOffset = Math.sin(pitch) * alt;
+						
+						const xOffsetRot = yOffset * Math.sin(bearing);
+						const yOffsetRot = yOffset * Math.cos(bearing);
+						
+						camMercator = new THREE.Vector3(
+							centerMc.x + xOffsetRot / worldSize,
+							centerMc.y + yOffsetRot / worldSize,
+							zOffset / worldSize
+						);
+					}
+					const lInv = new THREE.Matrix4().copy(l).invert();
+					camMercator.applyMatrix4(lInv);
+					this.dummyCamera.position.copy(camMercator);
+					
+					// 4. Sync Rotation (Look exactly at the map's center ground point)
+					const center = map.getCenter();
+					const centerMc = maplibregl.MercatorCoordinate.fromLngLat(center, 0);
+					const centerMercatorVec = new THREE.Vector3(centerMc.x, centerMc.y, centerMc.z);
+					centerMercatorVec.applyMatrix4(lInv);
+					this.dummyCamera.lookAt(centerMercatorVec);
+					
+					// 5. Finalize matrices for TransformControls raycasting
+					this.dummyCamera.updateMatrixWorld(true);
+				}
+
+				// Sync Three.js Model to state before rendering
+				if (this.modelGroup && this.modelGroup.children.length > 0) {
+					const model = this.modelGroup.children[0];
+					model.position.set(0, 0, 0);
+					const currRot = modelRotation || [0, 0, 0];
+					model.rotation.set(currRot[0], currRot[1], currRot[2]);
+					const currScale = modelScale || [1, 1, 1];
+					model.scale.set(currScale[0], currScale[1], currScale[2]);
+				}
+
 				this.renderer.resetState();
 				this.renderer.render(this.scene, this.camera);
 				this.map.triggerRepaint();
 			}
 		};
+
+		// Keyboard toggle for Transform modes
+		window._handleKeydown = (e) => {
+			if (customLayer && customLayer.transformControls) {
+				if (e.key === 't' || e.key === 'T') customLayer.transformControls.setMode('translate');
+				if (e.key === 'r' || e.key === 'R') customLayer.transformControls.setMode('rotate');
+				if (e.key === 's' || e.key === 'S') customLayer.transformControls.setMode('scale');
+			}
+		};
+		window.addEventListener('keydown', window._handleKeydown);
 
 		map.on('style.load', () => {
 			if (!map.getLayer('3d-model')) {
@@ -181,12 +345,23 @@
 	
 	$effect(() => {
 		// Trigger repaint when reactive properties change
-		if (map && (wallAzimuth !== undefined || scale !== undefined || relativeAltitude !== undefined)) {
+		if (map && (coordinates !== undefined || relativeAltitude !== undefined)) {
 			map.triggerRepaint();
 		}
 	});
 
 	onDestroy(() => {
+		if (window._centerMarker) {
+			window._centerMarker.remove();
+			window._centerMarker = null;
+		}
+		if (window._handleKeydown) {
+			window.removeEventListener('keydown', window._handleKeydown);
+			window._handleKeydown = null;
+		}
+		if (customLayer && customLayer.transformControls) {
+			customLayer.transformControls.dispose();
+		}
 		map?.remove();
 	});
 
@@ -205,80 +380,106 @@
 			</button>
 		</div>
 
-		<!-- Map Area -->
-		<div class="flex-1 relative overflow-hidden bg-warm-white">
-			<!-- Map -->
+		<!-- Map container -->
+		<div class="flex-1 relative bg-warm-gray-200 overflow-hidden isolate shadow-inner">
 			<div bind:this={mapContainer} class="w-full h-full absolute inset-0 z-0 grayscale-[0.2]"></div>
-			
-			<!-- Crosshair -->
-			{#if !isPinned}
-				<div class="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
-					<div class="w-10 h-10 border border-white/50 rounded-sm z-20 shadow-sm relative">
-                        <div class="absolute top-1/2 left-0 w-full h-px bg-white/30"></div>
-                        <div class="absolute left-1/2 top-0 h-full w-px bg-white/30"></div>
-                    </div>
-					<div class="absolute w-1.5 h-1.5 bg-red-500 rounded-sm z-30 shadow-sm"></div>
+
+			<!-- CSS 3D Gizmo Overlay -->
+			{#if gizmoX !== -1000}
+				<!-- Outer container positioned exactly on the model's screen center -->
+				<div 
+					class="absolute z-40 pointer-events-none"
+					style="left: {gizmoX}px; top: {gizmoY}px; perspective: 1000px;"
+				>
+					<!-- Inner 3D container perfectly rotated to match MapLibre's camera perspective -->
+					<div 
+						style="transform-style: preserve-3d; transform: rotateX({mapPitch}deg) rotateZ({-mapBearing}deg);"
+					>
+						
+						<!-- Center Dot -->
+						<div class="absolute inset-0 m-auto w-3 h-3 bg-white rounded-full shadow-md border-2 border-gray-800 pointer-events-auto" style="transform: translate(-50%, -50%);"></div>
+
+						<!-- Z-Rotation Ring (Yaw) -->
+						<div 
+							class="absolute inset-0 m-auto w-32 h-32 rounded-full border-[3px] border-blue-400/50 cursor-grab hover:border-blue-500 pointer-events-auto flex items-center justify-center transition-colors"
+							onpointerdown={(e) => startDrag(e, 'ry')}
+							style="transform: translate(-50%, -50%);"
+							role="slider"
+							tabindex="0"
+							aria-valuenow={modelRotation?.[1] || 0}
+						>
+							<div class="absolute -top-[5px] left-1/2 -translate-x-1/2 w-4 h-4 bg-blue-500 rounded-full shadow-sm hover:scale-125 transition-transform"></div>
+						</div>
+
+						<!-- X Arrow (Red) - Points East -->
+						<div 
+							class="absolute top-0 left-0 flex items-center cursor-ew-resize pointer-events-auto hover:brightness-125 origin-left group"
+							style="transform: translate(0, -50%);"
+							onpointerdown={(e) => startDrag(e, 'x')}
+							role="slider"
+							tabindex="0"
+							aria-valuenow={coordinates[0]}
+						>
+							<div class="w-16 h-[5px] bg-red-500 shadow-sm border border-red-700/50 group-hover:scale-y-150 transition-transform"></div>
+							<div class="w-0 h-0 border-t-[8px] border-t-transparent border-l-[12px] border-l-red-500 border-b-[8px] border-b-transparent drop-shadow-sm"></div>
+						</div>
+
+						<!-- Z Arrow (Blue) - Points North (Horizontal Depth) -->
+						<div 
+							class="absolute top-0 left-0 flex flex-col items-center justify-end cursor-ns-resize pointer-events-auto hover:brightness-125 origin-bottom group"
+							style="transform: translate(-50%, -100%);"
+							onpointerdown={(e) => startDrag(e, 'z')}
+							role="slider"
+							tabindex="0"
+							aria-valuenow={coordinates[1]}
+						>
+							<div class="w-0 h-0 border-l-[8px] border-l-transparent border-b-[12px] border-b-blue-500 border-r-[8px] border-r-transparent drop-shadow-sm"></div>
+							<div class="w-[5px] h-16 bg-blue-500 shadow-sm border border-blue-700/50 group-hover:scale-x-150 transition-transform"></div>
+						</div>
+						
+						<!-- Y Arrow (Green) - Points Up (Vertical) -->
+						<div 
+							class="absolute top-0 left-0 flex flex-col items-center justify-end cursor-ns-resize pointer-events-auto hover:brightness-125 origin-bottom group"
+							style="transform: translate(-50%, -100%) rotateX(-90deg);"
+							onpointerdown={(e) => startDrag(e, 'y')}
+							role="slider"
+							tabindex="0"
+							aria-valuenow={altitude}
+						>
+							<div class="w-0 h-0 border-l-[8px] border-l-transparent border-b-[12px] border-b-green-500 border-r-[8px] border-r-transparent drop-shadow-sm"></div>
+							<div class="w-[5px] h-16 bg-green-500 shadow-sm border border-green-700/50 group-hover:scale-x-150 transition-transform"></div>
+						</div>
+						
+					</div>
 				</div>
 			{/if}
-			
-			<!-- Controls Overlay -->
-			<div class="absolute top-2 right-2 bottom-2 w-64 bg-white/90 backdrop-blur-md p-3 rounded shadow-panel border border-black/15 z-30 flex flex-col gap-4 overflow-y-auto custom-scrollbar">
+
+			<!-- Overlay Controls -->
+			<div class="absolute top-6 left-1/2 -translate-x-1/2 z-30 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full shadow-modal border border-black/15 text-sm font-medium text-warm-gray-500">
+				Use <kbd class="px-1.5 py-0.5 bg-black/5 rounded">T</kbd> to Translate, <kbd class="px-1.5 py-0.5 bg-black/5 rounded">R</kbd> to Rotate, <kbd class="px-1.5 py-0.5 bg-black/5 rounded">S</kbd> to Scale
+			</div>
+
+			<!-- Move Model Here Button -->
+			<div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
 				<button 
-					class={`btn-primary w-full shadow-sm ${isPinned ? '!bg-rose-600 hover:!bg-rose-700' : '!bg-emerald-600 hover:!bg-emerald-700'}`}
-					onclick={() => isPinned = !isPinned}
+					class="bg-white px-5 py-2.5 rounded-full shadow-modal border border-black/15 text-body-text font-bold text-near-black hover:bg-black/5 transition-none flex items-center gap-2"
+					onclick={() => {
+						const center = map.getCenter();
+						coordinates = [center.lng, center.lat];
+						if (window._centerMarker) window._centerMarker.setLngLat(coordinates);
+						map.triggerRepaint();
+					}}
 				>
-					<i class="fa-solid {isPinned ? 'fa-lock' : 'fa-lock-open'} mr-2 opacity-60"></i>
-                    {isPinned ? 'Unlock Position' : 'Pin Position'}
+					<i class="fa-solid fa-location-crosshairs text-creator-blue"></i>
+					Move Model Here
 				</button>
+			</div>
 
-				<div class="space-y-3">
-                    <div>
-                        <label class="text-ui-label block mb-2">Wall Orientation</label>
-                        <div class="flex items-center justify-center mb-3">
-                            <div class="relative w-28 h-28 rounded-sm border border-black/10 flex items-center justify-center bg-black/5">
-                                <div class="absolute text-[9px] font-black text-warm-gray-400 top-1">N</div>
-                                <div class="absolute text-[9px] font-black text-warm-gray-400 bottom-1">S</div>
-                                <div class="absolute text-[9px] font-black text-warm-gray-400 left-2">W</div>
-                                <div class="absolute text-[9px] font-black text-warm-gray-400 right-2">O</div>
-                                <div class="w-0.5 h-12 bg-rose-500 absolute bottom-1/2 origin-bottom transition-none" style="transform: rotate({wallAzimuth}deg)"></div>
-                                <div class="w-2 h-2 bg-near-black rounded-sm z-10 shadow-sm"></div>
-                            </div>
-                        </div>
-                        <div class="space-y-1.5">
-                            <div class="flex justify-between items-center px-1">
-                                <span class="text-micro-data font-bold text-near-black">{wallAzimuth}°</span>
-                                <span class="text-[9px] text-warm-gray-400 uppercase font-bold tracking-widest">Azimuth</span>
-                            </div>
-                            <input type="range" min="0" max="360" bind:value={wallAzimuth} class="studio-range w-full">
-                        </div>
-                    </div>
-
-                    <div class="pt-3 border-t border-black/10 space-y-2.5">
-                        <div class="space-y-1.5">
-                            <div class="flex justify-between items-center px-1">
-                                <label class="text-ui-label !m-0">Height (Relative)</label>
-                                <span class="text-micro-data font-mono text-near-black">{relativeAltitude > 0 ? '+' : ''}{relativeAltitude.toFixed(1)}m</span>
-                            </div>
-                            <input type="range" min="-50" max="50" step="0.5" bind:value={relativeAltitude} class="studio-range w-full !accent-emerald-600">
-                            <div class="text-[9px] text-warm-gray-400 font-bold uppercase text-right px-1">Abs: {altitude.toFixed(1)}m</div>
-                        </div>
-
-                        <div class="space-y-1.5 pt-1">
-                            <div class="flex justify-between items-center px-1">
-                                <label class="text-ui-label !m-0">Model Scale</label>
-                                <span class="text-micro-data font-mono text-near-black">x{scale.toFixed(2)}</span>
-                            </div>
-                            <input type="range" min="0.01" max="10" step="0.01" bind:value={scale} class="studio-range w-full !accent-creator-blue">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mt-auto pt-3 border-t border-black/10">
-                    <div class="bg-black/5 p-2 rounded-sm space-y-1">
-                        <div class="flex justify-between text-micro-data font-mono"><span class="text-warm-gray-400">LAT</span> <span class="text-near-black font-bold">{coordinates[1].toFixed(6)}</span></div>
-                        <div class="flex justify-between text-micro-data font-mono"><span class="text-warm-gray-400">LON</span> <span class="text-near-black font-bold">{coordinates[0].toFixed(6)}</span></div>
-                    </div>
-                </div>
+			<!-- Scale Control -->
+			<div class="absolute right-6 top-1/2 -translate-y-1/2 z-30 bg-white/90 backdrop-blur-md rounded-full shadow-modal border border-black/15 flex flex-col items-center py-4 px-2 gap-3 w-12">
+				<div class="text-[9px] font-bold text-warm-gray-400 uppercase tracking-widest leading-none">Scale</div>
+				<input type="range" min="0.1" max="10" step="0.1" bind:value={uniformScale} oninput={updateScale} class="studio-range-vertical" style="height: 150px;">
+				<div class="text-micro-data font-mono font-bold text-near-black leading-none">{uniformScale.toFixed(1)}x</div>
 			</div>
 		</div>
 
@@ -311,6 +512,28 @@
 	.studio-range::-webkit-slider-runnable-track {
 		width: 100%;
 		height: 4px;
+		cursor: pointer;
+		background: rgba(0, 0, 0, 0.1);
+		border-radius: 0px;
+	}
+	.studio-range-vertical {
+		-webkit-appearance: slider-vertical;
+		width: 10px;
+		background: transparent;
+	}
+	.studio-range-vertical::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		height: 10px;
+		width: 10px;
+		border-radius: 2px;
+		background: #ffffff;
+		cursor: pointer;
+		border: 2px solid currentColor;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+	}
+	.studio-range-vertical::-webkit-slider-runnable-track {
+		width: 4px;
+		height: 100%;
 		cursor: pointer;
 		background: rgba(0, 0, 0, 0.1);
 		border-radius: 0px;
