@@ -10,8 +10,6 @@
 
 	import CragEditorMap from '$lib/components/editor/crag/CragEditorMap.svelte';
 	import CragEditorLayout from '$lib/components/editor/crag/CragEditorLayout.svelte';
-	import CompactAppBar from '$lib/components/editor/crag/CompactAppBar.svelte';
-	import MobileToolPill from '$lib/components/editor/crag/MobileToolPill.svelte';
 	import CragEditorBottomSheet from '$lib/components/editor/crag/CragEditorBottomSheet.svelte';
 	import {
 		availableTags,
@@ -49,7 +47,6 @@
 		ensureCragEditorLayers
 	} from '$lib/components/editor/crag/crag-editor-map.js';
 	import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.js';
-
 
 	let { inspectorShadow = true } = $props();
 
@@ -298,7 +295,6 @@
 		accessEditor.syncDetectionHighlights();
 	});
 
-
 	function snapToNearestWay(point, originalLngLat) {
 		if (!map) return originalLngLat;
 		const layers = [
@@ -355,8 +351,7 @@
 				map.easeTo({ center: coordinates, zoom: Math.max(map.getZoom(), 15), duration: 500 });
 				if (activeTool === 'position' && !selectedSectorId) setCragPosition(coordinates);
 			},
-			() => {
-			},
+			() => {},
 			{ enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
 		);
 	}
@@ -468,7 +463,12 @@
 					await writeFile(path, image._file, image.type || image._file.type);
 					uploadedImages.push({ name: image.name, path, type: image.type, size: image.size });
 				} else {
-					uploadedImages.push({ name: image.name, path: image.path, type: image.type, size: image.size });
+					uploadedImages.push({
+						name: image.name,
+						path: image.path,
+						type: image.type,
+						size: image.size
+					});
 				}
 			}
 			cragEditorState.crag.assets.images = uploadedImages;
@@ -558,7 +558,9 @@
 		ensureCragAssets();
 		const image = cragEditorState.crag.assets.images[index];
 		if (image?.previewUrl) URL.revokeObjectURL(image.previewUrl);
-		cragEditorState.crag.assets.images = cragEditorState.crag.assets.images.filter((_, i) => i !== index);
+		cragEditorState.crag.assets.images = cragEditorState.crag.assets.images.filter(
+			(_, i) => i !== index
+		);
 	}
 
 	function createSector() {
@@ -611,8 +613,6 @@
 	{isCompact}
 	{isMedium}
 	{isLandscape}
-	{CompactAppBar}
-	{MobileToolPill}
 	{CragEditorBottomSheet}
 	bind:activeTool
 	bind:mapStyle
@@ -634,6 +634,7 @@
 	onStartRoutingDraft={startRoutingDraft}
 	onHandleTrackConfirm={handleTrackConfirm}
 	onCancelTrackEdit={cancelTrackEdit}
+	onUndoTrackPoint={undoTrackPoint}
 	onGpxUpload={handleGpxUpload}
 	onExport={saveToServer}
 	onUseSearchPosition={setCragPositionFromSearch}

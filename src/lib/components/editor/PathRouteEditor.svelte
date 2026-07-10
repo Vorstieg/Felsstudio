@@ -9,13 +9,17 @@
 	import { generateRouteId } from '$lib/assets/js/id-utils.js';
 	import { writeJson } from '$lib/api/felslager.js';
 	import { authState } from '$lib/api/auth.svelte.js';
-	import SaveStatus from '$lib/components/ui/SaveStatus.svelte';
+	import ToolBar from '$lib/components/editor/tools/ToolBar.svelte';
 	import TopoRoutesPanel from '$lib/components/editor/topo-properties/TopoRoutesPanel.svelte';
 	import CragEditorMap from '$lib/components/editor/crag/CragEditorMap.svelte';
 	import MapSearch from '$lib/components/editor/MapSearch.svelte';
 	import { initMapPointDragHandlers } from '$lib/components/editor/map-point-drag-handlers.js';
 	import { useTrackDrawing } from '$lib/components/editor/track/use-track-drawing.svelte.js';
-	import { coordinatesToPathGeoJson, parseGpx, pathGeoJsonToCoordinates } from '$lib/assets/js/route-path-utils.js';
+	import {
+		coordinatesToPathGeoJson,
+		parseGpx,
+		pathGeoJsonToCoordinates
+	} from '$lib/assets/js/route-path-utils.js';
 	import {
 		fitCoordinatesBounds,
 		reverseCoordinates,
@@ -47,6 +51,7 @@
 	let saveTimeout = null;
 	let canAutosave = false;
 	let geometryRevision = $state(0);
+	let drawingSnapshot = $state(null);
 
 	const routeMainCoordinates = new WeakMap();
 	const assetCoordinates = new Map();
@@ -57,7 +62,8 @@
 		initialMode: 'routing',
 		onPointsChange: (coordinates) => {
 			if (!selectedRoute) return;
-			const asset = selectedPathAsset || createPathAsset(selectedRoute, selectedRoute.name || 'Track');
+			const asset =
+				selectedPathAsset || createPathAsset(selectedRoute, selectedRoute.name || 'Track');
 			setAssetCoordinates(asset, coordinates);
 			syncRoutePathData(selectedRoute);
 			if (coordinates[0]) userState.topo.coordinates = coordinates[0];
@@ -69,7 +75,9 @@
 	let selectedRoute = $derived(
 		(userState.topo.routes || []).find((route) => route.id === userState.ui.selectedRouteId)
 	);
-	let selectedPathAsset = $derived(selectedRoute?.assets?.paths?.[userState.ui.selectedPathIndex ?? -1] || null);
+	let selectedPathAsset = $derived(
+		selectedRoute?.assets?.paths?.[userState.ui.selectedPathIndex ?? -1] || null
+	);
 	let isExpanded = $derived(viewport.isExpanded);
 
 	onMount(() => {
@@ -124,11 +132,13 @@
 		if (!route) return;
 		if (!route.track) route.track = { coordinates: [], pointCount: 0 };
 		if (!Array.isArray(route.track.coordinates)) route.track.coordinates = [];
-		if (!Number.isFinite(route.track.pointCount)) route.track.pointCount = route.track.coordinates.length;
+		if (!Number.isFinite(route.track.pointCount))
+			route.track.pointCount = route.track.coordinates.length;
 		if (!route.geometryMode) route.geometryMode = 'track';
 		if (!route.topo) route.topo = { enabled: false, topoId: null };
 		if (!route.assets) route.assets = { paths: [] };
-		if (!Array.isArray(route.assets.paths)) route.assets.paths = route.assets.paths ? [route.assets.paths] : [];
+		if (!Array.isArray(route.assets.paths))
+			route.assets.paths = route.assets.paths ? [route.assets.paths] : [];
 		route.assets.paths = route.assets.paths.map((asset) => ({
 			role: asset.role || 'main',
 			label: asset.label || '',
@@ -195,7 +205,9 @@
 	}
 
 	function assetHasCoordinates(asset) {
-		return getAssetCoordinates(asset).length > 1 || pathGeoJsonToCoordinates(asset?.path).length > 1;
+		return (
+			getAssetCoordinates(asset).length > 1 || pathGeoJsonToCoordinates(asset?.path).length > 1
+		);
 	}
 
 	function pathSegmentsForRoute(route) {
@@ -233,7 +245,8 @@
 		for (const route of userState.topo.routes || []) {
 			ensurePathRouteShape(route);
 			for (const asset of route.assets.paths || []) {
-				if (Array.isArray(asset._coordinates)) setAssetCoordinates(asset, cloneCoordinates(asset._coordinates));
+				if (Array.isArray(asset._coordinates))
+					setAssetCoordinates(asset, cloneCoordinates(asset._coordinates));
 				else if (asset.path) setAssetCoordinates(asset, pathGeoJsonToCoordinates(asset.path));
 			}
 		}
@@ -286,7 +299,9 @@
 			return;
 		}
 		if (activeTool === 'select' && map) {
-			const features = map.queryRenderedFeatures(event.point, { layers: ['path-route-points', 'path-route-lines'] });
+			const features = map.queryRenderedFeatures(event.point, {
+				layers: ['path-route-points', 'path-route-lines']
+			});
 			const feature = features.find((item) => item.properties?.routeId);
 			if (feature) {
 				userState.ui.selectedRouteId = feature.properties.routeId;
@@ -314,14 +329,41 @@
 
 	function setDrawMode(mode) {
 		drawMode = mode;
-		trackDrawing.setPoints(firstRouteCoordinates(selectedRoute), mode === 'routing' ? 'routing' : 'freestyle');
+		trackDrawing.setPoints(
+			firstRouteCoordinates(selectedRoute),
+			mode === 'routing' ? 'routing' : 'freestyle'
+		);
 	}
 
 	function startDrawing() {
 		if (!selectedRoute) return;
-		const asset = selectedPathAsset || createPathAsset(selectedRoute, selectedRoute.name || 'Track');
+		const wasNew = !selectedPathAsset;
+		const asset =
+			selectedPathAsset || createPathAsset(selectedRoute, selectedRoute.name || 'Track');
+		drawingSnapshot = { asset, wasNew, coordinates: cloneCoordinates(getAssetCoordinates(asset)) };
 		trackDrawing.setPoints(getAssetCoordinates(asset), drawMode);
 		activeTool = 'draw';
+	}
+
+	function finishDrawing() {
+		drawingSnapshot = null;
+		activeTool = 'select';
+	}
+
+	function cancelDrawing() {
+		if (!drawingSnapshot || !selectedRoute) return finishDrawing();
+		if (drawingSnapshot.wasNew) {
+			selectedRoute.assets.paths = selectedRoute.assets.paths.filter(
+				(asset) => asset !== drawingSnapshot.asset
+			);
+			userState.ui.selectedPathIndex = Math.max(0, selectedRoute.assets.paths.length - 1);
+		} else {
+			setAssetCoordinates(drawingSnapshot.asset, drawingSnapshot.coordinates);
+			syncRoutePathData(selectedRoute);
+		}
+		drawingSnapshot = null;
+		activeTool = 'select';
+		scheduleMapSync();
 	}
 
 	function clearTrack() {
@@ -420,7 +462,12 @@
 
 	function findCutIntersection(coordinates, lineStart, lineEnd) {
 		for (let index = 0; index < coordinates.length - 1; index += 1) {
-			const intersection = segmentLineIntersection(coordinates[index], coordinates[index + 1], lineStart, lineEnd);
+			const intersection = segmentLineIntersection(
+				coordinates[index],
+				coordinates[index + 1],
+				lineStart,
+				lineEnd
+			);
 			if (intersection) return { ...intersection, segmentIndex: index };
 		}
 		return null;
@@ -455,11 +502,12 @@
 		ensurePathRouteShape(selectedRoute);
 		const segmentLabel = `${selectedRoute.name || 'Track'} segment ${(selectedRoute.assets.paths || []).length + 1}`;
 		const selectedIndex = userState.ui.selectedPathIndex ?? 0;
-		const firstAsset = selectedPathAsset || selectedRoute.assets.paths[selectedIndex] || {
-			role: 'main',
-			label: selectedRoute.name || 'Track',
-			path: ''
-		};
+		const firstAsset = selectedPathAsset ||
+			selectedRoute.assets.paths[selectedIndex] || {
+				role: 'main',
+				label: selectedRoute.name || 'Track',
+				path: ''
+			};
 		const nextAsset = { role: firstAsset.role || 'main', label: segmentLabel, path: segmentLabel };
 		setAssetCoordinates(firstAsset, pendingCut.startCoordinates);
 		setAssetCoordinates(nextAsset, pendingCut.endCoordinates);
@@ -490,10 +538,14 @@
 			pendingCut = null;
 			return;
 		}
-		const [startCoordinates, endCoordinates] = splitCoordinatesAtIntersection(coordinates, intersection);
-		pendingCut = startCoordinates.length > 1 && endCoordinates.length > 1
-			? { startCoordinates, endCoordinates, intersection: intersection.coordinate }
-			: null;
+		const [startCoordinates, endCoordinates] = splitCoordinatesAtIntersection(
+			coordinates,
+			intersection
+		);
+		pendingCut =
+			startCoordinates.length > 1 && endCoordinates.length > 1
+				? { startCoordinates, endCoordinates, intersection: intersection.coordinate }
+				: null;
 	}
 
 	function coordinatesForSegment(route, segmentIndex) {
@@ -506,7 +558,8 @@
 		if (!selectedRoute) return false;
 		const asset = selectedRoute.assets?.paths?.[segmentIndex];
 		const assetSegment = getAssetCoordinates(asset);
-		const coordinates = assetSegment.length > 0 ? assetSegment : getRouteMainCoordinates(selectedRoute);
+		const coordinates =
+			assetSegment.length > 0 ? assetSegment : getRouteMainCoordinates(selectedRoute);
 		if (!coordinates[pointIndex]) return false;
 		coordinates[pointIndex] = coordinate;
 		if (assetSegment.length > 0) setAssetCoordinates(asset, coordinates);
@@ -517,7 +570,8 @@
 	}
 
 	function dragOverlayFeatures(dragState) {
-		if (!selectedRoute || dragState?.type !== 'track') return { type: 'FeatureCollection', features: [] };
+		if (!selectedRoute || dragState?.type !== 'track')
+			return { type: 'FeatureCollection', features: [] };
 		const { segmentIndex, pointIndex } = dragState;
 		const segment = coordinatesForSegment(selectedRoute, segmentIndex);
 		const coordinate = dragState.coordinate || segment[pointIndex];
@@ -539,13 +593,25 @@
 		if (segment[pointIndex + 1]) {
 			features.push({
 				type: 'Feature',
-				properties: { id: selectedRoute.id, segmentIndex, edgeIndex: pointIndex, selected: true, dragOverlay: true },
+				properties: {
+					id: selectedRoute.id,
+					segmentIndex,
+					edgeIndex: pointIndex,
+					selected: true,
+					dragOverlay: true
+				},
 				geometry: { type: 'LineString', coordinates: [coordinate, segment[pointIndex + 1]] }
 			});
 		}
 		features.push({
 			type: 'Feature',
-			properties: { id: selectedRoute.id, index: pointIndex, segmentIndex, selected: true, dragOverlay: true },
+			properties: {
+				id: selectedRoute.id,
+				index: pointIndex,
+				segmentIndex,
+				selected: true,
+				dragOverlay: true
+			},
 			geometry: { type: 'Point', coordinates: coordinate }
 		});
 		return { type: 'FeatureCollection', features };
@@ -715,7 +781,8 @@
 			ensurePathRouteShape(route);
 			const label = route.name || file.name.replace(/\.[^.]+$/i, '');
 			route.name = route.name || label;
-			const selectedIndex = userState.ui.selectedRouteId === route.id ? (userState.ui.selectedPathIndex ?? -1) : -1;
+			const selectedIndex =
+				userState.ui.selectedRouteId === route.id ? (userState.ui.selectedPathIndex ?? -1) : -1;
 			const selectedAsset = selectedIndex >= 0 ? route.assets.paths?.[selectedIndex] : null;
 			let asset = selectedAsset && !assetHasCoordinates(selectedAsset) ? selectedAsset : null;
 			let assetIndex = selectedIndex;
@@ -729,7 +796,8 @@
 			}
 			asset.label = asset.label || label;
 			setAssetCoordinates(asset, coordinates);
-			userState.ui.selectedPathIndex = assetIndex >= 0 ? assetIndex : userState.ui.selectedPathIndex;
+			userState.ui.selectedPathIndex =
+				assetIndex >= 0 ? assetIndex : userState.ui.selectedPathIndex;
 			userState.topo.coordinates = coordinates[0];
 			trimPointIndex = 0;
 			activeTool = 'select';
@@ -775,7 +843,8 @@
 			activeTrackDragState?.type !== 'track' ||
 			!selected ||
 			activeTrackDragState.segmentIndex !== segmentIndex
-		) return [lineFeature(route, segmentIndex, segment, selected)];
+		)
+			return [lineFeature(route, segmentIndex, segment, selected)];
 
 		const pointIndex = activeTrackDragState.pointIndex;
 		return [
@@ -788,7 +857,9 @@
 		const features = [];
 		for (const route of userState.topo.routes || []) {
 			for (const { segmentIndex, coordinates: segment } of pathSegmentsForRoute(route)) {
-				const selected = route.id === userState.ui.selectedRouteId && segmentIndex === (userState.ui.selectedPathIndex ?? -1);
+				const selected =
+					route.id === userState.ui.selectedRouteId &&
+					segmentIndex === (userState.ui.selectedPathIndex ?? -1);
 				features.push(...routeLineFeatures(route, segmentIndex, segment, selected));
 				if (!selected) continue;
 				for (const [index, coordinate] of visiblePointEntries(segment)) {
@@ -796,10 +867,17 @@
 						activeTrackDragState?.type === 'track' &&
 						activeTrackDragState.segmentIndex === segmentIndex &&
 						activeTrackDragState.pointIndex === index
-					) continue;
+					)
+						continue;
 					features.push({
 						type: 'Feature',
-						properties: { id: `${route.id}:${segmentIndex}`, routeId: route.id, index, segmentIndex, selected },
+						properties: {
+							id: `${route.id}:${segmentIndex}`,
+							routeId: route.id,
+							index,
+							segmentIndex,
+							selected
+						},
 						geometry: { type: 'Point', coordinates: coordinate }
 					});
 				}
@@ -814,7 +892,10 @@
 			map.addSource('path-routes', { type: 'geojson', data: routeFeatures() });
 		}
 		if (!map.getSource('path-route-drag-overlay')) {
-			map.addSource('path-route-drag-overlay', { type: 'geojson', data: dragOverlayFeatures(null) });
+			map.addSource('path-route-drag-overlay', {
+				type: 'geojson',
+				data: dragOverlayFeatures(null)
+			});
 		}
 		if (!map.getSource('path-cut-overlay')) {
 			map.addSource('path-cut-overlay', { type: 'geojson', data: cutOverlayFeatures() });
@@ -824,7 +905,11 @@
 				id: 'path-route-lines',
 				type: 'line',
 				source: 'path-routes',
-				filter: ['all', ['==', ['geometry-type'], 'LineString'], ['!=', ['get', 'cutPreview'], true]],
+				filter: [
+					'all',
+					['==', ['geometry-type'], 'LineString'],
+					['!=', ['get', 'cutPreview'], true]
+				],
 				paint: {
 					'line-color': ['case', ['==', ['get', 'selected'], true], '#2563eb', '#dc2626'],
 					'line-width': ['case', ['==', ['get', 'selected'], true], 6, 3],
@@ -864,7 +949,12 @@
 				id: 'path-route-points',
 				type: 'circle',
 				source: 'path-routes',
-				filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['get', 'cut'], true], ['!=', ['get', 'cutIntersection'], true]],
+				filter: [
+					'all',
+					['==', ['geometry-type'], 'Point'],
+					['!=', ['get', 'cut'], true],
+					['!=', ['get', 'cutIntersection'], true]
+				],
 				paint: {
 					'circle-radius': ['case', ['==', ['get', 'selected'], true], 5, 3],
 					'circle-color': ['case', ['==', ['get', 'selected'], true], '#2563eb', '#dc2626'],
@@ -928,8 +1018,9 @@
 						? [route.assets.paths]
 						: [];
 				const assetSignature = assets
-					.map((asset) =>
-						`${asset.role || ''}:${asset.label || ''}:${asset.path?.coordinates?.length || 0}:${asset._pointCount || 0}`
+					.map(
+						(asset) =>
+							`${asset.role || ''}:${asset.label || ''}:${asset.path?.coordinates?.length || 0}:${asset._pointCount || 0}`
 					)
 					.join(',');
 				return `${route.id}:${route.name || ''}:${route.track?.pointCount || 0}:${assetSignature}`;
@@ -953,7 +1044,10 @@
 		if (!isMapLoaded || !map || !routeId) return;
 		const selectionKey = `${routeId}:${pathIndex ?? ''}`;
 		if (selectionKey === lastFocusedSelectionKey) return;
-		const coordinates = selectedPathCoordinates().length > 1 ? selectedPathCoordinates() : firstRouteCoordinates(selectedRoute);
+		const coordinates =
+			selectedPathCoordinates().length > 1
+				? selectedPathCoordinates()
+				: firstRouteCoordinates(selectedRoute);
 		if (coordinates.length < 2) return;
 		lastFocusedSelectionKey = selectionKey;
 		const runFit = () => fitRouteBounds(coordinates);
@@ -1002,7 +1096,9 @@
 			}
 		}
 		if (!userState.ui.selectedRouteId) {
-			const firstRoute = (userState.topo.routes || []).find((route) => (route.assets?.paths || []).length > 0);
+			const firstRoute = (userState.topo.routes || []).find(
+				(route) => (route.assets?.paths || []).length > 0
+			);
 			if (firstRoute) {
 				userState.ui.selectedRouteId = firstRoute.id;
 				userState.ui.selectedPathIndex = 0;
@@ -1034,7 +1130,9 @@
 			data.editorMode = 'path';
 			data.routes = (data.routes || []).map((route, routeIndex) => {
 				const sourceRoute = (userState.topo.routes || [])[routeIndex];
-				const sourceAssets = Array.isArray(sourceRoute?.assets?.paths) ? sourceRoute.assets.paths : [];
+				const sourceAssets = Array.isArray(sourceRoute?.assets?.paths)
+					? sourceRoute.assets.paths
+					: [];
 				const paths = sourceAssets
 					.map((asset, assetIndex) => {
 						const coordinates = getAssetCoordinates(sourceAssets[assetIndex]);
@@ -1053,7 +1151,10 @@
 				delete route.assets.gpx;
 				return route;
 			});
-			await writeJson(`${savePath}/${fileName.endsWith('.json') ? fileName : fileName + '.json'}`, data);
+			await writeJson(
+				`${savePath}/${fileName.endsWith('.json') ? fileName : fileName + '.json'}`,
+				data
+			);
 			saveStatus = 'success';
 			setTimeout(() => {
 				if (saveStatus === 'success') saveStatus = 'idle';
@@ -1075,48 +1176,52 @@
 	onMapClick={handleMapClick}
 />
 
-<div class="fixed top-2 left-2 right-2 z-50 panel p-1.5 flex items-center justify-between shadow-panel bg-white">
-	<div class="flex items-center gap-2.5">
-		<button
-			class="w-7 h-7 flex items-center justify-center rounded-sm bg-black/5 hover:bg-black/10 text-near-black transition-none border border-black/10 ml-0.5"
-			onclick={() => goto(base + '/')} title={$_('ui.back_to_launcher')}>
-			<i class="fa-solid fa-arrow-left text-[11px]"></i>
-		</button>
-		<div class="ml-1 mr-3 hidden sm:block"><h1 class="text-section-title leading-none">{$_('ui.path_studio')}</h1></div>
-		<div class="w-px h-5 bg-black/15 mx-1 hidden sm:block"></div>
-		<button
-			class="px-3 py-1.5 rounded-sm text-ui-label {activeTool === 'select' ? 'bg-creator-blue text-white' : 'text-warm-gray-500 hover:bg-black/5'}"
-			onclick={() => (activeTool = 'select')}>
-			<i class="fa-solid fa-arrow-pointer mr-1"></i>Select
-		</button>
-		<button
-			class="px-3 py-1.5 rounded-sm text-ui-label {activeTool === 'draw' ? 'bg-creator-blue text-white' : 'text-warm-gray-500 hover:bg-black/5'}"
-			onclick={startDrawing} disabled={!selectedRoute}>
-			<i class="fa-solid fa-route mr-1"></i>Draw Path
-		</button>
-		<button
-			class="px-3 py-1.5 rounded-sm text-ui-label {activeTool === 'cut' ? 'bg-creator-blue text-white' : 'text-warm-gray-500 hover:bg-black/5'}"
-			onclick={() => { activeTool = 'cut'; resetCutPreview(); }} disabled={!canEditSelectedTrack()}>
-			<i class="fa-solid fa-scissors mr-1"></i>Cut
-		</button>
-		<button class="px-3 py-1.5 rounded-sm text-ui-label text-warm-gray-500 hover:bg-black/5" onclick={undoPoint}
-		        disabled={!selectedRoute}>
-			Undo point
-		</button>
-		<select bind:value={mapStyle} class="input-studio w-32 hidden md:block">
+<ToolBar
+	title={$_('ui.path_studio')}
+	bind:activeTool
+	tools={[
+		{ id: 'select', icon: 'fa-arrow-pointer', label: 'Select', toggle: false },
+		{
+			id: 'draw',
+			icon: 'fa-route',
+			label: 'Draw Path',
+			disabled: !selectedRoute,
+			onSelect: startDrawing
+		},
+		{
+			id: 'cut',
+			icon: 'fa-scissors',
+			label: 'Cut',
+			disabled: !canEditSelectedTrack(),
+			onSelect: () => {
+				activeTool = 'cut';
+				resetCutPreview();
+			}
+		}
+	]}
+	onBack={() => goto(base + '/')}
+	undo={activeTool === 'draw'
+		? { label: 'Undo point', run: undoPoint, disabled: !selectedRoute }
+		: null}
+	finish={activeTool === 'draw'
+		? { label: $_('ui.finish'), run: finishDrawing }
+		: pendingCut
+			? { label: $_('ui.finish'), run: confirmCut }
+			: null}
+	cancel={activeTool === 'draw'
+		? { label: $_('ui.cancel'), run: cancelDrawing }
+		: activeTool === 'cut'
+			? { label: $_('ui.cancel'), run: cancelCut }
+			: null}
+	save={{ status: saveStatus, errorMessage: saveError, run: saveToServer }}
+>
+	{#snippet controls()}
+		<select bind:value={mapStyle} class="input-studio hidden w-32 xl:block">
 			<option value="transport">Transport</option>
 			<option value="satellite">Satellite</option>
 		</select>
-	</div>
-	<div class="flex items-center gap-4 pr-1">
-		<SaveStatus status={saveStatus} errorMessage={saveError} />
-		<button
-			class="bg-creator-blue text-white px-4 py-1.5 rounded-sm text-[11px] font-bold shadow-sm hover:bg-creator-blue-active transition-none uppercase tracking-widest"
-			onclick={saveToServer} disabled={saveStatus === 'saving'}>
-			{$_('save.save_to_server')}
-		</button>
-	</div>
-</div>
+	{/snippet}
+</ToolBar>
 
 {#if isExpanded}
 	<div class="fixed top-14 left-2 z-50 w-[min(24rem,calc(100vw-1rem))] md:right-auto">
@@ -1125,47 +1230,74 @@
 {/if}
 
 <div
-	class="fixed top-14 right-2 z-50 w-96 max-w-[calc(100vw-1rem)] max-h-[calc(100vh-4rem)] overflow-hidden panel flex flex-col shadow-panel">
+	class="fixed top-14 right-2 z-50 w-96 max-w-[calc(100vw-1rem)] max-h-[calc(100vh-4rem)] overflow-hidden panel flex flex-col shadow-panel"
+>
 	<div class="border-b border-black/15 p-3 pb-2 flex-shrink-0">
 		<h2 class="text-section-title">Routes</h2>
 		<p class="text-ui-label !m-0">Draw or attach path segments for Hochtouren and Klettersteige.</p>
 	</div>
 	<div class="p-3 border-b border-black/10 space-y-2">
 		<div class="grid grid-cols-2 gap-2">
-			<input bind:value={userState.topo.name} class="input-studio w-full" placeholder="Area / tour group name" />
-			<input bind:value={userState.topo._entryPath} class="input-studio w-full font-mono"
-			       placeholder="area/name" />
+			<input
+				bind:value={userState.topo.name}
+				class="input-studio w-full"
+				placeholder="Area / tour group name"
+			/>
+			<input
+				bind:value={userState.topo._entryPath}
+				class="input-studio w-full font-mono"
+				placeholder="area/name"
+			/>
 		</div>
 		<div class="flex gap-1">
-			<button class="px-2 py-1 rounded-sm bg-creator-blue text-white text-ui-label"
-			        onclick={() => addRoute('alpine-tour')}>+ Hochtour
+			<button
+				class="px-2 py-1 rounded-sm bg-creator-blue text-white text-ui-label"
+				onclick={() => addRoute('alpine-tour')}
+				>+ Hochtour
 			</button>
-			<button class="px-2 py-1 rounded-sm bg-creator-blue text-white text-ui-label"
-			        onclick={() => addRoute('via-ferrata')}>+ Klettersteig
+			<button
+				class="px-2 py-1 rounded-sm bg-creator-blue text-white text-ui-label"
+				onclick={() => addRoute('via-ferrata')}
+				>+ Klettersteig
 			</button>
-			<button class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
-			        onclick={clearTrack} disabled={!selectedRoute}>Clear track
+			<button
+				class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
+				onclick={clearTrack}
+				disabled={!selectedRoute}
+				>Clear track
 			</button>
-			<button class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
-			        onclick={locateUser}>Locate
+			<button
+				class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
+				onclick={locateUser}
+				>Locate
 			</button>
 		</div>
 		<div class="rounded-sm border border-black/10 bg-black/[0.02] p-2 space-y-2">
 			<div class="flex items-center justify-between gap-2">
 				<div>
-					<div class="text-ui-label font-bold uppercase tracking-wide text-warm-gray-500">Drawing mode</div>
-					<div class="text-[10px] text-warm-gray-400">Routing follows foot paths between clicks; freestyle connects raw
-						clicked points.
+					<div class="text-ui-label font-bold uppercase tracking-wide text-warm-gray-500">
+						Drawing mode
+					</div>
+					<div class="text-[10px] text-warm-gray-400">
+						Routing follows foot paths between clicks; freestyle connects raw clicked points.
 					</div>
 				</div>
 				<div class="flex rounded-sm border border-black/15 overflow-hidden bg-white">
 					<button
-						class="px-2 py-1 text-ui-label {drawMode === 'routing' ? 'bg-creator-blue text-white' : 'text-warm-gray-500'}"
-						onclick={() => setDrawMode('routing')} disabled={!selectedRoute}>Routing
+						class="px-2 py-1 text-ui-label {drawMode === 'routing'
+							? 'bg-creator-blue text-white'
+							: 'text-warm-gray-500'}"
+						onclick={() => setDrawMode('routing')}
+						disabled={!selectedRoute}
+						>Routing
 					</button>
 					<button
-						class="px-2 py-1 text-ui-label {drawMode === 'freestyle' ? 'bg-creator-blue text-white' : 'text-warm-gray-500'}"
-						onclick={() => setDrawMode('freestyle')} disabled={!selectedRoute}>Freestyle
+						class="px-2 py-1 text-ui-label {drawMode === 'freestyle'
+							? 'bg-creator-blue text-white'
+							: 'text-warm-gray-500'}"
+						onclick={() => setDrawMode('freestyle')}
+						disabled={!selectedRoute}
+						>Freestyle
 					</button>
 				</div>
 			</div>
@@ -1173,33 +1305,62 @@
 		<div class="rounded-sm border border-black/10 bg-black/[0.02] p-2 space-y-2">
 			<div class="flex items-center justify-between gap-2">
 				<div>
-					<div class="text-ui-label font-bold uppercase tracking-wide text-warm-gray-500">Track tools</div>
-					<div class="text-[10px] text-warm-gray-400">Click a point on the map or enter its index.</div>
+					<div class="text-ui-label font-bold uppercase tracking-wide text-warm-gray-500">
+						Track tools
+					</div>
+					<div class="text-[10px] text-warm-gray-400">
+						Click a point on the map or enter its index.
+					</div>
 				</div>
-				<button class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
-				        onclick={reverseSelectedTrack} disabled={!canEditSelectedTrack()}>Reverse
+				<button
+					class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
+					onclick={reverseSelectedTrack}
+					disabled={!canEditSelectedTrack()}
+					>Reverse
 				</button>
 			</div>
 			<div class="grid grid-cols-[1fr_auto_auto] gap-1 items-center">
-				<input bind:value={trimPointIndex} type="number" min="0"
-				       max={Math.max(0, firstRouteCoordinates(selectedRoute).length - 1)} class="input-studio w-full"
-				       placeholder="Point index" disabled={!canEditSelectedTrack()} />
-				<button class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
-				        onclick={trimSelectedTrackStart} disabled={!canEditSelectedTrack()}>Trim start
+				<input
+					bind:value={trimPointIndex}
+					type="number"
+					min="0"
+					max={Math.max(0, firstRouteCoordinates(selectedRoute).length - 1)}
+					class="input-studio w-full"
+					placeholder="Point index"
+					disabled={!canEditSelectedTrack()}
+				/>
+				<button
+					class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
+					onclick={trimSelectedTrackStart}
+					disabled={!canEditSelectedTrack()}
+					>Trim start
 				</button>
-				<button class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
-				        onclick={trimSelectedTrackEnd} disabled={!canEditSelectedTrack()}>Trim end
+				<button
+					class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
+					onclick={trimSelectedTrackEnd}
+					disabled={!canEditSelectedTrack()}
+					>Trim end
 				</button>
 			</div>
 			<div class="grid grid-cols-[1fr_auto] gap-1 items-center">
-				<input bind:value={simplifyToleranceMeters} type="number" min="1" step="1" class="input-studio w-full"
-				       placeholder="Tolerance (m)" disabled={!canEditSelectedTrack()} />
-				<button class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
-				        onclick={simplifySelectedTrack} disabled={!canEditSelectedTrack()}>Simplify path
+				<input
+					bind:value={simplifyToleranceMeters}
+					type="number"
+					min="1"
+					step="1"
+					class="input-studio w-full"
+					placeholder="Tolerance (m)"
+					disabled={!canEditSelectedTrack()}
+				/>
+				<button
+					class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
+					onclick={simplifySelectedTrack}
+					disabled={!canEditSelectedTrack()}
+					>Simplify path
 				</button>
 			</div>
-			<div class="text-[10px] text-warm-gray-400">Removes redundant points from the selected path segment using the
-				tolerance in meters.
+			<div class="text-[10px] text-warm-gray-400">
+				Removes redundant points from the selected path segment using the tolerance in meters.
 			</div>
 			{#if simplifySummary}
 				<div class="text-[10px] text-warm-gray-500">{simplifySummary}</div>
@@ -1219,32 +1380,33 @@
 
 {#if activeTool === 'draw'}
 	<div
-		class="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-sm border border-black/10 bg-near-black px-3 py-2 text-sm text-white shadow-lg">
-		{isRoutingTrack ? 'Routing path segment…' : drawMode === 'routing' ? 'Routing drawing: click waypoints; paths are routed between them.' : 'Freestyle drawing: click points; straight path lines are appended.'}
+		class="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-sm border border-black/10 bg-near-black px-3 py-2 text-sm text-white shadow-lg"
+	>
+		{isRoutingTrack
+			? 'Routing path segment…'
+			: drawMode === 'routing'
+				? 'Routing drawing: click waypoints; paths are routed between them.'
+				: 'Freestyle drawing: click points; straight path lines are appended.'}
 	</div>
 {/if}
 
 {#if activeTool === 'cut'}
 	<div
-		class="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-sm border border-black/10 bg-near-black px-3 py-2 text-sm text-white shadow-lg">
+		class="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-sm border border-black/10 bg-near-black px-3 py-2 text-sm text-white shadow-lg"
+	>
 		{#if pendingCut}
-			<div class="flex items-center gap-3">
-				<span>Cut line intersects the track. Confirm to create a new path segment in this route.</span>
-				<button class="rounded-sm bg-creator-blue px-2 py-1 text-ui-label text-white" onclick={confirmCut}>Confirm cut
-				</button>
-				<button class="rounded-sm border border-white/30 px-2 py-1 text-ui-label text-white" onclick={cancelCut}>
-					Cancel
-				</button>
-			</div>
+			<span
+				>Cut line intersects the track. Use the toolbar tick to create a new path segment, or X to
+				discard it.</span
+			>
 		{:else}
-			<div class="flex items-center gap-3">
-				<span>{cutLineStart ? cutLineEnd ? 'No intersection found. Click again to start a new cut line.' : 'Click the second point of the cut line across the track.' : 'Click the first point of a cut line across the selected track.'}</span>
-				{#if cutLineStart}
-					<button class="rounded-sm border border-white/30 px-2 py-1 text-ui-label text-white" onclick={cancelCut}>
-						Cancel
-					</button>
-				{/if}
-			</div>
+			<span
+				>{cutLineStart
+					? cutLineEnd
+						? 'No intersection found. Click again to start a new cut line.'
+						: 'Click the second point of the cut line across the track.'
+					: 'Click the first point of a cut line across the selected track.'}</span
+			>
 		{/if}
 	</div>
 {/if}

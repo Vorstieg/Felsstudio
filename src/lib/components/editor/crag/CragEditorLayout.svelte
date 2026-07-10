@@ -10,8 +10,6 @@
 		isCompact = false,
 		isMedium = false,
 		isLandscape = false,
-		CompactAppBar,
-		MobileToolPill,
 		CragEditorBottomSheet,
 		activeTool = $bindable('position'),
 		mapStyle = $bindable('transport'),
@@ -35,6 +33,7 @@
 		onStartRoutingDraft = () => {},
 		onHandleTrackConfirm = () => {},
 		onCancelTrackEdit = () => {},
+		onUndoTrackPoint = () => {},
 		onGpxUpload = () => {},
 		onExport = () => {},
 		onUseSearchPosition = () => {},
@@ -60,57 +59,28 @@
 	} = $props();
 </script>
 
-{#if isExpanded}
-	<CragEditorToolbar
-		bind:activeTool
-		bind:mapStyle
-		{currentTrackPoints}
-		{editingTrackIndex}
-		{trackDraftMode}
-		{isRoutingTrack}
-		onBack={onBack}
-		onStartRoutingDraft={onStartRoutingDraft}
-		onHandleTrackConfirm={onHandleTrackConfirm}
-		onCancelTrackEdit={onCancelTrackEdit}
-		onGpxUpload={onGpxUpload}
-		onExport={onExport}
-		status={saveStatus}
-		errorMessage={saveError}
-	/>
-{/if}
-
-{#if isCompact || isMedium}
-	{#if CompactAppBar}
-		<CompactAppBar
-			bind:activeTool
-			bind:mapStyle
-			{currentTrackPoints}
-			{editingTrackIndex}
-			{trackDraftMode}
-			{isRoutingTrack}
-			onBack={onBack}
-			onStartRoutingDraft={onStartRoutingDraft}
-			onHandleTrackConfirm={onHandleTrackConfirm}
-			onCancelTrackEdit={onCancelTrackEdit}
-			onGpxUpload={onGpxUpload}
-			onExport={onExport}
-			onLocateUser={onLocateUser}
-			status={saveStatus}
-			errorMessage={saveError}
-		/>
-	{/if}
-{/if}
+<CragEditorToolbar
+	bind:activeTool
+	bind:mapStyle
+	{currentTrackPoints}
+	{trackDraftMode}
+	{isRoutingTrack}
+	{onBack}
+	{onStartRoutingDraft}
+	{onHandleTrackConfirm}
+	{onCancelTrackEdit}
+	{onUndoTrackPoint}
+	{onGpxUpload}
+	{onLocateUser}
+	{onExport}
+	status={saveStatus}
+	errorMessage={saveError}
+/>
 
 {#if isExpanded}
 	<div class="fixed top-14 left-2 z-50 w-[min(24rem,calc(100vw-1rem))] md:right-auto">
 		<MapSearch {map} onUsePosition={onUseSearchPosition} />
 	</div>
-{/if}
-
-{#if isCompact || isMedium}
-	{#if MobileToolPill}
-		<MobileToolPill bind:activeTool />
-	{/if}
 {/if}
 
 {#if isExpanded}
@@ -125,26 +95,26 @@
 		{rockTypes}
 		{commonEquipment}
 		bind:selectedSectorId
-		saveStatus={saveStatus}
-		onAddEquipmentItem={onAddEquipmentItem}
-		onRemoveEquipmentItem={onRemoveEquipmentItem}
-		onAddCragImages={onAddCragImages}
-		onRemoveCragImage={onRemoveCragImage}
-		onAddSector={onAddSector}
-		onDuplicateSector={onDuplicateSector}
-		onRemoveSector={onRemoveSector}
-		onMoveSector={onMoveSector}
-		onSetSectorGeometryType={onSetSectorGeometryType}
-		onFocusSector={onFocusSector}
-		onSetHoverHighlight={onSetHoverHighlight}
-		onClearDetectedAssets={onClearDetectedAssets}
-		onAddDetectedAsset={onAddDetectedAsset}
-		onRemoveTransit={onRemoveTransit}
-		onRemoveParking={onRemoveParking}
-		onEditTrack={onEditTrack}
-		onRemoveTrack={onRemoveTrack}
-		onFinalizeTrack={onFinalizeTrack}
-		onCancelTrackEdit={onCancelTrackEdit}
+		{saveStatus}
+		{onAddEquipmentItem}
+		{onRemoveEquipmentItem}
+		{onAddCragImages}
+		{onRemoveCragImage}
+		{onAddSector}
+		{onDuplicateSector}
+		{onRemoveSector}
+		{onMoveSector}
+		{onSetSectorGeometryType}
+		{onFocusSector}
+		{onSetHoverHighlight}
+		{onClearDetectedAssets}
+		{onAddDetectedAsset}
+		{onRemoveTransit}
+		{onRemoveParking}
+		{onEditTrack}
+		{onRemoveTrack}
+		{onFinalizeTrack}
+		{onCancelTrackEdit}
 	/>
 {/if}
 
@@ -160,26 +130,26 @@
 			{rockTypes}
 			{commonEquipment}
 			bind:selectedSectorId
-			saveStatus={saveStatus}
-			onAddEquipmentItem={onAddEquipmentItem}
-			onRemoveEquipmentItem={onRemoveEquipmentItem}
-			onAddCragImages={onAddCragImages}
-			onRemoveCragImage={onRemoveCragImage}
-			onAddSector={onAddSector}
-			onDuplicateSector={onDuplicateSector}
-			onRemoveSector={onRemoveSector}
-			onMoveSector={onMoveSector}
-			onSetSectorGeometryType={onSetSectorGeometryType}
-			onFocusSector={onFocusSector}
-			onSetHoverHighlight={onSetHoverHighlight}
-			onClearDetectedAssets={onClearDetectedAssets}
-			onAddDetectedAsset={onAddDetectedAsset}
-			onRemoveTransit={onRemoveTransit}
-			onRemoveParking={onRemoveParking}
-			onEditTrack={onEditTrack}
-			onRemoveTrack={onRemoveTrack}
-			onFinalizeTrack={onFinalizeTrack}
-			onCancelTrackEdit={onCancelTrackEdit}
+			{saveStatus}
+			{onAddEquipmentItem}
+			{onRemoveEquipmentItem}
+			{onAddCragImages}
+			{onRemoveCragImage}
+			{onAddSector}
+			{onDuplicateSector}
+			{onRemoveSector}
+			{onMoveSector}
+			{onSetSectorGeometryType}
+			{onFocusSector}
+			{onSetHoverHighlight}
+			{onClearDetectedAssets}
+			{onAddDetectedAsset}
+			{onRemoveTransit}
+			{onRemoveParking}
+			{onEditTrack}
+			{onRemoveTrack}
+			{onFinalizeTrack}
+			{onCancelTrackEdit}
 		/>
 	{/if}
 {/if}

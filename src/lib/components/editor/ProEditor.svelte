@@ -24,12 +24,12 @@
 	// 2D Editor imports
 	import Topo2DEditor from '$lib/components/editor/2d/Topo2DEditor.svelte';
 	import ToolPalette2D from '$lib/components/editor/2d/ToolPalette2D.svelte';
+	import ToolBar from '$lib/components/editor/tools/ToolBar.svelte';
 	import OutlineToolOptions from '$lib/components/editor/tools/OutlineToolOptions.svelte';
 
 	import { generateSymbolId, initializeIdCounters } from '$lib/assets/js/id-utils.js';
 	import { writeFile, writeJson } from '$lib/api/felslager.js';
 	import { authState } from '$lib/api/auth.svelte.js';
-	import SaveStatus from '$lib/components/ui/SaveStatus.svelte';
 
 	let { workspace = '3d-create', children } = $props();
 	let isMobile = $state(false);
@@ -41,7 +41,9 @@
 	}
 
 	function getInitialActiveTool() {
-		return getInitialEditorMode() === '3d' || userState.clustering.rawHits.length > 0 ? 'ai-bolts' : null;
+		return getInitialEditorMode() === '3d' || userState.clustering.rawHits.length > 0
+			? 'ai-bolts'
+			: null;
 	}
 
 	function getInitialWorkspace() {
@@ -487,7 +489,7 @@
 
 			if (workspace === '3d-create') {
 				// Convert visible clusters to fixPoints
-				const confirmedBolts = userState.clustering.clusters.map(c => ({
+				const confirmedBolts = userState.clustering.clusters.map((c) => ({
 					id: generateSymbolId(),
 					type: c.class || 'bolt',
 					position: c.anchor,
@@ -512,11 +514,7 @@
 
 			// Upload GLB model if available (3D mode)
 			if (userState.topo.editorMode === '3d' && userState.ui.glbBlob) {
-				await writeFile(
-					`${savePath}/${baseName}.glb`,
-					userState.ui.glbBlob,
-					'model/gltf-binary'
-				);
+				await writeFile(`${savePath}/${baseName}.glb`, userState.ui.glbBlob, 'model/gltf-binary');
 			}
 
 			saveStatus = 'success';
@@ -539,110 +537,77 @@
 		: 'block'}"
 >
 	{#if userState.topo.editorMode === '3d'}
-		<div class="panel p-1.5 flex items-center justify-between shadow-panel bg-white">
-			<div class="flex items-center gap-2.5">
-				<button
-					class="w-7 h-7 flex items-center justify-center rounded-sm bg-black/5 hover:bg-black/10 text-near-black transition-none border border-black/10 ml-0.5"
-					onclick={() => goto(base + '/')}
-					title={$_('ui.back_to_launcher')}
-				>
-					<i class="fa-solid fa-arrow-left text-[11px]"></i>
-				</button>
-				<div class="ml-1 mr-3 hidden sm:block">
-					<h1 class="text-section-title leading-none">{$_('ui.3d_studio')}</h1>
-				</div>
-				<div class="w-px h-5 bg-black/15 mx-1 hidden sm:block"></div>
-
-				<div class="flex items-center gap-1">
-					{#if workspace.includes('3d') && (workspace.includes('create') || userState.clustering.rawHits.length > 0)}
-						<button
-							class={`flex items-center gap-2 py-1.5 px-3 rounded-sm text-ui-label transition-none ${activeTool === 'ai-bolts' ? 'bg-creator-blue text-white shadow-sm' : 'bg-transparent text-warm-gray-500 hover:bg-black/5'}`}
-							onclick={() => {
-								activeTool = 'ai-bolts';
-								drawingTarget = null;
-							}}
-							title={$_('ui.ai-bolts')}
-						>
-							<i class="fa-solid fa-wand-magic-sparkles"></i><span class="hidden md:inline"
-						>{$_('ui.ai-bolts')}</span
-						>
-						</button>
-					{/if}
-					<button
-						class={`flex items-center gap-2 py-1.5 px-3 rounded-sm text-ui-label transition-none ${activeTool === 'route' ? 'bg-creator-blue text-white' : 'bg-transparent text-warm-gray-500 hover:bg-black/5'}`}
-						onclick={() => {
-							activeTool = 'route';
-							drawingTarget = null;
-						}}
-						title={$_('ui.route')}
-					>
-						<i class="fa-solid fa-route"></i><span class="hidden md:inline">{$_('ui.route')}</span>
-					</button>
-					<button
-						class={`flex items-center gap-2 py-1.5 px-3 rounded-sm text-ui-label transition-none ${activeTool === 'multipitch' ? 'bg-creator-blue text-white' : 'bg-transparent text-warm-gray-500 hover:bg-black/5'}`}
-						onclick={() => {
-							activeTool = 'multipitch';
-							drawingTarget = null;
-						}}
-						title={$_('ui.multipitch')}
-					>
-						<i class="fa-solid fa-timeline"></i><span class="hidden md:inline"
-					>{$_('ui.multipitch')}</span
-					>
-					</button>
-					<button
-						class={`flex items-center gap-2 py-1.5 px-3 rounded-sm text-ui-label transition-none ${activeTool === 'fixpoint' ? 'bg-creator-blue text-white' : 'bg-transparent text-warm-gray-500 hover:bg-black/5'}`}
-						onclick={() => {
-							activeTool = 'fixpoint';
-							drawingTarget = null;
-						}}
-						title={$_('ui.fixpoint')}
-					>
-						<i class="fa-solid fa-circle-dot"></i><span class="hidden md:inline"
-					>{$_('ui.fixpoint')}</span
-					>
-					</button>
-					<button
-						class={`flex items-center gap-2 py-1.5 px-3 rounded-sm text-ui-label transition-none ${activeTool === 'crop' ? 'bg-creator-blue text-white shadow-sm' : 'bg-transparent text-warm-gray-500 hover:bg-black/5'}`}
-						onclick={() => {
-							activeTool = 'crop';
-							drawingTarget = null;
-							lassoPoints = [];
-						}}
-						title={$_('ui.crop')}
-					>
-						<i class="fa-solid fa-scissors"></i><span class="hidden md:inline">{$_('ui.crop')}</span
-					>
-					</button>
-				</div>
-
-				<div class="w-px h-5 bg-black/15 mx-1 hidden sm:block"></div>
-
+		<ToolBar
+			title={$_('ui.3d_studio')}
+			bind:activeTool
+			tools={[
+				{
+					id: 'ai-bolts',
+					icon: 'fa-wand-magic-sparkles',
+					label: $_('ui.ai-bolts'),
+					hidden: !(
+						workspace.includes('3d') &&
+						(workspace.includes('create') || userState.clustering.rawHits.length > 0)
+					),
+					onSelect: () => {
+						activeTool = 'ai-bolts';
+						drawingTarget = null;
+					}
+				},
+				{
+					id: 'route',
+					icon: 'fa-route',
+					label: $_('ui.route'),
+					onSelect: () => {
+						activeTool = 'route';
+						drawingTarget = null;
+					}
+				},
+				{
+					id: 'multipitch',
+					icon: 'fa-timeline',
+					label: $_('ui.multipitch'),
+					onSelect: () => {
+						activeTool = 'multipitch';
+						drawingTarget = null;
+					}
+				},
+				{
+					id: 'fixpoint',
+					icon: 'fa-circle-dot',
+					label: $_('ui.fixpoint'),
+					onSelect: () => {
+						activeTool = 'fixpoint';
+						drawingTarget = null;
+					}
+				},
+				{
+					id: 'crop',
+					icon: 'fa-scissors',
+					label: $_('ui.crop'),
+					onSelect: () => {
+						activeTool = 'crop';
+						drawingTarget = null;
+						lassoPoints = [];
+					}
+				}
+			]}
+			onBack={() => goto(base + '/')}
+			save={{ status: saveStatus, errorMessage: saveError, run: combinedExport }}
+		>
+			{#snippet controls()}
 				<label
-					class="flex items-center gap-2 px-3 py-1.5 rounded-sm hover:bg-black/5 cursor-pointer group transition-none"
+					class="hidden cursor-pointer items-center gap-2 rounded-sm px-3 py-1.5 hover:bg-black/5 xl:flex"
 				>
 					<input
 						type="checkbox"
 						bind:checked={userState.clustering.showCameraTrail}
-						class="w-3 h-3 rounded-sm border border-black/15 text-creator-blue focus:ring-1 focus:ring-creator-blue transition-none"
+						class="h-3 w-3 rounded-sm border border-black/15 text-creator-blue"
 					/>
-					<span class="text-ui-label text-warm-gray-500 group-hover:text-near-black transition-none"
-					>{$_('ui.show_camera_trail')}</span
-					>
+					<span class="text-ui-label text-warm-gray-500">{$_('ui.show_camera_trail')}</span>
 				</label>
-			</div>
-
-			<div class="flex items-center gap-4 pr-1">
-				<SaveStatus status={saveStatus} errorMessage={saveError} />
-				<button
-					class="bg-creator-blue text-white px-4 py-1.5 rounded-sm text-[11px] font-bold shadow-sm hover:bg-creator-blue-active transition-none uppercase tracking-widest"
-					onclick={combinedExport}
-					disabled={saveStatus === 'saving'}
-				>
-					{$_('save.save_to_server')}
-				</button>
-			</div>
-		</div>
+			{/snippet}
+		</ToolBar>
 	{:else}
 		<div class="hidden md:block">
 			<ToolPalette2D
@@ -676,21 +641,21 @@
 					<span>{$_('ui.set_vertex')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Dbl Click</kbd
+						>Dbl Click</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.undo_vertex')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Backspace</kbd
+						>Backspace</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.finalize')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Enter</kbd
+						>Enter</kbd
 					>
 				</div>
 			{:else if activeTool === 'multipitch'}
@@ -698,28 +663,28 @@
 					<span>{$_('ui.vertex')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Dbl Click</kbd
+						>Dbl Click</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.undo_vertex')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Backspace</kbd
+						>Backspace</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.place_belay')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>B</kbd
+						>B</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.finalize')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Enter</kbd
+						>Enter</kbd
 					>
 				</div>
 			{:else if activeTool === 'fixpoint'}
@@ -727,7 +692,7 @@
 					<span>{$_('ui.place_point')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Dbl Click</kbd
+						>Dbl Click</kbd
 					>
 				</div>
 				<div class="w-px h-4 bg-black/10 mx-1"></div>
@@ -749,7 +714,7 @@
 									: 'opacity-70'}"
 							/>
 							<span class="text-[9px] font-bold uppercase tracking-tighter"
-							>{$_(`topo.fixpoints.${symbol.id}`)}</span
+								>{$_(`topo.fixpoints.${symbol.id}`)}</span
 							>
 						</button>
 					{/each}
@@ -759,28 +724,28 @@
 					<span>Select Area</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Shift + Drag</kbd
+						>Shift + Drag</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>Select Islands</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>C</kbd
+						>C</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>Apply Cut</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Delete</kbd
+						>Delete</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>Reset</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Esc</kbd
+						>Esc</kbd
 					>
 				</div>
 			{/if}
