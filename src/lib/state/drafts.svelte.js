@@ -5,7 +5,7 @@ const STORAGE_KEY = 'topo_drafts_v1';
 const LATEST_STORAGE_PREFIX = 'topo_latest_draft_';
 const LATEST_INDEXEDDB_PREFIX = 'latest-';
 
-function isBlankTopoSession(session) {
+export function isBlankTopoSession(session) {
 	const topo = session?.topo || session;
 	return (
 		!topo?.name &&

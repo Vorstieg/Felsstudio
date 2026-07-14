@@ -646,7 +646,6 @@ export function generate2DFromTopo_OLD(topo) {
 /**
  * Main function: Generate 2D topo from 3D data
  * Uses Panoramic Unrolling (Option 1)
- * TODO: not used for now. reintroduce later
  */
 export function generate2DFromTopo(topo) {
 	const { routes = [], fixPoints = [] } = topo;

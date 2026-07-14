@@ -352,3 +352,4 @@ export const topoSymbols = [
 		height: 32
 	}
 ];
+export const fixpointSymbols = topoSymbols.filter((symbol) => symbol.type === 'fixpoint');

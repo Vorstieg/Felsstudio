@@ -6,8 +6,6 @@
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import { browser } from '$app/environment';
-	import { goto } from '$app/navigation';
-	import { base } from '$app/paths';
 	import { tweened } from 'svelte/motion';
 	import { cubicOut } from 'svelte/easing';
 
@@ -17,75 +15,37 @@
 	import TopoPropertiesPanel from '$lib/components/editor/TopoPropertiesPanel.svelte';
 	import HitInspector from '$lib/components/editor/HitInspector.svelte';
 	import { userState } from '$lib/state/editor.svelte.js';
-	import { draftsState } from '$lib/state/drafts.svelte.js';
+	import { isBlankTopoSession } from '$lib/state/drafts.svelte.js';
+	import { useTopoDraftAutosave } from '$lib/components/editor/use-topo-draft-autosave.svelte.js';
 	import { isMobileViewport } from '$lib/assets/js/mobile-utils.js';
-	import { topoSymbols } from '$lib/assets/js/topo-utils.js';
 
 	// 2D Editor imports
-	import Topo2DEditor from '$lib/components/editor/2d/Topo2DEditor.svelte';
-	import ToolPalette2D from '$lib/components/editor/2d/ToolPalette2D.svelte';
-	import ToolBar from '$lib/components/editor/tools/ToolBar.svelte';
-	import OutlineToolOptions from '$lib/components/editor/tools/OutlineToolOptions.svelte';
 
 	import { generateSymbolId, initializeIdCounters } from '$lib/assets/js/id-utils.js';
 	import { writeFile, writeJson } from '$lib/api/felslager.js';
 	import { authState } from '$lib/api/auth.svelte.js';
+	import ToolPalette3D from '$lib/components/editor/3d/ToolPalette3D.svelte';
 
 	let { workspace = '3d-create', children } = $props();
 	let isMobile = $state(false);
 	let saveStatus = $state('idle');
 	let saveError = $state('');
 
-	function getInitialEditorMode() {
-		return workspace.includes('/2d') || workspace.startsWith('2d') ? '2d' : '3d';
-	}
-
 	function getInitialActiveTool() {
-		return getInitialEditorMode() === '3d' || userState.clustering.rawHits.length > 0
-			? 'ai-bolts'
-			: null;
+		return userState.clustering.rawHits.length > 0 ? 'ai-bolts' : null;
 	}
 
 	function getInitialWorkspace() {
 		return workspace;
 	}
 
-	function isBlankTopoSession() {
-		return (
-			!userState.topo.name &&
-			!userState.topo.crag_id &&
-			!userState.topo.sector_id &&
-			!userState.topo.description &&
-			!userState.topo.image2D &&
-			(userState.topo.routes || []).length === 0 &&
-			(userState.topo.fixPoints || []).length === 0 &&
-			(userState.topo.outlines || []).length === 0 &&
-			(userState.topo.textLabels || []).length === 0 &&
-			!userState.ui.glbBlob &&
-			!userState.ui.modelUrl &&
-			(userState.clustering.rawHits || []).length === 0
-		);
-	}
-
-	const initialEditorMode = getInitialEditorMode();
-	userState.topo.editorMode = initialEditorMode;
-	if (
-		(userState.ui.activeDraftId?.startsWith('2d-') && initialEditorMode !== '2d') ||
-		(userState.ui.activeDraftId?.startsWith('3d-') && initialEditorMode !== '3d')
-	) {
-		userState.reset();
-		userState.topo.editorMode = initialEditorMode;
-	}
 	userState.ui.workspace = getInitialWorkspace();
 
 	let activeTool = $state(getInitialActiveTool());
-	let selectedOutlineStyle = $state('rock');
 	let modelComponent = $state();
 	let editorInternal = $state();
 	let drawingTarget = $state(null);
 	let hasPendingChanges = $state(false);
-	let canAutosave = $state(false);
-	const fixpointSymbols = topoSymbols.filter((symbol) => symbol.type === 'fixpoint');
 
 	// Lasso state
 	let selectedIndicesMap = $state(new Map());
@@ -122,7 +82,6 @@
 	let gltfError = $state(null);
 
 	let showMapModal = $state(false);
-	let showDraftsModal = $state(false);
 
 	// --- Camera Focus Logic (Svelte Native Animation) ---
 	const cameraPosStore = tweened([0, 1, 5], {
@@ -192,16 +151,6 @@
 	});
 
 	onMount(async () => {
-		draftsState.init();
-
-		if (!userState.ui.activeDraftId && (workspace.endsWith('edit') || isBlankTopoSession())) {
-			const latest = await draftsState.getLatest(getInitialEditorMode());
-			if (latest) {
-				restoreSession(latest.session, latest.id);
-				activeTool = getInitialActiveTool();
-			}
-		}
-
 		initializeIdCounters(userState.topo);
 
 		// Initialize mobile detection (client-side only)
@@ -218,8 +167,6 @@
 			loadGlbFromUrl(userState.ui.modelUrl);
 		}
 
-		canAutosave = true;
-
 		const handleKeyDown = (e) => {
 			if (activeTool === 'crop') {
 				if (e.key === 'Delete' || e.key === 'Del') applyLassoCut();
@@ -234,7 +181,6 @@
 		window.addEventListener('keydown', handleKeyDown);
 		window.addEventListener('keyup', handleKeyUp);
 		return () => {
-			clearTimeout(saveTimeout);
 			window.removeEventListener('resize', handleResize);
 			window.removeEventListener('keydown', handleKeyDown);
 			window.removeEventListener('keyup', handleKeyUp);
@@ -260,6 +206,41 @@
 		userState.ui.activeDraftId = id;
 		userState.ui.workspace = topo.editorMode === '2d' ? 'topos/2d/editor' : 'topos/3d/editor';
 	}
+
+	useTopoDraftAutosave({
+		editorMode: '3d',
+		getWorkspace: () => workspace,
+		shouldRestore: () =>
+			workspace.endsWith('edit') ||
+			isBlankTopoSession({
+				topo: userState.topo,
+				clustering: userState.clustering,
+				glbBlob: userState.ui.glbBlob
+			}),
+		restoreSession: (session, id) => {
+			restoreSession(session, id);
+			activeTool = getInitialActiveTool();
+			initializeIdCounters(userState.topo);
+		},
+		getSaveSignature: () =>
+			JSON.stringify({
+				routes: userState.topo.routes,
+				fixPoints: userState.topo.fixPoints,
+				outlines: userState.topo.outlines,
+				textLabels: userState.topo.textLabels,
+				image2D: userState.topo.image2D,
+				name: userState.topo.name,
+				crag_id: userState.topo.crag_id,
+				sector_id: userState.topo.sector_id,
+				clustering: userState.clustering,
+				glbBlob: userState.ui.glbBlob,
+				modelRevision: userState.ui.modelRevision
+			}),
+		getExtra: () => ({
+			clustering: $state.snapshot(userState.clustering),
+			glbBlob: userState.ui.glbBlob
+		})
+	});
 
 	async function loadGlbFromUrl(url) {
 		isLoadingGltf = true;
@@ -289,50 +270,6 @@
 		} finally {
 			isLoadingGltf = false;
 		}
-	}
-
-	// --- Auto-save logic ---
-	let saveTimeout;
-	$effect(() => {
-		if (!canAutosave) return;
-
-		const topoString = JSON.stringify({
-			routes: userState.topo.routes,
-			fixPoints: userState.topo.fixPoints,
-			outlines: userState.topo.outlines,
-			textLabels: userState.topo.textLabels,
-			image2D: userState.topo.image2D,
-			name: userState.topo.name,
-			crag_id: userState.topo.crag_id,
-			sector_id: userState.topo.sector_id,
-			clustering: userState.clustering,
-			glbBlob: userState.ui.glbBlob,
-			modelRevision: userState.ui.modelRevision
-		});
-
-		if (topoString) {
-			clearTimeout(saveTimeout);
-			saveTimeout = setTimeout(async () => {
-				if (isBlankTopoSession()) return;
-
-				const id = await draftsState.save(userState.topo, userState.ui.activeDraftId, {
-					clustering: $state.snapshot(userState.clustering),
-					glbBlob: userState.ui.glbBlob
-				});
-				if (!userState.ui.activeDraftId) userState.ui.activeDraftId = id;
-				userState.ui.lastSaved = new Date().toISOString();
-			}, 2000);
-		}
-	});
-
-	function handleFinishRoute() {
-		if (editor2D) editor2D.finalize();
-		else window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', bubbles: true }));
-	}
-
-	function handleCancelAction() {
-		if (editor2D) editor2D.cancel();
-		else window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 	}
 
 	// --- Lasso Handlers ---
@@ -379,6 +316,7 @@
 	}
 
 	function handleGenerate2DTopo() {
+		//TODO: Actually implement this
 		try {
 			const result = generate2DFromTopo(userState.topo);
 			if (result.updatedRoutes > 0 || result.updatedFixPoints > 0) {
@@ -439,18 +377,8 @@
 		// Require authentication
 		if (!authState.requireAuth(() => combinedExport())) return;
 
-		// Require a save path
-		let savePath = userState.topo._entryPath;
-		if (!savePath) {
-			saveStatus = 'error';
-			saveError = 'No save path set. Set it in the Properties panel.';
-			return;
-		}
-		saveStatus = 'saving';
-		saveError = '';
-
 		try {
-			if (userState.topo.editorMode === '3d' && modelComponent) {
+			if (modelComponent) {
 				await modelComponent.bakeTransforms();
 			}
 
@@ -489,7 +417,7 @@
 			await writeJson(userState.topo._topoFileName, topoToSave);
 
 			// Upload GLB model if available (3D mode)
-			if (userState.topo.editorMode === '3d' && userState.ui.glbBlob) {
+			if (userState.ui.glbBlob) {
 				await writeFile(
 					userState.topo._topoFileName.replace(/-topo\.json$/, '.glb'),
 					userState.ui.glbBlob,
@@ -507,108 +435,22 @@
 			saveError = err.message;
 		}
 	}
-
-	let editor2D = $state();
 </script>
 
-<div
-	class="fixed top-2 left-2 right-2 z-50 {userState.topo.editorMode === '2d'
-		? 'hidden md:block'
-		: 'block'}"
->
-	{#if userState.topo.editorMode === '3d'}
-		<ToolBar
-			title={$_('ui.3d_studio')}
-			bind:activeTool
-			tools={[
-				{
-					id: 'ai-bolts',
-					icon: 'fa-wand-magic-sparkles',
-					label: $_('ui.ai-bolts'),
-					hidden: !(
-						workspace.includes('3d') &&
-						(workspace.includes('create') || userState.clustering.rawHits.length > 0)
-					),
-					onSelect: () => {
-						activeTool = 'ai-bolts';
-						drawingTarget = null;
-					}
-				},
-				{
-					id: 'route',
-					icon: 'fa-route',
-					label: $_('ui.route'),
-					onSelect: () => {
-						activeTool = 'route';
-						drawingTarget = null;
-					}
-				},
-				{
-					id: 'multipitch',
-					icon: 'fa-timeline',
-					label: $_('ui.multipitch'),
-					onSelect: () => {
-						activeTool = 'multipitch';
-						drawingTarget = null;
-					}
-				},
-				{
-					id: 'fixpoint',
-					icon: 'fa-circle-dot',
-					label: $_('ui.fixpoint'),
-					onSelect: () => {
-						activeTool = 'fixpoint';
-						drawingTarget = null;
-					}
-				},
-				{
-					id: 'crop',
-					icon: 'fa-scissors',
-					label: $_('ui.crop'),
-					onSelect: () => {
-						activeTool = 'crop';
-						drawingTarget = null;
-						lassoPoints = [];
-					}
-				}
-			]}
-			onBack={() => goto(base + '/')}
-			save={{ status: saveStatus, errorMessage: saveError, run: combinedExport }}
-		>
-			{#snippet controls()}
-				<label
-					class="hidden cursor-pointer items-center gap-2 rounded-sm px-3 py-1.5 hover:bg-black/5 xl:flex"
-				>
-					<input
-						type="checkbox"
-						bind:checked={userState.clustering.showCameraTrail}
-						class="h-3 w-3 rounded-sm border border-black/15 text-creator-blue"
-					/>
-					<span class="text-ui-label text-warm-gray-500">{$_('ui.show_camera_trail')}</span>
-				</label>
-			{/snippet}
-		</ToolBar>
-	{:else}
-		<div class="hidden md:block">
-			<ToolPalette2D
-				bind:activeTool
-				bind:selectedSymbol={userState.ui.selectedSymbol}
-				bind:selectedOutlineStyle
-				{hasPendingChanges}
-				onFinishRoute={handleFinishRoute}
-				onCancelAction={handleCancelAction}
-				onUndo={() => editor2D?.undo()}
-				onRedo={() => editor2D?.redo()}
-				onExport={combinedExport}
-				status={saveStatus}
-				errorMessage={saveError}
-			/>
-		</div>
-	{/if}
+<div class="fixed top-2 left-2 right-2 z-50 'block'}">
+	<ToolPalette3D
+		{saveStatus}
+		{saveError}
+		{combinedExport}
+		bind:activeTool
+		bind:drawingTarget
+		bind:lassoPoints
+		bind:clustering={userState.clustering}
+	></ToolPalette3D>
 </div>
 
 <!-- Floating Hint Panels for 3D Mode -->
-{#if userState.topo.editorMode === '3d' && activeTool && activeTool !== 'ai-bolts'}
+{#if activeTool && activeTool !== 'ai-bolts'}
 	<div
 		class="fixed top-14 left-2 flex items-center gap-3 p-1.5 bg-white rounded-sm border border-black/15 shadow-modal z-100"
 	>
@@ -765,98 +607,58 @@
 		? 'top-25'
 		: 'top-14'} left-2 z-40 flex flex-col w-80 max-h-[calc(100vh-8rem)] overflow-y-auto custom-scrollbar"
 >
-	{#if userState.topo.editorMode === '3d' && activeTool === 'ai-bolts'}
+	{#if activeTool === 'ai-bolts'}
 		{@render children?.()}
 	{/if}
 </div>
 
-{#if userState.topo.editorMode === '3d' && activeTool === 'ai-bolts' && (workspace.includes('create') || workspace === 'topos/3d/editor' || userState.clustering.rawHits.length > 0)}
+{#if activeTool === 'ai-bolts' && userState.clustering.rawHits.length > 0}
 	<HitInspector />
 {/if}
 
-<div class="md:hidden">
-	{#if userState.topo.editorMode === '2d'}
-		<ToolPalette2D
-			bind:activeTool
-			bind:selectedSymbol={userState.ui.selectedSymbol}
-			bind:selectedOutlineStyle
-			{hasPendingChanges}
-			onFinishRoute={handleFinishRoute}
-			onCancelAction={handleCancelAction}
-			onUndo={() => editor2D?.undo()}
-			onRedo={() => editor2D?.redo()}
-			onExport={combinedExport}
-		/>
-	{/if}
-</div>
-
-{#if browser && userState.topo.editorMode === '2d' && ['route', 'multipitch', 'outline'].includes(activeTool)}
-	<div class="fixed bottom-16 left-2 right-2 z-101 md:bottom-auto md:right-auto md:top-25">
-		<OutlineToolOptions
-			outlineTool={editor2D?.getCurrentTool?.()}
-			{activeTool}
-			bind:selectedOutlineStyle
-			onFinalize={handleFinishRoute}
-			onCancelAction={handleCancelAction}
-			onClose={() => (activeTool = null)}
-		/>
-	</div>
-{/if}
-
 <div class="h-screen w-screen absolute overflow-hidden bg-warm-white">
-	{#if userState.topo.editorMode === '2d'}
-		<Topo2DEditor
-			bind:this={editor2D}
-			bind:activeTool
-			bind:drawingTarget
-			selectedSymbol={userState.ui.selectedSymbol}
-			{selectedOutlineStyle}
-			bind:hasPendingChanges
-		/>
-	{:else}
-		<div
-			id="css-renderer-target"
-			bind:this={element}
-			style="position: absolute; top: 0; left: 0; width: 100%; pointer-events: none; height: 100%; z-index: 1;"
-		></div>
-		<Canvas linear {createRenderer} dpr={browser ? window.devicePixelRatio : 1}>
-			<T.PerspectiveCamera makeDefault position={cameraPosition} fov={75} near={0.1} far={1000}>
-				<OrbitControls
-					bind:ref={controlsRef}
-					enableZoom={true}
-					target={controlsTarget}
-					enabled={activeTool !== 'crop' || !isShiftPressed}
-				/>
-			</T.PerspectiveCamera>
-			<T.AmbientLight intensity={1.0} />
-			<T.DirectionalLight position={[5, 10, 7]} intensity={1.2} />
-			<T.HemisphereLight skyColor={'#ffffff'} groundColor={'#444444'} intensity={0.5} />
-			{#if element !== undefined}
-				<Model
-					bind:this={modelComponent}
-					gltfScene={loadedGltfScene}
+	<div
+		id="css-renderer-target"
+		bind:this={element}
+		style="position: absolute; top: 0; left: 0; width: 100%; pointer-events: none; height: 100%; z-index: 1;"
+	></div>
+	<Canvas linear {createRenderer} dpr={browser ? window.devicePixelRatio : 1}>
+		<T.PerspectiveCamera makeDefault position={cameraPosition} fov={75} near={0.1} far={1000}>
+			<OrbitControls
+				bind:ref={controlsRef}
+				enableZoom={true}
+				target={controlsTarget}
+				enabled={activeTool !== 'crop' || !isShiftPressed}
+			/>
+		</T.PerspectiveCamera>
+		<T.AmbientLight intensity={1.0} />
+		<T.DirectionalLight position={[5, 10, 7]} intensity={1.2} />
+		<T.HemisphereLight skyColor={'#ffffff'} groundColor={'#444444'} intensity={0.5} />
+		{#if element !== undefined}
+			<Model
+				bind:this={modelComponent}
+				gltfScene={loadedGltfScene}
+				{activeTool}
+				{drawingTarget}
+				{element}
+				bind:cameraPosition
+				bind:controlsTarget
+				bind:selectedIndicesMap
+			>
+				<EditorInternal
+					bind:this={editorInternal}
+					{loadedGltfScene}
+					{element}
+					bind:selectedIndicesMap
 					{activeTool}
 					{drawingTarget}
-					{element}
-					bind:cameraPosition
-					bind:controlsTarget
-					bind:selectedIndicesMap
-				>
-					<EditorInternal
-						bind:this={editorInternal}
-						{loadedGltfScene}
-						{element}
-						bind:selectedIndicesMap
-						{activeTool}
-						{drawingTarget}
-						{cameraPosition}
-						{controlsTarget}
-						{controlsRef}
-					/>
-				</Model>
-			{/if}
-		</Canvas>
-	{/if}
+					{cameraPosition}
+					{controlsTarget}
+					{controlsRef}
+				/>
+			</Model>
+		{/if}
+	</Canvas>
 </div>
 
 <TopoPropertiesPanel bind:showMapModal bind:drawingTarget bind:activeTool />
