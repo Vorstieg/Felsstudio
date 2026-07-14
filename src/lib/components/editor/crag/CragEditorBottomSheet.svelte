@@ -14,6 +14,8 @@
 		rockTypes = [],
 		commonEquipment = [],
 		selectedSectorId = $bindable(null),
+		routeDocuments = [],
+		selectedRouteKey = null,
 		saveStatus = 'idle',
 		onAddEquipmentItem = () => {},
 		onRemoveEquipmentItem = () => {},
@@ -33,7 +35,13 @@
 		onEditTrack = () => {},
 		onRemoveTrack = () => {},
 		onFinalizeTrack = () => {},
-		onCancelTrackEdit = () => {}
+		onCancelTrackEdit = () => {},
+		onAddParentRoute = () => {},
+		onAddSectorRoute = () => {},
+		onSelectRoute = () => {},
+		onUpdateRouteName = () => {},
+		onUpdateRoute = () => {},
+		onDeleteRoute = () => {}
 	} = $props();
 
 </script>
@@ -57,6 +65,8 @@
 			<CragEditorPanelContent
 				bind:activeTab
 				bind:selectedSectorId
+				{routeDocuments}
+				{selectedRouteKey}
 				{detectedAssets}
 				{editingTrackIndex}
 				{cragTypes}
@@ -84,6 +94,12 @@
 				{onRemoveTrack}
 				{onFinalizeTrack}
 				{onCancelTrackEdit}
+				{onAddParentRoute}
+				{onAddSectorRoute}
+				{onSelectRoute}
+				{onUpdateRouteName}
+				{onUpdateRoute}
+				{onDeleteRoute}
 			/>
 		</div>
 	</div>

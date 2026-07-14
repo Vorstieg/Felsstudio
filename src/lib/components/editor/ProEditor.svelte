@@ -435,29 +435,6 @@
 		return estGps.map((v) => v / weightSum);
 	}
 
-	function slugifyName(value, fallback = 'topo') {
-		return (value || fallback).trim().toLowerCase().replace(/\s+/g, '-');
-	}
-
-	function pathBasename(path = '') {
-		return String(path).split('/').filter(Boolean).at(-1) || '';
-	}
-
-	function getExportNames(savePath) {
-		if (userState.topo._topoFileName) {
-			const topoFileName = userState.topo._topoFileName.endsWith('.json')
-				? userState.topo._topoFileName
-				: `${userState.topo._topoFileName}.json`;
-			return {
-				baseName: topoFileName.replace(/-topo\.json$/i, '').replace(/\.json$/i, ''),
-				topoFileName
-			};
-		}
-
-		const baseName = pathBasename(savePath) || slugifyName(userState.topo.name);
-		return { baseName, topoFileName: `${baseName}-topo.json` };
-	}
-
 	async function combinedExport() {
 		// Require authentication
 		if (!authState.requireAuth(() => combinedExport())) return;
@@ -480,7 +457,6 @@
 			userState.topo.date = userState.topo.date || new Date().toISOString().split('T')[0];
 			userState.topo.updated = new Date().toISOString().split('T')[0];
 
-			const { baseName, topoFileName } = getExportNames(savePath);
 			let topoToSave = JSON.parse(JSON.stringify(userState.topo));
 
 			// Remove internal UI fields before saving
@@ -510,11 +486,15 @@
 			}
 
 			// Save topo JSON to Felslager
-			await writeJson(`${savePath}/${topoFileName}`, topoToSave);
+			await writeJson(userState.topo._topoFileName, topoToSave);
 
 			// Upload GLB model if available (3D mode)
 			if (userState.topo.editorMode === '3d' && userState.ui.glbBlob) {
-				await writeFile(`${savePath}/${baseName}.glb`, userState.ui.glbBlob, 'model/gltf-binary');
+				await writeFile(
+					userState.topo._topoFileName.replace(/-topo\.json$/, '.glb'),
+					userState.ui.glbBlob,
+					'model/gltf-binary'
+				);
 			}
 
 			saveStatus = 'success';

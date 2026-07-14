@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
 	import { listDir } from '$lib/api/felslager.js';
-	import { normalizeEntryPath } from '$lib/assets/js/sector-utils.js';
 	import CragHierarchyModal from './CragHierarchyModal.svelte';
 	import { slugifyName, normalizePath } from '$lib/components/editor/crag/crag-editor-paths.js';
 
@@ -23,9 +22,8 @@
 			const files = await listDir('', { recursive: true });
 			const folders = new Set(['']);
 			for (const file of files || []) {
-				const path = normalizePath(normalizeEntryPath(file.path || ''));
-				if (!path) continue;
-				const parts = path.split('/').filter(Boolean);
+				if (!file.path) continue;
+				const parts = file.path.split('/').filter(Boolean);
 				const isFile = file.type === 'file' || /\.[^/]+$/.test(parts.at(-1) || '');
 				const folderParts = isFile ? parts.slice(0, -1) : parts;
 				for (let i = 1; i <= folderParts.length; i++) {
@@ -44,43 +42,8 @@
 		if (!normalized) return [];
 		return normalized.split('/').filter(Boolean);
 	}
-
-	function pathDirname(path = '') {
-		const parts = normalizePath(path).split('/').filter(Boolean);
-		return parts.slice(0, -1).join('/');
-	}
-
-	function pathBasename(path = '') {
-		return normalizePath(path).split('/').filter(Boolean).at(-1) || '';
-	}
-
-	function syncFromCragPath(path) {
-		const normalized = normalizePath(path);
-		parentPath = pathDirname(normalized);
-		cragSlug = pathBasename(normalized);
-	}
-
-	function updateCragPath(nextParentPath = parentPath, nextCragSlug = cragSlug) {
-		const nextPath = normalizePath([nextParentPath, nextCragSlug].filter(Boolean).join('/'));
-		if (!nextPath) return;
-		lastBuiltPath = nextPath;
-		if (cragEditorState.crag.path !== nextPath) cragEditorState.crag.path = nextPath;
-	}
-
-	$effect(() => {
-		const currentPath = normalizePath(cragEditorState.crag.path);
-		if (currentPath && currentPath !== lastBuiltPath && currentPath !== finalPath) {
-			syncFromCragPath(currentPath);
-			lastBuiltPath = currentPath;
-		}
-	});
-
 	$effect(() => {
 		cragSlug = slugifyName(cragEditorState.crag.name);
-	});
-
-	$effect(() => {
-		updateCragPath();
 	});
 </script>
 

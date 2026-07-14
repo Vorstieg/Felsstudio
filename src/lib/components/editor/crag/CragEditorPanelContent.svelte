@@ -7,7 +7,6 @@
 	import CragHierarchyPlacement from './CragHierarchyPlacement.svelte';
 
 	let {
-		inspectorShadow = true,
 		showTabs = true,
 		activeTab = $bindable('info'),
 		detectedAssets = [],
@@ -18,6 +17,8 @@
 		rockTypes = [],
 		commonEquipment = [],
 		selectedSectorId = $bindable(null),
+		routeDocuments = [],
+		selectedRouteKey = null,
 		saveStatus = 'idle',
 		onAddEquipmentItem = () => {},
 		onRemoveEquipmentItem = () => {},
@@ -38,6 +39,13 @@
 		onRemoveTrack = () => {},
 		onFinalizeTrack = () => {},
 		onCancelTrackEdit = () => {}
+		,
+		onAddParentRoute = () => {},
+		onAddSectorRoute = () => {},
+		onSelectRoute = () => {},
+		onUpdateRouteName = () => {},
+		onUpdateRoute = () => {},
+		onDeleteRoute = () => {}
 	} = $props();
 
 	let selectedSector = $derived(
@@ -46,6 +54,35 @@
 	let pendingCragImageCount = $derived(
 		(cragEditorState.crag.assets?.images || []).filter((image) => image?._file).length
 	);
+	let parentRoutes = $derived(
+		routeDocuments.flatMap((document) =>
+			document.sectorId ? [] : (document.data?.routes || []).map((route) => ({ document, route }))
+		)
+	);
+
+	function sectorRoutes(sectorId) {
+		return routeDocuments.flatMap((document) =>
+			document.sectorId !== sectorId
+				? []
+				: (document.data?.routes || []).map((route) => ({ document, route }))
+		);
+	}
+
+	function routeKey(document, route) {
+		return `${document.path}:${route.id}`;
+	}
+
+	function selectedSectorRoute(sectorId) {
+		return sectorRoutes(sectorId).find(
+			({ document, route }) => selectedRouteKey === routeKey(document, route)
+		);
+	}
+
+	function selectedRouteEntry() {
+		return routeDocuments
+			.flatMap((document) => (document.data?.routes || []).map((route) => ({ document, route })))
+			.find(({ document, route }) => selectedRouteKey === routeKey(document, route));
+	}
 
 	function ensureSectorCollections(sector) {
 		if (!sector.type) sector.type = [];
@@ -239,6 +276,50 @@
 				</button>
 			</div>
 
+			<div class="rounded-sm border border-black/10 bg-black/[0.02] p-2">
+				<div class="mb-2 flex items-center justify-between">
+					<div class="text-ui-label text-warm-gray-500">Crag routes</div>
+					<button class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-creator-blue hover:bg-creator-blue hover:text-white" onclick={onAddParentRoute}>
+						<i class="fa-solid fa-route mr-1"></i>+ Route
+					</button>
+				</div>
+				{#if parentRoutes.length === 0}
+					<p class="text-micro-data text-warm-gray-400">No parent routes.</p>
+				{:else}
+					<table class="w-full text-left text-micro-data">
+						<thead class="text-warm-gray-400"><tr><th class="pb-1 font-bold">Route</th><th class="pb-1 font-bold">Type</th><th class="pb-1 font-bold">Paths</th><th></th></tr></thead>
+						<tbody>
+							{#each parentRoutes as { document, route }}
+								<tr class="border-t border-black/10 {selectedRouteKey === routeKey(document, route) ? 'bg-creator-blue/5 text-creator-blue' : ''}">
+									<td><button class="w-full py-1.5 text-left font-bold" onclick={() => onSelectRoute(document.path, route.id)}>{route.name || 'Unnamed route'}</button></td>
+									<td>{route.type || 'route'}</td><td>{route.assets?.paths?.filter((path) => path.path?.coordinates?.length > 1).length || 0}</td>
+									<td><button class="text-warm-gray-300 hover:text-rose-600" title="Delete route" onclick={() => onDeleteRoute(document.path, route.id)}><i class="fa-solid fa-trash-can"></i></button></td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				{/if}
+			</div>
+
+			{#if selectedRouteEntry()}
+				{@const selectedRoute = selectedRouteEntry()}
+				<div class="space-y-2 rounded-sm border border-creator-blue/20 bg-creator-blue/5 p-2">
+					<div class="text-ui-label text-creator-blue">Selected route</div>
+					<div class="grid grid-cols-[1fr_6rem] gap-2">
+						<input class="input-studio w-full" value={selectedRoute.route.name} placeholder="Route name" onchange={(event) => onUpdateRouteName(selectedRoute.document.path, selectedRoute.route.id, event.currentTarget.value)} />
+						<select class="input-studio w-full" value={selectedRoute.route.type || 'alpine-tour'} onchange={(event) => onUpdateRoute(selectedRoute.document.path, selectedRoute.route.id, 'type', event.currentTarget.value)}>
+							<option value="sports-climbing">SC</option><option value="bouldering">B</option><option value="trad">T</option><option value="multi-pitch">MP</option><option value="alpine-tour">HT</option><option value="via-ferrata">KS</option>
+						</select>
+					</div>
+					<div class="grid grid-cols-[6rem_1fr] gap-2">
+						<input class="input-studio w-full" value={selectedRoute.route.grade || ''} placeholder="Grade" onchange={(event) => onUpdateRoute(selectedRoute.document.path, selectedRoute.route.id, 'grade', event.currentTarget.value)} />
+						<input class="input-studio w-full" value={selectedRoute.route.length || ''} placeholder="Length (m)" onchange={(event) => onUpdateRoute(selectedRoute.document.path, selectedRoute.route.id, 'length', event.currentTarget.value)} />
+					</div>
+					<textarea class="input-studio w-full resize-none" rows="2" value={selectedRoute.route.description || ''} placeholder="Description" onchange={(event) => onUpdateRoute(selectedRoute.document.path, selectedRoute.route.id, 'description', event.currentTarget.value)}></textarea>
+					<p class="text-micro-data text-warm-gray-500">Stored in {selectedRoute.document.path.split('/').at(-1)}</p>
+				</div>
+			{/if}
+
 			{#if !cragEditorState.crag.sectors || cragEditorState.crag.sectors.length === 0}
 				<div class="bg-warm-white rounded-sm p-6 text-center border border-black/15">
 					<i class="fa-solid fa-table-cells-large text-2xl text-warm-gray-300 mb-2 block"></i>
@@ -249,6 +330,7 @@
 			<div class="space-y-1">
 				{#each cragEditorState.crag.sectors || [] as sector, i}
 					{@const isSelected = selectedSectorId === sector.id}
+					{@const routes = sectorRoutes(sector.id)}
 					<div
 						class="w-full panel-inner p-2 text-left border-black/10 hover:border-creator-blue transition-none cursor-pointer {isSelected ? 'border-creator-blue bg-creator-blue/5' : ''}"
 						role="button"
@@ -270,6 +352,11 @@
 							</div>
 							<div class="flex items-center gap-1">
 								<button
+									class="h-6 rounded-sm px-1.5 text-[10px] font-bold text-creator-blue hover:bg-creator-blue/10"
+									title="Add route to this sector"
+									onclick={(e) => { e.stopPropagation(); onAddSectorRoute(sector.id); }}
+								><i class="fa-solid fa-route mr-1"></i>+ Route</button>
+								<button
 									class="w-6 h-6 rounded-sm text-warm-gray-400 hover:bg-black/5 hover:text-near-black transition-none"
 									title="Move up"
 									onclick={(e) => { e.stopPropagation(); onMoveSector(sector.id, -1); }}
@@ -283,6 +370,20 @@
 								><i class="fa-solid fa-arrow-down text-[10px]"></i></button>
 							</div>
 						</div>
+						{#if routes.length > 0}
+							<table class="mt-2 w-full border-t border-black/10 text-left text-micro-data">
+								<thead class="text-warm-gray-400"><tr><th class="py-1 font-bold">Route</th><th class="py-1 font-bold">Type</th><th class="py-1 font-bold">Paths</th><th></th></tr></thead>
+								<tbody>
+									{#each routes as { document, route }}
+										<tr class="border-t border-black/10 {selectedRouteKey === routeKey(document, route) ? 'bg-creator-blue/5 text-creator-blue' : ''}">
+											<td><button class="w-full py-1 text-left font-bold" onclick={(e) => { e.stopPropagation(); onSelectRoute(document.path, route.id); }}>{route.name || 'Unnamed route'}</button></td>
+											<td>{route.type || 'route'}</td><td>{route.assets?.paths?.filter((path) => path.path?.coordinates?.length > 1).length || 0}</td>
+											<td><button class="text-warm-gray-300 hover:text-rose-600" title="Delete route" onclick={(e) => { e.stopPropagation(); onDeleteRoute(document.path, route.id); }}><i class="fa-solid fa-trash-can"></i></button></td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						{/if}
 					</div>
 				{/each}
 			</div>
@@ -323,6 +424,19 @@
 							/>
 						</div>
 					</div>
+
+					{#if selectedSectorRoute(sector.id)}
+						<div class="space-y-1 rounded-sm border border-creator-blue/20 bg-creator-blue/5 p-2">
+							<label class="text-ui-label block">Selected Route</label>
+							<input
+								class="input-studio w-full"
+								value={selectedSectorRoute(sector.id).route.name}
+								placeholder="Route name"
+								onchange={(event) => onUpdateRouteName(selectedSectorRoute(sector.id).document.path, selectedSectorRoute(sector.id).route.id, event.currentTarget.value)}
+							/>
+							<p class="text-micro-data text-warm-gray-500">Stored in {selectedSectorRoute(sector.id).document.path.split('/').at(-1)}</p>
+						</div>
+					{/if}
 
 					<div class="space-y-0.5">
 						<label class="text-ui-label block">Geometry</label>
@@ -383,11 +497,6 @@
 					<div class="space-y-0.5">
 						<label class="text-ui-label block">Approach (EN)</label>
 						<textarea bind:value={sector.approach_en} rows="2" class="input-studio w-full resize-none"></textarea>
-					</div>
-
-					<div class="space-y-0.5 pt-2 border-t border-black/15">
-						<label class="text-ui-label block">Topo Link</label>
-						<input type="url" bind:value={sector.topo.link} class="input-studio w-full" />
 					</div>
 
 					<div class="flex items-center justify-between bg-white rounded-sm border border-black/15 p-2">

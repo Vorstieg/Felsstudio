@@ -1083,10 +1083,6 @@
 		});
 	}
 
-	function pathBasename(path = '') {
-		return String(path).split('/').filter(Boolean).at(-1) || '';
-	}
-
 	async function loadEmbeddedPaths() {
 		pendingInitialFit = true;
 		for (const route of userState.topo.routes || []) {
@@ -1122,9 +1118,6 @@
 		try {
 			userState.topo.date = userState.topo.date || new Date().toISOString().split('T')[0];
 			userState.topo.updated = new Date().toISOString().split('T')[0];
-			const baseName = pathBasename(savePath) || 'topo';
-			const fileName = userState.topo._topoFileName || `${baseName}-topo.json`;
-
 			const data = JSON.parse(JSON.stringify(userState.topo));
 			delete data._entryPath;
 			delete data._topoFileName;
@@ -1152,10 +1145,7 @@
 				delete route.assets.gpx;
 				return route;
 			});
-			await writeJson(
-				`${savePath}/${fileName.endsWith('.json') ? fileName : fileName + '.json'}`,
-				data
-			);
+			await writeJson(userState.topo._topoFileName, data);
 			saveStatus = 'success';
 			setTimeout(() => {
 				if (saveStatus === 'success') saveStatus = 'idle';
@@ -1230,148 +1220,152 @@
 	</div>
 {/if}
 
-<DetailsComponent title="Routes" subtitle="Draw or attach path segments for Hochtouren and Klettersteige." width="24rem">
+<DetailsComponent
+	title="Routes"
+	subtitle="Draw or attach path segments for Hochtouren and Klettersteige."
+	width="24rem"
+>
 	{#snippet children({ mobile })}
-	<div class="p-3 border-b border-black/10 space-y-2">
-		<div class="grid grid-cols-2 gap-2">
-			<input
-				bind:value={userState.topo.name}
-				class="input-studio w-full"
-				placeholder="Area / tour group name"
-			/>
-			<input
-				bind:value={userState.topo._entryPath}
-				class="input-studio w-full font-mono"
-				placeholder="area/name"
-			/>
-		</div>
-		<div class="flex gap-1">
-			<button
-				class="px-2 py-1 rounded-sm bg-creator-blue text-white text-ui-label"
-				onclick={() => addRoute('alpine-tour')}
-				>+ Hochtour
-			</button>
-			<button
-				class="px-2 py-1 rounded-sm bg-creator-blue text-white text-ui-label"
-				onclick={() => addRoute('via-ferrata')}
-				>+ Klettersteig
-			</button>
-			<button
-				class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
-				onclick={clearTrack}
-				disabled={!selectedRoute}
-				>Clear track
-			</button>
-			<button
-				class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
-				onclick={locateUser}
-				>Locate
-			</button>
-		</div>
-		<div class="rounded-sm border border-black/10 bg-black/[0.02] p-2 space-y-2">
-			<div class="flex items-center justify-between gap-2">
-				<div>
-					<div class="text-ui-label font-bold uppercase tracking-wide text-warm-gray-500">
-						Drawing mode
+		<div class="p-3 border-b border-black/10 space-y-2">
+			<div class="grid grid-cols-2 gap-2">
+				<input
+					bind:value={userState.topo.name}
+					class="input-studio w-full"
+					placeholder="Area / tour group name"
+				/>
+				<input
+					bind:value={userState.topo._entryPath}
+					class="input-studio w-full font-mono"
+					placeholder="area/name"
+				/>
+			</div>
+			<div class="flex gap-1">
+				<button
+					class="px-2 py-1 rounded-sm bg-creator-blue text-white text-ui-label"
+					onclick={() => addRoute('alpine-tour')}
+					>+ Hochtour
+				</button>
+				<button
+					class="px-2 py-1 rounded-sm bg-creator-blue text-white text-ui-label"
+					onclick={() => addRoute('via-ferrata')}
+					>+ Klettersteig
+				</button>
+				<button
+					class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
+					onclick={clearTrack}
+					disabled={!selectedRoute}
+					>Clear track
+				</button>
+				<button
+					class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
+					onclick={locateUser}
+					>Locate
+				</button>
+			</div>
+			<div class="rounded-sm border border-black/10 bg-black/[0.02] p-2 space-y-2">
+				<div class="flex items-center justify-between gap-2">
+					<div>
+						<div class="text-ui-label font-bold uppercase tracking-wide text-warm-gray-500">
+							Drawing mode
+						</div>
+						<div class="text-[10px] text-warm-gray-400">
+							Routing follows foot paths between clicks; freestyle connects raw clicked points.
+						</div>
 					</div>
-					<div class="text-[10px] text-warm-gray-400">
-						Routing follows foot paths between clicks; freestyle connects raw clicked points.
+					<div class="flex rounded-sm border border-black/15 overflow-hidden bg-white">
+						<button
+							class="px-2 py-1 text-ui-label {drawMode === 'routing'
+								? 'bg-creator-blue text-white'
+								: 'text-warm-gray-500'}"
+							onclick={() => setDrawMode('routing')}
+							disabled={!selectedRoute}
+							>Routing
+						</button>
+						<button
+							class="px-2 py-1 text-ui-label {drawMode === 'freestyle'
+								? 'bg-creator-blue text-white'
+								: 'text-warm-gray-500'}"
+							onclick={() => setDrawMode('freestyle')}
+							disabled={!selectedRoute}
+							>Freestyle
+						</button>
 					</div>
 				</div>
-				<div class="flex rounded-sm border border-black/15 overflow-hidden bg-white">
+			</div>
+			<div class="rounded-sm border border-black/10 bg-black/[0.02] p-2 space-y-2">
+				<div class="flex items-center justify-between gap-2">
+					<div>
+						<div class="text-ui-label font-bold uppercase tracking-wide text-warm-gray-500">
+							Track tools
+						</div>
+						<div class="text-[10px] text-warm-gray-400">
+							Click a point on the map or enter its index.
+						</div>
+					</div>
 					<button
-						class="px-2 py-1 text-ui-label {drawMode === 'routing'
-							? 'bg-creator-blue text-white'
-							: 'text-warm-gray-500'}"
-						onclick={() => setDrawMode('routing')}
-						disabled={!selectedRoute}
-						>Routing
+						class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
+						onclick={reverseSelectedTrack}
+						disabled={!canEditSelectedTrack()}
+						>Reverse
+					</button>
+				</div>
+				<div class="grid grid-cols-[1fr_auto_auto] gap-1 items-center">
+					<input
+						bind:value={trimPointIndex}
+						type="number"
+						min="0"
+						max={Math.max(0, firstRouteCoordinates(selectedRoute).length - 1)}
+						class="input-studio w-full"
+						placeholder="Point index"
+						disabled={!canEditSelectedTrack()}
+					/>
+					<button
+						class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
+						onclick={trimSelectedTrackStart}
+						disabled={!canEditSelectedTrack()}
+						>Trim start
 					</button>
 					<button
-						class="px-2 py-1 text-ui-label {drawMode === 'freestyle'
-							? 'bg-creator-blue text-white'
-							: 'text-warm-gray-500'}"
-						onclick={() => setDrawMode('freestyle')}
-						disabled={!selectedRoute}
-						>Freestyle
+						class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
+						onclick={trimSelectedTrackEnd}
+						disabled={!canEditSelectedTrack()}
+						>Trim end
 					</button>
 				</div>
-			</div>
-		</div>
-		<div class="rounded-sm border border-black/10 bg-black/[0.02] p-2 space-y-2">
-			<div class="flex items-center justify-between gap-2">
-				<div>
-					<div class="text-ui-label font-bold uppercase tracking-wide text-warm-gray-500">
-						Track tools
-					</div>
-					<div class="text-[10px] text-warm-gray-400">
-						Click a point on the map or enter its index.
-					</div>
+				<div class="grid grid-cols-[1fr_auto] gap-1 items-center">
+					<input
+						bind:value={simplifyToleranceMeters}
+						type="number"
+						min="1"
+						step="1"
+						class="input-studio w-full"
+						placeholder="Tolerance (m)"
+						disabled={!canEditSelectedTrack()}
+					/>
+					<button
+						class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
+						onclick={simplifySelectedTrack}
+						disabled={!canEditSelectedTrack()}
+						>Simplify path
+					</button>
 				</div>
-				<button
-					class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
-					onclick={reverseSelectedTrack}
-					disabled={!canEditSelectedTrack()}
-					>Reverse
-				</button>
+				<div class="text-[10px] text-warm-gray-400">
+					Removes redundant points from the selected path segment using the tolerance in meters.
+				</div>
+				{#if simplifySummary}
+					<div class="text-[10px] text-warm-gray-500">{simplifySummary}</div>
+				{/if}
 			</div>
-			<div class="grid grid-cols-[1fr_auto_auto] gap-1 items-center">
-				<input
-					bind:value={trimPointIndex}
-					type="number"
-					min="0"
-					max={Math.max(0, firstRouteCoordinates(selectedRoute).length - 1)}
-					class="input-studio w-full"
-					placeholder="Point index"
-					disabled={!canEditSelectedTrack()}
-				/>
-				<button
-					class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
-					onclick={trimSelectedTrackStart}
-					disabled={!canEditSelectedTrack()}
-					>Trim start
-				</button>
-				<button
-					class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
-					onclick={trimSelectedTrackEnd}
-					disabled={!canEditSelectedTrack()}
-					>Trim end
-				</button>
-			</div>
-			<div class="grid grid-cols-[1fr_auto] gap-1 items-center">
-				<input
-					bind:value={simplifyToleranceMeters}
-					type="number"
-					min="1"
-					step="1"
-					class="input-studio w-full"
-					placeholder="Tolerance (m)"
-					disabled={!canEditSelectedTrack()}
-				/>
-				<button
-					class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
-					onclick={simplifySelectedTrack}
-					disabled={!canEditSelectedTrack()}
-					>Simplify path
-				</button>
-			</div>
-			<div class="text-[10px] text-warm-gray-400">
-				Removes redundant points from the selected path segment using the tolerance in meters.
-			</div>
-			{#if simplifySummary}
-				<div class="text-[10px] text-warm-gray-500">{simplifySummary}</div>
-			{/if}
 		</div>
-	</div>
-	<div class="custom-scrollbar p-2.5">
-		<TopoRoutesPanel
-			routes={userState.topo.routes}
-			bind:drawingTarget
-			bind:activeTool
-			onPathUpload={handlePathUpload}
-			onPathSelect={focusSelectedPath}
-		/>
-	</div>
+		<div class="custom-scrollbar p-2.5">
+			<TopoRoutesPanel
+				routes={userState.topo.routes}
+				bind:drawingTarget
+				bind:activeTool
+				onPathUpload={handlePathUpload}
+				onPathSelect={focusSelectedPath}
+			/>
+		</div>
 	{/snippet}
 </DetailsComponent>
 

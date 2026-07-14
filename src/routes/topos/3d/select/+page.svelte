@@ -5,7 +5,7 @@
 </script>
 
 <WizardRouteShell
-	workspace="topos/3d/editor"
+	workspace="/topos/3d/editor"
 	titleKey="ui.3d_studio"
 	actionLabelKey="ui.new_or_edit"
 	locations={data.locations}

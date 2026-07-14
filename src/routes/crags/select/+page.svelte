@@ -5,7 +5,7 @@
 </script>
 
 <WizardRouteShell
-	workspace="crags/editor"
+	workspace="/crags/editor"
 	titleKey="ui.crag_studio"
 	actionLabelKey="ui.new_crag"
 	locations={data.locations}

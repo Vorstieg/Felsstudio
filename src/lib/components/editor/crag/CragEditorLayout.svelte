@@ -16,6 +16,8 @@
 		activeTab = $bindable('info'),
 		detectedAssets = [],
 		selectedSectorId = $bindable(null),
+		routeDocuments = [],
+		selectedRouteKey = null,
 		currentTrackPoints = [],
 		editingTrackIndex = null,
 		trackDraftMode = 'routing',
@@ -55,7 +57,13 @@
 		onRemoveTrack = () => {},
 		onFinalizeTrack = () => {},
 		vertexDeleteUndo = null,
-		onUndoSectorVertexDelete = () => {}
+		onUndoSectorVertexDelete = () => {},
+		onAddParentRoute = () => {},
+		onAddSectorRoute = () => {},
+		onSelectRoute = () => {},
+		onUpdateRouteName = () => {},
+		onUpdateRoute = () => {},
+		onDeleteRoute = () => {}
 	} = $props();
 </script>
 
@@ -88,6 +96,8 @@
 		bind:activeTab
 		{detectedAssets}
 		{editingTrackIndex}
+		{routeDocuments}
+		{selectedRouteKey}
 		{cragTypes}
 		{availableTags}
 		{securityOptions}
@@ -114,6 +124,12 @@
 		{onRemoveTrack}
 		{onFinalizeTrack}
 		{onCancelTrackEdit}
+		{onAddParentRoute}
+		{onAddSectorRoute}
+		{onSelectRoute}
+		{onUpdateRouteName}
+		{onUpdateRoute}
+		{onDeleteRoute}
 	/>
 
 {#if vertexDeleteUndo}

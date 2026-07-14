@@ -27,6 +27,10 @@ export const cragEditorState = $state({
 	transit: [], // List of transit points: { id, name, type: 'bus'|'train', coordinates: [lon, lat] }
 	parking: [], // List of parking points: { id, coordinates: [lon, lat] }
 	tracks: [], // List of tracks: { id, name, coordinates: [[lon, lat], ...] }
+	// Route documents stay at their existing on-disk locations. Each item is
+	// { path, sectorId: string|null, data, dirty } and data.routes is the source of truth.
+	routeDocuments: [],
+	selectedRouteKey: null,
 
 	reset() {
 		const today = new Date().toISOString().split('T')[0];
@@ -51,5 +55,7 @@ export const cragEditorState = $state({
 		this.transit = [];
 		this.parking = [];
 		this.tracks = [];
+		this.routeDocuments = [];
+		this.selectedRouteKey = null;
 	}
 });

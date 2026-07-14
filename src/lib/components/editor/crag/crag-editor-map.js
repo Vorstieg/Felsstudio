@@ -76,6 +76,19 @@ export function ensureCragEditorLayers(map) {
 			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: { 'line-color': '#0075de', 'line-width': 3, 'line-dasharray': [2, 1] }
 		});
+	if (!map.getLayer('routes-line'))
+		map.addLayer({
+			id: 'routes-line',
+			type: 'line',
+			source: 'crag-editor-data',
+			filter: ['==', ['get', 'feature'], 'route'],
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': ['case', ['==', ['get', 'selected'], true], '#0075de', '#31302e'],
+				'line-width': ['case', ['==', ['get', 'selected'], true], 6, 4],
+				'line-opacity': 0.9
+			}
+		});
 	if (!map.getLayer('tracks-points-drawing'))
 		map.addLayer({
 			id: 'tracks-points-drawing',
@@ -167,6 +180,8 @@ export function ensureCragEditorLayers(map) {
 export function buildEditorFeatureCollection({
 	sectors = [],
 	savedTracks = [],
+	routes = [],
+	selectedRouteKey = null,
 	drawingPoints = [],
 	selectedSectorId = null,
 	selectedSectorVertex = null,
@@ -224,6 +239,21 @@ export function buildEditorFeatureCollection({
 			geometry: { type: 'LineString', coordinates: track.coordinates },
 			properties: { name: track.name, state: 'saved', trackIndex: index }
 		});
+	});
+	routes.forEach(({ key, route }) => {
+		for (const path of route?.assets?.paths || []) {
+			if (path?.path?.type !== 'LineString' || path.path.coordinates?.length < 2) continue;
+			features.push({
+				type: 'Feature',
+				geometry: path.path,
+				properties: {
+					feature: 'route',
+					key,
+					name: route.name || 'Unnamed route',
+					selected: key === selectedRouteKey
+				}
+			});
+		}
 	});
 	if (drawingPoints.length > 1)
 		features.push({

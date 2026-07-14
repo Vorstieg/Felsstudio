@@ -21,14 +21,10 @@
 	} from '$lib/components/editor/crag/crag-editor-options.js';
 	import { writeFile, writeJson } from '$lib/api/felslager.js';
 	import { authState } from '$lib/api/auth.svelte.js';
-	import {
-		createPolygonAround,
-		getGeometryCenter,
-		pathBasename,
-		translateGeometryTo
-	} from '$lib/assets/js/sector-utils.js';
+	import { createPolygonAround, getGeometryCenter, translateGeometryTo } from '$lib/assets/js/sector-utils.js';
 	import { storage } from '$lib/assets/js/storage-utils.js';
-	import { getCragEntryPath, slugifyName } from '$lib/components/editor/crag/crag-editor-paths.js';
+	import { Topo } from '$lib/assets/js/topo-paths.js';
+	import { slugifyName } from '$lib/components/editor/crag/crag-editor-paths.js';
 	import {
 		addEquipment,
 		addSector,
@@ -47,6 +43,7 @@
 		ensureCragEditorLayers
 	} from '$lib/components/editor/crag/crag-editor-map.js';
 	import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.js';
+	import { generateRouteId } from '$lib/assets/js/id-utils.js';
 
 	let { inspectorShadow = true } = $props();
 
@@ -67,6 +64,7 @@
 	let activeTool = $state('position'); // 'position' | 'transit' | 'parking' | 'track'
 	let activeTab = $state('info'); // 'info' | 'registry'
 	let selectedSectorId = $state(null);
+	let selectedRouteKey = $state(null);
 	let suppressNextMapClick = false;
 	let canAutosaveSession = $state(false);
 	let autosaveSessionTimeout;
@@ -351,7 +349,8 @@
 				map.easeTo({ center: coordinates, zoom: Math.max(map.getZoom(), 15), duration: 500 });
 				if (activeTool === 'position' && !selectedSectorId) setCragPosition(coordinates);
 			},
-			() => {},
+			() => {
+			},
 			{ enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
 		);
 	}
@@ -438,30 +437,24 @@
 	async function saveToServer() {
 		if (!authState.requireAuth(() => saveToServer())) return;
 
-		let savePath = getCragEntryPath(cragEditorState.crag);
-		if (!savePath) {
-			saveStatus = 'error';
-			saveError = 'No path set for this crag.';
-			return;
-		}
-		cragEditorState.crag.path = savePath;
+		let savePath = cragEditorState.crag.path;
 
 		saveStatus = 'saving';
 		saveError = '';
 
 		try {
-			const baseName = pathBasename(savePath) || slugifyName(cragEditorState.crag.name);
-			cragEditorState.crag.id = cragEditorState.crag.id || baseName;
+			cragEditorState.crag.id = slugifyName(cragEditorState.crag.name);
+			const topo = new Topo(savePath, cragEditorState.crag.id);
 			ensureCragAssets();
+			const sectors = $state.snapshot(cragEditorState.crag.sectors) || [];
 
 			const uploadedImages = [];
 			for (let i = 0; i < cragEditorState.crag.assets.images.length; i++) {
 				const image = cragEditorState.crag.assets.images[i];
 				if (image._file) {
-					const fileName = `${baseName}-image${i > 0 ? '-' + i : ''}-${safeFileName(image.name)}`;
-					const path = `${savePath}/${fileName}`;
-					await writeFile(path, image._file, image.type || image._file.type);
-					uploadedImages.push({ name: image.name, path, type: image.type, size: image.size });
+					const imagePath = topo.getImagePath(image.name, i);
+					await writeFile(topo.getImagePath(image.name, i), image.type || image._file.type);
+					uploadedImages.push({ name: image.name, path: imagePath, type: image.type, size: image.size });
 				} else {
 					uploadedImages.push({
 						name: image.name,
@@ -473,19 +466,33 @@
 			}
 			cragEditorState.crag.assets.images = uploadedImages;
 
-			await writeJson(`${savePath}/${baseName}.json`, {
+			await writeJson(topo.getCragPath(), {
 				type: 'Feature',
 				properties: {
 					...$state.snapshot(cragEditorState.crag),
+					sectors: sectors.map(({ id, name }) => ({ id, name })),
 					id: cragEditorState.crag.id,
 					updated: new Date().toISOString().split('T')[0]
 				},
 				geometry: cragEditorState.crag.geometry
 			});
 
+			for (const sector of sectors) {
+				if (!sector.id) continue;
+				const sectorTopo = new Topo(savePath, cragEditorState.crag.id, sector.id);
+				const { geometry, ...properties } = sector;
+				await writeJson(sectorTopo.getSectorPath(), {
+					type: 'Feature',
+					crag_id: cragEditorState.crag.id,
+					sector_id: sector.id,
+					properties,
+					geometry
+				});
+			}
+
 			for (let i = 0; i < cragEditorState.transit.length; i++) {
 				const transit = cragEditorState.transit[i];
-				await writeJson(`${savePath}/${baseName}-transit${i > 0 ? '-' + i : ''}.json`, {
+				await writeJson(topo.getCragAssetPath('transit', i), {
 					type: 'Feature',
 					properties: { name: transit.name, type: transit.type },
 					geometry: { type: 'Point', coordinates: transit.coordinates }
@@ -494,7 +501,7 @@
 
 			for (let i = 0; i < cragEditorState.parking.length; i++) {
 				const parking = cragEditorState.parking[i];
-				await writeJson(`${savePath}/${baseName}-parking${i > 0 ? '-' + i : ''}.json`, {
+				await writeJson(topo.getCragAssetPath('parking', i), {
 					type: 'Feature',
 					properties: { type: 'parking-space' },
 					geometry: { type: 'Point', coordinates: parking.coordinates }
@@ -503,11 +510,16 @@
 
 			for (let i = 0; i < cragEditorState.tracks.length; i++) {
 				const track = cragEditorState.tracks[i];
-				await writeJson(`${savePath}/${baseName}-transit-track${i > 0 ? '-' + i : ''}.json`, {
+				await writeJson(topo.getCragAssetPath('transit-track', i), {
 					type: 'Feature',
 					properties: {},
 					geometry: { type: 'LineString', coordinates: track.coordinates }
 				});
+			}
+
+			for (const document of cragEditorState.routeDocuments) {
+				if (document.dirty) await writeJson(document.path, document.data);
+				document.dirty = false;
 			}
 
 			saveStatus = 'success';
@@ -532,12 +544,6 @@
 	function ensureCragAssets() {
 		if (!cragEditorState.crag.assets) cragEditorState.crag.assets = { images: [] };
 		if (!cragEditorState.crag.assets.images) cragEditorState.crag.assets.images = [];
-	}
-
-	function safeFileName(name = 'image') {
-		const extension = name.includes('.') ? `.${name.split('.').pop()}` : '';
-		const base = name.replace(/\.[^/.]+$/, '') || 'image';
-		return `${slugifyName(base) || 'image'}${extension.toLowerCase()}`;
 	}
 
 	function addCragImages(files = []) {
@@ -595,6 +601,78 @@
 			direction
 		);
 	}
+
+	function getRouteDocument(sectorId) {
+		return cragEditorState.routeDocuments.find((document) => document.sectorId === sectorId);
+	}
+
+	function createRouteDocument(sectorId) {
+		const sectorTopo = new Topo(
+			cragEditorState.crag.path,
+			cragEditorState.crag.id,
+			sectorId || undefined
+		);
+		return {
+			path: sectorTopo.getTopoPath(),
+			sectorId,
+			data: {
+				id: sectorId ? `${cragEditorState.crag.id}:${sectorId}` : cragEditorState.crag.id,
+				crag_id: cragEditorState.crag.id,
+				sector_id: sectorId || '',
+				name: sectorId || cragEditorState.crag.name,
+				routes: []
+			},
+			dirty: true
+		};
+	}
+
+	function addRoute(sectorId = null) {
+		let document = getRouteDocument(sectorId);
+		if (!document) {
+			document = createRouteDocument(sectorId);
+			cragEditorState.routeDocuments = [...cragEditorState.routeDocuments, document];
+		}
+
+		let routeId;
+		do {
+			routeId = generateRouteId();
+		} while (
+			cragEditorState.routeDocuments.some((entry) =>
+				(entry.data.routes || []).some((route) => route.id === routeId)
+			)
+		);
+
+		const route = {
+			id: routeId,
+			name: '',
+			type: 'sports-climbing',
+			tags: [],
+			assets: { paths: [] }
+		};
+		document.data.routes = [...(document.data.routes || []), route];
+		document.dirty = true;
+		selectedRouteKey = `${document.path}:${route.id}`;
+	}
+
+	function deleteRoute(path, routeId) {
+		const document = cragEditorState.routeDocuments.find((entry) => entry.path === path);
+		if (!document) return;
+		document.data.routes = (document.data.routes || []).filter((route) => route.id !== routeId);
+		document.dirty = true;
+		if (selectedRouteKey === `${path}:${routeId}`) selectedRouteKey = null;
+	}
+
+	function selectRoute(path, routeId) {
+		selectedRouteKey = `${path}:${routeId}`;
+	}
+
+	function updateRoute(path, routeId, field, value) {
+		const document = cragEditorState.routeDocuments.find((entry) => entry.path === path);
+		const route = document?.data.routes?.find((entry) => entry.id === routeId);
+		if (!route) return;
+		route[field] = value;
+		document.dirty = true;
+	}
 </script>
 
 <CragEditorMap
@@ -630,6 +708,8 @@
 	{commonEquipment}
 	{saveStatus}
 	{saveError}
+	routeDocuments={cragEditorState.routeDocuments}
+	{selectedRouteKey}
 	onBack={() => goto(base + '/')}
 	onStartRoutingDraft={startRoutingDraft}
 	onHandleTrackConfirm={handleTrackConfirm}
@@ -657,6 +737,12 @@
 	onEditTrack={editTrack}
 	onRemoveTrack={removeTrack}
 	onFinalizeTrack={finalizeTrack}
+	onAddParentRoute={() => addRoute()}
+	onAddSectorRoute={addRoute}
+	onSelectRoute={selectRoute}
+	onUpdateRouteName={(path, routeId, name) => updateRoute(path, routeId, 'name', name)}
+	onUpdateRoute={updateRoute}
+	onDeleteRoute={deleteRoute}
 	{vertexDeleteUndo}
 	onUndoSectorVertexDelete={undoSectorVertexDelete}
 />

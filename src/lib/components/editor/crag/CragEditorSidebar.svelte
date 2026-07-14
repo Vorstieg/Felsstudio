@@ -31,6 +31,12 @@
 		},
 		onFinalizeTrack = () => {
 		}, onCancelTrackEdit = () => {
+		}, routeDocuments = [], selectedRouteKey = null, onAddParentRoute = () => {
+		}, onAddSectorRoute = () => {
+		}, onSelectRoute = () => {
+		}, onUpdateRouteName = () => {
+		}, onUpdateRoute = () => {
+		}, onDeleteRoute = () => {
 		}
 	} = $props();
 
@@ -51,6 +57,7 @@
 	{#snippet children()}
 		<CragEditorPanelContent
 			bind:activeTab bind:selectedSectorId showTabs={false} {detectedAssets} {editingTrackIndex} {cragTypes}
+			{routeDocuments} {selectedRouteKey} {onAddParentRoute} {onAddSectorRoute} {onSelectRoute} {onUpdateRouteName} {onUpdateRoute} {onDeleteRoute}
 			{availableTags}
 			{securityOptions} {rockTypes} {commonEquipment} {saveStatus} {onAddEquipmentItem}
 			{onRemoveEquipmentItem} {onAddCragImages} {onRemoveCragImage} {onAddSector} {onDuplicateSector}
