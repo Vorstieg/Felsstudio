@@ -2,7 +2,7 @@
 	import { calculateRouteLength } from '$lib/assets/js/topo-utils.js';
 	import { _ } from 'svelte-i18n';
 
-	let { route, length = $bindable(), topoScale } = $props();
+	let { route, length = $bindable(), topoScale, onCalculate = null } = $props();
 </script>
 
 <label class="text-ui-label block" for="route-length">{$_('ui.length')}</label>
@@ -16,7 +16,10 @@
 		/>
 
 		<button
-			onclick={() => (length = calculateRouteLength(route, topoScale))}
+			onclick={() => {
+				length = calculateRouteLength(route, topoScale);
+				onCalculate?.();
+			}}
 			title={$_('ui.length')}
 			aria-label={$_('ui.length')}
 			class="fa-solid fa-calculator absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 z-10"

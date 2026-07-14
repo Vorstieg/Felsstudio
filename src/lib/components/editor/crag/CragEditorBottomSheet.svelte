@@ -41,6 +41,10 @@
 		onSelectRoute = () => {},
 		onUpdateRouteName = () => {},
 		onUpdateRoute = () => {},
+		onAddRoutePath = () => {},
+		onEditRoutePath = () => {},
+		onUpdateRoutePath = () => {},
+		onRemoveRoutePath = () => {},
 		onDeleteRoute = () => {}
 	} = $props();
 
@@ -99,6 +103,10 @@
 				{onSelectRoute}
 				{onUpdateRouteName}
 				{onUpdateRoute}
+				{onAddRoutePath}
+				{onEditRoutePath}
+				{onUpdateRoutePath}
+				{onRemoveRoutePath}
 				{onDeleteRoute}
 			/>
 		</div>

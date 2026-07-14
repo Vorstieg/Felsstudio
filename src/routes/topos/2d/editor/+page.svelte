@@ -5,9 +5,12 @@
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
 	import Topo2DEditor from '$lib/components/editor/2d/Topo2DEditor.svelte';
 	import OutlineToolOptions from '$lib/components/editor/tools/OutlineToolOptions.svelte';
+	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
 	import TopoPropertiesPanel from '$lib/components/editor/TopoPropertiesPanel.svelte';
 	import { authState } from '$lib/api/auth.svelte.js';
 	import { writeJson } from '$lib/api/felslager.js';
+	import { topoSymbols } from '$lib/assets/js/topo-utils.js';
+	import { _ } from 'svelte-i18n';
 
 	let activeTool = $state(null);
 	let selectedOutlineStyle = $state('rock');
@@ -17,6 +20,9 @@
 	let editor2D = $state();
 	let saveStatus = $state();
 	let saveError = $state();
+	let activeSymbols = $derived(
+		topoSymbols.filter((symbol) => symbol.type === (activeTool === 'fixpoint' ? 'fixpoint' : 'feature'))
+	);
 
 	useTopoDraftAutosave({
 		editorMode: '2d',
@@ -80,17 +86,31 @@
 	status={saveStatus}
 	errorMessage={saveError}
 />
-{#if ['route', 'multipitch', 'outline'].includes(activeTool)}
-	<div class="fixed bottom-16 left-2 right-2 z-101 md:bottom-auto md:right-auto md:top-25">
+
+{#if activeTool === 'outline'}
 		<OutlineToolOptions
 			outlineTool={editor2D?.getCurrentTool?.()}
 			{activeTool}
 			bind:selectedOutlineStyle
-			onFinalize={() => editor2D.finalize()}
-			onCancelAction={() => editor2D.cancel()}
 			onClose={() => (activeTool = null)}
 		/>
-	</div>
+{:else if ['symbol', 'fixpoint'].includes(activeTool)}
+	<ToolOptions title={ $_(`ui.${activeTool}`)} onClose={() => (activeTool = null)}>
+			<div class="grid grid-cols-5 gap-1.5">
+				{#each activeSymbols as symbol}
+					<button
+						type="button"
+						class={`flex min-h-11 flex-col items-center justify-center rounded-sm p-1.5 transition-none ${userState.ui.selectedSymbol === symbol.id ? 'bg-creator-blue text-white ring-1 ring-creator-blue' : 'bg-black/5 hover:bg-black/10'}`}
+						onclick={() => (userState.ui.selectedSymbol = symbol.id)}
+						title={$_(`topo.fixpoints.${symbol.id}`)}
+						aria-label={$_(`topo.fixpoints.${symbol.id}`)}
+					>
+						<img src={symbol.icon} alt="" class="h-5 w-5" />
+					</button>
+				{/each}
+			</div>
+
+	</ToolOptions>
 {/if}
 
 <TopoPropertiesPanel bind:showMapModal bind:drawingTarget bind:activeTool />

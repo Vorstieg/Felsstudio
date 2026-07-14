@@ -85,10 +85,8 @@ export function convertRouteType(route, newType) {
 		delete route.pitches;
 	}
 
-	route.geometryMode = getDefaultGeometryMode(newType);
 	route.topo = {
-		...(route.topo || {}),
-		enabled: route.geometryMode !== 'track'
+		...(route.topo || {})
 	};
 	if (!route.assets) route.assets = { paths: [] };
 	if (!route.assets.paths) route.assets.paths = [];

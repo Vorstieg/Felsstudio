@@ -185,6 +185,14 @@
 	}
 
 	export function undo() {
+		if (
+			(currentTool instanceof RouteTool || currentTool instanceof OutlineTool) &&
+			currentTool.currentPoints.length > 0
+		) {
+			currentTool.undoLastPoint();
+			return;
+		}
+
 		if (historyIndex > 0) {
 			historyIndex--;
 			const state = history[historyIndex];
@@ -333,7 +341,7 @@
 
 	function getOutlineLineStyle(styleId = 'rock') {
 		const styles = {
-			rock: { stroke: '#d97706', width: 3, dash: '5,5' },
+			rock: { stroke: '#000000', width: 3, dash: null },
 			approach: { stroke: '#eab308', width: 4, dash: null },
 			descent: { stroke: '#6b7280', width: 3, dash: '10 10' },
 			variant: { stroke: '#8f8a84', width: 3, dash: '8 8' },

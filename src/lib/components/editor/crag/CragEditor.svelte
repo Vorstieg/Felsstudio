@@ -11,12 +11,12 @@
 	import CragEditorMap from '$lib/components/editor/crag/CragEditorMap.svelte';
 	import CragEditorLayout from '$lib/components/editor/crag/CragEditorLayout.svelte';
 	import CragEditorBottomSheet from '$lib/components/editor/crag/CragEditorBottomSheet.svelte';
+	import RouteDetailModal from '$lib/components/editor/crag/RouteDetailModal.svelte';
 	import {
 		availableTags,
 		commonEquipment,
 		CRAG_SESSION_KEY,
 		cragTypes,
-		rockTypes,
 		securityOptions
 	} from '$lib/components/editor/crag/crag-editor-options.js';
 	import { writeFile, writeJson } from '$lib/api/felslager.js';
@@ -37,6 +37,7 @@
 	import { useCragTrackEditor } from '$lib/components/editor/crag/use-crag-track-editor.svelte.js';
 	import { useCragSectorMapEditor } from '$lib/components/editor/crag/use-crag-sector-map-editor.svelte.js';
 	import { useCragAccessEditor } from '$lib/components/editor/crag/use-crag-access-editor.svelte.js';
+	import { initMapPointDragHandlers } from '$lib/components/editor/map-point-drag-handlers.js';
 	import {
 		buildEditorFeatureCollection,
 		createIconMarkerElement,
@@ -44,6 +45,7 @@
 	} from '$lib/components/editor/crag/crag-editor-map.js';
 	import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.js';
 	import { generateRouteId } from '$lib/assets/js/id-utils.js';
+	import { rockTypes } from '$lib/config.js';
 
 	let { inspectorShadow = true } = $props();
 
@@ -65,6 +67,22 @@
 	let activeTab = $state('info'); // 'info' | 'registry'
 	let selectedSectorId = $state(null);
 	let selectedRouteKey = $state(null);
+	let selectedRouteEntry = $derived.by(() => {
+		if (!selectedRouteKey) return null;
+		return cragEditorState.routeDocuments
+			.flatMap((document) =>
+				(document.data?.routes || []).map((route) => ({ document, route }))
+			)
+			.find(({ document, route }) => `${document.path}:${route.id}` === selectedRouteKey);
+	});
+	let routePathDrawingTarget = $state(null);
+	let isRoutePathDrawing = $derived(routePathDrawingTarget !== null);
+	let cutLineStart = $state(null);
+	let cutLineEnd = $state(null);
+	let pendingTrackCut = $state(null);
+	let hasPendingTrackCut = $derived(pendingTrackCut !== null);
+	let areTrackCutDragHandlersReady = false;
+	let areTrackViewportSyncHandlersReady = false;
 	let suppressNextMapClick = false;
 	let canAutosaveSession = $state(false);
 	let autosaveSessionTimeout;
@@ -74,21 +92,34 @@
 		getActiveTool: () => activeTool,
 		setActiveTool: (value) => (activeTool = value),
 		setActiveTab: (value) => (activeTab = value),
-		setSuppressNextMapClick: (value) => (suppressNextMapClick = value)
+		setSuppressNextMapClick: (value) => (suppressNextMapClick = value),
+		getRoutePathTarget: () => routePathDrawingTarget,
+		onSaveRoutePath: saveRoutePathCoordinates,
+		onRoutePathDrawingEnd: () => (routePathDrawingTarget = null),
+		onTrackPointDragStart: () => syncEditorData(),
+		onTrackPointDragEnd: () => syncEditorData()
 	});
 	let currentTrackPoints = $derived(trackEditor.currentTrackPoints);
 	let editingTrackIndex = $derived(trackEditor.editingTrackIndex);
 	let trackDraftMode = $derived(trackEditor.trackDraftMode);
 	let isSnappingEnabled = $derived(trackEditor.isSnappingEnabled);
 	let isRoutingTrack = $derived(trackEditor.isRoutingTrack);
+	let activeTrackDragState = $derived(trackEditor.draggingTrackPoint);
 
 	const addTrackPoint = (...args) => trackEditor.addTrackPoint(...args);
 	const handleTrackConfirm = (...args) => trackEditor.handleTrackConfirm(...args);
 	const startRoutingDraft = (...args) => trackEditor.startRoutingDraft(...args);
+	const setTrackDraftMode = (...args) => trackEditor.setTrackDraftMode(...args);
 	const undoTrackPoint = (...args) => trackEditor.undoTrackPoint(...args);
+	const reverseTrack = (...args) => trackEditor.reverseTrack(...args);
+	const trimTrackStart = (...args) => trackEditor.trimTrackStart(...args);
+	const trimTrackEnd = (...args) => trackEditor.trimTrackEnd(...args);
+	const simplifyTrack = (...args) => trackEditor.simplifyTrack(...args);
 	const removeTrack = (...args) => trackEditor.removeTrack(...args);
+	const splitEditingTrack = (...args) => trackEditor.splitEditingTrack(...args);
 	const finalizeTrack = (...args) => trackEditor.finalizeTrack(...args);
 	const editTrack = (...args) => trackEditor.editTrack(...args);
+	const editRoutePathTrack = (...args) => trackEditor.editRoutePath(...args);
 	const cancelTrackEdit = (...args) => trackEditor.cancelTrackEdit(...args);
 	const handleGpxUpload = (...args) => trackEditor.handleGpxUpload(...args);
 
@@ -164,6 +195,205 @@
 		if (center && map) map.easeTo({ center, zoom: Math.max(map.getZoom(), 15), duration: 400 });
 	}
 
+	function coordinatesEqual(a, b) {
+		return Math.abs(a[0] - b[0]) < 1e-10 && Math.abs(a[1] - b[1]) < 1e-10;
+	}
+
+	function segmentLineIntersection(a, b, c, d) {
+		const [x1, y1] = a;
+		const [x2, y2] = b;
+		const [x3, y3] = c;
+		const [x4, y4] = d;
+		const denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+		if (Math.abs(denominator) < 1e-12) return null;
+
+		const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denominator;
+		const u = -((x1 - x2) * (y1 - y2) - (y1 - y2) * (x1 - x3)) / denominator;
+		if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+		return { coordinate: [x1 + t * (x2 - x1), y1 + t * (y2 - y1)], t };
+	}
+
+	function findTrackCutIntersection(coordinates, lineStart, lineEnd) {
+		for (let index = 0; index < coordinates.length - 1; index += 1) {
+			const intersection = segmentLineIntersection(
+				coordinates[index],
+				coordinates[index + 1],
+				lineStart,
+				lineEnd
+			);
+			if (intersection) return { ...intersection, segmentIndex: index };
+		}
+		return null;
+	}
+
+	function splitTrackAtIntersection(coordinates, intersection) {
+		const { coordinate, segmentIndex } = intersection;
+		const startCoordinates = coordinates.slice(0, segmentIndex + 1);
+		const endCoordinates = coordinates.slice(segmentIndex + 1);
+		if (!coordinatesEqual(startCoordinates.at(-1), coordinate)) startCoordinates.push(coordinate);
+		if (!coordinatesEqual(endCoordinates[0], coordinate)) endCoordinates.unshift(coordinate);
+		return [startCoordinates, endCoordinates];
+	}
+
+	function cutOverlayFeatures() {
+		const features = [];
+		if (cutLineStart && cutLineEnd) {
+			features.push({
+				type: 'Feature',
+				properties: { feature: 'track-cut-line' },
+				geometry: { type: 'LineString', coordinates: [cutLineStart, cutLineEnd] }
+			});
+		}
+		for (const [cutPointIndex, coordinate] of [cutLineStart, cutLineEnd].entries()) {
+			if (!coordinate) continue;
+			features.push({
+				type: 'Feature',
+				properties: { feature: 'track-cut-point', cutPointIndex },
+				geometry: { type: 'Point', coordinates: coordinate }
+			});
+		}
+		if (pendingTrackCut?.intersection) {
+			features.push({
+				type: 'Feature',
+				properties: { feature: 'track-cut-intersection', intersection: true },
+				geometry: { type: 'Point', coordinates: pendingTrackCut.intersection }
+			});
+		}
+		return { type: 'FeatureCollection', features };
+	}
+
+	function syncTrackCutOverlay() {
+		const source = map?.getSource('track-cut-overlay');
+		if (source) source.setData(cutOverlayFeatures());
+	}
+
+	function trackDragOverlayFeatures() {
+		if (!activeTrackDragState) return { type: 'FeatureCollection', features: [] };
+		const { pointIndex, coordinate } = activeTrackDragState;
+		const features = [];
+		if (currentTrackPoints[pointIndex - 1]) {
+			features.push({
+				type: 'Feature',
+				properties: { feature: 'track-drag-edge' },
+				geometry: {
+					type: 'LineString',
+					coordinates: [currentTrackPoints[pointIndex - 1], coordinate]
+				}
+			});
+		}
+		if (currentTrackPoints[pointIndex + 1]) {
+			features.push({
+				type: 'Feature',
+				properties: { feature: 'track-drag-edge' },
+				geometry: {
+					type: 'LineString',
+					coordinates: [coordinate, currentTrackPoints[pointIndex + 1]]
+				}
+			});
+		}
+		features.push({
+			type: 'Feature',
+			properties: { feature: 'track-drag-point' },
+			geometry: { type: 'Point', coordinates: coordinate }
+		});
+		return { type: 'FeatureCollection', features };
+	}
+
+	function syncTrackDragOverlay() {
+		const source = map?.getSource('tracks-drag-overlay');
+		if (source) source.setData(trackDragOverlayFeatures());
+	}
+
+	function visibleDrawingPointIndexes(points) {
+		const bounds = map?.getBounds?.();
+		if (!bounds) return [];
+		const indexes = [];
+		for (let index = 0; index < points.length; index += 1) {
+			if (bounds.contains(points[index])) indexes.push(index);
+		}
+		return indexes;
+	}
+
+	function initTrackViewportSyncHandlers() {
+		if (!map || areTrackViewportSyncHandlersReady) return;
+		areTrackViewportSyncHandlersReady = true;
+		for (const event of ['moveend', 'zoomend', 'resize']) map.on(event, syncEditorData);
+	}
+
+	function resetTrackCut() {
+		cutLineStart = null;
+		cutLineEnd = null;
+		pendingTrackCut = null;
+		syncTrackCutOverlay();
+	}
+
+	function rebuildPendingTrackCut() {
+		if (!cutLineStart || !cutLineEnd || currentTrackPoints.length < 2) {
+			pendingTrackCut = null;
+			return;
+		}
+		const intersection = findTrackCutIntersection(currentTrackPoints, cutLineStart, cutLineEnd);
+		if (!intersection) {
+			pendingTrackCut = null;
+			return;
+		}
+		const [startCoordinates, endCoordinates] = splitTrackAtIntersection(
+			currentTrackPoints,
+			intersection
+		);
+		pendingTrackCut =
+			startCoordinates.length > 1 && endCoordinates.length > 1
+				? { startCoordinates, endCoordinates, intersection: intersection.coordinate }
+				: null;
+	}
+
+	function startTrackCut() {
+		if (editingTrackIndex === null || currentTrackPoints.length < 2 || isRoutePathDrawing) return;
+		activeTool = 'cut';
+		resetTrackCut();
+	}
+
+	function handleTrackCutClick(coordinate) {
+		if (!cutLineStart || pendingTrackCut) {
+			cutLineStart = coordinate;
+			cutLineEnd = null;
+			pendingTrackCut = null;
+		} else {
+			cutLineEnd = coordinate;
+			rebuildPendingTrackCut();
+		}
+		syncTrackCutOverlay();
+	}
+
+	function confirmTrackCut() {
+		if (!pendingTrackCut) return;
+		if (splitEditingTrack(pendingTrackCut.startCoordinates, pendingTrackCut.endCoordinates)) resetTrackCut();
+	}
+
+	function initTrackCutDragHandlers() {
+		if (!map || areTrackCutDragHandlersReady) return;
+		areTrackCutDragHandlersReady = true;
+		initMapPointDragHandlers({
+			map,
+			layers: ['track-cut-points'],
+			canDrag: () => activeTool === 'cut',
+			getDragState: (event) => {
+				const cutPointIndex = Number(event.features?.[0]?.properties?.cutPointIndex);
+				return cutPointIndex === 0 || cutPointIndex === 1 ? { cutPointIndex } : null;
+			},
+			onDragMove: ({ cutPointIndex }, event) => {
+				const coordinate = [event.lngLat.lng, event.lngLat.lat];
+				if (cutPointIndex === 0) cutLineStart = coordinate;
+				else cutLineEnd = coordinate;
+				rebuildPendingTrackCut();
+			syncTrackCutOverlay();
+		},
+			onDragEnd: () => {
+				suppressNextMapClick = true;
+			}
+		});
+	}
+
 	onMount(() => {
 		if (isBlankCragSession()) restoreLatestCragSession();
 		canAutosaveSession = true;
@@ -175,6 +405,8 @@
 				else if (e.key === 'Backspace' || e.key === 'Delete') {
 					undoTrackPoint();
 				}
+			} else if (activeTool === 'cut' && e.key === 'Escape') {
+				resetTrackCut();
 			}
 		};
 
@@ -193,8 +425,14 @@
 			return;
 		}
 
+		if (activeTool === 'cut') {
+			handleTrackCutClick([e.lngLat.lng, e.lngLat.lat]);
+			return;
+		}
+
 		if (
 			activeTool === 'track' &&
+			!routePathDrawingTarget &&
 			currentTrackPoints.length === 0 &&
 			map.getLayer('tracks-line-saved')
 		) {
@@ -266,9 +504,20 @@
 	});
 
 	$effect(() => {
+		activeTrackDragState;
+		syncTrackDragOverlay();
+	});
+
+	$effect(() => {
+		if (activeTool !== 'cut' && (cutLineStart || cutLineEnd || pendingTrackCut)) resetTrackCut();
+	});
+
+	$effect(() => {
 		if (!isMapLoaded || !map) return;
 		JSON.stringify(cragEditorState.crag.sectors || []);
+		JSON.stringify(cragEditorState.routeDocuments || []);
 		selectedSectorId;
+		selectedRouteKey;
 		selectedSectorVertex;
 		draggingSectorMarkerId;
 		untrack(() => {
@@ -414,22 +663,36 @@
 		accessEditor.syncAccessMarkers();
 
 		trackEditor.initTrackPointDragHandlers();
+		initTrackCutDragHandlers();
+		initTrackViewportSyncHandlers();
 		sectorMapEditor.initSectorEditHandlers();
 		accessEditor.initDetectionPointHandlers();
 		syncEditorData();
+		syncTrackCutOverlay();
+		syncTrackDragOverlay();
 	}
 
 	function syncEditorData() {
 		const source = map?.getSource('crag-editor-data');
 		if (!source) return;
+		const drawingPoints = $state.snapshot(currentTrackPoints) || [];
 		source.setData(
 			buildEditorFeatureCollection({
 				sectors: $state.snapshot(cragEditorState.crag.sectors) || [],
 				savedTracks: $state.snapshot(cragEditorState.tracks) || [],
-				drawingPoints: $state.snapshot(currentTrackPoints) || [],
+				routes: (cragEditorState.routeDocuments || []).flatMap((document) =>
+					(document.data?.routes || []).map((route) => ({
+						key: `${document.path}:${route.id}`,
+						route: $state.snapshot(route)
+					}))
+				),
+				selectedRouteKey,
+				drawingPoints,
+				visibleDrawingPointIndexes: visibleDrawingPointIndexes(drawingPoints),
 				selectedSectorId,
 				selectedSectorVertex,
-				editingTrackIndex
+				editingTrackIndex,
+				draggingTrackPointIndex: untrack(() => activeTrackDragState?.pointIndex ?? null)
 			})
 		);
 	}
@@ -673,6 +936,70 @@
 		route[field] = value;
 		document.dirty = true;
 	}
+
+	function touchRoute(path, routeId) {
+		const document = cragEditorState.routeDocuments.find((entry) => entry.path === path);
+		if (document?.data.routes?.some((route) => route.id === routeId)) document.dirty = true;
+	}
+
+	function updateRoutePaths(path, routeId, update) {
+		const document = cragEditorState.routeDocuments.find((entry) => entry.path === path);
+		const route = document?.data.routes?.find((entry) => entry.id === routeId);
+		if (!route) return;
+
+		const existingPaths = route.assets?.paths;
+		const paths = Array.isArray(existingPaths) ? existingPaths : existingPaths ? [existingPaths] : [];
+		route.assets = { ...(route.assets || {}), paths: update(paths) };
+		document.dirty = true;
+	}
+
+	function addRoutePath(path, routeId) {
+		updateRoutePaths(path, routeId, (paths) => [
+			...paths,
+			{ role: 'main', label: '', path: null }
+		]);
+		const document = cragEditorState.routeDocuments.find((entry) => entry.path === path);
+		const route = document?.data.routes?.find((entry) => entry.id === routeId);
+		const pathIndex = (route?.assets?.paths || []).length - 1;
+		if (pathIndex < 0) return;
+
+		routePathDrawingTarget = { path, routeId, pathIndex };
+		startRoutingDraft();
+	}
+
+	function saveRoutePathCoordinates({ path, routeId, pathIndex }, coordinates) {
+		updateRoutePaths(path, routeId, (paths) =>
+			paths.map((pathAsset, index) =>
+				index === pathIndex
+					? { ...pathAsset, path: { type: 'LineString', coordinates } }
+					: pathAsset
+			)
+		);
+	}
+
+	function editRoutePath(path, routeId, pathIndex) {
+		const document = cragEditorState.routeDocuments.find((entry) => entry.path === path);
+		const route = document?.data.routes?.find((entry) => entry.id === routeId);
+		const paths = route?.assets?.paths;
+		const pathAssets = Array.isArray(paths) ? paths : paths ? [paths] : [];
+		const coordinates = pathAssets[pathIndex]?.path?.coordinates;
+		if (!Array.isArray(coordinates) || coordinates.length < 2) return;
+
+		routePathDrawingTarget = { path, routeId, pathIndex };
+		editRoutePathTrack(coordinates);
+	}
+
+	function updateRoutePath(path, routeId, pathIndex, field, value) {
+		updateRoutePaths(path, routeId, (paths) =>
+			paths.map((pathAsset, index) =>
+				index === pathIndex ? { ...pathAsset, [field]: value } : pathAsset
+			)
+		);
+	}
+
+	function removeRoutePath(path, routeId, pathIndex) {
+		updateRoutePaths(path, routeId, (paths) => paths.filter((_, index) => index !== pathIndex));
+	}
 </script>
 
 <CragEditorMap
@@ -701,6 +1028,8 @@
 	{editingTrackIndex}
 	{trackDraftMode}
 	{isRoutingTrack}
+	{hasPendingTrackCut}
+	{isRoutePathDrawing}
 	{cragTypes}
 	{availableTags}
 	{securityOptions}
@@ -712,9 +1041,17 @@
 	{selectedRouteKey}
 	onBack={() => goto(base + '/')}
 	onStartRoutingDraft={startRoutingDraft}
+	onSetTrackDraftMode={setTrackDraftMode}
 	onHandleTrackConfirm={handleTrackConfirm}
 	onCancelTrackEdit={cancelTrackEdit}
 	onUndoTrackPoint={undoTrackPoint}
+	onStartTrackCut={startTrackCut}
+	onConfirmTrackCut={confirmTrackCut}
+	onCancelTrackCut={resetTrackCut}
+	onReverseTrack={reverseTrack}
+	onTrimTrackStart={trimTrackStart}
+	onTrimTrackEnd={trimTrackEnd}
+	onSimplifyTrack={simplifyTrack}
 	onGpxUpload={handleGpxUpload}
 	onExport={saveToServer}
 	onUseSearchPosition={setCragPositionFromSearch}
@@ -742,7 +1079,37 @@
 	onSelectRoute={selectRoute}
 	onUpdateRouteName={(path, routeId, name) => updateRoute(path, routeId, 'name', name)}
 	onUpdateRoute={updateRoute}
+	onAddRoutePath={addRoutePath}
+	onEditRoutePath={editRoutePath}
+	onUpdateRoutePath={updateRoutePath}
+	onRemoveRoutePath={removeRoutePath}
 	onDeleteRoute={deleteRoute}
 	{vertexDeleteUndo}
 	onUndoSectorVertexDelete={undoSectorVertexDelete}
 />
+
+<RouteDetailModal
+	routeEntry={selectedRouteEntry}
+	onClose={() => (selectedRouteKey = null)}
+	onChange={touchRoute}
+	onAddRoutePath={addRoutePath}
+	onEditRoutePath={editRoutePath}
+	onUpdateRoutePath={updateRoutePath}
+	onRemoveRoutePath={removeRoutePath}
+/>
+
+{#if activeTool === 'cut'}
+	<div
+		class="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-sm border border-black/10 bg-near-black px-3 py-2 text-sm text-white shadow-lg"
+	>
+		{#if pendingTrackCut}
+			The cut intersects the track. Use the toolbar tick to split it, or X to discard the cut line.
+		{:else if cutLineEnd}
+			No intersection found. Click again to start a new cut line.
+		{:else if cutLineStart}
+			Click the second point of a line across the track.
+		{:else}
+			Click the first point of a line across the track.
+		{/if}
+	</div>
+{/if}

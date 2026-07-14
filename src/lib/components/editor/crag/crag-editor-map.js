@@ -102,6 +102,58 @@ export function ensureCragEditorLayers(map) {
 				'circle-stroke-color': '#0075de'
 			}
 		});
+	if (!map.getSource('tracks-drag-overlay'))
+		map.addSource('tracks-drag-overlay', {
+			type: 'geojson',
+			data: { type: 'FeatureCollection', features: [] }
+		});
+	if (!map.getLayer('tracks-drag-lines'))
+		map.addLayer({
+			id: 'tracks-drag-lines',
+			type: 'line',
+			source: 'tracks-drag-overlay',
+			filter: ['==', ['geometry-type'], 'LineString'],
+			paint: { 'line-color': '#0075de', 'line-width': 4, 'line-opacity': 1 }
+		});
+	if (!map.getLayer('tracks-drag-point'))
+		map.addLayer({
+			id: 'tracks-drag-point',
+			type: 'circle',
+			source: 'tracks-drag-overlay',
+			filter: ['==', ['geometry-type'], 'Point'],
+			paint: {
+				'circle-radius': drawingPointRadius,
+				'circle-color': '#0075de',
+				'circle-stroke-width': 2,
+				'circle-stroke-color': '#ffffff'
+			}
+		});
+	if (!map.getSource('track-cut-overlay'))
+		map.addSource('track-cut-overlay', {
+			type: 'geojson',
+			data: { type: 'FeatureCollection', features: [] }
+		});
+	if (!map.getLayer('track-cut-line'))
+		map.addLayer({
+			id: 'track-cut-line',
+			type: 'line',
+			source: 'track-cut-overlay',
+			filter: ['==', ['geometry-type'], 'LineString'],
+			paint: { 'line-color': '#dc2626', 'line-width': 3, 'line-dasharray': [2, 1] }
+		});
+	if (!map.getLayer('track-cut-points'))
+		map.addLayer({
+			id: 'track-cut-points',
+			type: 'circle',
+			source: 'track-cut-overlay',
+			filter: ['==', ['geometry-type'], 'Point'],
+			paint: {
+				'circle-radius': ['case', ['==', ['get', 'intersection'], true], 7, 5],
+				'circle-color': ['case', ['==', ['get', 'intersection'], true], '#facc15', '#dc2626'],
+				'circle-stroke-width': 2,
+				'circle-stroke-color': '#ffffff'
+			}
+		});
 	if (!map.getLayer('sector-polygons-fill'))
 		map.addLayer(
 			{
@@ -183,6 +235,8 @@ export function buildEditorFeatureCollection({
 	routes = [],
 	selectedRouteKey = null,
 	drawingPoints = [],
+	visibleDrawingPointIndexes = [],
+	draggingTrackPointIndex = null,
 	selectedSectorId = null,
 	selectedSectorVertex = null,
 	editingTrackIndex = null
@@ -255,18 +309,28 @@ export function buildEditorFeatureCollection({
 			});
 		}
 	});
-	if (drawingPoints.length > 1)
+	const drawingSegments =
+		draggingTrackPointIndex === null
+			? [drawingPoints]
+			: [
+				drawingPoints.slice(0, draggingTrackPointIndex),
+				drawingPoints.slice(draggingTrackPointIndex + 1)
+			];
+	for (const coordinates of drawingSegments) {
+		if (coordinates.length < 2) continue;
 		features.push({
 			type: 'Feature',
-			geometry: { type: 'LineString', coordinates: drawingPoints },
+			geometry: { type: 'LineString', coordinates },
 			properties: { name: 'Drawing', state: 'drawing' }
 		});
-	drawingPoints.forEach((point, pointIndex) =>
+	}
+	for (const pointIndex of visibleDrawingPointIndexes) {
+		if (pointIndex === draggingTrackPointIndex || !drawingPoints[pointIndex]) continue;
 		features.push({
 			type: 'Feature',
-			geometry: { type: 'Point', coordinates: point },
+			geometry: { type: 'Point', coordinates: drawingPoints[pointIndex] },
 			properties: { type: 'Point', state: 'drawing', pointIndex }
-		})
-	);
+		});
+	}
 	return { type: 'FeatureCollection', features };
 }

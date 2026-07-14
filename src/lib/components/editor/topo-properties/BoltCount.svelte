@@ -2,7 +2,7 @@
 	import { calculateBoltAmount } from '$lib/assets/js/topo-utils.js';
 	import { _ } from 'svelte-i18n';
 
-	let { route, boltCount = $bindable(), fixPoints } = $props();
+	let { route, boltCount = $bindable(), fixPoints, onCalculate = null } = $props();
 </script>
 
 <label class="text-ui-label block" for="route-length">{$_('topo.protection')}</label>
@@ -16,7 +16,10 @@
 		/>
 
 		<button
-			onclick={() => (boltCount = calculateBoltAmount(route,fixPoints))}
+			onclick={() => {
+				boltCount = calculateBoltAmount(route, fixPoints);
+				onCalculate?.();
+			}}
 			title={$_('ui.length')}
 			aria-label={$_('ui.length')}
 			class="fa-solid fa-calculator absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 z-10"

@@ -42,21 +42,6 @@ export const availableTags = [
 
 export const securityOptions = ['Sehr Gut', 'Gut', 'Mittel', 'Alpine'];
 
-export const rockTypes = [
-	'limestone',
-	'granite',
-	'gneiss',
-	'dolomite',
-	'sandstone',
-	'basalt',
-	'tuff',
-	'rhyolite',
-	'quartzite',
-	'conglomerate',
-	'schist',
-	'slate'
-];
-
 export const commonEquipment = [
 	'Expressschlingen',
 	'Friends',

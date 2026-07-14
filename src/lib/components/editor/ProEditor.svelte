@@ -25,6 +25,8 @@
 	import { writeFile, writeJson } from '$lib/api/felslager.js';
 	import { authState } from '$lib/api/auth.svelte.js';
 	import ToolPalette3D from '$lib/components/editor/3d/ToolPalette3D.svelte';
+	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
+	import { fixpointSymbols } from '$lib/assets/js/topo-utils.js';
 
 	let { workspace = '3d-create', children } = $props();
 	let isMobile = $state(false);
@@ -451,33 +453,28 @@
 
 <!-- Floating Hint Panels for 3D Mode -->
 {#if activeTool && activeTool !== 'ai-bolts'}
-	<div
-		class="fixed top-14 left-2 flex items-center gap-3 p-1.5 bg-white rounded-sm border border-black/15 shadow-modal z-100"
-	>
-		<div class="px-2 py-0.5 border-r border-black/10">
-			<p class="text-ui-label text-near-black m-0!">{$_(`ui.${activeTool}`)}</p>
-		</div>
-		<div class="flex items-center gap-4 px-1 text-warm-gray-500">
+	<ToolOptions title={$_(`ui.${activeTool}`)} onClose={() => (activeTool = null)}>
+		<div class="flex flex-col gap-2 text-warm-gray-500">
 			{#if activeTool === 'route'}
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.set_vertex')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Dbl Click</kbd
+					>Dbl Click</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.undo_vertex')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Backspace</kbd
+					>Backspace</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.finalize')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Enter</kbd
+					>Enter</kbd
 					>
 				</div>
 			{:else if activeTool === 'multipitch'}
@@ -485,28 +482,28 @@
 					<span>{$_('ui.vertex')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Dbl Click</kbd
+					>Dbl Click</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.undo_vertex')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Backspace</kbd
+					>Backspace</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.place_belay')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>B</kbd
+					>B</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.finalize')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Enter</kbd
+					>Enter</kbd
 					>
 				</div>
 			{:else if activeTool === 'fixpoint'}
@@ -514,7 +511,7 @@
 					<span>{$_('ui.place_point')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Dbl Click</kbd
+					>Dbl Click</kbd
 					>
 				</div>
 				<div class="w-px h-4 bg-black/10 mx-1"></div>
@@ -536,7 +533,7 @@
 									: 'opacity-70'}"
 							/>
 							<span class="text-[9px] font-bold uppercase tracking-tighter"
-								>{$_(`topo.fixpoints.${symbol.id}`)}</span
+							>{$_(`topo.fixpoints.${symbol.id}`)}</span
 							>
 						</button>
 					{/each}
@@ -546,33 +543,33 @@
 					<span>Select Area</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Shift + Drag</kbd
+					>Shift + Drag</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>Select Islands</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>C</kbd
+					>C</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>Apply Cut</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Delete</kbd
+					>Delete</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>Reset</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Esc</kbd
+					>Esc</kbd
 					>
 				</div>
 			{/if}
 		</div>
-	</div>
+	</ToolOptions>
 {/if}
 
 {#if activeTool === 'crop'}

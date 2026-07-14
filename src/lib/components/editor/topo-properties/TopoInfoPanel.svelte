@@ -7,6 +7,7 @@
 	import { availableTopoTags } from '$lib/assets/js/topo-utils.js';
 	import { outlineLineStyles } from './topo-properties-utils.js';
 	import TopoJsonEditor from './TopoJsonEditor.svelte';
+	import { rockTypes } from '$lib/config.js';
 
 	let {
 		showMapModal = $bindable(false),
@@ -107,17 +108,10 @@
 					bind:value={userState.topo.rock}
 					class="input-studio w-full appearance-none"
 				>
-					<option value="granite">{$_('rock_types.granite')}</option>
-					<option value="gneiss">{$_('rock_types.gneiss')}</option>
-					<option value="limestone">{$_('rock_types.limestone')}</option>
-					<option value="dolomite">{$_('rock_types.dolomite')}</option>
-					<option value="sandstone">{$_('rock_types.sandstone')}</option>
-					<option value="basalt">{$_('rock_types.basalt')}</option>
-					<option value="tuff">{$_('rock_types.tuff')}</option>
-					<option value="rhyolite">{$_('rock_types.rhyolite')}</option>
-					<option value="quartzite">{$_('rock_types.quartzite')}</option>
-					<option value="conglomerate">{$_('rock_types.conglomerate')}</option>
-					<option value="schist">{$_('rock_types.schist')}</option>
+					{#each rockTypes as rockType}
+						<option value="{rockType}">{$_(`rock_types.${rockType}`)}</option>
+
+					{/each}
 				</select>
 			</div>
 

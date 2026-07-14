@@ -45,6 +45,10 @@
 		onSelectRoute = () => {},
 		onUpdateRouteName = () => {},
 		onUpdateRoute = () => {},
+		onAddRoutePath = () => {},
+		onEditRoutePath = () => {},
+		onUpdateRoutePath = () => {},
+		onRemoveRoutePath = () => {},
 		onDeleteRoute = () => {}
 	} = $props();
 
@@ -59,6 +63,7 @@
 			document.sectorId ? [] : (document.data?.routes || []).map((route) => ({ document, route }))
 		)
 	);
+	let collapsedRoutePanels = $state({});
 
 	function sectorRoutes(sectorId) {
 		return routeDocuments.flatMap((document) =>
@@ -72,16 +77,18 @@
 		return `${document.path}:${route.id}`;
 	}
 
+	function routePanelIsCollapsed(panelId) {
+		return collapsedRoutePanels[panelId] !== false;
+	}
+
+	function toggleRoutePanel(panelId) {
+		collapsedRoutePanels[panelId] = !routePanelIsCollapsed(panelId);
+	}
+
 	function selectedSectorRoute(sectorId) {
 		return sectorRoutes(sectorId).find(
 			({ document, route }) => selectedRouteKey === routeKey(document, route)
 		);
-	}
-
-	function selectedRouteEntry() {
-		return routeDocuments
-			.flatMap((document) => (document.data?.routes || []).map((route) => ({ document, route })))
-			.find(({ document, route }) => selectedRouteKey === routeKey(document, route));
 	}
 
 	function ensureSectorCollections(sector) {
@@ -289,7 +296,7 @@
 					<table class="w-full text-left text-micro-data">
 						<thead class="text-warm-gray-400"><tr><th class="pb-1 font-bold">Route</th><th class="pb-1 font-bold">Type</th><th class="pb-1 font-bold">Paths</th><th></th></tr></thead>
 						<tbody>
-							{#each parentRoutes as { document, route }}
+							{#each parentRoutes.slice(0, routePanelIsCollapsed('crag') ? 3 : parentRoutes.length) as { document, route }}
 								<tr class="border-t border-black/10 {selectedRouteKey === routeKey(document, route) ? 'bg-creator-blue/5 text-creator-blue' : ''}">
 									<td><button class="w-full py-1.5 text-left font-bold" onclick={() => onSelectRoute(document.path, route.id)}>{route.name || 'Unnamed route'}</button></td>
 									<td>{route.type || 'route'}</td><td>{route.assets?.paths?.filter((path) => path.path?.coordinates?.length > 1).length || 0}</td>
@@ -298,27 +305,19 @@
 							{/each}
 						</tbody>
 					</table>
+					{#if parentRoutes.length > 3}
+						<button
+							class="mt-2 flex w-full items-center justify-center gap-1 rounded-sm border border-black/10 bg-white px-2 py-1.5 text-micro-data font-bold text-creator-blue hover:border-creator-blue hover:bg-creator-blue/5"
+							onclick={() => toggleRoutePanel('crag')}
+						>
+							<i class={`fa-solid ${routePanelIsCollapsed('crag') ? 'fa-chevron-down' : 'fa-chevron-up'} text-[10px]`}></i>
+							{routePanelIsCollapsed('crag')
+								? `Show ${parentRoutes.length - 3} more route${parentRoutes.length === 4 ? '' : 's'}`
+								: 'Show fewer routes'}
+						</button>
+					{/if}
 				{/if}
 			</div>
-
-			{#if selectedRouteEntry()}
-				{@const selectedRoute = selectedRouteEntry()}
-				<div class="space-y-2 rounded-sm border border-creator-blue/20 bg-creator-blue/5 p-2">
-					<div class="text-ui-label text-creator-blue">Selected route</div>
-					<div class="grid grid-cols-[1fr_6rem] gap-2">
-						<input class="input-studio w-full" value={selectedRoute.route.name} placeholder="Route name" onchange={(event) => onUpdateRouteName(selectedRoute.document.path, selectedRoute.route.id, event.currentTarget.value)} />
-						<select class="input-studio w-full" value={selectedRoute.route.type || 'alpine-tour'} onchange={(event) => onUpdateRoute(selectedRoute.document.path, selectedRoute.route.id, 'type', event.currentTarget.value)}>
-							<option value="sports-climbing">SC</option><option value="bouldering">B</option><option value="trad">T</option><option value="multi-pitch">MP</option><option value="alpine-tour">HT</option><option value="via-ferrata">KS</option>
-						</select>
-					</div>
-					<div class="grid grid-cols-[6rem_1fr] gap-2">
-						<input class="input-studio w-full" value={selectedRoute.route.grade || ''} placeholder="Grade" onchange={(event) => onUpdateRoute(selectedRoute.document.path, selectedRoute.route.id, 'grade', event.currentTarget.value)} />
-						<input class="input-studio w-full" value={selectedRoute.route.length || ''} placeholder="Length (m)" onchange={(event) => onUpdateRoute(selectedRoute.document.path, selectedRoute.route.id, 'length', event.currentTarget.value)} />
-					</div>
-					<textarea class="input-studio w-full resize-none" rows="2" value={selectedRoute.route.description || ''} placeholder="Description" onchange={(event) => onUpdateRoute(selectedRoute.document.path, selectedRoute.route.id, 'description', event.currentTarget.value)}></textarea>
-					<p class="text-micro-data text-warm-gray-500">Stored in {selectedRoute.document.path.split('/').at(-1)}</p>
-				</div>
-			{/if}
 
 			{#if !cragEditorState.crag.sectors || cragEditorState.crag.sectors.length === 0}
 				<div class="bg-warm-white rounded-sm p-6 text-center border border-black/15">
@@ -374,7 +373,7 @@
 							<table class="mt-2 w-full border-t border-black/10 text-left text-micro-data">
 								<thead class="text-warm-gray-400"><tr><th class="py-1 font-bold">Route</th><th class="py-1 font-bold">Type</th><th class="py-1 font-bold">Paths</th><th></th></tr></thead>
 								<tbody>
-									{#each routes as { document, route }}
+									{#each routes.slice(0, routePanelIsCollapsed(`sector:${sector.id}`) ? 3 : routes.length) as { document, route }}
 										<tr class="border-t border-black/10 {selectedRouteKey === routeKey(document, route) ? 'bg-creator-blue/5 text-creator-blue' : ''}">
 											<td><button class="w-full py-1 text-left font-bold" onclick={(e) => { e.stopPropagation(); onSelectRoute(document.path, route.id); }}>{route.name || 'Unnamed route'}</button></td>
 											<td>{route.type || 'route'}</td><td>{route.assets?.paths?.filter((path) => path.path?.coordinates?.length > 1).length || 0}</td>
@@ -383,6 +382,17 @@
 									{/each}
 								</tbody>
 							</table>
+							{#if routes.length > 3}
+								<button
+									class="mt-2 flex w-full items-center justify-center gap-1 rounded-sm border border-black/10 bg-white px-2 py-1.5 text-micro-data font-bold text-creator-blue hover:border-creator-blue hover:bg-creator-blue/5"
+									onclick={(e) => { e.stopPropagation(); toggleRoutePanel(`sector:${sector.id}`); }}
+								>
+									<i class={`fa-solid ${routePanelIsCollapsed(`sector:${sector.id}`) ? 'fa-chevron-down' : 'fa-chevron-up'} text-[10px]`}></i>
+									{routePanelIsCollapsed(`sector:${sector.id}`)
+										? `Show ${routes.length - 3} more route${routes.length === 4 ? '' : 's'}`
+										: 'Show fewer routes'}
+								</button>
+							{/if}
 						{/if}
 					</div>
 				{/each}
@@ -424,19 +434,6 @@
 							/>
 						</div>
 					</div>
-
-					{#if selectedSectorRoute(sector.id)}
-						<div class="space-y-1 rounded-sm border border-creator-blue/20 bg-creator-blue/5 p-2">
-							<label class="text-ui-label block">Selected Route</label>
-							<input
-								class="input-studio w-full"
-								value={selectedSectorRoute(sector.id).route.name}
-								placeholder="Route name"
-								onchange={(event) => onUpdateRouteName(selectedSectorRoute(sector.id).document.path, selectedSectorRoute(sector.id).route.id, event.currentTarget.value)}
-							/>
-							<p class="text-micro-data text-warm-gray-500">Stored in {selectedSectorRoute(sector.id).document.path.split('/').at(-1)}</p>
-						</div>
-					{/if}
 
 					<div class="space-y-0.5">
 						<label class="text-ui-label block">Geometry</label>

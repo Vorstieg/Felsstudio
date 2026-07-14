@@ -2,7 +2,7 @@
 	import { slide } from 'svelte/transition';
 	import { _ } from 'svelte-i18n';
 
-	let { selectedTags = $bindable([]), availableTags = [], small = false } = $props();
+	let { selectedTags = $bindable(), availableTags = [], small = false } = $props();
 
 	let isOpen = $state(false);
 	let container;

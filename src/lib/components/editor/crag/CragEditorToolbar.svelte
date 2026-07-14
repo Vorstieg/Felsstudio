@@ -8,12 +8,14 @@
 		currentTrackPoints = [],
 		trackDraftMode = 'routing',
 		isRoutingTrack = false,
+		hasPendingTrackCut = false,
 		onBack = () => {},
 		onStartRoutingDraft = () => {},
 		onHandleTrackConfirm = () => {},
 		onCancelTrackEdit = () => {},
 		onUndoTrackPoint = () => {},
-		onGpxUpload = () => {},
+		onConfirmTrackCut = () => {},
+		onCancelTrackCut = () => {},
 		onLocateUser = () => {},
 		onExport = () => {},
 		status = 'idle',
@@ -41,12 +43,18 @@
 	{tools}
 	{onBack}
 	undo={activeTool === 'track'
-		? { label: 'Undo point', run: onUndoTrackPoint, disabled: currentTrackPoints.length === 0 }
+		? { label: 'Undo', run: onUndoTrackPoint, disabled: currentTrackPoints.length === 0 }
 		: null}
 	finish={canFinishTrack
 		? { label: $_('ui.finish'), run: onHandleTrackConfirm, disabled: isRoutingTrack }
+		: activeTool === 'cut' && hasPendingTrackCut
+			? { label: $_('ui.finish'), run: onConfirmTrackCut }
 		: null}
-	cancel={activeTool === 'track' ? { label: $_('ui.cancel'), run: onCancelTrackEdit } : null}
+	cancel={activeTool === 'track'
+		? { label: $_('ui.cancel'), run: onCancelTrackEdit }
+		: activeTool === 'cut'
+			? { label: $_('ui.cancel'), run: onCancelTrackCut }
+			: null}
 	save={{ status, errorMessage, run: onExport }}
 >
 	{#snippet controls()}
@@ -62,22 +70,5 @@
 				>
 			{/each}
 		</div>
-		{#if activeTool === 'track'}
-			<label
-				class="hidden cursor-pointer items-center gap-1.5 rounded-sm border border-black/15 bg-black/5 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-creator-blue hover:bg-black/10 xl:flex"
-			>
-				<i class="fa-solid fa-file-import"></i>Import GPX
-				<input type="file" accept=".gpx" class="hidden" onchange={onGpxUpload} />
-			</label>
-		{/if}
 	{/snippet}
 </ToolBar>
-
-{#if activeTool === 'track'}
-	<label
-		class="fixed right-2 top-14 z-50 cursor-pointer rounded-sm border border-black/15 bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-creator-blue shadow-panel xl:hidden"
-	>
-		<i class="fa-solid fa-file-import mr-1.5"></i>Import GPX
-		<input type="file" accept=".gpx" class="hidden" onchange={onGpxUpload} />
-	</label>
-{/if}
