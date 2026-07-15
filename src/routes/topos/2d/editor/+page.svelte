@@ -9,7 +9,7 @@
 	import TopoPropertiesPanel from '$lib/components/editor/TopoPropertiesPanel.svelte';
 	import { authState } from '$lib/api/auth.svelte.js';
 	import { writeJson } from '$lib/api/felslager.js';
-	import { topoSymbols } from '$lib/assets/js/topo-utils.js';
+import { topoSymbols } from '@vorstieg/topo-renderer';
 	import { _ } from 'svelte-i18n';
 
 	let activeTool = $state(null);

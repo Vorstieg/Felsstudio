@@ -141,35 +141,6 @@ export function isClosedShape(points = []) {
 	return isClosedPath(points);
 }
 
-export function pointsToSvg(points = [], canvasSize = {}) {
-	const { baseWidth, baseHeight } = normalizeCanvasSize(canvasSize);
-	return points.map((p) => `${p[0] * baseWidth},${p[1] * baseHeight}`).join(' ');
-}
-
-export function getOutlinePoints(outline, canvasSize = {}) {
-	const shape = outline?.shape;
-	if (!shape?.type) return outline?.points2D || [];
-
-	if (shape.type === OUTLINE_SHAPE_TYPES.RECTANGLE) {
-		return createRectanglePoints(shape.start2D, shape.end2D, {
-			center: shape.fromCenter,
-			square: shape.square,
-			canvasSize
-		});
-	}
-
-	if (shape.type === OUTLINE_SHAPE_TYPES.CIRCLE) {
-		return createCirclePoints(
-			shape.center2D,
-			shape.radius2D,
-			canvasSize,
-			shape.segments || CIRCLE_SEGMENTS
-		);
-	}
-
-	return shape.points2D || outline?.points2D || [];
-}
-
 export function translateOutline(outline, deltaX, deltaY, canvasSize = {}) {
 	if (outline.shape?.type === OUTLINE_SHAPE_TYPES.RECTANGLE) {
 		outline.shape.start2D = [outline.shape.start2D[0] + deltaX, outline.shape.start2D[1] + deltaY];
@@ -286,3 +257,10 @@ import {
 	removePathVertex,
 	translatePath
 } from '$lib/assets/js/path-geometry.js';
+import {
+	getOutlinePoints as getSharedOutlinePoints,
+	pointsToSvg as sharedPointsToSvg
+} from '@vorstieg/topo-renderer';
+
+export const pointsToSvg = sharedPointsToSvg;
+export const getOutlinePoints = getSharedOutlinePoints;

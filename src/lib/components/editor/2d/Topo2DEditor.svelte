@@ -11,7 +11,13 @@
 	import { SelectTool } from '../tools/SelectTool.svelte.js';
 	import { TextTool } from '../tools/TextTool.svelte.js';
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
-	import { topoSymbols } from '$lib/assets/js/topo-utils.js';
+	import { topoSymbols } from '@vorstieg/topo-renderer';
+	import {
+		formatPitchLabel,
+		formatVariantLabel,
+		getOutlineLineStyle,
+		getRouteLineStyle
+} from '@vorstieg/topo-renderer';
 	import {
 		getOutlineMidpoints,
 		getOutlinePoints,
@@ -328,42 +334,6 @@
 			x: transformedX / baseWidth,
 			y: transformedY / baseHeight
 		};
-	}
-
-	function getRouteLineStyle(styleId = 'red') {
-		const styles = {
-			red: { stroke: '#dc2626', width: 4, dash: null },
-			redDashed: { stroke: '#dc2626', width: 4, dash: '18 12' },
-			variant: { stroke: '#8f8a84', width: 3, dash: '8 8' }
-		};
-		return styles[styleId] || styles.red;
-	}
-
-	function getOutlineLineStyle(styleId = 'rock') {
-		const styles = {
-			rock: { stroke: '#000000', width: 3, dash: null },
-			approach: { stroke: '#eab308', width: 4, dash: null },
-			descent: { stroke: '#6b7280', width: 3, dash: '10 10' },
-			variant: { stroke: '#8f8a84', width: 3, dash: '8 8' },
-			fixedRope: { stroke: '#1d70b8', width: 5, dash: null }
-		};
-		return styles[styleId] || styles.rock;
-	}
-
-	function formatPitchLabel(pitch, pitchIndex) {
-		const number = pitch.pitchNumber || pitchIndex + 1;
-		const length = Number(pitch.length) > 0 ? `${pitch.length}m` : '';
-		const grade = pitch.grade || '';
-		const details = [length, grade].filter(Boolean).join(' / ');
-		return details ? `${number}.SL / ${details}` : `${number}.SL`;
-	}
-
-	function formatVariantLabel(variant, variantIndex) {
-		const name = variant.name || `Variant ${variantIndex + 1}`;
-		const length = Number(variant.length) > 0 ? `${variant.length}m` : '';
-		const grade = variant.grade || '';
-		const details = [length, grade].filter(Boolean).join(' / ');
-		return details ? `${name} / ${details}` : name;
 	}
 
 	// Touch event helpers

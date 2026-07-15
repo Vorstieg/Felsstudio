@@ -2,7 +2,7 @@
 	import { _ } from 'svelte-i18n';
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
-	import { topoSymbols } from '$lib/assets/js/topo-utils.js';
+import { topoSymbols } from '@vorstieg/topo-renderer';
 	import ToolBar from '$lib/components/editor/tools/ToolBar.svelte';
 
 	let {

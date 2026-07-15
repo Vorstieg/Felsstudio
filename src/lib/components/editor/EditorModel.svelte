@@ -9,7 +9,7 @@
 	import CssObject from '../CssObject.svelte';
 	import { userState } from '$lib/state/editor.svelte.js';
 	import { Topo3DInteractionManager } from './3d/InteractionManager.svelte.js';
-	import { topoSymbols } from '$lib/assets/js/topo-utils.js';
+import { topoSymbols } from '@vorstieg/topo-renderer';
 
 	interactivity();
 

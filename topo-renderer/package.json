@@ -1,0 +1,23 @@
+{
+	"name": "@vorstieg/topo-renderer",
+	"version": "0.1.0",
+	"description": "Shared SVG renderer, topo geometry, symbols, and assets for Vorstieg climbing topos.",
+	"type": "module",
+	"exports": "./src/index.js",
+	"files": [
+		"src",
+		"assets",
+		"README.md"
+	],
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Vorstieg/Felsstudio.git",
+		"directory": "topo-renderer"
+	},
+	"publishConfig": {
+		"registry": "https://npm.pkg.github.com"
+	},
+	"peerDependencies": {
+		"d3-selection": "^3.0.0"
+	}
+}

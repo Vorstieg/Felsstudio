@@ -26,7 +26,7 @@
 	import { authState } from '$lib/api/auth.svelte.js';
 	import ToolPalette3D from '$lib/components/editor/3d/ToolPalette3D.svelte';
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
-	import { fixpointSymbols } from '$lib/assets/js/topo-utils.js';
+import { fixpointSymbols } from '@vorstieg/topo-renderer';
 
 	let { workspace = '3d-create', children } = $props();
 	let isMobile = $state(false);

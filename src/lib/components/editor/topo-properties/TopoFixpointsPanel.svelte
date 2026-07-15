@@ -1,7 +1,7 @@
 <script>
 	import { userState } from '$lib/state/editor.svelte.js';
 	import { _ } from 'svelte-i18n';
-	import { topoSymbols } from '$lib/assets/js/topo-utils.js';
+import { topoSymbols } from '@vorstieg/topo-renderer';
 	import { createAiFixpoint } from './topo-properties-utils.js';
 
 	let { aiSuggestions = [], mobile = false } = $props();
