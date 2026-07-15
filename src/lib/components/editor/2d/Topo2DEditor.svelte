@@ -2,47 +2,34 @@
 	import { userState } from '$lib/state/editor.svelte.js';
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { zoom as d3Zoom } from 'd3-zoom';
 	import { select } from 'd3-selection';
 	import { RouteTool } from '../tools/RouteTool.svelte.js';
 	import { SymbolTool } from '../tools/SymbolTool.svelte.js';
-	import { EraserTool } from '../tools/EraserTool.svelte.js';
 	import { OutlineTool } from '../tools/OutlineTool.svelte.js';
+	import { EraserTool } from '../tools/EraserTool.svelte.js';
 	import { SelectTool } from '../tools/SelectTool.svelte.js';
 	import { TextTool } from '../tools/TextTool.svelte.js';
+	import { SymbolEditTool } from '../tools/SymbolEditTool.svelte.js';
+	import { RouteEditTool } from '../tools/RouteEditTool.svelte.js';
+	import { OutlineEditTool } from '../tools/OutlineEditTool.svelte.js';
+	import { createTopo2DEditorController } from './create-topo-2d-editor-controller.svelte.js';
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
-	import { topoSymbols } from '@vorstieg/topo-renderer';
-	import {
-		formatPitchLabel,
-		formatVariantLabel,
-		getOutlineLineStyle,
-		getRouteLineStyle
-} from '@vorstieg/topo-renderer';
-	import {
-		getOutlineMidpoints,
-		getOutlinePoints,
-		insertOutlinePoint,
-		pointsToSvg,
-		removeOutlinePoint,
-		setOutlinePoint,
-		translateOutline
-	} from '$lib/assets/js/outline-geometry.js';
-	import {
-		insertPathVertex,
-		movePathVertex,
-		removePathVertex,
-		translatePath
-	} from '$lib/assets/js/path-geometry.js';
-	import {
-		getTouchTargetSize,
-		getHitAreaSize,
-		getTouchPoint,
-		createLongPressDetector,
-		vibrateOnAction
-	} from '$lib/assets/js/mobile-utils.js';
+	import { getOutlinePoints } from '$lib/assets/js/outline-geometry.js';
+	import { createEditablePathResolver } from './editable-path.js';
+	import { buildTopo2DRenderModel } from './topo-2d-render-model.js';
+	import { renderBackgroundLayer } from './render-background-layer.js';
+	import { renderCurrentLayer } from './render-current-layer.js';
+	import { renderOutlinesLayer } from './render-outlines-layer.js';
+	import { renderRoutesLayer } from './render-routes-layer.js';
+	import { renderTextLabelsLayer } from './render-text-labels-layer.js';
+	import { renderSymbolsLayer } from './render-symbols-layer.js';
+	import { createTopoLayerStack } from './create-topo-layer-stack.js';
+	import { createTopo2DRenderContext } from './create-topo-render-context.js';
+	import { createTopoHistory } from './create-topo-history.svelte.js';
+	import { createCanvasInput } from './create-canvas-input.svelte.js';
 
 	let {
-		activeTool = $bindable(null),
+		activeTool = $bindable('select'),
 		selectedSymbol = 'bolt',
 		selectedOutlineStyle = 'rock',
 		drawingTarget = $bindable(null),
@@ -52,43 +39,79 @@
 	let svgElement = $state(null);
 	let gElement = $state(null);
 
-	// Pass editor callbacks to all tools
+	// Pass editor callbacks to all remaining tools.
 	const toolConfig = {
-		saveHistory,
+		saveHistory: () => history.save(),
 		beginTextEdit,
-		getCanvasSize: () => ({ baseWidth, baseHeight })
+		getCanvasSize: () => ({ baseWidth, baseHeight }),
+		getDrawingTarget: () => drawingTarget,
+		setDrawingTarget: (target) => (drawingTarget = target),
+		clearSelection
 	};
 	const tools = {
-		route: new RouteTool(toolConfig),
-		multipitch: null,
+		route: new RouteTool({ ...toolConfig, mode: 'route' }),
+		multipitch: new RouteTool({ ...toolConfig, mode: 'multipitch' }),
 		symbol: new SymbolTool(toolConfig),
-		fixpoint: null,
+		fixpoint: new SymbolTool(toolConfig),
 		text: new TextTool(toolConfig),
 		eraser: new EraserTool(toolConfig),
 		outline: new OutlineTool(toolConfig),
-		select: new SelectTool(toolConfig)
+		select: new SelectTool(toolConfig),
+		routeEdit: new RouteEditTool({
+			getTopo: () => userState.topo,
+			getActiveTool: () => activeTool,
+			getEditablePath: (target) => editablePaths.resolve(target),
+			startInteraction: (kind, details) => editor.startInteraction(kind, details),
+			isSelected,
+			selectObject,
+			getIsShiftPressed: () => isShiftPressed,
+			beginSelectionMove: collectDraggingSelection,
+			setDrawingTarget: (target) => (drawingTarget = target),
+			saveHistory: () => history.save()
+		}),
+		outlineEdit: new OutlineEditTool({
+			getActiveTool: () => activeTool,
+			getEditablePath: (target) => editablePaths.resolve(target),
+			startInteraction: (kind, details) => editor.startInteraction(kind, details),
+			isSelected,
+			selectObject,
+			getIsShiftPressed: () => isShiftPressed,
+			beginSelectionMove: collectDraggingSelection,
+			saveHistory: () => history.save()
+		}),
+		symbolEdit: new SymbolEditTool({
+			getTopo: () => userState.topo,
+			getCanvasSize: () => ({ baseWidth, baseHeight }),
+			getInteraction: () => editor.interaction,
+			startInteraction: (kind, details) => editor.startInteraction(kind, details),
+			isSelected,
+			selectObject,
+			getSelectionSize: () => editor.selectedItems.size,
+			getIsShiftPressed: () => isShiftPressed,
+			getSelectedSymbolId: () => userState.ui.selectedFixpointId,
+			saveHistory: () => history.save(),
+			beginSelectionMove: (mouse) => ({
+				kind: 'move-selection',
+				...collectDraggingSelection(mouse)
+			})
+		})
 	};
-	// Share instances
-	tools.multipitch = tools.route;
-	tools.fixpoint = tools.symbol;
 
 	// Track previous tool for lifecycle
 	let previousTool = $state(null);
 
-	let currentTool = $derived(tools[activeTool] || tools.select);
-
-	// Synchronize drawingTarget to the tool
+	// `select` is the editor's idle tool. Normalize bound values as well, so
+	// consumers never have to handle a null active tool.
 	$effect(() => {
-		if (currentTool instanceof RouteTool) {
-			currentTool.mode = activeTool === 'multipitch' ? 'multipitch' : 'route';
-			currentTool.drawingTarget = drawingTarget;
-		}
+		if (activeTool == null) activeTool = 'select';
 	});
 
-	// Sync selectedSymbol to SymbolTool
+	let currentTool = $derived(tools[activeTool] || tools.select);
+
+	// Sync selected options to their configured tool.
 	$effect(() => {
-		if (tools.symbol) {
-			tools.symbol.selectedType = selectedSymbol;
+		if (currentTool instanceof SymbolTool) {
+			currentTool.selectedType = selectedSymbol;
 		}
 		if (tools.outline) {
 			tools.outline.selectedStyle = selectedOutlineStyle;
@@ -112,8 +135,7 @@
 			userState.ui.selectedRouteId = null;
 			userState.ui.selectedOutlineId = null;
 			userState.ui.selectedTextLabelId = null;
-			selectedSymbolInstance = null;
-			selectedItems.clear();
+			editor.clearSelection();
 		}
 
 		currentTool.onActivate?.();
@@ -122,181 +144,80 @@
 
 	// Derived state for rendering
 	let currentRoutePoints = $derived(
-		currentTool instanceof RouteTool ? currentTool.currentPoints : []
+		currentTool instanceof RouteTool ? currentTool.draftPoints : []
 	);
 	let currentOutlinePoints = $derived(
 		currentTool instanceof OutlineTool ? currentTool.getPreviewPoints() : []
 	);
 
 	$effect(() => {
+		const isMultiPitchRouteTarget = activeTool === 'multipitch' && drawingTarget?.type === 'newPitch';
 		hasPendingChanges =
-			(currentRoutePoints?.length || 0) > 0 || (currentOutlinePoints?.length || 0) > 0;
+			(currentRoutePoints?.length || 0) > 0 ||
+			(currentOutlinePoints?.length || 0) > 0 ||
+			isMultiPitchRouteTarget;
 	});
 	// Symbol tool manages symbol creation directly into userState, so no "currentSymbolPoints" needed for preview distinct from cursor?
-	// RouteTool creates points as you click.
+	// RouteTool owns route draft points, target transitions, and previews.
 
-	let transform = $state({ x: 0, y: 0, k: 1 }); // D3 zoom transform
-	let selectedSymbolInstance = $state(null);
-	let draggingPoint = $state(null); // { routeId, outlineId, pointIndex }
-	let rotatingSymbol = $state(null); // { id, startAngle, startRotation }
-	let scalingSymbol = $state(null); // { id, startDist, startScale }
-	let draggingLabel = $state(null); // { routeId, pitchId }
-	let draggingTextLabel = $state(null); // { id, startPos, startMouse }
-	let draggingSelection = $state(null); // { items: { routes: [], outlines: [], symbols: [] }, startMouse }
+	const editor = createTopo2DEditorController({
+		getTopo: () => userState.topo,
+		ui: userState.ui
+	});
+	const editablePaths = createEditablePathResolver({
+		getTopo: () => userState.topo,
+		getCanvasSize: () => ({ baseWidth, baseHeight })
+	});
 	let editingTextLabelId = $state(null);
 	let editingTextValue = $state('');
 	let editingTextOriginalValue = $state('');
 	let editingTextNeedsFocus = false;
-	let baseWidth = $state(1000);
-	let baseHeight = $state(667);
-	let zoomBehavior = null;
-
-	// Touch interaction state
-	let activeTouch = $state(null); // Track active touch ID
-	// Disabled long-press auto-finish - was triggering too easily when drawing slowly
-	let longPressDetector = createLongPressDetector(() => {
-		// No-op: User should explicitly tap finish button
-	}, 5000); // Very long timeout so it never triggers during normal use
-
-	// Multi-select state
-	// Unified selection state: Set of "type:id" strings
-	let selectedItems = $state(new Set());
 	let isShiftPressed = $state(false);
 
-	// History management
-	let history = $state([]);
-	let historyIndex = $state(-1);
-
-	function saveHistory() {
-		// Deep clone routes, fixPoints, and outlines to history
-		const snapshot = JSON.parse(
-			JSON.stringify({
-				routes: userState.topo.routes,
-				fixPoints: userState.topo.fixPoints,
-				outlines: userState.topo.outlines,
-				textLabels: userState.topo.textLabels || []
-			})
-		);
-
-		// If we're at the end of the stack, just push
-		// If we undo and then make a change, clear the redo stack
-		if (historyIndex < history.length - 1) {
-			history = history.slice(0, historyIndex + 1);
+	const history = createTopoHistory({
+		getTopo: () => userState.topo,
+		restore: (state) => {
+			userState.topo.routes = JSON.parse(JSON.stringify(state.routes));
+			userState.topo.fixPoints = JSON.parse(JSON.stringify(state.fixPoints));
+			userState.topo.outlines = JSON.parse(JSON.stringify(state.outlines));
+			userState.topo.textLabels = JSON.parse(JSON.stringify(state.textLabels || []));
 		}
-
-		history.push(snapshot);
-		// Keep history reasonably sized
-		if (history.length > 50) history.shift();
-		else historyIndex = history.length - 1;
-	}
+	});
+	const saveHistory = () => history.save();
+	const canvasInput = createCanvasInput({
+		getActiveTool: () => activeTool,
+		getAspectRatio: () => userState.topo.imageAspectRatio,
+		onDown: handleCanvasDown,
+		onMove: handleCanvasMove,
+		onUp: handleCanvasUp,
+		onEmptyTouchTap: handleEmptyTouchTap
+	});
+	let baseWidth = $derived(canvasInput.baseWidth);
+	let baseHeight = $derived(canvasInput.baseHeight);
+	let transform = $derived(canvasInput.transform);
 
 	export function undo() {
 		if (
 			(currentTool instanceof RouteTool || currentTool instanceof OutlineTool) &&
-			currentTool.currentPoints.length > 0
+			(currentTool instanceof RouteTool
+				? currentTool.draftPoints.length > 0
+				: currentTool.currentPoints.length > 0)
 		) {
 			currentTool.undoLastPoint();
 			return;
 		}
 
-		if (historyIndex > 0) {
-			historyIndex--;
-			const state = history[historyIndex];
-			userState.topo.routes = JSON.parse(JSON.stringify(state.routes));
-			userState.topo.fixPoints = JSON.parse(JSON.stringify(state.fixPoints));
-			userState.topo.outlines = JSON.parse(JSON.stringify(state.outlines));
-			userState.topo.textLabels = JSON.parse(JSON.stringify(state.textLabels || []));
-		}
+		history.undo();
 	}
 
 	export function redo() {
-		if (historyIndex < history.length - 1) {
-			historyIndex++;
-			const state = history[historyIndex];
-			userState.topo.routes = JSON.parse(JSON.stringify(state.routes));
-			userState.topo.fixPoints = JSON.parse(JSON.stringify(state.fixPoints));
-			userState.topo.outlines = JSON.parse(JSON.stringify(state.outlines));
-			userState.topo.textLabels = JSON.parse(JSON.stringify(state.textLabels || []));
-		}
+		history.redo();
 	}
 
-	// Initialize D3 zoom and update base dimensions
+	/* Canvas setup and input lifecycle live in createCanvasInput. */
 	onMount(() => {
 		if (!svgElement || !gElement) return;
-
-		// Set base dimensions from aspect ratio
-		const rect = svgElement.getBoundingClientRect();
-		const ratio = userState.topo.imageAspectRatio || rect.width / rect.height;
-		baseWidth = 1000;
-		baseHeight = 1000 / ratio;
-
-		// Create D3 zoom behavior with smooth mobile pinch support
-		zoomBehavior = d3Zoom()
-			.scaleExtent([0.1, 5])
-			.translateExtent([
-				[-baseWidth * 0.5, -baseHeight * 0.5],
-				[baseWidth * 1.5, baseHeight * 1.5]
-			])
-			.extent([
-				[0, 0],
-				[baseWidth, baseHeight]
-			])
-			.wheelDelta((event) => {
-				// Smoother wheel zoom with better sensitivity
-				return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
-			})
-			.interpolate(() => (t) => t) // No interpolation - follow fingers immediately
-			.duration(0) // No transition delay - respond instantly to touch
-			.constrain((transform, extent, translateExtent) => {
-				// Allow smooth continuous zoom without stepping
-				return transform;
-			})
-			.filter((event) => {
-				// Always allow mouse wheel zoom (desktop)
-				if (event.type === 'wheel') return true;
-
-				// TOUCH EVENTS (Mobile):
-				// - 2+ fingers: Enable d3-zoom for pinch-to-zoom and two-finger panning
-				// - 1 finger: Return false to let our drawing handlers work
-				if (
-					event.type === 'touchstart' ||
-					event.type === 'touchmove' ||
-					event.type === 'touchend'
-				) {
-					// 2+ fingers always allow zoom/pan
-					if (event.touches && event.touches.length >= 2) return true;
-					// 1 finger: Only allow zoom (pan) if no tool is active
-					return activeTool === null && event.touches && event.touches.length === 1;
-				}
-
-				// MOUSE EVENTS (Desktop):
-				// - Left button drag: Enable panning (d3-zoom handles it)
-				// - Drawing is done via SVG click handler, which doesn't conflict with drag
-				if (event.type === 'mousedown') {
-					// Only allow d3-zoom panning if NO tool is active
-					// OR if it's not the left button (e.g. middle/right button panning)
-					if (activeTool !== null && event.button === 0) return false;
-					return event.button === 0; // Allow left mouse button for panning when no tool active
-				}
-
-				return false;
-			})
-			.touchable(() => true) // Enable touch events
-			.on('zoom', (event) => {
-				transform = event.transform;
-				// Apply transform directly to the g element via D3
-				// Convert transform object to SVG transform string
-				select(gElement).attr(
-					'transform',
-					`translate(${event.transform.x},${event.transform.y}) scale(${event.transform.k})`
-				);
-			});
-
-		// Apply zoom to SVG
-		const svg = select(svgElement);
-		if (zoomBehavior) {
-			svg.call(zoomBehavior);
-		}
+		canvasInput.setElements({ svg: svgElement, content: gElement });
 
 		// Initialize ID counters from existing data to avoid collisions
 		initializeIdCounters(userState.topo);
@@ -304,177 +225,32 @@
 		// Initialize first history state
 		saveHistory();
 
-		return () => {
-			select(svgElement).on('.zoom', null);
-		};
+		return () => canvasInput.destroy();
 	});
 
 	// Update base dimensions when image aspect ratio changes
 	$effect(() => {
 		if (userState.topo.imageAspectRatio) {
-			const ratio = userState.topo.imageAspectRatio;
-			baseWidth = 1000;
-			baseHeight = 1000 / ratio;
+			canvasInput.refreshDimensions();
 		}
 	});
 
-	function getSVGPoint(event) {
-		if (!svgElement) return null;
-		const pt = svgElement.createSVGPoint();
-		pt.x = event.clientX;
-		pt.y = event.clientY;
-		const svgP = pt.matrixTransform(svgElement.getScreenCTM().inverse());
-
-		// Apply inverse D3 zoom transform to get coordinates in base space
-		const transformedX = (svgP.x - transform.x) / transform.k;
-		const transformedY = (svgP.y - transform.y) / transform.k;
-
-		// Normalize to 0-1 range
-		return {
-			x: transformedX / baseWidth,
-			y: transformedY / baseHeight
-		};
-	}
-
-	// Touch event helpers
-	function handleTouchStart(event) {
-		if (event.touches.length === 1) {
-			// Single touch - treat as mouse down
-			const touch = event.touches[0];
-			const point = getTouchPoint(event, svgElement, transform, baseWidth, baseHeight);
-			if (point) {
-				// If no tool is active, let d3-zoom handle the single-finger pan
-				// We don't track activeTouch here so handleTouchMove skips custom logic
-				if (activeTool === null) {
-					// Still call this to clear selection on background tap
-					handleSVGMouseDown({
-						clientX: touch.clientX,
-						clientY: touch.clientY,
-						button: 0,
-						touches: event.touches
-					});
-					return;
-				}
-
-				event.preventDefault();
-
-				activeTouch = touch.identifier;
-
-				// Start long press detection
-				longPressDetector.start(event);
-
-				// Simulate mouse event for tool and SVG interaction
-				const mouseEvent = {
-					clientX: touch.clientX,
-					clientY: touch.clientY,
-					stopPropagation: () => event.stopPropagation(),
-					preventDefault: () => event.preventDefault(),
-					altKey: false,
-					shiftKey: false,
-					touches: event.touches // Pass touches to identify as touch event in handleSVGMouseDown
-				};
-				handleSVGMouseDown(mouseEvent);
-				vibrateOnAction('selection');
-			}
-		} else if (event.touches.length >= 2) {
-			// Multi-touch: prevent default browser zoom/scroll
-			event.preventDefault();
-			// d3-zoom will handle this for pinch-to-zoom
-		}
-		// Two+ fingers are handled by D3 zoom for pan/pinch
-	}
-
-	function handleTouchMove(event) {
-		if (event.touches.length >= 2) {
-			event.preventDefault(); // d3-zoom handles multi-touch pan/zoom
-			return;
-		}
-
-		// Single touch movement
-		longPressDetector.cancel();
-
-		if (event.touches.length === 1 && activeTouch !== null) {
-			event.preventDefault(); // Prevent browser scroll when drawing or dragging objects
-			const touch = Array.from(event.touches).find((t) => t.identifier === activeTouch);
-			if (!touch) return;
-
-			const mouseEvent = {
-				clientX: touch.clientX,
-				clientY: touch.clientY,
-				stopPropagation: () => event.stopPropagation(),
-				preventDefault: () => event.preventDefault()
-			};
-			handleMouseMove(mouseEvent);
-		}
-	}
-
-	function handleTouchEnd(event) {
-		longPressDetector.cancel();
-
-		if (activeTouch !== null) {
-			// Find if our tracked touch ended
-			const touchStillActive = Array.from(event.touches).some((t) => t.identifier === activeTouch);
-			if (!touchStillActive) {
-				// Simulate mouse up
-				const changedTouch = Array.from(event.changedTouches).find(
-					(t) => t.identifier === activeTouch
-				);
-				if (changedTouch) {
-					const point = getTouchPoint(
-						{ touches: [changedTouch] },
-						svgElement,
-						transform,
-						baseWidth,
-						baseHeight
-					);
-					if (point) {
-						const mouseEvent = {
-							clientX: changedTouch.clientX,
-							clientY: changedTouch.clientY,
-							stopPropagation: () => event.stopPropagation(),
-							preventDefault: () => event.preventDefault()
-						};
-						handleMouseUp(mouseEvent);
-					}
-				}
-				activeTouch = null;
-			}
-		}
-	}
-
-	$effect(() => {
-		if (!svgElement) return;
-		const el = svgElement;
-
-		const options = { passive: false };
-		el.addEventListener('touchstart', handleTouchStart, options);
-		el.addEventListener('touchmove', handleTouchMove, options);
-		el.addEventListener('touchend', handleTouchEnd, options);
-		el.addEventListener('touchcancel', handleTouchEnd, options);
-
-		return () => {
-			el.removeEventListener('touchstart', handleTouchStart);
-			el.removeEventListener('touchmove', handleTouchMove);
-			el.removeEventListener('touchend', handleTouchEnd);
-			el.removeEventListener('touchcancel', handleTouchEnd);
-		};
-	});
-
-	function handleSVGMouseDown(event) {
-		// Only handle left click for drawing/selection
-		if (event.button !== 0 && !event.touches) return;
+	function handleCanvasDown(input) {
+		if (!input || (input.button !== 0 && !input.isTouch)) return;
+		const { point, sourceEvent: event } = input;
 
 		if (editingTextLabelId) {
 			commitTextEdit();
 			event.stopPropagation?.();
 			return;
 		}
-
-		const point = getSVGPoint(event);
-		if (!point) return;
+		if (['symbolEdit', 'routeEdit', 'outlineEdit'].includes(activeTool)) {
+			deselectEditTarget();
+			return;
+		}
 
 		// If in selection mode, clicking empty space clears selection (unless Shift is pressed)
-		if (activeTool === null && !isShiftPressed) {
+		if (activeTool === 'select' && !isShiftPressed) {
 			clearSelection();
 		}
 
@@ -494,102 +270,25 @@
 		}
 	}
 
-	// Forward dragging events if tools support it (optional future step)
-	function getRoutePathTarget({ routeId, pitchId, variantId }) {
-		const route = userState.topo.routes.find((item) => item.id === routeId);
-		if (!route) return null;
-		if (pitchId) return route.pitches?.find((pitch) => pitch.id === pitchId) || null;
-		if (variantId) return route.variants?.find((variant) => variant.id === variantId) || null;
-		return route;
-	}
-
-	function handlePointMouseDown(event, { routeId, pitchId, variantId, outlineId, pointIndex }) {
-		// Only allow point manipulation in selection mode (null tool) or eraser mode
-		if (activeTool !== null && activeTool !== 'eraser') return;
-
-		event?.stopPropagation?.();
-
-		// Delete point on Alt+Click or if using the eraser tool
-		if (event.altKey || activeTool === 'eraser') {
-			if (routeId) {
-				const target = getRoutePathTarget({ routeId, pitchId, variantId });
-				if (target?.points2D?.length > 2) {
-					target.points2D = removePathVertex(target.points2D, pointIndex, {
-						closed: false,
-						minPoints: 2
-					});
-					return;
-				}
-			} else if (outlineId) {
-				const outline = userState.topo.outlines.find((o) => o.id === outlineId);
-				if (outline && getOutlinePoints(outline, { baseWidth, baseHeight }).length > 2) {
-					removeOutlinePoint(outline, pointIndex, { baseWidth, baseHeight });
-					return;
-				}
-			}
-		}
-
-		// Set dragging state
-		draggingPoint = { routeId, pitchId, variantId, outlineId, pointIndex };
-	}
-
-	function handleMidpointClick(
-		event,
-		{ routeId, pitchId, variantId, outlineId, insertIndex, point }
-	) {
-		event?.stopPropagation?.();
-		if (routeId) {
-			const target = getRoutePathTarget({ routeId, pitchId, variantId });
-			if (target?.points2D) {
-				target.points2D = insertPathVertex(
-					target.points2D,
-					insertIndex,
-					[point.x, point.y],
-					{ closed: false }
-				);
-			}
-		} else if (outlineId) {
-			const outline = userState.topo.outlines.find((o) => o.id === outlineId);
-			if (outline) {
-				insertOutlinePoint(outline, insertIndex, [point.x, point.y], { baseWidth, baseHeight });
-			}
-		}
-		// Set dragging state to allow immediate dragging after click
-		draggingPoint = { routeId, pitchId, variantId, outlineId, pointIndex: insertIndex };
-		saveHistory();
-	}
-
-	function handleMouseMove(event) {
-		const mouse = getSVGPoint(event);
-		if (!mouse) return;
+	function handleCanvasMove(input) {
+		if (!input) return;
+		const { point: mouse, sourceEvent: event } = input;
 
 		// Delegate to tool for generic mouse move (e.g. hover effects)
 		currentTool.onMouseMove(event, mouse);
 
-		if (draggingSelection) {
-			const deltaX = mouse.x - draggingSelection.startMouse.x;
-			const deltaY = mouse.y - draggingSelection.startMouse.y;
+		const interaction = editor.interaction;
+		if (interaction?.kind === 'move-selection') {
+			const deltaX = mouse.x - interaction.startMouse.x;
+			const deltaY = mouse.y - interaction.startMouse.y;
 
 			// Move routes
-			draggingSelection.items.routes.forEach(({ routeId, pitchId, variantId, startPoints }) => {
-				const target = getRoutePathTarget({ routeId, pitchId, variantId });
-				if (target?.points2D) {
-					target.points2D = translatePath(startPoints, [deltaX, deltaY], { closed: false });
-				}
-			});
-
-			// Move outlines
-			draggingSelection.items.outlines.forEach(({ outlineId, startOutline }) => {
-				const outline = userState.topo.outlines.find((o) => o.id === outlineId);
-				if (outline) {
-					const movedOutline = JSON.parse(JSON.stringify(startOutline));
-					translateOutline(movedOutline, deltaX, deltaY, { baseWidth, baseHeight });
-					Object.assign(outline, movedOutline);
-				}
+			interaction.items.paths.forEach(({ target, snapshot }) => {
+				editablePaths.resolve(target)?.translateFrom(snapshot, [deltaX, deltaY]);
 			});
 
 			// Move symbols
-			draggingSelection.items.symbols.forEach(({ symbolId, startPos }) => {
+			interaction.items.symbols.forEach(({ symbolId, startPos }) => {
 				const symbol = userState.topo.fixPoints.find((s) => s.id === symbolId);
 				if (symbol) {
 					symbol.position2D = [startPos[0] + deltaX, startPos[1] + deltaY];
@@ -597,56 +296,29 @@
 			});
 
 			// Move text labels
-			draggingSelection.items.texts.forEach(({ textId, startPos }) => {
+			interaction.items.texts.forEach(({ textId, startPos }) => {
 				const label = userState.topo.textLabels?.find((t) => t.id === textId);
 				if (label) {
 					label.position2D = [startPos[0] + deltaX, startPos[1] + deltaY];
 				}
 			});
-		} else if (draggingPoint) {
-			if (draggingPoint.routeId) {
-				const target = getRoutePathTarget(draggingPoint);
-				if (target?.points2D) {
-					target.points2D = movePathVertex(
-						target.points2D,
-						draggingPoint.pointIndex,
-						[mouse.x, mouse.y],
-						{ closed: false }
-					);
-				}
-			} else if (draggingPoint.outlineId) {
-				const outline = userState.topo.outlines.find((o) => o.id === draggingPoint.outlineId);
-				if (outline) {
-					setOutlinePoint(outline, draggingPoint.pointIndex, [mouse.x, mouse.y], {
-						baseWidth,
-						baseHeight
-					});
-				}
-			}
-		} else if (rotatingSymbol) {
-			const symbol = userState.topo.fixPoints.find((s) => s.id === rotatingSymbol.id);
-			if (symbol && symbol.position2D) {
-				const dx = (mouse.x - symbol.position2D[0]) * baseWidth;
-				const dy = (mouse.y - symbol.position2D[1]) * baseHeight;
-				const currentAngle = Math.atan2(dy, dx) * (180 / Math.PI);
-				symbol.rotation2D = (currentAngle + 90) % 360;
-			}
-		} else if (scalingSymbol) {
-			const symbol = userState.topo.fixPoints.find((s) => s.id === scalingSymbol.id);
-			if (symbol && symbol.position2D) {
-				const dx = (mouse.x - symbol.position2D[0]) * baseWidth;
-				const dy = (mouse.y - symbol.position2D[1]) * baseHeight;
-				const currentDist = Math.sqrt(dx * dx + dy * dy);
-				const scaleFactor = currentDist / scalingSymbol.startDist;
-				symbol.scale2D = Math.max(0.2, Math.min(5, (scalingSymbol.startScale || 1) * scaleFactor));
-			}
-		} else if (draggingLabel) {
-			const route = userState.topo.routes.find((r) => r.id === draggingLabel.routeId);
+		} else if (interaction?.kind === 'move-point') {
+			editablePaths
+				.resolve(interaction)
+				?.movePoint(interaction.pointIndex, [mouse.x, mouse.y]);
+		} else if (
+			interaction?.kind === 'move-symbol' ||
+			interaction?.kind === 'rotate-symbol' ||
+			interaction?.kind === 'scale-symbol'
+		) {
+			currentTool.onMouseMove(event, mouse);
+		} else if (interaction?.kind === 'move-route-label') {
+			const route = userState.topo.routes.find((r) => r.id === interaction.routeId);
 			if (route) {
-				const target = draggingLabel.pitchId
-					? route.pitches.find((p) => p.id === draggingLabel.pitchId)
-					: draggingLabel.variantId
-						? route.variants?.find((v) => v.id === draggingLabel.variantId)
+				const target = interaction.pitchId
+					? route.pitches.find((p) => p.id === interaction.pitchId)
+					: interaction.variantId
+						? route.variants?.find((v) => v.id === interaction.variantId)
 						: route;
 				if (target && target.points2D?.length > 0) {
 					const basePoint = target.points2D[0];
@@ -654,76 +326,49 @@
 					target.labelOffset2D = [mouse.x - basePoint[0], mouse.y - basePoint[1]];
 				}
 			}
-		} else if (draggingTextLabel) {
-			const label = userState.topo.textLabels?.find((t) => t.id === draggingTextLabel.id);
+		} else if (interaction?.kind === 'move-text') {
+			const label = userState.topo.textLabels?.find((t) => t.id === interaction.id);
 			if (label) {
 				label.position2D = [
-					draggingTextLabel.startPos[0] + mouse.x - draggingTextLabel.startMouse.x,
-					draggingTextLabel.startPos[1] + mouse.y - draggingTextLabel.startMouse.y
+					interaction.startPos[0] + mouse.x - interaction.startMouse.x,
+					interaction.startPos[1] + mouse.y - interaction.startMouse.y
 				];
 			}
 		}
 	}
 
-	function handleMouseUp(event) {
-		const point = getSVGPoint(event);
-		if (point) currentTool.onMouseUp(event, point);
+	function handleCanvasUp(input) {
+		if (!input) return;
+		const { point, sourceEvent: event } = input;
+		currentTool.onMouseUp(event, point);
 
-		if (
-			draggingPoint ||
-			rotatingSymbol ||
-			scalingSymbol ||
-			draggingLabel ||
-			draggingTextLabel ||
-			draggingSelection
-		) {
-			saveHistory();
-		}
-		draggingPoint = null;
-		rotatingSymbol = null;
-		scalingSymbol = null;
-
-		draggingLabel = null;
-		draggingTextLabel = null;
-		draggingSelection = null;
+		if (editor.endInteraction()) saveHistory();
 	}
 
 	function isSelected(type, id) {
-		return selectedItems.has(`${type}:${id}`);
+		return editor.isSelected(type, id);
 	}
 
 	function selectObject(type, id, multi = false) {
-		if (!multi) {
-			selectedItems.clear();
-			userState.ui.selectedRouteId = null;
-			userState.ui.selectedFixpointId = null;
-			userState.ui.selectedOutlineId = null;
-			userState.ui.selectedTextLabelId = null;
-			selectedSymbolInstance = null;
+		editor.selectObject(type, id, multi);
+		if(type ==='symbol'){
+			activeTool = 'symbolEdit'
 		}
-
-		const itemKey = `${type}:${id}`;
-		if (multi && selectedItems.has(itemKey)) {
-			selectedItems.delete(itemKey);
-		} else {
-			selectedItems.add(itemKey);
-			if (type === 'route') {
-				userState.ui.selectedRouteId = id;
-			} else if (type === 'symbol') {
-				userState.ui.selectedFixpointId = id;
-				selectedSymbolInstance = userState.topo.fixPoints.find((s) => s.id === id);
-			} else if (type === 'outline') {
-				userState.ui.selectedOutlineId = id;
-			} else if (type === 'text') {
-				userState.ui.selectedTextLabelId = id;
-			}
+		else if (type === 'route') {
+			activeTool = 'routeEdit';
+		}
+		else if (type === 'outline') {
+			activeTool = 'outlineEdit';
+		}
+		else {
+			activeTool = 'select'
 		}
 	}
 
 	function handleObjectMouseDown(event, { type, id, pitchId = null, variantId = null }) {
-		if (activeTool !== null) return;
+		if (activeTool !== 'select') return;
 		event?.stopPropagation?.();
-		const mouse = getSVGPoint(event);
+		const mouse = canvasInput.normalizeEvent(event)?.point;
 		if (!mouse) return;
 
 		if (!isSelected(type, id)) {
@@ -738,17 +383,22 @@
 				drawingTarget = null;
 			}
 		}
-
-		draggingSelection = collectDraggingSelection(mouse);
+		editor.startInteraction('move-selection', collectDraggingSelection(mouse));
 	}
 
 	function clearSelection() {
-		userState.ui.selectedFixpointId = null;
-		userState.ui.selectedRouteId = null;
-		userState.ui.selectedOutlineId = null;
-		userState.ui.selectedTextLabelId = null;
-		selectedSymbolInstance = null;
-		selectedItems.clear();
+		editor.clearSelection();
+	}
+
+	function handleEmptyTouchTap() {
+		deselectEditTarget();
+	}
+
+	function deselectEditTarget() {
+		if (!['symbolEdit', 'routeEdit', 'outlineEdit'].includes(activeTool)) return;
+		clearSelection();
+		drawingTarget = null;
+		activeTool = 'select';
 	}
 
 	function beginTextEdit(id) {
@@ -776,7 +426,7 @@
 					(textLabel) => textLabel.id !== editingTextLabelId
 				);
 				userState.ui.selectedTextLabelId = null;
-				selectedItems.delete(`text:${editingTextLabelId}`);
+				editor.selectedItems.delete(`text:${editingTextLabelId}`);
 			}
 		}
 
@@ -809,18 +459,21 @@
 
 	function handleObjectClick(event, type, id) {
 		if (event?.stopPropagation) event.stopPropagation();
-		if (activeTool !== null) return;
+		if (activeTool !== 'select') return;
 		if (currentRoutePoints.length > 0 || currentOutlinePoints.length > 0) return;
 		selectObject(type, id, isShiftPressed);
 	}
 
 	function collectDraggingSelection(mouse) {
-		const routes = [];
-		const outlines = [];
+		const paths = [];
 		const symbols = [];
 		const texts = [];
+		const addPath = (target) => {
+			const path = editablePaths.resolve(target);
+			if (path?.getPoints().length) paths.push({ target, snapshot: path.snapshot() });
+		};
 
-		selectedItems.forEach((itemKey) => {
+		editor.selectedItems.forEach((itemKey) => {
 			const [type, id] = itemKey.split(':');
 
 			if (type === 'route') {
@@ -836,24 +489,14 @@
 							: null;
 
 					if (r.points2D && !selectedPitchId && !selectedVariantId) {
-						routes.push({
-							routeId: r.id,
-							pitchId: null,
-							variantId: null,
-							startPoints: JSON.parse(JSON.stringify(r.points2D))
-						});
+						addPath({ routeId: r.id });
 					}
 
 					if (r.pitches) {
 						r.pitches.forEach((p) => {
 							if (selectedPitchId && p.id !== selectedPitchId) return;
 							if (p.points2D) {
-								routes.push({
-									routeId: r.id,
-									pitchId: p.id,
-									variantId: null,
-									startPoints: JSON.parse(JSON.stringify(p.points2D))
-								});
+								addPath({ routeId: r.id, pitchId: p.id });
 							}
 						});
 					}
@@ -861,24 +504,13 @@
 						r.variants.forEach((v) => {
 							if (selectedVariantId && v.id !== selectedVariantId) return;
 							if (v.points2D) {
-								routes.push({
-									routeId: r.id,
-									pitchId: null,
-									variantId: v.id,
-									startPoints: JSON.parse(JSON.stringify(v.points2D))
-								});
+								addPath({ routeId: r.id, variantId: v.id });
 							}
 						});
 					}
 				}
 			} else if (type === 'outline') {
-				const o = userState.topo.outlines.find((outline) => outline.id === id);
-				if (o && o.points2D) {
-					outlines.push({
-						outlineId: o.id,
-						startOutline: JSON.parse(JSON.stringify(o))
-					});
-				}
+				addPath({ outlineId: id });
 			} else if (type === 'symbol') {
 				const s = userState.topo.fixPoints.find((fp) => fp.id === id);
 				if (s && s.position2D) {
@@ -899,138 +531,32 @@
 		});
 
 		return {
-			items: { routes, outlines, symbols, texts },
+			items: { paths, symbols, texts },
 			startMouse: mouse
 		};
 	}
 
 	function handleTextMouseDown(event, label) {
-		if (activeTool !== null) return;
+		if (activeTool !== 'select') return;
 		event?.stopPropagation?.();
-		const mouse = getSVGPoint(event);
+		const mouse = canvasInput.normalizeEvent(event)?.point;
 		if (!mouse || !label.position2D) return;
 		selectObject('text', label.id, isShiftPressed);
-		draggingTextLabel = {
+		editor.startInteraction('move-text', {
 			id: label.id,
 			startPos: [...label.position2D],
 			startMouse: mouse
-		};
+		});
 	}
 
 	function handleLabelMouseDown(event, { routeId, pitchId, variantId }) {
 		event?.stopPropagation?.();
-		draggingLabel = { routeId, pitchId, variantId };
-	}
-
-	function handleRotateGizmoMouseDown(event, symbol) {
-		event?.stopPropagation?.();
-		rotatingSymbol = { id: symbol.id };
-	}
-
-	function handleScaleGizmoMouseDown(event, symbol) {
-		event?.stopPropagation?.();
-		const mouse = getSVGPoint(event);
-		if (!mouse) return;
-
-		const dx = (mouse.x - symbol.position2D[0]) * baseWidth;
-		const dy = (mouse.y - symbol.position2D[1]) * baseHeight;
-		const startDist = Math.sqrt(dx * dx + dy * dy);
-
-		scalingSymbol = {
-			id: symbol.id,
-			startDist,
-			startScale: symbol.scale2D || 1
-		};
-	}
-
-	// D3 zoom handles all pan/zoom - no custom handlers needed
-
-	// Finalize/Cancel functions delegated to Tools (removed local versions)
-
-	function activatePitchTarget(route, pitch) {
-		userState.ui.selectedRouteId = route.id;
-		userState.ui.selectedFixpointId = null;
-		drawingTarget = { type: 'pitch', routeId: route.id, pitchId: pitch.id };
-		activeTool = 'multipitch';
-	}
-
-	function activateNewPitchTarget(route) {
-		userState.ui.selectedRouteId = route.id;
-		userState.ui.selectedFixpointId = null;
-		drawingTarget = { type: 'newPitch', routeId: route.id };
-		activeTool = 'multipitch';
-	}
-
-	function createNextPitchTarget(route, currentPitchId = null) {
-		if (!route || route.type !== 'multi-pitch') return;
-		if (!route.pitches) route.pitches = [];
-
-		const currentIndex = currentPitchId
-			? route.pitches.findIndex((pitch) => pitch.id === currentPitchId)
-			: route.pitches.length - 1;
-		const currentPitch = currentIndex >= 0 ? route.pitches[currentIndex] : null;
-		if (currentPitch && (currentPitch.points2D?.length || 0) < 2) {
-			activatePitchTarget(route, currentPitch);
-			return;
-		}
-		const nextExistingPitch = route.pitches[currentIndex + 1];
-
-		if (nextExistingPitch) {
-			activatePitchTarget(route, nextExistingPitch);
-			return;
-		}
-
-		activateNewPitchTarget(route);
-	}
-
-	function finishRouteTool() {
-		const mode = activeTool;
-		const targetBeforeFinish = drawingTarget;
-		const selectedRouteBeforeFinish = userState.ui.selectedRouteId;
-		const draftPointCount = currentTool instanceof RouteTool ? currentTool.currentPoints.length : 0;
-
-		currentTool.finalize();
-
-		if (mode === 'route') {
-			drawingTarget = null;
-			clearSelection();
-			return;
-		}
-
-		if (mode !== 'multipitch') return;
-
-		if (targetBeforeFinish?.type === 'variant') {
-			drawingTarget = null;
-			activeTool = null;
-			return;
-		}
-
-		if (!targetBeforeFinish && draftPointCount < 2) return;
-
-		const route =
-			userState.topo.routes.find((r) => r.id === targetBeforeFinish?.routeId) ||
-			userState.topo.routes.find((r) => r.id === userState.ui.selectedRouteId) ||
-			userState.topo.routes.find((r) => r.id === selectedRouteBeforeFinish);
-
-		if (!route || route.type !== 'multi-pitch') return;
-
-		const currentPitchId =
-			targetBeforeFinish?.type === 'pitch'
-				? targetBeforeFinish.pitchId
-				: draftPointCount >= 2
-					? route.pitches?.[route.pitches.length - 1]?.id
-					: null;
-
-		createNextPitchTarget(route, currentPitchId);
+		editor.startInteraction('move-route-label', { routeId, pitchId, variantId });
 	}
 
 	export function finalize() {
-		if (currentTool instanceof RouteTool) {
-			finishRouteTool();
-		} else if (currentTool && typeof currentTool.finalize === 'function') {
+		if (currentTool && typeof currentTool.finalize === 'function') {
 			currentTool.finalize();
-		} else {
-			currentTool.onKeyDown?.({ key: 'n' });
 		}
 	}
 
@@ -1065,10 +591,10 @@
 			}
 
 			// Priority 2: If a tool is active, deselect it
-			if (activeTool !== null) {
+			if (activeTool !== 'select') {
 				currentTool.cancel?.();
 				drawingTarget = null;
-				activeTool = null;
+				activeTool = 'select';
 				clearSelection();
 				return;
 			}
@@ -1078,40 +604,22 @@
 		}
 
 		if (event.key === 'Delete' || event.key === 'Backspace') {
-			if (selectedItems.size > 0) {
+			if (editor.selectedItems.size > 0) {
 				const idsByType = { route: [], symbol: [], outline: [], text: [] };
-				selectedItems.forEach((itemKey) => {
+				editor.selectedItems.forEach((itemKey) => {
 					const [type, id] = itemKey.split(':');
 					idsByType[type].push(id);
 				});
 
 				// Delete routes
 				if (idsByType.route.length > 0) {
-					userState.topo.routes = userState.topo.routes.filter(
-						(r) => !idsByType.route.includes(r.id)
-					);
+					tools.routeEdit.delete(idsByType.route);
 					userState.ui.selectedRouteId = null;
 				}
 
 				// Delete symbols
 				if (idsByType.symbol.length > 0) {
-					userState.topo.fixPoints = userState.topo.fixPoints.filter(
-						(p) => !idsByType.symbol.includes(p.id)
-					);
-					// Remove references from routes
-					userState.topo.routes.forEach((route) => {
-						if (route.fixPoints) {
-							route.fixPoints = route.fixPoints.filter((id) => !idsByType.symbol.includes(id));
-						}
-						if (route.pitches) {
-							route.pitches.forEach((pitch) => {
-								idsByType.symbol.forEach((id) => {
-									if (pitch.startNodeId === id) pitch.startNodeId = null;
-									if (pitch.endNodeId === id) pitch.endNodeId = null;
-								});
-							});
-						}
-					});
+					tools.symbolEdit.delete(idsByType.symbol);
 					userState.ui.selectedFixpointId = null;
 				}
 
@@ -1130,7 +638,7 @@
 					userState.ui.selectedTextLabelId = null;
 				}
 
-				selectedItems.clear();
+				editor.selectedItems.clear();
 				saveHistory();
 				return;
 			}
@@ -1138,35 +646,12 @@
 			// Single delete (existing logic)
 			if (userState.ui.selectedFixpointId) {
 				const idToDelete = userState.ui.selectedFixpointId;
-				// Remove from global fixpoints
-				userState.topo.fixPoints = userState.topo.fixPoints.filter((p) => p.id !== idToDelete);
-
-				// Remove references from routes
-				userState.topo.routes.forEach((route) => {
-					if (route.fixPoints) {
-						route.fixPoints = route.fixPoints.filter((id) => id !== idToDelete);
-					}
-					if (route.pitches) {
-						route.pitches.forEach((pitch) => {
-							if (pitch.startNodeId === idToDelete) pitch.startNodeId = null;
-							if (pitch.endNodeId === idToDelete) pitch.endNodeId = null;
-						});
-					}
-				});
+				if (tools.symbolEdit.delete([idToDelete])) saveHistory();
 
 				userState.ui.selectedFixpointId = null;
-				selectedSymbolInstance = null;
+				editor.selectedSymbolInstance = null;
 				return;
 			}
-		}
-
-		if (
-			currentTool instanceof RouteTool &&
-			(event.key === 'n' || event.key === 'N' || event.key === 'Enter')
-		) {
-			event.preventDefault();
-			finishRouteTool();
-			return;
 		}
 
 		currentTool.onKeyDown(event);
@@ -1177,22 +662,9 @@
 		} else if ((event.ctrlKey || event.metaKey) && event.key === 'y') {
 			event.preventDefault();
 			redo();
-		} else if (event.key === '+' || event.key === '=') {
-			updateSymbolScale(0.1);
-			saveHistory();
-		} else if (event.key === '-' || event.key === '_') {
-			updateSymbolScale(-0.1);
-			saveHistory();
 		}
 	}
 
-	function updateSymbolScale(delta) {
-		if (!selectedSymbolInstance) return;
-		const symbol = userState.topo.fixPoints.find((s) => s.id === selectedSymbolInstance.id);
-		if (symbol) {
-			symbol.scale2D = Math.max(0.2, Math.min(5, (symbol.scale2D || 1) + delta));
-		}
-	}
 
 	onMount(() => {
 		window.addEventListener('keydown', handleKeyDown);
@@ -1206,1237 +678,89 @@
 		};
 	});
 
-	// Get routes that have 2D points
-	let routes2D = $derived(userState.topo.routes.filter((r) => r.points2D && r.points2D.length > 0));
-
 	// D3 Render groups (Managed imperatively)
 
 	function updateD3Rendering() {
-		if (userState.topo.editorMode !== '2d') return;
 		if (!svgElement || !gElement) return;
 
 		const svg = select(svgElement);
-		const mainG = select(gElement);
 
 		// Interaction state check for suppressing handles/gizmos
 		// We suppress handles when moving OBJECTS, but NOT when moving POINTS
 		const isAnyInteractionActive =
-			draggingSelection || draggingLabel || draggingTextLabel || rotatingSymbol || scalingSymbol;
+			editor.interaction && editor.interaction.kind !== 'move-point';
 
-		// Ensure layer groups exist and are stable
-		function getOrCreateLayer(className, touchActionNone = false) {
-			let layer = mainG.select(`g.${className}`);
-			if (layer.empty()) {
-				layer = mainG.append('g').attr('class', className);
-				if (touchActionNone) layer.style('touch-action', 'none');
-			}
-			return layer;
-		}
-
-		const bgLayer = getOrCreateLayer('background-layer');
-		const outlinesLayer = getOrCreateLayer('outlines-layer', true);
-		const routesLayer = getOrCreateLayer('routes-layer');
-		const currentLayer = getOrCreateLayer('current-layer');
-		const handlesLayer = getOrCreateLayer('handles-layer', true);
-		const symbolsLayer = getOrCreateLayer('symbols-layer');
-		const textLayer = getOrCreateLayer('text-layer', true);
-
-		// 1. Background Rendering
-		bgLayer
-			.selectAll('image.bg-image')
-			.data(userState.topo.image2D ? [userState.topo.image2D] : [])
-			.join(
-				(enter) => enter.append('image').attr('class', 'bg-image'),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('href', (d) => d)
-			.attr('x', 0)
-			.attr('y', 0)
-			.attr('width', baseWidth)
-			.attr('height', baseHeight)
-			.attr('preserveAspectRatio', 'none');
-
-		bgLayer
-			.selectAll('rect.blank-bg')
-			.data(userState.topo.image2D ? [] : [1])
-			.join(
-				(enter) => enter.append('rect').attr('class', 'blank-bg'),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('width', baseWidth)
-			.attr('height', baseHeight)
-			.attr('fill', '#f9fafb');
-
-		// Grid pattern (only if no image)
-		if (!userState.topo.image2D) {
-			const defs = svg.select('defs');
-			if (defs.empty()) svg.append('defs');
-			if (svg.select('#grid-pattern').empty()) {
-				svg
-					.select('defs')
-					.append('pattern')
-					.attr('id', 'grid-pattern')
-					.attr('width', 50)
-					.attr('height', 50)
-					.attr('patternUnits', 'userSpaceOnUse')
-					.append('path')
-					.attr('d', 'M 50 0 L 0 0 0 50')
-					.attr('fill', 'none')
-					.attr('stroke', '#e5e7eb')
-					.attr('stroke-width', 1);
-			}
-		}
-
-		bgLayer
-			.selectAll('rect.grid-bg')
-			.data(!userState.topo.image2D ? [1] : [])
-			.join(
-				(enter) => enter.append('rect').attr('class', 'grid-bg'),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('width', baseWidth)
-			.attr('height', baseHeight)
-			.attr('fill', 'url(#grid-pattern)');
-
-		// 1.5 Rock Outlines Rendering
-		// Hit Area
-		const outlineSelection = outlinesLayer
-			.selectAll('polyline.hit-area')
-			.data(userState.topo.outlines, (d) => d.id);
-
-		outlineSelection
-			.join(
-				(enter) =>
-					enter
-						.append('polyline')
-						.attr('class', 'hit-area cursor-pointer')
-						.attr('fill', 'none')
-						.attr('stroke', 'transparent')
-						.on('mousedown', (e, d) => {
-							e?.stopPropagation?.();
-							handleObjectMouseDown(e, { type: 'outline', id: d.id });
-						})
-						.on('touchstart', (e, d) => {
-							if (e.touches.length === 1) {
-								e.preventDefault();
-								e.stopPropagation();
-								activeTouch = e.touches[0].identifier;
-								handleObjectMouseDown(e.touches[0], { type: 'outline', id: d.id });
-							}
-						})
-						.on('click', (e, d) => handleObjectClick(e, 'outline', d.id)),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('points', (d) =>
-				pointsToSvg(getOutlinePoints(d, { baseWidth, baseHeight }), { baseWidth, baseHeight })
-			)
-			.attr('stroke-width', getHitAreaSize(8))
-			.style('pointer-events', activeTool !== null && activeTool !== 'eraser' ? 'none' : 'auto');
-
-		// Main Path
-		const outlineMainSelection = outlinesLayer
-			.selectAll('polyline.rock-outline')
-			.data(userState.topo.outlines, (d) => d.id);
-
-		outlineMainSelection
-			.join(
-				(enter) =>
-					enter.append('polyline').attr('class', 'cursor-move rock-outline').attr('fill', 'none'),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('points', (d) =>
-				pointsToSvg(getOutlinePoints(d, { baseWidth, baseHeight }), { baseWidth, baseHeight })
-			)
-			.attr('stroke', (d) =>
-				isSelected('outline', d.id) ? '#3b82f6' : getOutlineLineStyle(d.lineStyle).stroke
-			)
-			.attr('stroke-width', (d) => {
-				const style = getOutlineLineStyle(d.lineStyle);
-				return isSelected('outline', d.id) ? style.width + 1 : style.width;
-			})
-			.attr('stroke-dasharray', (d) => getOutlineLineStyle(d.lineStyle).dash)
-			.attr('stroke-linecap', 'round')
-			.attr('stroke-linejoin', 'round')
-			.style('pointer-events', activeTool !== null && activeTool !== 'eraser' ? 'none' : 'auto');
-
-		// Filled shapes (for closed outlines with fill)
-		const outlineFillSelection = outlinesLayer.selectAll('polygon.outline-fill').data(
-			userState.topo.outlines.filter(
-				(d) => d.fillColor && getOutlinePoints(d, { baseWidth, baseHeight }).length > 2
-			),
-			(d) => d.id
-		);
-
-		outlineFillSelection
-			.join(
-				(enter) => enter.append('polygon').attr('class', 'outline-fill'),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('points', (d) =>
-				pointsToSvg(getOutlinePoints(d, { baseWidth, baseHeight }), { baseWidth, baseHeight })
-			)
-			.attr('fill', (d) => d.fillColor || 'none')
-			.attr('fill-opacity', (d) => d.fillOpacity || 0.3)
-			.attr('stroke', 'none')
-			.style('pointer-events', 'none');
-
-		// Rock Outline Handles
-		const outlineHandlesData = [];
-		const outlineMidpointsData = [];
-
-		userState.topo.outlines.forEach((outline) => {
-			const itemSelected = isSelected('outline', outline.id);
-			if (
-				!isAnyInteractionActive &&
-				itemSelected &&
-				(activeTool === null || activeTool === 'eraser') &&
-				selectedItems.size <= 1
-			) {
-				const handleSize = getTouchTargetSize(activeTool === 'eraser' ? 7 : 4);
-				const outlinePoints = getOutlinePoints(outline, { baseWidth, baseHeight });
-				outlinePoints.forEach((p, i) => {
-					outlineHandlesData.push({ outlineId: outline.id, index: i, p, handleSize });
-				});
-
-				const midpointSize = getTouchTargetSize(3);
-				getOutlineMidpoints(outline, { baseWidth, baseHeight }).forEach((midpoint) => {
-					outlineMidpointsData.push({
-						outlineId: outline.id,
-						insertIndex: midpoint.insertIndex,
-						midX: midpoint.point[0],
-						midY: midpoint.point[1],
-						midpointSize
-					});
-				});
-			}
+		const layers = createTopoLayerStack(gElement);
+		const {
+			background: bgLayer,
+			outlines: outlinesLayer,
+			routes: routesLayer,
+			current: currentLayer,
+			handles: handlesLayer,
+			symbols: symbolsLayer,
+			text: textLayer
+		} = layers;
+		const renderModel = buildTopo2DRenderModel({
+			topo: userState.topo,
+			ui: userState.ui,
+			isSelected,
+			selectionSize: editor.selectedItems.size,
+			activeTool,
+			drawingTarget,
+			isInteractionActive: isAnyInteractionActive,
+			baseWidth,
+			baseHeight,
+			currentRoutePoints,
+			currentOutlinePoints
 		});
 
-		const outlineHandleSelection = handlesLayer
-			.selectAll('circle.outline-handle')
-			.data(outlineHandlesData, (d) => `outline-${d.outlineId}-handle-${d.index}`);
-
-		outlineHandleSelection
-			.join(
-				(enter) => enter.append('circle').attr('class', 'outline-handle cursor-move'),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('cx', (d) => d.p[0] * baseWidth)
-			.attr('cy', (d) => d.p[1] * baseHeight)
-			.attr('r', (d) => d.handleSize)
-			.attr('fill', activeTool === 'eraser' ? '#fee2e2' : '#b45309')
-			.attr('stroke', activeTouch === 'eraser' ? '#ef4444' : 'none')
-			.attr('stroke-width', 2)
-			.on('mousedown', (e, d) =>
-				handlePointMouseDown(e, { outlineId: d.outlineId, pointIndex: d.index })
-			)
-			.on('touchstart', (e, d) => {
-				if (e.touches.length === 1) {
-					e.preventDefault(); // Prevent emulated mousedown
-					e.stopPropagation();
-					activeTouch = e.touches[0].identifier;
-					handlePointMouseDown(e.touches[0], { outlineId: d.outlineId, pointIndex: d.index });
-				}
-			})
-			.on('click', (e) => e.stopPropagation());
-
-		const outlineMidpointSelection = handlesLayer
-			.selectAll('circle.outline-midpoint')
-			.data(outlineMidpointsData, (d) => `outline-${d.outlineId}-mid-${d.insertIndex}`);
-
-		outlineMidpointSelection
-			.join(
-				(enter) =>
-					enter
-						.append('circle')
-						.attr('class', 'outline-midpoint cursor-pointer')
-						.attr('opacity', 0.6)
-						.attr('stroke', 'white')
-						.attr('stroke-width', 1)
-						.on('mouseover', function () {
-							select(this).attr('opacity', 1);
-						})
-						.on('mouseout', function () {
-							select(this).attr('opacity', 0.6);
-						}),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('cx', (d) => d.midX * baseWidth)
-			.attr('cy', (d) => d.midY * baseHeight)
-			.attr('r', (d) => d.midpointSize)
-			.attr('fill', '#d97706')
-			.on('touchstart', (e, d) => {
-				if (e.touches.length === 1) {
-					e.preventDefault(); // Prevent emulated mousedown
-					e.stopPropagation();
-					activeTouch = e.touches[0].identifier;
-					handleMidpointClick(e, {
-						outlineId: d.outlineId,
-						insertIndex: d.insertIndex,
-						point: { x: d.midX, y: d.midY }
-					});
-				}
-			})
-			.on('mousedown', (e, d) =>
-				handleMidpointClick(e, {
-					outlineId: d.outlineId,
-					insertIndex: d.insertIndex,
-					point: { x: d.midX, y: d.midY }
-				})
-			);
-
-		// 2. Routes Rendering
-		const routesData = [];
-		const routeLabelsData = [];
-		const routeMidpointsData = [];
-
-		userState.topo.routes.forEach((route, i) => {
-			const processLine = (
-				points,
-				id,
-				label,
-				isPitch = false,
-				parentRouteId = null,
-				isVariant = false,
-				labelOnly = false
-			) => {
-				if (!points || points.length < 1) return;
-
-				const lineSelected =
-					isSelected('route', parentRouteId || id) ||
-					(drawingTarget?.type === 'pitch' && drawingTarget.pitchId === id) ||
-					(drawingTarget?.type === 'variant' && drawingTarget.variantId === id);
-
-				if (!labelOnly) {
-					routesData.push({
-						id: parentRouteId || id,
-						pitchId: isPitch ? id : null,
-						variantId: isVariant ? id : null,
-						isPitch,
-						isVariant,
-						points,
-						pointsStr: points.map((p) => `${p[0] * baseWidth},${p[1] * baseHeight}`).join(' '),
-						lineSelected,
-						label,
-						routeObj: isPitch
-							? route.pitches.find((p) => p.id === id)
-							: isVariant
-								? route.variants.find((v) => v.id === id)
-								: route,
-						parentRoute: route,
-						index: i
-					});
-				}
-
-				if (label) {
-					const routeObj = isPitch
-						? route.pitches.find((p) => p.id === id)
-						: isVariant
-							? route.variants.find((v) => v.id === id)
-							: route;
-					routeLabelsData.push({
-						id: parentRouteId || id,
-						pitchId: isPitch ? id : null,
-						variantId: isVariant ? id : null,
-						isPitch,
-						isVariant,
-						label,
-						points,
-						routeObj,
-						lineSelected
-					});
-				}
-
-				if (
-					!isAnyInteractionActive &&
-					lineSelected &&
-					activeTool === null &&
-					selectedItems.size <= 1 &&
-					!labelOnly
-				) {
-					if (points && points.length > 1) {
-						const midpointSize = getTouchTargetSize(2);
-						for (let j = 0; j < points.length - 1; j++) {
-							const p1 = points[j];
-							const p2 = points[j + 1];
-							routeMidpointsData.push({
-								routeId: parentRouteId || id,
-								pitchId: isPitch ? id : null,
-								variantId: isVariant ? id : null,
-								insertIndex: j + 1,
-								midX: (p1[0] + p2[0]) / 2,
-								midY: (p1[1] + p2[1]) / 2,
-								midpointSize
-							});
-						}
-					}
-				}
-			};
-
-			if (route.type === 'multi-pitch' && route.pitches) {
-				route.pitches.forEach((pitch, pitchIndex) => {
-					const pitchLabel = formatPitchLabel(pitch, pitchIndex);
-					processLine(pitch.points2D, pitch.id, pitchLabel, true, route.id);
-				});
-				if (route.pitches[0]?.points2D?.length > 0) {
-					processLine(route.pitches[0].points2D, route.id, i + 1, false, null, false, true);
-				}
-				(route.variants || []).forEach((variant, variantIndex) => {
-					const variantLabel = formatVariantLabel(variant, variantIndex);
-					processLine(variant.points2D, variant.id, variantLabel, false, route.id, true);
-				});
-			} else {
-				processLine(route.points2D, route.id, i + 1);
-			}
+		const renderContext = createTopo2DRenderContext({
+			svg,
+			layers,
+			topo: userState.topo,
+			renderModel,
+			activeTool,
+			baseWidth,
+			baseHeight,
+			currentRoutePoints,
+			currentOutlinePoints,
+			selectedOutlineStyle,
+			outlinePreview: {
+				baseWidth,
+				baseHeight,
+				fillColor: currentTool instanceof OutlineTool ? currentTool.fillColor : null,
+				fillOpacity: currentTool instanceof OutlineTool ? currentTool.fillOpacity : null
+			},
+			canvasInput,
+			routeEditTool: tools.routeEdit,
+			outlineEditTool: tools.outlineEdit,
+			symbolEditTool: tools.symbolEdit,
+			isSelected,
+			selectedSymbolInstance: editor.selectedSymbolInstance,
+			editingTextLabelId,
+			editingTextValue,
+			editingTextNeedsFocus,
+			basePath: base,
+			onObjectMouseDown: handleObjectMouseDown,
+			onObjectClick: handleObjectClick,
+			onLabelMouseDown: handleLabelMouseDown,
+			onTextMouseDown: handleTextMouseDown,
+			onBeginTextEdit: beginTextEdit,
+			onTextEditKeyDown: handleTextEditKeyDown,
+			onTextValueChange: (value) => (editingTextValue = value),
+			onCommitTextEdit: commitTextEdit,
+			onTextFocusHandled: () => (editingTextNeedsFocus = false),
+			setActiveTouch: (identifier) => canvasInput.trackTouch({ identifier })
 		});
 
-		const routeGroupSelection = routesLayer
-			.selectAll('g.route-container')
-			.data(routesData, (d) => `route-${d.id}-${d.pitchId || d.variantId || 'main'}`);
-
-		const routeGroups = routeGroupSelection
-			.join(
-				(enter) => enter.append('g').attr('class', 'route-container').style('touch-action', 'none'),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr(
-				'class',
-				(d) =>
-					`route-container ${d.isPitch ? 'pitch-group' : d.isVariant ? 'variant-group' : 'route-group'}`
-			);
-
-		// Hit Area
-		routeGroups
-			.selectAll('polyline.hit-area')
-			.data((d) => [d])
-			.join(
-				(enter) =>
-					enter
-						.append('polyline')
-						.attr('class', 'hit-area cursor-pointer')
-						.attr('fill', 'none')
-						.attr('stroke', 'transparent')
-						.on('mousedown', (e, d) => {
-							e?.stopPropagation?.();
-							handleObjectMouseDown(e, {
-								type: 'route',
-								id: d.id,
-								pitchId: d.pitchId,
-								variantId: d.variantId
-							});
-						})
-						.on('touchstart', (e, d) => {
-							if (e.touches.length === 1) {
-								e.preventDefault(); // Prevent emulated mousedown
-								e.stopPropagation();
-								activeTouch = e.touches[0].identifier;
-								handleObjectMouseDown(e.touches[0], {
-									type: 'route',
-									id: d.id,
-									pitchId: d.pitchId,
-									variantId: d.variantId
-								});
-							}
-						})
-						.on('click', (e, d) => (d.isPitch ? null : handleObjectClick(e, 'route', d.id))),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('points', (d) => d.pointsStr)
-			.attr('stroke-width', getHitAreaSize(7))
-			.style('pointer-events', activeTool !== null && activeTool !== 'eraser' ? 'none' : 'auto');
-
-		// Main Path
-		routeGroups
-			.selectAll('polyline.main-path')
-			.data((d) => [d])
-			.join(
-				(enter) =>
-					enter
-						.append('polyline')
-						.attr('class', 'main-path cursor-move')
-						.attr('fill', 'none')
-						.attr('stroke-linecap', 'round')
-						.attr('stroke-linejoin', 'round')
-						.on('mousedown', (e, d) =>
-							handleObjectMouseDown(e, {
-								type: 'route',
-								id: d.id,
-								pitchId: d.pitchId,
-								variantId: d.variantId
-							})
-						)
-						.on('touchstart', (e, d) => {
-							if (e.touches.length === 1) {
-								e.preventDefault(); // Prevent emulated mousedown
-								e.stopPropagation();
-								activeTouch = e.touches[0].identifier;
-								handleObjectMouseDown(e.touches[0], {
-									type: 'route',
-									id: d.id,
-									pitchId: d.pitchId,
-									variantId: d.variantId
-								});
-							}
-						})
-						.on('click', (e, d) => (d.isPitch ? null : handleObjectClick(e, 'route', d.id))),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('points', (d) => d.pointsStr)
-			.attr('stroke', (d) =>
-				d.lineSelected
-					? '#3b82f6'
-					: getRouteLineStyle(d.routeObj?.lineStyle || d.parentRoute?.lineStyle).stroke
-			)
-			.attr('stroke-width', (d) => {
-				const style = getRouteLineStyle(d.routeObj?.lineStyle || d.parentRoute?.lineStyle);
-				return d.lineSelected ? style.width + 2 : style.width;
-			})
-			.attr(
-				'stroke-dasharray',
-				(d) => getRouteLineStyle(d.routeObj?.lineStyle || d.parentRoute?.lineStyle).dash
-			)
-			.style('pointer-events', activeTool !== null && activeTool !== 'eraser' ? 'none' : 'auto');
-
-		// Route Labels
-		const labelSelection = routesLayer
-			.selectAll('text.route-label')
-			.data(routeLabelsData, (d) => `label-${d.id}-${d.pitchId || d.variantId || 'main'}`);
-
-		labelSelection
-			.join(
-				(enter) =>
-					enter
-						.append('text')
-						.attr('class', 'route-label cursor-move')
-						.attr('font-size', '20')
-						.attr('font-weight', 'bold')
-						.attr('text-anchor', 'middle')
-						.style('user-select', 'none')
-						.on('mousedown', (e, d) =>
-							handleLabelMouseDown(e, {
-								routeId: d.id,
-								pitchId: d.pitchId,
-								variantId: d.variantId
-							})
-						)
-						.on('touchstart', (e, d) => {
-							if (e.touches.length === 1) {
-								e.preventDefault(); // Prevent emulated mousedown
-								e.stopPropagation();
-								activeTouch = e.touches[0].identifier;
-								handleLabelMouseDown(e.touches[0], {
-									routeId: d.id,
-									pitchId: d.pitchId,
-									variantId: d.variantId
-								});
-							}
-						})
-						.on('click', (e) => e?.stopPropagation?.()),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('x', (d) => {
-				const offsetX = d.routeObj?.labelOffset2D ? d.routeObj.labelOffset2D[0] : 0;
-				return (d.points[0][0] + offsetX) * baseWidth;
-			})
-			.attr('y', (d) => {
-				const offsetY = d.routeObj?.labelOffset2D ? d.routeObj.labelOffset2D[1] : 10 / baseHeight;
-				return (d.points[0][1] + offsetY) * baseHeight;
-			})
-			.attr('fill', (d) => (d.lineSelected ? '#3b82f6' : '#12538b'))
-			.style('pointer-events', activeTool !== null && activeTool !== 'eraser' ? 'none' : 'all')
-			.text((d) => d.label);
-
-		// Route Midpoints
-		const routeMidpointSelection = handlesLayer
-			.selectAll('circle.route-midpoint')
-			.data(
-				routeMidpointsData,
-				(d) => `route-${d.routeId}-mid-${d.pitchId || d.variantId || 'main'}-${d.insertIndex}`
-			);
-
-		routeMidpointSelection
-			.join(
-				(enter) =>
-					enter
-						.append('circle')
-						.attr('class', 'route-midpoint cursor-pointer')
-						.attr('opacity', 0.6)
-						.attr('stroke', 'white')
-						.attr('stroke-width', 1)
-						.on('mouseover', function () {
-							select(this).attr('opacity', 1);
-						})
-						.on('mouseout', function () {
-							select(this).attr('opacity', 0.6);
-						}),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('cx', (d) => d.midX * baseWidth)
-			.attr('cy', (d) => d.midY * baseHeight)
-			.attr('r', (d) => d.midpointSize)
-			.attr('fill', '#3b82f6')
-			.on('touchstart', (e, d) => {
-				if (e.touches.length === 1) {
-					e.preventDefault(); // Prevent emulated mousedown
-					e.stopPropagation();
-					activeTouch = e.touches[0].identifier;
-					handleMidpointClick(e, {
-						routeId: d.routeId,
-						pitchId: d.pitchId,
-						variantId: d.variantId,
-						insertIndex: d.insertIndex,
-						point: { x: d.midX, y: d.midY }
-					});
-				}
-			})
-			.on('mousedown', (e, d) =>
-				handleMidpointClick(e, {
-					routeId: d.routeId,
-					pitchId: d.pitchId,
-					variantId: d.variantId,
-					insertIndex: d.insertIndex,
-					point: { x: d.midX, y: d.midY }
-				})
-			);
-
-		// 3. Current Drawing Rendering
-		const currentPathData =
-			currentRoutePoints.length > 0
-				? [
-						{
-							points: currentRoutePoints,
-							pointsStr: currentRoutePoints
-								.map((p) => `${p[0] * baseWidth},${p[1] * baseHeight}`)
-								.join(' ')
-						}
-					]
-				: [];
-
-		currentLayer
-			.selectAll('polyline.current-path')
-			.data(currentPathData)
-			.join(
-				(enter) =>
-					enter
-						.append('polyline')
-						.attr('class', 'current-path')
-						.attr('fill', 'none')
-						.attr('stroke', '#ff00ff')
-						.attr('stroke-width', 3)
-						.attr('stroke-linecap', 'round')
-						.attr('stroke-linejoin', 'round'),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('points', (d) => d.pointsStr);
-
-		currentLayer
-			.selectAll('circle.current-point')
-			.data(currentRoutePoints)
-			.join(
-				(enter) =>
-					enter
-						.append('circle')
-						.attr('class', 'current-point')
-						.attr('fill', '#ff00ff'),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('r', getTouchTargetSize(3))
-			.attr('cx', (p) => p[0] * baseWidth)
-			.attr('cy', (p) => p[1] * baseHeight);
-
-		const currentOutlineData =
-			currentOutlinePoints.length > 0
-				? [
-						{
-							points: currentOutlinePoints,
-							pointsStr: currentOutlinePoints
-								.map((p) => `${p[0] * baseWidth},${p[1] * baseHeight}`)
-								.join(' ')
-						}
-					]
-				: [];
-
-		currentLayer
-			.selectAll('polyline.current-outline')
-			.data(currentOutlineData)
-			.join(
-				(enter) =>
-					enter
-						.append('polyline')
-						.attr('class', 'current-outline')
-						.attr('fill', 'none')
-						.attr('stroke-linecap', 'round')
-						.attr('stroke-linejoin', 'round'),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('points', (d) => d.pointsStr)
-			.attr('stroke', getOutlineLineStyle(selectedOutlineStyle).stroke)
-			.attr('stroke-width', getOutlineLineStyle(selectedOutlineStyle).width)
-			.attr('stroke-dasharray', getOutlineLineStyle(selectedOutlineStyle).dash);
-
-		currentLayer
-			.selectAll('circle.current-outline-point')
-			.data(currentOutlinePoints)
-			.join(
-				(enter) =>
-					enter
-						.append('circle')
-						.attr('class', 'current-outline-point')
-						.attr('fill', '#f59e0b'),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('r', getTouchTargetSize(3))
-			.attr('cx', (p) => p[0] * baseWidth)
-			.attr('cy', (p) => p[1] * baseHeight);
-
-		// Current outline fill preview (for closed shapes)
-		const currentOutlineFillData =
-			currentOutlineData.length > 0 && currentOutlinePoints.length > 2
-				? [
-						{
-							points: currentOutlinePoints,
-							pointsStr: currentOutlinePoints
-								.map((p) => `${p[0] * baseWidth},${p[1] * baseHeight}`)
-								.join(' ')
-						}
-					]
-				: [];
-
-		currentLayer
-			.selectAll('polygon.current-outline-fill')
-			.data(currentOutlineFillData)
-			.join(
-				(enter) => enter.append('polygon').attr('class', 'current-outline-fill'),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('points', (d) => d.pointsStr)
-			.attr('fill', (d) => {
-				const tool = currentTool;
-				return tool instanceof OutlineTool && tool.fillColor
-					? tool.fillColor
-					: 'rgba(255, 165, 0, 0.2)';
-			})
-			.attr('fill-opacity', (d) => {
-				const tool = currentTool;
-				return tool instanceof OutlineTool && tool.fillOpacity ? tool.fillOpacity : 0.2;
-			})
-			.attr('stroke', 'none');
-
-		// 4. Handles Rendering (Selected Route)
-		const routePointHandlesData = [];
-
-		if (!isAnyInteractionActive) {
-			if (userState.ui.selectedRouteId && (activeTool === null || activeTool === 'eraser')) {
-				const route = userState.topo.routes.find((r) => r.id === userState.ui.selectedRouteId);
-				if (route && route.points2D && selectedItems.size <= 1) {
-					route.points2D.forEach((p, index) => {
-						routePointHandlesData.push({
-							routeId: route.id,
-							pitchId: null,
-							index,
-							p,
-							handleSize: getTouchTargetSize(activeTool === 'eraser' ? 5 : 3)
-						});
-					});
-				}
-			}
-
-			if (
-				(activeTool === null || activeTool === 'eraser' || activeTool === 'multipitch') &&
-				drawingTarget?.type === 'pitch'
-			) {
-				const route = userState.topo.routes.find((r) => r.id === drawingTarget.routeId);
-				if (route && route.pitches) {
-					const pitch = route.pitches.find((p) => p.id === drawingTarget.pitchId);
-					if (pitch && pitch.points2D) {
-						pitch.points2D.forEach((p, index) => {
-							routePointHandlesData.push({
-								routeId: route.id,
-								pitchId: pitch.id,
-								variantId: null,
-								index,
-								p,
-								handleSize: getTouchTargetSize(activeTool === 'eraser' ? 5 : 3)
-							});
-						});
-					}
-				}
-			}
-
-			if (
-				(activeTool === null || activeTool === 'eraser' || activeTool === 'multipitch') &&
-				drawingTarget?.type === 'variant'
-			) {
-				const route = userState.topo.routes.find((r) => r.id === drawingTarget.routeId);
-				if (route && route.variants) {
-					const variant = route.variants.find((v) => v.id === drawingTarget.variantId);
-					if (variant && variant.points2D) {
-						variant.points2D.forEach((p, index) => {
-							routePointHandlesData.push({
-								routeId: route.id,
-								pitchId: null,
-								variantId: variant.id,
-								index,
-								p,
-								handleSize: getTouchTargetSize(activeTool === 'eraser' ? 5 : 3)
-							});
-						});
-					}
-				}
-			}
-		}
-
-		const routePointHandleSelection = handlesLayer
-			.selectAll('circle.route-point-handle')
-			.data(
-				routePointHandlesData,
-				(d) => `handle-${d.routeId}-${d.pitchId || d.variantId || 'main'}-${d.index}`
-			);
-
-		routePointHandleSelection
-			.join(
-				(enter) =>
-					enter
-						.append('circle')
-						.attr('class', 'route-point-handle cursor-move')
-						.attr('stroke-width', 2)
-						.on('mousedown', (e, d) =>
-							handlePointMouseDown(e, {
-								routeId: d.routeId,
-								pitchId: d.pitchId,
-								variantId: d.variantId,
-								pointIndex: d.index
-							})
-						)
-						.on('click', (e) => e?.stopPropagation?.())
-						.on('touchstart', (e, d) => {
-							if (e.touches.length === 1) {
-								e.preventDefault(); // Prevent emulated mousedown
-								e.stopPropagation();
-								activeTouch = e.touches[0].identifier;
-								handlePointMouseDown(e.touches[0], {
-									routeId: d.routeId,
-									pitchId: d.pitchId,
-									variantId: d.variantId,
-									pointIndex: d.index
-								});
-							}
-						}),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('cx', (d) => d.p[0] * baseWidth)
-			.attr('cy', (d) => d.p[1] * baseHeight)
-			.attr('r', (d) => d.handleSize)
-			.attr('fill', activeTool === 'eraser' ? '#fee2e2' : 'white')
-			.attr('stroke', activeTool === 'eraser' ? '#ef4444' : '#3b82f6')
-			.attr(
-				'class',
-				(d) => `route-point-handle ${activeTool === null ? 'cursor-move' : 'cursor-pointer'}`
-			);
-
-		// 5. Symbols (FixPoints) Rendering
-		const symbolGroupSelection = symbolsLayer
-			.selectAll('g.symbol-group')
-			.data(userState.topo.fixPoints, (d) => d.id);
-
-		const symbolGroups = symbolGroupSelection
-			.join(
-				(enter) =>
-					enter
-						.append('g')
-						.attr('class', 'symbol-group cursor-move')
-						.style('touch-action', 'none')
-						.on('mousedown', (e, d) => handleObjectMouseDown(e, { type: 'symbol', id: d.id }))
-						.on('touchstart', (e, d) => {
-							if (e.touches.length === 1) {
-								e.preventDefault(); // Prevent emulated mousedown
-								e.stopPropagation();
-								activeTouch = e.touches[0].identifier;
-								handleObjectMouseDown(e.touches[0], { type: 'symbol', id: d.id });
-							}
-						}),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr(
-				'transform',
-				(d) =>
-					`translate(${(d.position2D?.[0] || 0) * baseWidth}, ${(d.position2D?.[1] || 0) * baseHeight}) rotate(${d.rotation2D || 0}) scale(${d.scale2D || 1})`
-			)
-			.attr('opacity', (d) =>
-				selectedSymbolInstance?.id === d.id || isSelected('symbol', d.id) ? 0.9 : 1
-			)
-			.style('pointer-events', activeTool !== null && activeTool !== 'eraser' ? 'none' : 'auto')
-			.on('click', (e, d) => {
-				handleObjectClick(e, 'symbol', d.id);
-			});
-
-		// Invisible hit area for easier selecting on mobile
-		symbolGroups
-			.selectAll('circle.hit-area')
-			.data((d) => [d])
-			.join(
-				(enter) => enter.append('circle').attr('class', 'hit-area').attr('fill', 'transparent'),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('r', (d) => {
-				const meta = topoSymbols.find((s) => s.id === d.type);
-				const radius = (meta?.width || 24) / 2;
-				return getTouchTargetSize(radius);
-			})
-			.style('pointer-events', activeTool !== null && activeTool !== 'eraser' ? 'none' : 'all');
-
-		// Symbol Icon
-		symbolGroups
-			.selectAll('image.symbol-icon')
-			.data((d) => [d])
-			.join(
-				(enter) => enter.append('image').attr('class', 'symbol-icon'),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('width', (d) => {
-				const meta = topoSymbols.find((s) => s.id === d.type);
-				return meta?.width || 24;
-			})
-			.attr('height', (d) => {
-				const meta = topoSymbols.find((s) => s.id === d.type);
-				return meta?.height || 24;
-			})
-			.attr('x', (d) => {
-				const meta = topoSymbols.find((s) => s.id === d.type);
-				return -(meta?.width || 24) / 2;
-			})
-			.attr('y', (d) => {
-				const meta = topoSymbols.find((s) => s.id === d.type);
-				return -(meta?.height || 24) / 2;
-			})
-			.attr('href', (d) => {
-				const meta = topoSymbols.find((s) => s.id === d.type);
-				return meta?.icon || `${base}/icons/topo-symbols/${d.type}.svg`;
-			});
-
-		// Selection/Gizmo Overlay
-		symbolGroups.each(function (symbol) {
-			const group = select(this);
-			const itemSelected =
-				selectedSymbolInstance?.id === symbol.id || isSelected('symbol', symbol.id);
-
-			const meta = topoSymbols.find((s) => s.id === symbol.type);
-			const baseSize = meta?.width || 24;
-			const radius = baseSize / 2;
-
-			if (itemSelected && activeTool === null) {
-				const boxPadding = 5;
-				const boxSize = baseSize + boxPadding * 2;
-				const boxOffset = -(radius + boxPadding);
-
-				// Bounding Box
-				group
-					.selectAll('rect.bounding-box')
-					.data([symbol])
-					.join(
-						(enter) =>
-							enter
-								.append('rect')
-								.attr('class', 'bounding-box')
-								.attr('fill', 'none')
-								.attr('stroke', '#3b82f6')
-								.attr('stroke-width', 1)
-								.attr('stroke-dasharray', '2,2'),
-						(update) => update,
-						(exit) => exit.remove()
-					)
-					.attr('x', boxOffset)
-					.attr('y', boxOffset)
-					.attr('width', boxSize)
-					.attr('height', boxSize);
-
-				// Rotation Stalk
-				group
-					.selectAll('line.rotation-stalk')
-					.data([symbol])
-					.join(
-						(enter) =>
-							enter
-								.append('line')
-								.attr('class', 'rotation-stalk')
-								.attr('stroke', '#3b82f6')
-								.attr('stroke-width', 1),
-						(update) => update,
-						(exit) => exit.remove()
-					)
-					.attr('x1', 0)
-					.attr('y1', boxOffset)
-					.attr('x2', 0)
-					.attr('y2', boxOffset - 20);
-
-				const gizmoSize = boxSize / 4;
-
-				// Rotate gizmo (top)
-				group
-					.selectAll('circle.rotate-gizmo')
-					.data([symbol])
-					.join(
-						(enter) =>
-							enter
-								.append('circle')
-								.attr('class', 'gizmo rotate-gizmo cursor-alias')
-								.attr('fill', '#f59e0b')
-								.attr('stroke', 'white')
-								.on('mousedown', (e, d) => handleRotateGizmoMouseDown(e, d))
-								.on('click', (e) => e?.stopPropagation?.())
-								.on('touchstart', (e, d) => {
-									if (e.touches.length === 1) {
-										e.preventDefault(); // Prevent emulated mousedown
-										e.stopPropagation();
-										activeTouch = e.touches[0].identifier;
-										handleRotateGizmoMouseDown(e.touches[0], d);
-									}
-								}),
-						(update) => update,
-						(exit) => exit.remove()
-					)
-					.attr('cx', 0)
-					.attr('cy', boxOffset - 20)
-					.attr('r', gizmoSize)
-					.attr('stroke-width', 2 / (symbol.scale2D || 1));
-
-				// Scale gizmo (bottom right)
-				group
-					.selectAll('circle.scale-gizmo')
-					.data([symbol])
-					.join(
-						(enter) =>
-							enter
-								.append('circle')
-								.attr('class', 'gizmo scale-gizmo cursor-nwse-resize')
-								.attr('fill', '#3b82f6')
-								.attr('stroke', 'white')
-								.on('mousedown', (e, d) => handleScaleGizmoMouseDown(e, d))
-								.on('click', (e) => e?.stopPropagation?.())
-								.on('touchstart', (e, d) => {
-									if (e.touches.length === 1) {
-										e.preventDefault(); // Prevent emulated mousedown
-										e.stopPropagation();
-										activeTouch = e.touches[0].identifier;
-										handleScaleGizmoMouseDown(e.touches[0], d);
-									}
-								}),
-						(update) => update,
-						(exit) => exit.remove()
-					)
-					.attr('cx', -boxOffset)
-					.attr('cy', -boxOffset)
-					.attr('r', gizmoSize)
-					.attr('stroke-width', 2 / (symbol.scale2D || 1));
-			} else {
-				group.selectAll('.bounding-box, .rotation-stalk, .rotate-gizmo, .scale-gizmo').remove();
-			}
-
-			// Selection Circle (dashed circle always present but hidden when not selected)
-			group
-				.selectAll('circle.selection-circle')
-				.data([symbol])
-				.join(
-					(enter) =>
-						enter
-							.append('circle')
-							.attr('class', 'selection-circle')
-							.attr('fill', 'none')
-							.attr('stroke', '#3b82f6')
-							.attr('stroke-width', 2)
-							.attr('stroke-dasharray', '4'),
-					(update) => update,
-					(exit) => exit.remove()
-				)
-				.attr('cx', 0)
-				.attr('cy', 0)
-				.attr('r', radius + 10)
-				.style('display', itemSelected ? 'block' : 'none');
-		});
-
-		const textLabels = userState.topo.textLabels || [];
-		const textSelection = textLayer.selectAll('g.text-label-group').data(textLabels, (d) => d.id);
-
-		const textGroups = textSelection
-			.join(
-				(enter) =>
-					enter
-						.append('g')
-						.attr('class', 'text-label-group cursor-move')
-						.style('touch-action', 'none')
-						.on('mousedown', (e, d) => handleTextMouseDown(e, d))
-						.on('touchstart', (e, d) => {
-							if (e.touches.length === 1) {
-								e.preventDefault();
-								e.stopPropagation();
-								activeTouch = e.touches[0].identifier;
-								handleTextMouseDown(e.touches[0], d);
-							}
-						})
-						.on('dblclick', (e, d) => {
-							e.stopPropagation();
-							beginTextEdit(d.id);
-						}),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr(
-				'transform',
-				(d) =>
-					`translate(${(d.position2D?.[0] || 0) * baseWidth}, ${(d.position2D?.[1] || 0) * baseHeight}) rotate(${d.rotation2D || 0})`
-			)
-			.style('pointer-events', activeTool !== null && activeTool !== 'eraser' ? 'none' : 'auto');
-
-		textGroups
-			.selectAll('text.text-label')
-			.data((d) => [d])
-			.join(
-				(enter) =>
-					enter
-						.append('text')
-						.attr('class', 'text-label')
-						.attr('dominant-baseline', 'middle')
-						.attr('text-anchor', 'middle')
-						.style('user-select', 'none'),
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr('font-size', (d) => (d.fontSize2D || 0.025) * baseHeight)
-			.attr('font-weight', (d) => d.fontWeight || 700)
-			.attr('fill', (d) => d.color || '#23201d')
-			.text((d) => d.text || '');
-
-		const editingTextLabel = (userState.topo.textLabels || []).find(
-			(label) => label.id === editingTextLabelId
-		);
-
-		const textEditors = textLayer
-			.selectAll('foreignObject.text-editor')
-			.data(editingTextLabel ? [editingTextLabel] : [], (d) => d.id);
-
-		const textEditorObjects = textEditors
-			.join(
-				(enter) => {
-					const editor = enter
-						.append('foreignObject')
-						.attr('class', 'text-editor')
-						.style('overflow', 'visible')
-						.style('pointer-events', 'all');
-
-					editor
-						.append('xhtml:input')
-						.attr('type', 'text')
-						.attr('class', 'text-editor-input')
-						.style('width', '100%')
-						.style('height', '100%')
-						.style('box-sizing', 'border-box')
-						.style('border', '1px solid #3b82f6')
-						.style('border-radius', '2px')
-						.style('background', 'rgba(255, 255, 255, 0.96)')
-						.style('color', '#23201d')
-						.style('font', 'inherit')
-						.style('font-weight', '700')
-						.style('line-height', '1')
-						.style('outline', 'none')
-						.style('padding', '2px 5px')
-						.style('text-align', 'center')
-						.on('mousedown', (event) => event.stopPropagation())
-						.on('click', (event) => event.stopPropagation())
-						.on('dblclick', (event) => event.stopPropagation())
-						.on('touchstart', (event) => event.stopPropagation())
-						.on('keydown', handleTextEditKeyDown)
-						.on('input', (event) => {
-							editingTextValue = event.currentTarget.value;
-						})
-						.on('blur', commitTextEdit);
-
-					return editor;
-				},
-				(update) => update,
-				(exit) => exit.remove()
-			)
-			.attr(
-				'transform',
-				(d) =>
-					`translate(${(d.position2D?.[0] || 0) * baseWidth}, ${(d.position2D?.[1] || 0) * baseHeight}) rotate(${d.rotation2D || 0})`
-			)
-			.attr('x', (d) => {
-				const fontSize = (d.fontSize2D || 0.025) * baseHeight;
-				const width = Math.max(120, (editingTextValue.length || 4) * fontSize * 0.75);
-				return -width / 2;
-			})
-			.attr('y', (d) => -((d.fontSize2D || 0.025) * baseHeight) * 0.9)
-			.attr('width', (d) => {
-				const fontSize = (d.fontSize2D || 0.025) * baseHeight;
-				return Math.max(120, (editingTextValue.length || 4) * fontSize * 0.75);
-			})
-			.attr('height', (d) => Math.max(28, (d.fontSize2D || 0.025) * baseHeight * 1.8));
-
-		textEditorObjects
-			.select('input.text-editor-input')
-			.property('value', editingTextValue)
-			.style('font-size', (d) => `${Math.max(14, (d.fontSize2D || 0.025) * baseHeight)}px`)
-			.style('font-weight', (d) => d.fontWeight || 700)
-			.style('color', (d) => d.color || '#23201d')
-			.each(function () {
-				if (!editingTextNeedsFocus) return;
-				requestAnimationFrame(() => {
-					this.focus();
-					this.select();
-				});
-				editingTextNeedsFocus = false;
-			});
-
-		textGroups.each(function (label) {
-			const group = select(this);
-			const selected = isSelected('text', label.id);
-			group
-				.selectAll('rect.text-selection')
-				.data(selected ? [label] : [])
-				.join(
-					(enter) =>
-						enter
-							.append('rect')
-							.attr('class', 'text-selection')
-							.attr('fill', 'none')
-							.attr('stroke', '#3b82f6')
-							.attr('stroke-width', 1)
-							.attr('stroke-dasharray', '2,2'),
-					(update) => update,
-					(exit) => exit.remove()
-				)
-				.each(function () {
-					const textNode = group.select('text.text-label').node();
-					if (!textNode) return;
-					const box = textNode.getBBox();
-					select(this)
-						.attr('x', box.x - 4)
-						.attr('y', box.y - 2)
-						.attr('width', box.width + 8)
-						.attr('height', box.height + 4);
-				});
-		});
+		renderBackgroundLayer(renderContext);
+		renderOutlinesLayer(renderContext);
+		renderRoutesLayer(renderContext);
+		renderCurrentLayer(renderContext);
+		tools.route.render(renderContext);
+		tools.multipitch.render(renderContext);
+		renderSymbolsLayer(renderContext);
+		renderTextLabelsLayer(renderContext);
 	}
 
 	// Trigger D3 render on state changes
@@ -2542,7 +866,7 @@
 			selectedFixpoint: userState.ui.selectedFixpointId,
 			editingText: editingTextLabelId,
 			editingTextValue,
-			selectedItems: selectedItems.size,
+			selectedItems: editor.selectedItems.size,
 			transform: transform,
 			base: { baseWidth, baseHeight }
 		};
@@ -2560,10 +884,6 @@
 		viewBox="0 0 {baseWidth} {baseHeight}"
 		class="w-full h-full cursor-{activeTool === 'eraser' ? 'crosshair' : 'crosshair'}"
 		style="touch-action: none;"
-		onmousedown={handleSVGMouseDown}
-		onmousemove={handleMouseMove}
-		onmouseup={handleMouseUp}
-		onmouseleave={handleMouseUp}
 		role="application"
 		aria-label="Topo Editor"
 	>

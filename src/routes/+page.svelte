@@ -52,15 +52,6 @@
 			icon: 'fa-folder-tree',
 			color: 'bg-workspace-felslager',
 			wizardRoute: 'felslager/edit'
-		},
-		{
-			id: 'path-routes',
-			name: 'ui.path_studio',
-			label: 'ui.track_based_routes',
-			description: 'ui.path_desc',
-			icon: 'fa-route',
-			color: 'bg-workspace-crag',
-			wizardRoute: 'topos/path/select'
 		}
 	];
 </script>
@@ -72,7 +63,7 @@
 			<p class="text-ui-label text-warm-gray-500">{$_('ui.select_environment')}</p>
 		</div>
 
-		<div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+		<div class="grid grid-cols-1 md:grid-cols-4 gap-3">
 			{#each workspaces as ws}
 				<button
 					class="panel p-4 flex flex-col h-full text-left hover:border-creator-blue transition-none group cursor-pointer"
@@ -129,10 +120,7 @@
 									}
 
 									userState.ui.activeDraftId = draft.id;
-									userState.ui.workspace =
-										topo.editorMode === 'path'
-											? 'topos/path/editor'
-											: topo.editorMode === '2d'
+									userState.ui.workspace = topo.editorMode === '2d'
 												? 'topos/2d/editor'
 												: 'topos/3d/editor';
 									goto(`${base}/${userState.ui.workspace}`);

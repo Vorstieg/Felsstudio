@@ -1,4 +1,5 @@
 let snapToBiggestHeight;
+let snapToSmallestHeight;
 
 export function resize(element) {
 	const top = document.createElement('div');
@@ -27,8 +28,16 @@ export function resize(element) {
 
 		// If it hasn't been explicitly dragged yet, keep the CSS variable in sync with window.innerHeight
 		if (isMobile() && (!element.style.height || element.style.height === '')) {
-			document.body.style.setProperty('--info-panel-height', `${targetHeights[1]}px`);
+			setPanelHeight(targetHeights[0]);
 		}
+	}
+
+	function setPanelHeight(height) {
+		document.body.style.setProperty('--info-panel-height', `${height}px`);
+		document.body.style.setProperty(
+			'--mobile-toolbar-visibility',
+			height >= window.innerHeight * 0.75 ? 'hidden' : 'visible'
+		);
 	}
 
 	function calculateClosestHeight(currentHeight, direction) {
@@ -88,7 +97,7 @@ export function resize(element) {
 			element.style.height = `${closestHeight}px`;
 		}
 
-		document.body.style.setProperty('--info-panel-height', `${closestHeight}px`);
+		setPanelHeight(closestHeight);
 
 		// Ensure no inline margin overrides class styles on mobile (we want 0)
 		element.style.marginInline = '';
@@ -157,7 +166,7 @@ export function resize(element) {
 
 		element.style.top = `${newTop}px`;
 		element.style.height = `${newHeight}px`;
-		document.body.style.setProperty('--info-panel-height', `${newHeight}px`);
+		setPanelHeight(newHeight);
 		lastY = currentY;
 	}
 
@@ -248,9 +257,9 @@ export function resize(element) {
 	calculateTargetHeights();
 	// Initialize the CSS variable so floating buttons start at the exact correct pixel height, not the CSS fallback
 	if (isMobile()) {
-		document.body.style.setProperty('--info-panel-height', `${targetHeights[1]}px`);
-		element.style.top = `${window.innerHeight - targetHeights[1]}px`;
-		element.style.height = `${targetHeights[1]}px`;
+		setPanelHeight(targetHeights[0]);
+		element.style.top = `${window.innerHeight - targetHeights[0]}px`;
+		element.style.height = `${targetHeights[0]}px`;
 		element.style.borderRadius = `1.5rem 1.5rem 0 0`;
 	}
 
@@ -279,7 +288,26 @@ export function resize(element) {
 		element.style.top = `${window.innerHeight - biggestHeight}px`;
 		element.style.borderRadius = `1.5rem 1.5rem 0 0`;
 		element.style.height = `${biggestHeight}px`;
-		document.body.style.setProperty('--info-panel-height', `${biggestHeight}px`);
+		setPanelHeight(biggestHeight);
+
+		setTimeout(() => {
+			element.style.transition = '';
+			document.body.style.setProperty('--info-panel-transition', 'none');
+		}, 200);
+	};
+
+	snapToSmallestHeight = () => {
+		if (!isMobile()) return;
+
+		element.style.transition =
+			'top 0.2s ease-out, height 0.2s ease-out, border-radius 0.2s ease-out';
+		document.body.style.setProperty('--info-panel-transition', 'bottom 0.2s ease-out');
+		element.style.marginInline = '';
+		const smallestHeight = targetHeights[0];
+		element.style.top = `${window.innerHeight - smallestHeight}px`;
+		element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+		element.style.height = `${smallestHeight}px`;
+		setPanelHeight(smallestHeight);
 
 		setTimeout(() => {
 			element.style.transition = '';
@@ -294,7 +322,7 @@ export function resize(element) {
 			window.removeEventListener('mouseup', onMouseup);
 			window.removeEventListener('touchend', onMouseup);
 			window.removeEventListener('resize', calculateTargetHeights);
-			
+
 			element.removeEventListener('touchstart', onContentTouchStart);
 			element.removeEventListener('touchmove', onContentTouchMove);
 			element.removeEventListener('touchend', onContentTouchEnd);
@@ -303,8 +331,9 @@ export function resize(element) {
 				element.removeChild(top);
 			}
 			document.body.style.removeProperty('--info-panel-height');
+			document.body.style.removeProperty('--mobile-toolbar-visibility');
 		}
 	};
 }
 
-export { snapToBiggestHeight };
+export { snapToBiggestHeight, snapToSmallestHeight };

@@ -1,189 +1,173 @@
-import { userState } from '$lib/state/editor.svelte.js';
+import { getTouchTargetSize } from '$lib/assets/js/mobile-utils.js';
 import { generateId, generateRouteId } from '$lib/assets/js/id-utils.js';
+import { userState } from '$lib/state/editor.svelte.js';
 
 export class RouteTool {
-	id = 'route';
-	mode = 'route';
-	currentPoints = $state([]);
-	drawingTarget = $state(null);
+	draftPoints = $state([]);
 
-	constructor({ saveHistory } = {}) {
+	constructor({ mode = 'route', id = 'route', getDrawingTarget, setDrawingTarget, clearSelection, deactivate, saveHistory } = {}) {
+		this.mode = mode;
+		this.id = id;
+		this.getDrawingTarget = getDrawingTarget || (() => null);
+		this.setDrawingTarget = setDrawingTarget || (() => {});
+		this.clearSelection = clearSelection || (() => {});
+		this.deactivate = deactivate || (() => {});
 		this.saveHistory = saveHistory || (() => {});
+	}
+
+	appendPoint(mode, point) {
+		const target = this.getDrawingTarget();
+		const route = target?.routeId && this.findRoute(target.routeId);
+		const path = this.getTargetPath(route, target);
+		if (path) path.points2D = [...(path.points2D || []), [point.x, point.y]];
+		else if (!(mode === 'route' && this.appendToSelectedRoute(point))) {
+			this.draftPoints = [...this.draftPoints, [point.x, point.y]];
+		}
+		this.saveHistory();
+	}
+
+	finish(mode) {
+		const target = this.getDrawingTarget();
+		const draftPointCount = this.draftPoints.length;
+		if (mode === 'multipitch' && target?.type === 'newPitch' && draftPointCount === 0) {
+			this.setDrawingTarget(null);
+			this.clearSelection();
+			return;
+		}
+		const route = this.commitDraft(mode, target);
+		if (mode === 'route' || target?.type === 'variant') {
+			this.setDrawingTarget(null);
+			this.clearSelection();
+			return;
+		}
+		if (!target && draftPointCount < 2) return;
+		this.selectNextPitch(route || this.findRoute(target?.routeId));
+	}
+
+	findRoute(id) {
+		return userState.topo.routes.find((route) => route.id === id);
+	}
+
+	getTargetPath(route, target) {
+		if (!route || target?.type === 'newPitch') return null;
+		if (target?.type === 'pitch') return route.pitches?.find((pitch) => pitch.id === target.pitchId);
+		if (target?.type === 'variant') return route.variants?.find((variant) => variant.id === target.variantId);
+		return null;
+	}
+
+	appendToSelectedRoute(point) {
+		const route = this.findRoute(userState.ui.selectedRouteId);
+		if (!route || route.type === 'multi-pitch') return false;
+		route.points2D = [...(route.points2D || []), [point.x, point.y]];
+		return true;
+	}
+
+	commitDraft(mode, target) {
+		if (this.draftPoints.length < 2) {
+			if (this.draftPoints.length) console.warn('Route needs at least 2 points');
+			return null;
+		}
+		const points2D = $state.snapshot(this.draftPoints);
+		this.draftPoints = [];
+		if (mode === 'multipitch' && target?.type === 'newPitch') {
+			const route = this.findRoute(target.routeId);
+			if (!route || route.type !== 'multi-pitch') return null;
+			route.pitches = [...(route.pitches || []), this.createPitch(route.pitches?.length + 1, points2D)];
+			userState.ui.selectedRouteId = route.id;
+			this.saveHistory();
+			return route;
+		}
+		const route = this.createRoute(mode, points2D);
+		userState.topo.routes.push(route);
+		userState.ui.selectedRouteId = route.id;
+		this.saveHistory();
+		return route;
+	}
+
+	selectNextPitch(route) {
+		if (!route || route.type !== 'multi-pitch' || !route.pitches?.length) return;
+		const target = this.getDrawingTarget();
+		const selectedIndex = target?.type === 'pitch' ? route.pitches.findIndex((pitch) => pitch.id === target.pitchId) : -1;
+		const index = selectedIndex >= 0 ? selectedIndex : route.pitches.length - 1;
+		const pitch = route.pitches[index];
+		const nextPitch = (pitch.points2D?.length || 0) < 2 ? pitch : route.pitches[index + 1];
+		userState.ui.selectedRouteId = route.id;
+		userState.ui.selectedFixpointId = null;
+		this.setDrawingTarget(nextPitch ? { type: 'pitch', routeId: route.id, pitchId: nextPitch.id } : { type: 'newPitch', routeId: route.id });
+	}
+
+	createPitch(pitchNumber, points2D) {
+		return { id: generateId('pitch'), pitchNumber, points2D, points: [], grade: pitchNumber === 1 ? '5a' : '', length: 0, lineStyle: '', type: 'pitch' };
+	}
+
+	createRoute(mode, points2D) {
+		const baseRoute = { id: generateRouteId(), points: [], tags: [], name: `Route ${userState.topo.routes.length + 1}`, lineStyle: 'red' };
+		if (mode === 'multipitch') return { ...baseRoute, fixPoints: [], type: 'multi-pitch', _gradeScale: 'french', pitches: [this.createPitch(1, points2D)] };
+		if (mode === 'alpine-tour') return { ...baseRoute, points2D, hochtourGrade: 'PD', type: 'alpine-tour' };
+		if (mode === 'via-ferrata') return { ...baseRoute, points2D, viaFerrataGrade: 'K3', type: 'via-ferrata' };
+		return { ...baseRoute, points2D, grade: '5a', _gradeScale: 'french', type: 'sports-climbing' };
 	}
 
 	onMouseDown(event, point) {
 		event.stopPropagation();
-
-		// If we have a drawing target (e.g. a specific pitch or variant), we append to it
-		if (this.drawingTarget && this.drawingTarget.type === 'pitch') {
-			const route = userState.topo.routes.find((r) => r.id === this.drawingTarget.routeId);
-			if (route && route.pitches) {
-				const pitch = route.pitches.find((p) => p.id === this.drawingTarget.pitchId);
-				if (pitch) {
-					pitch.points2D = [...(pitch.points2D || []), [point.x, point.y]];
-					this.saveHistory();
-					return;
-				}
-			}
-		}
-
-		if (this.drawingTarget && this.drawingTarget.type === 'variant') {
-			const route = userState.topo.routes.find((r) => r.id === this.drawingTarget.routeId);
-			if (route && route.variants) {
-				const variant = route.variants.find((v) => v.id === this.drawingTarget.variantId);
-				if (variant) {
-					variant.points2D = [...(variant.points2D || []), [point.x, point.y]];
-					this.saveHistory();
-					return;
-				}
-			}
-		}
-
-		// If we have a selected route (single-pitch), we append to it
-		if (userState.ui.selectedRouteId) {
-			const route = userState.topo.routes.find((r) => r.id === userState.ui.selectedRouteId);
-			if (route && route.type !== 'multi-pitch') {
-				route.points2D = [...(route.points2D || []), [point.x, point.y]];
-				this.saveHistory();
-				return;
-			}
-		}
-
-		// Otherwise start/continue a new route instance
-		this.currentPoints = [...this.currentPoints, [point.x, point.y]];
-		this.saveHistory();
+		this.appendPoint(this.mode, point);
 	}
 
-	onMouseMove(event, point) {
-		// Route tool typically doesn't do much on mouse move unless dragging
-	}
+	onMouseMove() {}
 
-	onMouseUp(event, point) {
-		// No-op for simple point-by-point drawing
-	}
+	onMouseUp() {}
 
 	onKeyDown(event) {
-		if (event.key === 'n' || event.key === 'N' || event.key === 'Enter') {
-			this.finalize();
-		} else if (event.key === 'Escape') {
-			this.cancel();
-		} else if (event.key === 'Delete' || event.key === 'Backspace') {
-			this.undoLastPoint();
-		}
+		if (event.key === 'n' || event.key === 'N' || event.key === 'Enter') this.finalize();
+		else if (event.key === 'Escape') this.cancel();
+		else if (event.key === 'Delete' || event.key === 'Backspace') this.undoLastPoint();
 	}
 
-	onActivate() {
-		// clean state
-	}
+	onActivate() {}
 
 	onDeactivate() {
-		this.currentPoints = [];
+		this.cancel();
 	}
 
 	finalize() {
-		if (this.currentPoints.length < 2) {
-			if (this.currentPoints.length > 0) console.warn('Route needs at least 2 points');
-			return;
-		}
-
-		const points2D = $state.snapshot(this.currentPoints);
-
-		if (this.mode === 'multipitch' && this.drawingTarget?.type === 'newPitch') {
-			const route = userState.topo.routes.find((r) => r.id === this.drawingTarget.routeId);
-			if (!route || route.type !== 'multi-pitch') return;
-			if (!route.pitches) route.pitches = [];
-			route.pitches = [
-				...route.pitches,
-				{
-					id: generateId('pitch'),
-					pitchNumber: route.pitches.length + 1,
-					points2D,
-					points: [],
-					grade: '',
-					length: 0,
-					lineStyle: '',
-					type: 'pitch'
-				}
-			];
-			userState.ui.selectedRouteId = route.id;
-			this.currentPoints = [];
-			this.saveHistory();
-			return;
-		}
-
-		const routeId = generateRouteId();
-
-		if (this.mode === 'multipitch') {
-			userState.topo.routes.push({
-				id: routeId,
-				points: [],
-				tags: [],
-				fixPoints: [],
-				name: `Route ${userState.topo.routes.length + 1}`,
-				type: 'multi-pitch',
-				lineStyle: 'red',
-				_gradeScale: 'french',
-				pitches: [
-					{
-						id: generateId('pitch'),
-						pitchNumber: 1,
-						points2D,
-						points: [],
-						grade: '5a',
-						length: 0,
-						lineStyle: '',
-						type: 'pitch'
-					}
-				]
-			});
-		} else if (this.mode === 'alpine-tour') {
-			userState.topo.routes.push({
-				id: routeId,
-				points2D,
-				points: [],
-				tags: [],
-				name: `Route ${userState.topo.routes.length + 1}`,
-				hochtourGrade: 'PD',
-				lineStyle: 'red',
-				type: 'alpine-tour'
-			});
-		} else if (this.mode === 'via-ferrata') {
-			userState.topo.routes.push({
-				id: routeId,
-				points2D,
-				points: [],
-				tags: [],
-				name: `Route ${userState.topo.routes.length + 1}`,
-				viaFerrataGrade: 'K3',
-				lineStyle: 'red',
-				type: 'via-ferrata'
-			});
-		} else {
-			userState.topo.routes.push({
-				id: routeId,
-				points2D,
-				points: [],
-				tags: [],
-				name: `Route ${userState.topo.routes.length + 1}`,
-				grade: '5a',
-				_gradeScale: 'french',
-				lineStyle: 'red',
-				type: 'sports-climbing'
-			});
-		}
-		userState.ui.selectedRouteId = routeId;
-
-		this.currentPoints = [];
-		this.saveHistory();
+		this.finish(this.mode);
 	}
 
 	cancel() {
-		this.currentPoints = [];
+		this.draftPoints = [];
 	}
 
 	undoLastPoint() {
-		if (this.currentPoints.length === 0) return;
-		this.currentPoints = this.currentPoints.slice(0, -1);
+		if (!this.draftPoints.length) return;
+		this.draftPoints = this.draftPoints.slice(0, -1);
 		this.saveHistory();
+	}
+
+	render({ layers, activeTool, baseWidth, baseHeight }) {
+		const points = activeTool === this.mode ? this.draftPoints : [];
+		const layer = layers.current;
+		const previewClass = `current-${this.mode}-path`;
+		const pointClass = `current-${this.mode}-point`;
+		layer
+			.selectAll(`polyline.${previewClass}`)
+			.data(points.length > 1 ? [points] : [])
+			.join('polyline')
+			.attr('class', previewClass)
+			.attr('fill', 'none')
+			.attr('stroke', '#ff00ff')
+			.attr('stroke-width', 3)
+			.attr('stroke-linecap', 'round')
+			.attr('stroke-linejoin', 'round')
+			.attr('points', (path) => path.map(([x, y]) => `${x * baseWidth},${y * baseHeight}`).join(' '));
+
+		layer
+			.selectAll(`circle.${pointClass}`)
+			.data(points)
+			.join('circle')
+			.attr('class', pointClass)
+			.attr('fill', '#ff00ff')
+			.attr('r', getTouchTargetSize(3))
+			.attr('cx', ([x]) => x * baseWidth)
+			.attr('cy', ([, y]) => y * baseHeight);
 	}
 }

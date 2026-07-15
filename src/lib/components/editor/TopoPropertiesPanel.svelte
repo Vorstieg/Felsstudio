@@ -49,7 +49,11 @@
 			const route = userState.topo.routes.find((item) => item.id === selectedId);
 			if (route) {
 				activeTab = 'routes';
-				drawingTarget = route.type !== 'multi-pitch' ? { type: 'route', id: selectedId } : null;
+				if (route.type === 'multi-pitch') {
+					drawingTarget = drawingTarget?.routeId === selectedId ? drawingTarget : null;
+				} else {
+					drawingTarget = { type: 'route', id: selectedId };
+				}
 				scrollIntoInspectorView('route-' + selectedId);
 			}
 		} else if (!selectedId) {

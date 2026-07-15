@@ -126,7 +126,7 @@
 
 		{#if !mobile || userState.ui.selectedRouteId === route.id}
 			<SelectedRoutePanel
-				bind:route={routes[i]}
+				route={routes[i]}
 				bind:drawingTarget
 				bind:activeTool
 				{mobile}

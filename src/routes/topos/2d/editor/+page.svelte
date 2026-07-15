@@ -12,7 +12,7 @@
 import { topoSymbols } from '@vorstieg/topo-renderer';
 	import { _ } from 'svelte-i18n';
 
-	let activeTool = $state(null);
+	let activeTool = $state('select');
 	let selectedOutlineStyle = $state('rock');
 	let drawingTarget = $state(null);
 	let hasPendingChanges = $state(false);
@@ -92,10 +92,10 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 			outlineTool={editor2D?.getCurrentTool?.()}
 			{activeTool}
 			bind:selectedOutlineStyle
-			onClose={() => (activeTool = null)}
+			onClose={() => (activeTool = 'select')}
 		/>
 {:else if ['symbol', 'fixpoint'].includes(activeTool)}
-	<ToolOptions title={ $_(`ui.${activeTool}`)} onClose={() => (activeTool = null)}>
+	<ToolOptions title={ $_(`ui.${activeTool}`)} onClose={() => (activeTool = 'select')}>
 			<div class="grid grid-cols-5 gap-1.5">
 				{#each activeSymbols as symbol}
 					<button

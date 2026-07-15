@@ -9,16 +9,36 @@
 </script>
 
 {#if status !== 'idle'}
-	<div class="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-sm save-status {status === 'saving' || status === 'success' ? 'bg-black/5 text-warm-gray-400' : ''} {status === 'error' ? 'bg-rose-50 text-rose-600 border border-rose-200' : ''}">
+	<div
+		class="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm save-status sm:h-auto sm:w-auto sm:gap-1.5 sm:px-2 sm:py-1 {status ===
+			'saving' || status === 'success'
+			? 'bg-black/5 text-warm-gray-400'
+			: ''} {status === 'error' ? 'bg-rose-50 text-rose-600 border border-rose-200' : ''}"
+		role="status"
+		aria-live="polite"
+		aria-label={status === 'saving'
+			? $_('save.saving')
+			: status === 'success'
+				? $_('save.saved')
+				: errorMessage || $_('save.failed')}
+		title={status === 'error' ? errorMessage || $_('save.failed') : undefined}
+	>
 		{#if status === 'saving'}
 			<i class="fa-solid fa-spinner fa-spin text-[9px]"></i>
-			<span class="text-[9px] font-bold uppercase tracking-tighter">{$_('save.saving')}</span>
+			<span class="hidden text-[9px] font-bold uppercase tracking-tighter sm:inline"
+				>{$_('save.saving')}</span
+			>
 		{:else if status === 'success'}
-			<i class="fa-solid fa-cloud-check text-[9px]"></i>
-			<span class="text-[9px] font-bold uppercase tracking-tighter">{$_('save.saved')}</span>
+			<i class="fa-solid fa-floppy-disk text-[9px]"></i>
+			<span class="hidden text-[9px] font-bold uppercase tracking-tighter sm:inline"
+				>{$_('save.saved')}</span
+			>
 		{:else if status === 'error'}
 			<i class="fa-solid fa-circle-exclamation text-[9px]"></i>
-			<span class="text-[9px] font-bold uppercase tracking-tighter" title={errorMessage}>
+			<span
+				class="hidden text-[9px] font-bold uppercase tracking-tighter sm:inline"
+				title={errorMessage}
+			>
 				{errorMessage || $_('save.failed')}
 			</span>
 		{/if}

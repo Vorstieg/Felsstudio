@@ -7,6 +7,7 @@
 	let {
 		title = '',
 		activeTool = $bindable(null),
+		deselectedTool = null,
 		tools = [],
 		onBack = null,
 		undo = null,
@@ -27,7 +28,7 @@
 			tool.onSelect();
 			return;
 		}
-		activeTool = tool.toggle === false || activeTool !== tool.id ? tool.id : null;
+		activeTool = tool.toggle === false || activeTool !== tool.id ? tool.id : deselectedTool;
 	}
 
 	function run(action, vibration = 'light') {
@@ -136,7 +137,10 @@
 </div>
 
 {#if isCompact}
-	<div class="fixed bottom-3 left-2 right-2 z-50 flex justify-center pointer-events-none">
+	<div
+		class="fixed left-2 right-2 z-50 flex justify-center pointer-events-none"
+		style="bottom: calc(var(--info-panel-height, 0px) + max(0.75rem, env(safe-area-inset-bottom))); transition: var(--info-panel-transition, none); visibility: var(--mobile-toolbar-visibility, visible);"
+	>
 		<div
 			class="panel flex max-w-full items-center gap-1 overflow-x-auto bg-white p-1.5 shadow-panel pointer-events-auto"
 		>

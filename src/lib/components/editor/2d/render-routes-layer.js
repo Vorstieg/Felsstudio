@@ -1,0 +1,109 @@
+import { getRouteLineStyle } from '@vorstieg/topo-renderer';
+import { getHitAreaSize } from '$lib/assets/js/mobile-utils.js';
+
+/** Renders persisted route paths and delegates their edit controls to RouteEditTool. */
+export function renderRoutesLayer({
+	layers,
+	renderModel,
+	activeTool,
+	baseWidth,
+	baseHeight,
+	canvasInput,
+	routeEditTool,
+	onObjectMouseDown: handleObjectMouseDown,
+	onObjectClick: handleObjectClick
+}) {
+	const routesLayer = layers.routes;
+	const canInteract =
+		activeTool === 'select' || activeTool === 'eraser' || activeTool === routeEditTool?.id;
+	const handleRouteDown = (event, route) => {
+		const target = { id: route.id, pitchId: route.pitchId, variantId: route.variantId };
+		if (activeTool === 'select' || activeTool === routeEditTool?.id) {
+			routeEditTool.handleRouteDown(event, target, canvasInput);
+		} else {
+			handleObjectMouseDown(event, { type: 'route', ...target });
+		}
+	};
+	const handleRouteTouch = (event, route) => {
+		if (event.touches.length !== 1) return;
+		const target = { id: route.id, pitchId: route.pitchId, variantId: route.variantId };
+		if (activeTool === 'select' || activeTool === routeEditTool?.id) {
+			routeEditTool.handleTouchRouteDown(event, target, canvasInput);
+		} else {
+			event.preventDefault();
+			event.stopPropagation();
+			canvasInput.trackTouch(event.touches[0]);
+			handleObjectMouseDown(event.touches[0], { type: 'route', ...target });
+		}
+	};
+
+	const routeGroups = routesLayer
+		.selectAll('g.route-container')
+		.data(
+			renderModel.routes,
+			(route) => `route-${route.id}-${route.pitchId || route.variantId || 'main'}`
+		)
+		.join('g')
+		.attr(
+			'class',
+			(route) =>
+				`route-container ${route.isPitch ? 'pitch-group' : route.isVariant ? 'variant-group' : 'route-group'}`
+		)
+		.style('touch-action', 'none');
+
+	routeGroups
+		.selectAll('polyline.hit-area')
+		.data((route) => [route])
+		.join('polyline')
+		.attr('class', 'hit-area cursor-pointer')
+		.attr('fill', 'none')
+		.attr('stroke', 'transparent')
+		.attr('points', (route) => route.pointsStr)
+		.attr('stroke-width', getHitAreaSize(7))
+		.style('pointer-events', canInteract ? 'auto' : 'none')
+		.on('mousedown', handleRouteDown)
+		.on('touchstart', handleRouteTouch)
+		.on('click', (event, route) => {
+			if (!route.isPitch && activeTool !== routeEditTool?.id)
+				handleObjectClick(event, 'route', route.id);
+		});
+
+	routeGroups
+		.selectAll('polyline.main-path')
+		.data((route) => [route])
+		.join('polyline')
+		.attr('class', 'main-path cursor-move')
+		.attr('fill', 'none')
+		.attr('stroke-linecap', 'round')
+		.attr('stroke-linejoin', 'round')
+		.attr('points', (route) => route.pointsStr)
+		.attr('stroke', (route) =>
+			route.lineSelected
+				? '#3b82f6'
+				: getRouteLineStyle(route.routeObj?.lineStyle || route.parentRoute?.lineStyle).stroke
+		)
+		.attr('stroke-width', (route) => {
+			const style = getRouteLineStyle(route.routeObj?.lineStyle || route.parentRoute?.lineStyle);
+			return route.lineSelected ? style.width + 2 : style.width;
+		})
+		.attr(
+			'stroke-dasharray',
+			(route) => getRouteLineStyle(route.routeObj?.lineStyle || route.parentRoute?.lineStyle).dash
+		)
+		.style('pointer-events', canInteract ? 'auto' : 'none')
+		.on('mousedown', handleRouteDown)
+		.on('touchstart', handleRouteTouch)
+		.on('click', (event, route) => {
+			if (!route.isPitch && activeTool !== routeEditTool?.id)
+				handleObjectClick(event, 'route', route.id);
+		});
+
+	routeEditTool?.render({
+		layers,
+		renderModel,
+		activeTool,
+		baseWidth,
+		baseHeight,
+		canvasInput
+	});
+}

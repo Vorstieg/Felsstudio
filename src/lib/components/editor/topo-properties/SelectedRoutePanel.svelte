@@ -2,6 +2,7 @@
 	import { userState } from '$lib/state/editor.svelte.js';
 	import { cragTypes } from '$lib/components/editor/crag/crag-editor-options.js';
 	import { availableRouteTags, convertRouteType } from '$lib/assets/js/topo-utils.js';
+	import { snapToSmallestHeight } from '$lib/assets/js/resize.js';
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
 	import PitchComponent from './PitchComponent.svelte';
 	import {
@@ -46,6 +47,7 @@
 		userState.ui.selectedFixpointId = null;
 		drawingTarget = { type: 'newPitch', routeId: route.id };
 		activeTool = 'multipitch';
+		if (mobile) snapToSmallestHeight?.();
 	}
 
 	function drawPitch(route, pitch) {
@@ -53,6 +55,7 @@
 		userState.ui.selectedFixpointId = null;
 		drawingTarget = { type: 'pitch', routeId: route.id, pitchId: pitch.id };
 		activeTool = 'multipitch';
+		if (mobile) snapToSmallestHeight?.();
 	}
 
 	function addVariant(route) {
@@ -67,6 +70,7 @@
 		userState.ui.selectedFixpointId = null;
 		drawingTarget = { type: 'variant', routeId: route.id, variantId: variant.id };
 		activeTool = 'multipitch';
+		if (mobile) snapToSmallestHeight?.();
 	}
 
 	function removePitch(route, pitch, index) {

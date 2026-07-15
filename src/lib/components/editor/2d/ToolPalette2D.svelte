@@ -23,11 +23,13 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 
 	function toggleSymbolTool(id, symbols) {
 		if (activeTool === id) {
-			activeTool = null;
+			activeTool = 'select';
 			return;
 		}
 		activeTool = id;
-		if (!symbols.some((symbol) => symbol.id === selectedSymbol)) selectedSymbol = symbols[0].id;
+		if (!symbols.some((symbol) => symbol.id === selectedSymbol)) {
+			selectedSymbol = symbols[0].id;
+		}
 	}
 
 	let tools = $derived([
@@ -54,6 +56,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 <ToolBar
 	title={$_('ui.2d_studio')}
 	bind:activeTool
+	deselectedTool="select"
 	{tools}
 	onBack={() => goto(base + '/')}
 	undo={onUndo ? { label: `${$_('ui.undo_desc')} (Ctrl+Z)`, run: onUndo } : null}
