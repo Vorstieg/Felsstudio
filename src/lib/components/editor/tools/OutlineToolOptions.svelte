@@ -3,6 +3,7 @@
 	import {
 		OUTLINE_FILL_COLORS,
 		OUTLINE_MODES,
+		OUTLINE_PRESETS,
 		OUTLINE_STYLES
 	} from '$lib/components/editor/tools/OutlineTool.svelte.js';
 	import ToolOptions from './ToolOptions.svelte';
@@ -38,6 +39,29 @@
 				{/each}
 			</div>
 		</div>
+
+		{#if selectedOutlineStyle === 'rock'}
+			<div class="flex flex-col gap-2">
+				<label class="text-xs font-medium text-warm-gray-600">{$_('ui.rock_presets')}</label>
+				<div class="grid grid-cols-5 gap-1">
+					{#each OUTLINE_PRESETS as preset}
+						<button
+							type="button"
+							class="flex min-h-13 flex-col items-center justify-center gap-1 rounded-sm p-1.5 transition-none {outlineTool?.mode === 'preset' && outlineTool?.preset === preset.id
+								? 'bg-creator-blue text-white'
+								: 'bg-black/5 text-warm-gray-500 hover:bg-black/10'}"
+							onclick={() => outlineTool?.setPreset(preset.id)}
+							title={$_(preset.labelKey)}
+							aria-label={$_(preset.labelKey)}
+						>
+							<i class="fas {preset.icon} text-sm"></i>
+							<span class="text-[9px] font-medium leading-tight">{$_(preset.labelKey)}</span>
+						</button>
+					{/each}
+				</div>
+				<p class="text-micro-data text-warm-gray-500">{$_('ui.rock_preset_hint')}</p>
+			</div>
+		{/if}
 
 		<div class="flex flex-col gap-2">
 			<label class="text-xs font-medium text-warm-gray-600">{$_('ui.line_style')}</label>

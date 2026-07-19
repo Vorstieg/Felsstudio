@@ -70,6 +70,8 @@
 			saveHistory: () => history.save()
 		}),
 		outlineEdit: new OutlineEditTool({
+			getTopo: () => userState.topo,
+			getCanvasSize: () => ({ baseWidth, baseHeight }),
 			getActiveTool: () => activeTool,
 			getEditablePath: (target) => editablePaths.resolve(target),
 			startInteraction: (kind, details) => editor.startInteraction(kind, details),
@@ -306,6 +308,8 @@
 			editablePaths
 				.resolve(interaction)
 				?.movePoint(interaction.pointIndex, [mouse.x, mouse.y]);
+		} else if (interaction?.kind === 'transform-preset-outline') {
+			tools.outlineEdit.applySemanticTransform(interaction, mouse);
 		} else if (
 			interaction?.kind === 'move-symbol' ||
 			interaction?.kind === 'rotate-symbol' ||

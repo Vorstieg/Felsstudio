@@ -4,9 +4,11 @@ import {
 	CIRCLE_SEGMENTS,
 	DEFAULT_FREEHAND_SMOOTHING_PX,
 	FREEHAND_POINT_SPACING_PX,
+	OUTLINE_PRESETS,
 	OUTLINE_SHAPE_TYPES,
 	createCirclePoints,
 	createOutlineRecord,
+	createPresetShape,
 	createRectanglePoints,
 	distancePx,
 	normalizeCanvasSize,
@@ -28,6 +30,11 @@ export const OUTLINE_MODES = [
 	{ id: 'freehand', labelKey: 'ui.outline_mode_freehand', icon: 'fa-pencil' }
 ];
 
+// Kept here as a UI-facing export so the options panel does not need to know
+// about the geometry module directly. The shape definitions themselves live in
+// outline-geometry.js.
+export { OUTLINE_PRESETS };
+
 export const OUTLINE_FILL_COLORS = [
 	{ value: null, labelKey: 'ui.fill_none' },
 	{ value: 'rgba(255, 165, 0, 0.3)', labelKey: 'ui.fill_orange' },
@@ -48,6 +55,7 @@ export class OutlineTool {
 	currentPoints = $state([]);
 	selectedStyle = 'rock';
 	mode = $state('polyline'); // 'polyline', 'rectangle', 'circle', 'freehand'
+	preset = $state('slab');
 	isDrawing = $state(false);
 	temporaryPoints = $state([]);
 	startPoint = $state(null);
@@ -85,7 +93,7 @@ export class OutlineTool {
 		if (this.mode === 'polyline') {
 			this.currentPoints = [...this.currentPoints, toPair(nextPoint)];
 			this.saveHistory();
-		} else if (this.mode === 'rectangle') {
+		} else if (this.mode === 'rectangle' || this.mode === 'preset') {
 			this.startDragShape(toPair(nextPoint));
 		} else if (this.mode === 'circle') {
 			this.startDragShape(toPair(nextPoint), { center: true });
@@ -103,7 +111,10 @@ export class OutlineTool {
 
 	updateDragPreview(nextPoint, event = {}) {
 		const canvasSize = this.canvasSize;
-		if (this.mode === 'rectangle' && this.startPoint) {
+		if (this.mode === 'preset' && this.startPoint) {
+			this.previewShape = createPresetShape(this.preset, this.startPoint, nextPoint);
+			this.temporaryPoints = this.previewShape.points2D;
+		} else if (this.mode === 'rectangle' && this.startPoint) {
 			const points = createRectanglePoints(this.startPoint, nextPoint, {
 				center: event.altKey,
 				square: event.shiftKey,
@@ -136,7 +147,7 @@ export class OutlineTool {
 	onMouseUp(event, point) {
 		if (!this.isDrawing) return;
 
-		if (this.mode === 'rectangle' || this.mode === 'circle') {
+		if (this.mode === 'rectangle' || this.mode === 'circle' || this.mode === 'preset') {
 			this.updateDragPreview(toPair(this.normalizePoint(point)), event);
 			this.commitTemporaryShape();
 		} else if (this.mode === 'freehand') {
@@ -310,6 +321,14 @@ export class OutlineTool {
 	setMode(mode) {
 		this.mode = mode;
 		this.cancel(); // Clear current drawing when changing mode
+	}
+
+	/** Select a standard rock silhouette and enter its press-drag placement mode. */
+	setPreset(preset) {
+		if (!OUTLINE_PRESETS.some((item) => item.id === preset)) return;
+		this.preset = preset;
+		this.mode = 'preset';
+		this.cancel();
 	}
 
 	// Set fill properties

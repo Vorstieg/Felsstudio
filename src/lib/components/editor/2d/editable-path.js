@@ -17,6 +17,35 @@ function clone(value) {
 }
 
 /**
+ * A preset is only a convenient starting shape. Once somebody edits one of
+ * its vertices, retain the rendered points but detach the record from the
+ * preset so subsequent edits behave like an ordinary polyline.
+ *
+ * The top-level aliases make this tolerant of older/newer preset records
+ * while the shape fields cover the canonical outline representation.
+ */
+function isPresetOutline(outline) {
+	const shape = outline?.shape || {};
+	return Boolean(
+		shape.type === 'preset' ||
+		shape.preset ||
+		shape.presetId ||
+		outline?.preset ||
+		outline?.presetId
+	);
+}
+
+function detachPresetForVertexEdit(outline, canvasSize) {
+	if (!isPresetOutline(outline)) return;
+
+	const points2D = getOutlinePoints(outline, canvasSize).map((point) => [...point]);
+	outline.points2D = points2D;
+	outline.shape = { type: 'polyline', points2D };
+	delete outline.preset;
+	delete outline.presetId;
+}
+
+/**
  * Provides one editing API for a route, pitch, variant, or outline. The caller
  * only needs to retain a target descriptor ({ routeId, pitchId, variantId } or
  * { outlineId }); the adapter owns the different storage and geometry rules.
@@ -32,7 +61,8 @@ export function createEditablePathResolver({ getTopo, getCanvasSize }) {
 
 	function resolve(target) {
 		if (target.outlineId) {
-			const getOutline = () => getTopo().outlines.find((outline) => outline.id === target.outlineId);
+			const getOutline = () =>
+				getTopo().outlines.find((outline) => outline.id === target.outlineId);
 			if (!getOutline()) return null;
 
 			return {
@@ -41,11 +71,21 @@ export function createEditablePathResolver({ getTopo, getCanvasSize }) {
 				getPoints: () => getOutlinePoints(getOutline(), getCanvasSize()),
 				snapshot: () => clone(getOutline()),
 				canRemovePoint: () => getOutlinePoints(getOutline(), getCanvasSize()).length > 2,
-				movePoint: (index, point) =>
-					setOutlinePoint(getOutline(), index, point, getCanvasSize()),
-				insertPoint: (index, point) =>
-					insertOutlinePoint(getOutline(), index, point, getCanvasSize()),
-				removePoint: (index) => removeOutlinePoint(getOutline(), index, getCanvasSize()),
+				movePoint: (index, point) => {
+					const outline = getOutline();
+					detachPresetForVertexEdit(outline, getCanvasSize());
+					setOutlinePoint(outline, index, point, getCanvasSize());
+				},
+				insertPoint: (index, point) => {
+					const outline = getOutline();
+					detachPresetForVertexEdit(outline, getCanvasSize());
+					insertOutlinePoint(outline, index, point, getCanvasSize());
+				},
+				removePoint: (index) => {
+					const outline = getOutline();
+					detachPresetForVertexEdit(outline, getCanvasSize());
+					removeOutlinePoint(outline, index, getCanvasSize());
+				},
 				translateFrom: (snapshot, delta) => {
 					const outline = getOutline();
 					const movedOutline = clone(snapshot);

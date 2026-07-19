@@ -1,8 +1,11 @@
 import { EditablePathEditTool } from './EditablePathEditTool.svelte.js';
+import { applyPresetSemanticHandle } from '$lib/assets/js/outline-geometry.js';
 
 /** Editing interactions for persisted 2D rock outlines. */
 export class OutlineEditTool extends EditablePathEditTool {
 	constructor({
+		getTopo,
+		getCanvasSize,
 		getActiveTool,
 		getEditablePath,
 		startInteraction,
@@ -21,10 +24,61 @@ export class OutlineEditTool extends EditablePathEditTool {
 			targetFromPoint: ({ outlineId }) => ({ outlineId }),
 			targetFromMidpoint: ({ outlineId }) => ({ outlineId })
 		});
+		this.getTopo = getTopo || (() => ({ outlines: [] }));
+		this.getCanvasSize = getCanvasSize || (() => ({ baseWidth: 1, baseHeight: 1 }));
 		this.isSelected = isSelected || (() => false);
 		this.selectObject = selectObject || (() => {});
 		this.getIsShiftPressed = getIsShiftPressed || (() => false);
 		this.beginSelectionMove = beginSelectionMove || (() => null);
+	}
+
+	getOutline(id) {
+		return this.getTopo().outlines.find((outline) => outline.id === id) || null;
+	}
+
+	createSemanticInteraction(handle) {
+		const outline = this.getOutline(handle.outlineId);
+		if (!outline?.shape?.preset) return null;
+		return {
+			kind: 'transform-preset-outline',
+			outlineId: outline.id,
+			handleId: handle.id
+		};
+	}
+
+	handleSemanticHandleDown(event, handle, canvasInput) {
+		if (!this.isSemanticEditMode()) return false;
+		const mouse = canvasInput.normalizeEvent(event)?.point;
+		if (!mouse) return false;
+		event.preventDefault?.();
+		event.stopPropagation?.();
+		const interaction = this.createSemanticInteraction(handle);
+		if (!interaction) return false;
+		this.startInteraction(interaction.kind, interaction);
+		return true;
+	}
+
+	handleSemanticHandleTouch(event, handle, canvasInput) {
+		if (event.touches.length !== 1) return false;
+		event.preventDefault();
+		event.stopPropagation();
+		canvasInput.trackTouch(event.touches[0]);
+		return this.handleSemanticHandleDown(event.touches[0], handle, canvasInput);
+	}
+
+	applySemanticTransform(interaction, mouse) {
+		const outline = this.getOutline(interaction.outlineId);
+		if (!outline) return false;
+		Object.assign(
+			outline,
+			applyPresetSemanticHandle(
+				outline,
+				interaction.handleId,
+				[mouse.x, mouse.y],
+				this.getCanvasSize()
+			)
+		);
+		return true;
 	}
 
 	handleOutlineDown(event, outline, canvasInput) {
@@ -61,6 +115,59 @@ export class OutlineEditTool extends EditablePathEditTool {
 			baseWidth,
 			baseHeight
 		});
+		this.renderSemanticHandles({
+			layers,
+			handles: renderModel.outlines.semanticHandles,
+			baseWidth,
+			baseHeight,
+			canvasInput
+		});
+	}
+
+	renderSemanticHandles({ layers, handles, baseWidth, baseHeight, canvasInput }) {
+		const layer = layers.handles
+			.selectAll('g.outline-semantic-controls')
+			.data([null])
+			.join('g')
+			.attr('class', 'outline-semantic-controls');
+		const active = this.isSemanticEditMode();
+		const displayPoint = (item) => {
+			// Pillar/slab height and lean originate at the same logical anchor.
+			// Offset them visually so both controls remain reachable.
+			if (item.kind === 'lean') return [item.point[0], item.point[1] + 10 / baseHeight];
+			if (item.kind === 'scale-height') return [item.point[0] - 10 / baseWidth, item.point[1]];
+			return item.point;
+		};
+
+		layer
+			.selectAll('circle.outline-semantic-hit-area')
+			.data(handles, (item) => `${item.outlineId}-${item.id}`)
+			.join('circle')
+			.attr('class', 'outline-semantic-hit-area cursor-pointer')
+			.attr('cx', (item) => displayPoint(item)[0] * baseWidth)
+			.attr('cy', (item) => displayPoint(item)[1] * baseHeight)
+			.attr('r', (item) => item.hitSize)
+			.attr('fill', 'transparent')
+			.style('pointer-events', active ? 'auto' : 'none')
+			.on('mousedown', (event, item) => this.handleSemanticHandleDown(event, item, canvasInput))
+			.on('touchstart', (event, item) => this.handleSemanticHandleTouch(event, item, canvasInput));
+
+		layer
+			.selectAll('circle.outline-semantic-handle')
+			.data(handles, (item) => `${item.outlineId}-${item.id}`)
+			.join('circle')
+			.attr('class', (item) => `outline-semantic-handle ${item.kind}`)
+			.attr('cx', (item) => displayPoint(item)[0] * baseWidth)
+			.attr('cy', (item) => displayPoint(item)[1] * baseHeight)
+			.attr('r', (item) => item.handleSize)
+			.attr('fill', (item) => (item.kind.startsWith('scale') ? '#3b82f6' : '#f59e0b'))
+			.attr('stroke', 'white')
+			.attr('stroke-width', 2)
+			.style('pointer-events', 'none');
+	}
+
+	isSemanticEditMode() {
+		return ['select', this.id].includes(this.getActiveTool());
 	}
 
 	onMouseDown() {}

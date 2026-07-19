@@ -9,6 +9,322 @@ export const CIRCLE_SEGMENTS = 48;
 export const FREEHAND_POINT_SPACING_PX = 4;
 export const DEFAULT_FREEHAND_SMOOTHING_PX = 2;
 
+/**
+ * A preset deliberately remains a polyline on disk.  `preset` and `semantic`
+ * preserve its origin for the editor, while every existing renderer can still
+ * render `shape.points2D` without knowing about presets.
+ */
+export const OUTLINE_PRESETS = [
+	{
+		id: 'slab',
+		labelKey: 'ui.outline_preset_slab',
+		icon: 'fa-mountain',
+		points: [
+			[0.08, 0.05],
+			[0.9, 0],
+			[1, 0.92],
+			[0.02, 1],
+			[0.08, 0.05]
+		]
+	},
+	{
+		id: 'pillar',
+		labelKey: 'ui.outline_preset_pillar',
+		icon: 'fa-building-columns',
+		points: [
+			[0.28, 0],
+			[0.75, 0.04],
+			[0.92, 1],
+			[0.12, 1],
+			[0.28, 0]
+		]
+	},
+	{
+		id: 'arete',
+		labelKey: 'ui.outline_preset_arete',
+		icon: 'fa-diamond',
+		points: [
+			[0.5, 0],
+			[1, 0.55],
+			[0.48, 1],
+			[0, 0.58],
+			[0.5, 0]
+		]
+	},
+	{
+		id: 'overhang',
+		labelKey: 'ui.outline_preset_overhang',
+		icon: 'fa-arrow-down-wide-short',
+		points: [
+			[0, 0.08],
+			[1, 0],
+			[0.92, 0.42],
+			[0.65, 0.43],
+			[0.56, 0.72],
+			[0.2, 1],
+			[0, 0.08]
+		]
+	},
+	{
+		id: 'boulder',
+		labelKey: 'ui.outline_preset_boulder',
+		icon: 'fa-circle',
+		points: [
+			[0.22, 0.08],
+			[0.62, 0],
+			[0.9, 0.2],
+			[1, 0.62],
+			[0.76, 0.94],
+			[0.31, 1],
+			[0.03, 0.72],
+			[0, 0.31],
+			[0.22, 0.08]
+		]
+	},
+	{
+		id: 'cave',
+		labelKey: 'ui.outline_preset_cave',
+		icon: 'fa-door-open',
+		points: [
+			[0.05, 1],
+			[0, 0.23],
+			[0.24, 0],
+			[0.76, 0],
+			[1, 0.23],
+			[0.95, 1],
+			[0.68, 0.7],
+			[0.5, 0.5],
+			[0.32, 0.7],
+			[0.05, 1]
+		]
+	},
+	{
+		id: 'ledge',
+		labelKey: 'ui.outline_preset_ledge',
+		icon: 'fa-grip-lines',
+		points: [
+			[0, 0.25],
+			[0.72, 0],
+			[1, 0.22],
+			[0.78, 0.48],
+			[0.95, 0.72],
+			[0.28, 1],
+			[0, 0.78],
+			[0, 0.25]
+		]
+	}
+];
+
+export const PRESET_SEMANTIC_VERSION = 1;
+
+export function getOutlinePreset(presetId) {
+	return OUTLINE_PRESETS.find((preset) => preset.id === presetId) || null;
+}
+
+/** Maps a closed unit-template to the bounds of a drag gesture. */
+export function createPresetPoints(presetId, start2D, end2D) {
+	const preset = getOutlinePreset(presetId);
+	if (!preset || !start2D || !end2D) return [];
+	const minX = Math.min(start2D[0], end2D[0]);
+	const maxX = Math.max(start2D[0], end2D[0]);
+	const minY = Math.min(start2D[1], end2D[1]);
+	const maxY = Math.max(start2D[1], end2D[1]);
+	const width = maxX - minX;
+	const height = maxY - minY;
+	return preset.points.map(([x, y]) => [minX + x * width, minY + y * height]);
+}
+
+export function createPresetShape(presetId, start2D, end2D, { semantic = {} } = {}) {
+	if (!getOutlinePreset(presetId)) return null;
+	return {
+		type: OUTLINE_SHAPE_TYPES.POLYLINE,
+		preset: presetId,
+		semantic: { version: PRESET_SEMANTIC_VERSION, ...semantic },
+		points2D: createPresetPoints(presetId, start2D, end2D)
+	};
+}
+
+export function isPresetShape(shape) {
+	return Boolean(shape?.type === OUTLINE_SHAPE_TYPES.POLYLINE && getOutlinePreset(shape.preset));
+}
+
+export function isPresetOutline(outline) {
+	return isPresetShape(outline?.shape);
+}
+
+/**
+ * Handles are derived rather than serialized. They are intentionally generic
+ * so the editor can add richer preset-specific interactions without changing
+ * exported topo JSON.
+ */
+export function getPresetSemanticHandles(outline, canvasSize = {}) {
+	if (!isPresetOutline(outline)) return [];
+	const points = getOutlinePoints(outline, canvasSize);
+	if (!points.length) return [];
+	const xs = points.map(([x]) => x);
+	const ys = points.map(([, y]) => y);
+	const minX = Math.min(...xs);
+	const maxX = Math.max(...xs);
+	const minY = Math.min(...ys);
+	const maxY = Math.max(...ys);
+	const centerX = (minX + maxX) / 2;
+	const centerY = (minY + maxY) / 2;
+	const handles = [
+		{ id: 'width', kind: 'scale-width', point: [maxX, centerY] },
+		{ id: 'height', kind: 'scale-height', point: [centerX, minY] }
+	];
+	if (['pillar', 'slab'].includes(outline.shape.preset)) {
+		handles.push({ id: 'lean', kind: 'lean', point: [centerX, minY] });
+	}
+	if (outline.shape.preset === 'pillar') {
+		handles.push({ id: 'taper', kind: 'taper', point: [centerX, maxY] });
+	}
+	if (['overhang', 'cave'].includes(outline.shape.preset)) {
+		handles.push({ id: 'notch', kind: 'notch-depth', point: [centerX, centerY] });
+	}
+	return handles;
+}
+
+function getPresetBounds(points = []) {
+	if (!points.length) return null;
+	const xs = points.map(([x]) => x);
+	const ys = points.map(([, y]) => y);
+	const minX = Math.min(...xs);
+	const maxX = Math.max(...xs);
+	const minY = Math.min(...ys);
+	const maxY = Math.max(...ys);
+	return {
+		minX,
+		maxX,
+		minY,
+		maxY,
+		width: Math.max(maxX - minX, Number.EPSILON),
+		height: Math.max(maxY - minY, Number.EPSILON),
+		centerX: (minX + maxX) / 2,
+		centerY: (minY + maxY) / 2
+	};
+}
+
+function cloneOutline(outline) {
+	return JSON.parse(JSON.stringify(outline));
+}
+
+function getPresetNotchIndex(preset) {
+	if (preset === 'overhang') return 4;
+	if (preset === 'cave') return 7;
+	return null;
+}
+
+function presetSupportsSemantic(preset, key) {
+	if (key === 'lean') return ['pillar', 'slab'].includes(preset);
+	if (key === 'taper') return preset === 'pillar';
+	if (key === 'notchDepth') return ['overhang', 'cave'].includes(preset);
+	return true;
+}
+
+/**
+ * Applies normalized semantic values to a preset without changing its storage
+ * format. Width and height are canvas-normalized extents; lean, taper, and
+ * notchDepth are dimensionless values relative to the current extent.
+ *
+ * The function is pure: callers must replace their outline record with the
+ * returned value. Unknown properties, ordinary polylines, and unsupported
+ * parameters are left untouched.
+ */
+export function updatePresetOutline(outline, patch = {}, canvasSize = {}) {
+	if (!isPresetOutline(outline)) return outline;
+	const updated = cloneOutline(outline);
+	const points = getOutlinePoints(updated, canvasSize).map((point) => [...point]);
+	const initialBounds = getPresetBounds(points);
+	if (!initialBounds) return outline;
+	const semantic = { version: PRESET_SEMANTIC_VERSION, ...(updated.shape.semantic || {}) };
+
+	if (Number.isFinite(patch.width) && patch.width > 0) {
+		const factor = patch.width / initialBounds.width;
+		for (const point of points)
+			point[0] = initialBounds.minX + (point[0] - initialBounds.minX) * factor;
+		semantic.width = patch.width;
+	}
+
+	if (Number.isFinite(patch.height) && patch.height > 0) {
+		const factor = patch.height / initialBounds.height;
+		for (const point of points)
+			point[1] = initialBounds.maxY - (initialBounds.maxY - point[1]) * factor;
+		semantic.height = patch.height;
+	}
+
+	const bounds = getPresetBounds(points);
+	const applyRelative = (key, apply) => {
+		if (!Number.isFinite(patch[key]) || !presetSupportsSemantic(updated.shape.preset, key)) return;
+		const previous = Number.isFinite(semantic[key]) ? semantic[key] : 0;
+		apply(patch[key] - previous, bounds);
+		semantic[key] = patch[key];
+	};
+
+	applyRelative('lean', (difference, currentBounds) => {
+		for (const point of points) {
+			const fromTop = (currentBounds.maxY - point[1]) / currentBounds.height;
+			point[0] += difference * currentBounds.width * fromTop;
+		}
+	});
+
+	applyRelative('taper', (difference, currentBounds) => {
+		for (const point of points) {
+			const fromTop = (currentBounds.maxY - point[1]) / currentBounds.height;
+			point[0] =
+				currentBounds.centerX + (point[0] - currentBounds.centerX) * (1 + difference * fromTop);
+		}
+	});
+
+	applyRelative('notchDepth', (difference, currentBounds) => {
+		const notchIndex = getPresetNotchIndex(updated.shape.preset);
+		if (notchIndex !== null && points[notchIndex]) {
+			points[notchIndex][1] += difference * currentBounds.height;
+		}
+	});
+
+	// Preserve the SVG polyline invariant even if an external caller supplied
+	// a malformed open path.
+	if (points.length > 2) points[points.length - 1] = [...points[0]];
+	updated.shape.points2D = points;
+	updated.shape.semantic = semantic;
+	updated.points2D = points.map((point) => [...point]);
+	updated.closed = isClosedShape(points);
+	return updated;
+}
+
+/**
+ * Pointer-oriented convenience wrapper for editor gizmos. The pointer is in
+ * normalized canvas coordinates and is converted to the persisted semantic
+ * value before delegating to updatePresetOutline().
+ */
+export function applyPresetSemanticHandle(outline, handleId, point, canvasSize = {}) {
+	if (!isPresetOutline(outline) || !Array.isArray(point)) return outline;
+	const bounds = getPresetBounds(getOutlinePoints(outline, canvasSize));
+	if (!bounds) return outline;
+	let patch;
+	if (handleId === 'width') patch = { width: Math.max(point[0] - bounds.minX, Number.EPSILON) };
+	else if (handleId === 'height')
+		patch = { height: Math.max(bounds.maxY - point[1], Number.EPSILON) };
+	else if (handleId === 'lean') patch = { lean: (point[0] - bounds.centerX) / bounds.width };
+	else if (handleId === 'taper')
+		patch = { taper: (point[0] - bounds.centerX) / (bounds.width / 2) };
+	else if (handleId === 'notch')
+		patch = { notchDepth: (point[1] - bounds.centerY) / bounds.height };
+	else return outline;
+	return updatePresetOutline(outline, patch, canvasSize);
+}
+
+/** Drops editor-only preset information while retaining the exact visible path. */
+export function convertPresetToPolyline(outline, canvasSize = {}) {
+	if (!isPresetOutline(outline)) return outline;
+	const points2D = getOutlinePoints(outline, canvasSize);
+	outline.shape = { type: OUTLINE_SHAPE_TYPES.POLYLINE, points2D };
+	outline.points2D = points2D;
+	outline.closed = isClosedShape(points2D);
+	return outline;
+}
+
 export function normalizeCanvasSize(canvasSize = {}) {
 	const { baseWidth = 1, baseHeight = 1 } = canvasSize || {};
 	return {
@@ -166,7 +482,13 @@ export function setOutlinePoint(outline, pointIndex, point, canvasSize = {}) {
 	});
 	if (!points[pointIndex]) return;
 
-	if (outline.shape?.type === OUTLINE_SHAPE_TYPES.RECTANGLE) {
+	if (isPresetOutline(outline)) {
+		// A direct vertex edit deliberately makes the resulting path fully manual.
+		outline.shape = {
+			type: OUTLINE_SHAPE_TYPES.POLYLINE,
+			points2D: points
+		};
+	} else if (outline.shape?.type === OUTLINE_SHAPE_TYPES.RECTANGLE) {
 		outline.shape = {
 			type: OUTLINE_SHAPE_TYPES.POLYLINE,
 			points2D: points
@@ -256,7 +578,7 @@ import {
 	movePathVertex,
 	removePathVertex,
 	translatePath
-} from '$lib/assets/js/path-geometry.js';
+} from './path-geometry.js';
 import {
 	getOutlinePoints as getSharedOutlinePoints,
 	pointsToSvg as sharedPointsToSvg

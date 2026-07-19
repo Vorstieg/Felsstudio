@@ -1,5 +1,9 @@
 import { formatPitchLabel, formatVariantLabel } from '@vorstieg/topo-renderer';
-import { getOutlineMidpoints, getOutlinePoints } from '$lib/assets/js/outline-geometry.js';
+import {
+	getOutlineMidpoints,
+	getOutlinePoints,
+	getPresetSemanticHandles
+} from '$lib/assets/js/outline-geometry.js';
 import { getTouchTargetSize } from '$lib/assets/js/mobile-utils.js';
 
 function toSvgPoints(points, { baseWidth, baseHeight }) {
@@ -35,6 +39,7 @@ export function buildTopo2DRenderModel({
 
 	const outlineHandles = [];
 	const outlineMidpoints = [];
+	const outlineSemanticHandles = [];
 	topo.outlines.forEach((outline) => {
 		if (!canEditHandles || selectionSize > 1 || !isSelected('outline', outline.id)) return;
 		const handleSize = activeTool === 'eraser' ? 7 : 4;
@@ -52,6 +57,14 @@ export function buildTopo2DRenderModel({
 				midY: midpoint.point[1],
 				midpointSize,
 				midpointHitSize
+			});
+		});
+		getPresetSemanticHandles(outline, canvasSize).forEach((handle) => {
+			outlineSemanticHandles.push({
+				outlineId: outline.id,
+				...handle,
+				handleSize: 5,
+				hitSize: getTouchTargetSize(5)
 			});
 		});
 	});
@@ -192,7 +205,8 @@ export function buildTopo2DRenderModel({
 				(outline) => outline.fillColor && getOutlinePoints(outline, canvasSize).length > 2
 			),
 			handles: outlineHandles,
-			midpoints: outlineMidpoints
+			midpoints: outlineMidpoints,
+			semanticHandles: outlineSemanticHandles
 		},
 		routes,
 		routeLabels,
