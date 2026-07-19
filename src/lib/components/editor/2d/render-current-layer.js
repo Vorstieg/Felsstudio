@@ -7,10 +7,71 @@ export function renderCurrentLayer({
 	renderModel,
 	currentOutlinePoints,
 	selectedOutlineStyle,
-	outlinePreview
+	outlinePreview,
+	brushPreview = null
 }) {
 	const layer = layers.current;
 	const outlineStyle = getOutlineLineStyle(selectedOutlineStyle);
+	const brushPoints = brushPreview?.points || [];
+	const brushContourPoints = brushPreview?.contourPoints || [];
+	const toSvgPoints = (points) =>
+		points
+			.map((point) => `${point[0] * outlinePreview.baseWidth},${point[1] * outlinePreview.baseHeight}`)
+			.join(' ');
+
+	// A brush preview intentionally lives in the current layer rather than the
+	// background image. It stays above the photo while painting but below the
+	// editable controls. `points` is the raw brush centreline; `contourPoints`
+	// is the simplified candidate that will become an ordinary outline after
+	// the user accepts it.
+	layer
+		.selectAll('polyline.current-brush-stroke')
+		.data(brushPoints.length ? [brushPoints] : [])
+		.join(
+			(enter) =>
+				enter
+					.append('polyline')
+					.attr('class', 'current-brush-stroke')
+					.attr('fill', 'none')
+					.attr('stroke-linecap', 'round')
+					.attr('stroke-linejoin', 'round'),
+			(update) => update,
+			(exit) => exit.remove()
+		)
+		.attr('points', toSvgPoints)
+		.attr('stroke', brushPreview?.stroke || 'rgba(59, 130, 246, 0.35)')
+		.attr('stroke-width', Math.max(1, (brushPreview?.radiusPx || 12) * 2));
+
+	layer
+		.selectAll('polygon.current-brush-contour-fill')
+		.data(brushContourPoints.length > 2 ? [brushContourPoints] : [])
+		.join(
+			(enter) => enter.append('polygon').attr('class', 'current-brush-contour-fill'),
+			(update) => update,
+			(exit) => exit.remove()
+		)
+		.attr('points', toSvgPoints)
+		.attr('fill', brushPreview?.contourFill || 'rgba(59, 130, 246, 0.16)')
+		.attr('stroke', 'none');
+
+	layer
+		.selectAll('polyline.current-brush-contour')
+		.data(brushContourPoints.length > 1 ? [brushContourPoints] : [])
+		.join(
+			(enter) =>
+				enter
+					.append('polyline')
+					.attr('class', 'current-brush-contour')
+					.attr('fill', 'none')
+					.attr('stroke-linecap', 'round')
+					.attr('stroke-linejoin', 'round'),
+			(update) => update,
+			(exit) => exit.remove()
+		)
+		.attr('points', toSvgPoints)
+		.attr('stroke', brushPreview?.contourStroke || '#2563eb')
+		.attr('stroke-width', brushPreview?.contourWidth || 2)
+		.attr('stroke-dasharray', brushPreview?.contourDash || '5 3');
 	layer
 		.selectAll('polyline.current-outline')
 		.data(renderModel.currentOutline)

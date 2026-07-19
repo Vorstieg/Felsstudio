@@ -1,5 +1,7 @@
 import { userState } from '$lib/state/editor.svelte.js';
 import { generateOutlineId } from '$lib/assets/js/id-utils.js';
+import { createBrushOutline } from '$lib/assets/js/brush-outline-geometry.js';
+import { findBrushImageEdge } from '$lib/assets/js/brush-edge-assist.js';
 import {
 	CIRCLE_SEGMENTS,
 	DEFAULT_FREEHAND_SMOOTHING_PX,
@@ -27,7 +29,8 @@ export const OUTLINE_MODES = [
 	{ id: 'polyline', labelKey: 'ui.outline_mode_polyline', icon: 'fa-draw-polygon' },
 	{ id: 'rectangle', labelKey: 'ui.outline_mode_rectangle', icon: 'fa-rectangle' },
 	{ id: 'circle', labelKey: 'ui.outline_mode_circle', icon: 'fa-circle' },
-	{ id: 'freehand', labelKey: 'ui.outline_mode_freehand', icon: 'fa-pencil' }
+	{ id: 'freehand', labelKey: 'ui.outline_mode_freehand', icon: 'fa-pencil' },
+	{ id: 'brush', labelKey: 'ui.outline_mode_brush', icon: 'fa-paintbrush' }
 ];
 
 // Kept here as a UI-facing export so the options panel does not need to know
@@ -54,7 +57,7 @@ export class OutlineTool {
 	id = 'outline';
 	currentPoints = $state([]);
 	selectedStyle = 'rock';
-	mode = $state('polyline'); // 'polyline', 'rectangle', 'circle', 'freehand'
+	mode = $state('polyline'); // 'polyline', 'rectangle', 'circle', 'freehand', 'brush'
 	preset = $state('slab');
 	isDrawing = $state(false);
 	temporaryPoints = $state([]);
@@ -67,10 +70,19 @@ export class OutlineTool {
 	fillColor = $state(null);
 	fillOpacity = $state(0.3);
 	freehandSmoothingPx = $state(DEFAULT_FREEHAND_SMOOTHING_PX);
+	// Diameter of the canvas brush used by the brush-to-outline assist.
+	brushSizePx = $state(36);
+	// When enabled, the brush assist may use visible image edges inside the painted area.
+	// The outline falls back to the painted-area contour if no reliable edge is found.
+	followPhotoEdges = $state(true);
+	brushPoints = $state([]);
+	brushOutlinePoints = $state([]);
+	brushGeneration = 0;
 
-	constructor({ saveHistory, getCanvasSize } = {}) {
+	constructor({ saveHistory, getCanvasSize, getImageSrc } = {}) {
 		this.saveHistory = saveHistory || (() => {});
 		this.getCanvasSize = getCanvasSize || (() => ({ baseWidth: 1, baseHeight: 1 }));
+		this.getImageSrc = getImageSrc || (() => null);
 	}
 
 	onMouseDown(event, point) {
@@ -100,6 +112,11 @@ export class OutlineTool {
 		} else if (this.mode === 'freehand') {
 			this.isDrawing = true;
 			this.currentPoints = [toPair(nextPoint)];
+		} else if (this.mode === 'brush') {
+			this.brushGeneration += 1;
+			this.isDrawing = true;
+			this.brushPoints = [toPair(nextPoint)];
+			this.brushOutlinePoints = [];
 		}
 	}
 
@@ -141,10 +158,14 @@ export class OutlineTool {
 			if (this.shouldAddFreehandPoint(nextPoint)) {
 				this.currentPoints = [...this.currentPoints, nextPoint];
 			}
+		} else if (this.mode === 'brush') {
+			if (this.shouldAddBrushPoint(nextPoint)) {
+				this.brushPoints = [...this.brushPoints, nextPoint];
+			}
 		}
 	}
 
-	onMouseUp(event, point) {
+	async onMouseUp(event, point) {
 		if (!this.isDrawing) return;
 
 		if (this.mode === 'rectangle' || this.mode === 'circle' || this.mode === 'preset') {
@@ -166,6 +187,32 @@ export class OutlineTool {
 				smoothingPx: this.freehandSmoothingPx
 			};
 			this.commitCurrentShape();
+		} else if (this.mode === 'brush') {
+			const generation = this.brushGeneration;
+			const nextPoint = toPair(this.normalizePoint(point));
+			if (this.shouldAddBrushPoint(nextPoint)) {
+				this.brushPoints = [...this.brushPoints, nextPoint];
+			}
+			this.brushOutlinePoints = this.createBrushOutline();
+			const fallbackPoints = this.brushOutlinePoints;
+			if (fallbackPoints.length < 4) {
+				this.cancel();
+				return;
+			}
+
+			const edge = this.followPhotoEdges
+				? await this.findBrushImageEdge([...this.brushPoints])
+				: null;
+			if (generation !== this.brushGeneration || this.mode !== 'brush' || !this.isDrawing) return;
+
+			this.currentPoints = edge?.points?.length >= 2 ? edge.points : fallbackPoints;
+			this.previewShape = {
+				type: OUTLINE_SHAPE_TYPES.FREEHAND,
+				points2D: this.currentPoints,
+				brushSizePx: this.brushSizePx,
+				edgeTracked: Boolean(edge)
+			};
+			this.commitCurrentShape();
 		}
 	}
 
@@ -174,6 +221,48 @@ export class OutlineTool {
 
 		const lastPoint = this.currentPoints[this.currentPoints.length - 1];
 		return distancePx(newPoint, lastPoint, this.canvasSize) > FREEHAND_POINT_SPACING_PX;
+	}
+
+	shouldAddBrushPoint(newPoint) {
+		if (this.brushPoints.length === 0) return true;
+		const lastPoint = this.brushPoints[this.brushPoints.length - 1];
+		return distancePx(newPoint, lastPoint, this.canvasSize) > Math.max(this.brushSizePx / 4, 2);
+	}
+
+	createBrushOutline() {
+		return createBrushOutline(this.brushPoints, {
+			brushRadiusPx: this.brushSizePx / 2,
+			canvasSize: this.canvasSize,
+			simplifyTolerancePx: this.freehandSmoothingPx
+		});
+	}
+
+	async findBrushImageEdge(strokePoints) {
+		const imageSrc = this.getImageSrc?.();
+		if (!imageSrc || typeof Image === 'undefined') return null;
+		try {
+			const image = new Image();
+			image.src = imageSrc;
+			await image.decode();
+			const maximumDimension = 1400;
+			const scale = Math.min(1, maximumDimension / Math.max(image.naturalWidth, image.naturalHeight));
+			const width = Math.max(2, Math.round(image.naturalWidth * scale));
+			const height = Math.max(2, Math.round(image.naturalHeight * scale));
+			const canvas = document.createElement('canvas');
+			canvas.width = width;
+			canvas.height = height;
+			const context = canvas.getContext('2d', { willReadFrequently: true });
+			if (!context) return null;
+			context.drawImage(image, 0, 0, width, height);
+			return findBrushImageEdge(context.getImageData(0, 0, width, height), strokePoints, {
+				canvasSize: this.canvasSize,
+				brushRadiusPx: this.brushSizePx / 2
+			});
+		} catch {
+			// File URLs and externally-hosted images can deny canvas pixel access.
+			// The caller deliberately keeps the painted-mask outline in that case.
+			return null;
+		}
 	}
 
 	get canvasSize() {
@@ -260,7 +349,9 @@ export class OutlineTool {
 				type: this.mode,
 				points2D,
 				shape: shape ? $state.snapshot(shape) : null,
-				fillColor: this.fillColor,
+				// A photo-tracked edge is an open line, so it must not inherit an
+				// area fill from the paint-mask fallback.
+				fillColor: shape?.edgeTracked ? null : this.fillColor,
 				fillOpacity: this.fillOpacity,
 				canvasSize: this.canvasSize
 			})
@@ -307,14 +398,27 @@ export class OutlineTool {
 		this.centerPoint = null;
 		this.dragShape = null;
 		this.previewShape = null;
+		this.brushPoints = [];
+		this.brushOutlinePoints = [];
+		this.brushGeneration += 1;
 	}
 
 	// Get preview points for rendering
 	getPreviewPoints() {
+		if (this.mode === 'brush') return [];
 		if (this.temporaryPoints.length > 0) {
 			return this.temporaryPoints;
 		}
 		return this.currentPoints;
+	}
+
+	getBrushPreview() {
+		if (this.mode !== 'brush' || !this.isDrawing) return null;
+		return {
+			points: this.brushPoints,
+			contourPoints: this.brushOutlinePoints,
+			radiusPx: this.brushSizePx / 2
+		};
 	}
 
 	// Set drawing mode

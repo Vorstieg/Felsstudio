@@ -44,6 +44,7 @@
 		saveHistory: () => history.save(),
 		beginTextEdit,
 		getCanvasSize: () => ({ baseWidth, baseHeight }),
+		getImageSrc: () => userState.topo.image2D,
 		getDrawingTarget: () => drawingTarget,
 		setDrawingTarget: (target) => (drawingTarget = target),
 		clearSelection
@@ -151,12 +152,16 @@
 	let currentOutlinePoints = $derived(
 		currentTool instanceof OutlineTool ? currentTool.getPreviewPoints() : []
 	);
+	let brushPreview = $derived(
+		currentTool instanceof OutlineTool ? currentTool.getBrushPreview() : null
+	);
 
 	$effect(() => {
 		const isMultiPitchRouteTarget = activeTool === 'multipitch' && drawingTarget?.type === 'newPitch';
 		hasPendingChanges =
 			(currentRoutePoints?.length || 0) > 0 ||
 			(currentOutlinePoints?.length || 0) > 0 ||
+			(brushPreview?.points?.length || 0) > 0 ||
 			isMultiPitchRouteTarget;
 	});
 	// Symbol tool manages symbol creation directly into userState, so no "currentSymbolPoints" needed for preview distinct from cursor?
@@ -735,6 +740,7 @@
 				fillColor: currentTool instanceof OutlineTool ? currentTool.fillColor : null,
 				fillOpacity: currentTool instanceof OutlineTool ? currentTool.fillOpacity : null
 			},
+			brushPreview,
 			canvasInput,
 			routeEditTool: tools.routeEdit,
 			outlineEditTool: tools.outlineEdit,
@@ -858,6 +864,14 @@
 			p[1];
 		}
 		for (const p of currentOutlinePoints) {
+			p[0];
+			p[1];
+		}
+		for (const p of brushPreview?.points || []) {
+			p[0];
+			p[1];
+		}
+		for (const p of brushPreview?.contourPoints || []) {
 			p[0];
 			p[1];
 		}

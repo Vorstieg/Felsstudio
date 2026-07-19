@@ -134,6 +134,32 @@
 					<span class="w-8 text-right">{outlineTool.freehandSmoothingPx}px</span>
 				</label>
 			{/if}
+			{#if outlineTool?.mode === 'brush'}
+				<label class="flex items-center gap-2 text-xs font-medium text-warm-gray-600">
+					<span class="w-20">{$_('ui.brush_size')}</span>
+					<input
+						type="range"
+						min="8"
+						max="120"
+						step="2"
+						bind:value={outlineTool.brushSizePx}
+						class="min-w-0 flex-1"
+					/>
+					<span class="w-10 text-right">{outlineTool.brushSizePx}px</span>
+				</label>
+				<label class="flex items-center gap-2 text-xs font-medium text-warm-gray-600">
+					<input
+						type="checkbox"
+						bind:checked={outlineTool.followPhotoEdges}
+						class="h-4 w-4 rounded border-black/20 text-creator-blue focus:ring-creator-blue"
+					/>
+					<span>{$_('ui.follow_photo_edges')}</span>
+				</label>
+				<p class="text-micro-data text-warm-gray-500">{$_('ui.brush_outline_hint')}</p>
+				{#if outlineTool.followPhotoEdges}
+					<p class="text-micro-data text-warm-gray-500">{$_('ui.follow_photo_edges_hint')}</p>
+				{/if}
+			{/if}
 		</div>
 
 		<div class="hidden flex-col gap-2 border-t border-black/10 pt-2 md:flex">

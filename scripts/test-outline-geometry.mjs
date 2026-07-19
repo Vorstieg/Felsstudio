@@ -32,6 +32,15 @@ const {
 	translateOutline,
 	updatePresetOutline
 } = await vite.ssrLoadModule('/src/lib/assets/js/outline-geometry.js');
+const {
+	createBrushMaskOutline,
+	createBrushOutline,
+	isValidBrushOutline
+} = await vite.ssrLoadModule('/src/lib/assets/js/brush-outline-geometry.js');
+const {
+	createBrushMaskPredicate,
+	findBrushImageEdge
+} = await vite.ssrLoadModule('/src/lib/assets/js/brush-edge-assist.js');
 
 const open = [
 	[0, 0],
@@ -202,6 +211,65 @@ const unchangedUnsupportedParameter = updatePresetOutline(
 	{ taper: 0.3 }
 );
 assert.equal(unchangedUnsupportedParameter.shape.semantic.taper, undefined);
+
+const brushCanvas = { baseWidth: 1000, baseHeight: 500 };
+const brushOutline = createBrushOutline(
+	[
+		[0.2, 0.4],
+		[0.45, 0.4],
+		[0.7, 0.6]
+	],
+	{ brushRadiusPx: 20, canvasSize: brushCanvas, simplifyTolerancePx: 1 }
+);
+assert.ok(brushOutline.length > 6, 'a brush stroke creates an editable polygon');
+assert.deepEqual(brushOutline[0], brushOutline.at(-1), 'brush polygon is closed');
+assert.equal(isValidBrushOutline(brushOutline, brushCanvas), true, 'brush polygon is valid');
+const brushXs = brushOutline.map(([x]) => x);
+const brushYs = brushOutline.map(([, y]) => y);
+assert.ok(Math.min(...brushXs) < 0.2 && Math.max(...brushXs) > 0.7, 'brush adds horizontal radius');
+assert.ok(Math.min(...brushYs) < 0.4 && Math.max(...brushYs) > 0.6, 'brush adds vertical radius');
+const brushDot = createBrushOutline([[0.5, 0.5]], { brushRadiusPx: 16, canvasSize: brushCanvas });
+assert.equal(isValidBrushOutline(brushDot, brushCanvas), true, 'a single dab creates a valid circle');
+assert.ok(brushDot.length <= 48, 'corner reduction keeps a mask circle practical to edit');
+assert.ok(
+	brushDot.slice(0, -1).some(([x, y]) => !Number.isInteger(x * brushCanvas.baseWidth) || !Number.isInteger(y * brushCanvas.baseHeight)),
+	'corner softening avoids retaining only raster-grid corners'
+);
+const paintedBlob = createBrushMaskOutline(
+	[
+		[0.45, 0.4], [0.55, 0.4], [0.55, 0.5], [0.45, 0.5], [0.45, 0.4],
+		[0.5, 0.45]
+	],
+	{ brushRadiusPx: 18, canvasSize: brushCanvas, maskCellSizePx: 2, simplifyTolerancePx: 1 }
+);
+assert.equal(isValidBrushOutline(paintedBlob, brushCanvas), true, 'a scribbled paint mask traces as a valid outline');
+assert.ok(paintedBlob.length > 4, 'the traced mask retains an editable contour');
+assert.deepEqual(createBrushOutline([], { canvasSize: brushCanvas }), [], 'empty brush strokes are ignored');
+assert.equal(isValidBrushOutline([[0, 0], [1, 0], [0, 0]], brushCanvas), false, 'degenerate paths are rejected');
+
+const edgeCanvas = { baseWidth: 100, baseHeight: 100 };
+const edgeData = new Uint8ClampedArray(100 * 100 * 4);
+for (let y = 0; y < 100; y++) {
+	for (let x = 0; x < 100; x++) {
+		const offset = (y * 100 + x) * 4;
+		const value = y < 52 ? 25 : 230;
+		edgeData[offset] = edgeData[offset + 1] = edgeData[offset + 2] = value;
+		edgeData[offset + 3] = 255;
+	}
+}
+const edgeStroke = [[0.1, 0.48], [0.9, 0.48]];
+const maskContains = createBrushMaskPredicate(edgeStroke, { brushRadiusPx: 9, canvasSize: edgeCanvas });
+assert.equal(maskContains([0.5, 0.52]), true, 'the reconstructed brush mask includes the painted region');
+assert.equal(maskContains([0.5, 0.7]), false, 'the reconstructed brush mask excludes the rest of the photo');
+const edgePath = findBrushImageEdge({ width: 100, height: 100, data: edgeData }, edgeStroke, {
+	canvasSize: edgeCanvas,
+	brushRadiusPx: 9,
+	minimumConfidence: 0.15
+});
+assert.ok(edgePath, 'a high contrast edge inside the brush mask is found');
+assert.ok(edgePath.confidence > 0.15, 'the edge result reports useful confidence');
+assert.ok(edgePath.points.every(([, y]) => Math.abs(y - 0.52) < 0.03), 'the tracked path follows the image edge');
+assert.equal(findBrushImageEdge({ width: 100, height: 100, data: edgeData }, [[0.5, 0.5]], { canvasSize: edgeCanvas }), null, 'a single dab cannot imply an edge direction');
 
 console.log('path geometry tests passed');
 await vite.close();
