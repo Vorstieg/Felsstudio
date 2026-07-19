@@ -8,6 +8,8 @@ export const OUTLINE_SHAPE_TYPES = {
 export const CIRCLE_SEGMENTS = 48;
 export const FREEHAND_POINT_SPACING_PX = 4;
 export const DEFAULT_FREEHAND_SMOOTHING_PX = 2;
+export const DEFAULT_OUTLINE_CURVE_TENSION = 0.45;
+export const PILLAR_OUTLINE_CURVE_TENSION = 0.3;
 
 /**
  * A preset deliberately remains a polyline on disk.  `preset` and `semantic`
@@ -31,12 +33,13 @@ export const OUTLINE_PRESETS = [
 		id: 'pillar',
 		labelKey: 'ui.outline_preset_pillar',
 		icon: 'fa-building-columns',
+		// A pillar continues beyond the lower edge of the topo, so leave its
+		// base open rather than connecting the two bottom points.
 		points: [
+			[0.12, 1],
 			[0.28, 0],
 			[0.75, 0.04],
-			[0.92, 1],
-			[0.12, 1],
-			[0.28, 0]
+			[0.92, 1]
 		]
 	},
 	{
@@ -121,7 +124,7 @@ export function getOutlinePreset(presetId) {
 	return OUTLINE_PRESETS.find((preset) => preset.id === presetId) || null;
 }
 
-/** Maps a closed unit-template to the bounds of a drag gesture. */
+/** Maps a unit-template to the bounds of a drag gesture. */
 export function createPresetPoints(presetId, start2D, end2D) {
 	const preset = getOutlinePreset(presetId);
 	if (!preset || !start2D || !end2D) return [];
@@ -283,9 +286,6 @@ export function updatePresetOutline(outline, patch = {}, canvasSize = {}) {
 		}
 	});
 
-	// Preserve the SVG polyline invariant even if an external caller supplied
-	// a malformed open path.
-	if (points.length > 2) points[points.length - 1] = [...points[0]];
 	updated.shape.points2D = points;
 	updated.shape.semantic = semantic;
 	updated.points2D = points.map((point) => [...point]);
@@ -541,6 +541,7 @@ export function createOutlineRecord({
 	shape = null,
 	fillColor = null,
 	fillOpacity = 0.3,
+	curve = { enabled: false, tension: DEFAULT_OUTLINE_CURVE_TENSION },
 	canvasSize = {}
 }) {
 	const semanticShape =
@@ -555,6 +556,12 @@ export function createOutlineRecord({
 		points2D,
 		fillColor,
 		fillOpacity,
+		curve: {
+			enabled: Boolean(curve?.enabled),
+			tension: Number.isFinite(Number(curve?.tension))
+				? Math.min(1, Math.max(0, Number(curve.tension)))
+				: DEFAULT_OUTLINE_CURVE_TENSION
+		},
 		closed: isClosedShape(points2D)
 	};
 
@@ -581,8 +588,10 @@ import {
 } from './path-geometry.js';
 import {
 	getOutlinePoints as getSharedOutlinePoints,
+	pointsToSmoothSvgPath as sharedPointsToSmoothSvgPath,
 	pointsToSvg as sharedPointsToSvg
 } from '@vorstieg/topo-renderer';
 
 export const pointsToSvg = sharedPointsToSvg;
+export const pointsToSmoothSvgPath = sharedPointsToSmoothSvgPath;
 export const getOutlinePoints = getSharedOutlinePoints;

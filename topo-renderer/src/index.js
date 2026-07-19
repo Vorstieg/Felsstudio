@@ -46,6 +46,41 @@ export function pointsToSvg(points = [], canvasSize = {}) {
 	return points.map((point) => `${point[0] * baseWidth},${point[1] * baseHeight}`).join(' ');
 }
 
+/**
+ * Turns normalized vertices into a Catmull-Rom-derived cubic Bézier SVG path.
+ * It is a rendering-only conversion and leaves the supplied vertices intact.
+ */
+export function pointsToSmoothSvgPath(
+	points = [],
+	{ closed = false, tension = 0.45, baseWidth = 1, baseHeight = 1 } = {}
+) {
+	if (!Array.isArray(points) || points.length < 3) return null;
+	const hasRepeatedClosingPoint =
+		points[0]?.[0] === points.at(-1)?.[0] && points[0]?.[1] === points.at(-1)?.[1];
+	const vertices = closed && hasRepeatedClosingPoint ? points.slice(0, -1) : points;
+	if (vertices.length < 3) return null;
+	const amount = Math.min(1, Math.max(0, Number.isFinite(Number(tension)) ? Number(tension) : 0.45));
+	const svgVertices = vertices.map(([x, y]) => [x * baseWidth, y * baseHeight]);
+	const pointAt = (index) => {
+		if (closed) return svgVertices[(index + svgVertices.length) % svgVertices.length];
+		return svgVertices[Math.max(0, Math.min(index, svgVertices.length - 1))];
+	};
+	const format = ([x, y]) => `${x},${y}`;
+	let path = `M ${format(svgVertices[0])}`;
+	const segmentCount = closed ? svgVertices.length : svgVertices.length - 1;
+	for (let index = 0; index < segmentCount; index++) {
+		const p0 = pointAt(index - 1);
+		const p1 = pointAt(index);
+		const p2 = pointAt(index + 1);
+		const p3 = pointAt(index + 2);
+		const controlScale = amount / 6;
+		const c1 = [p1[0] + (p2[0] - p0[0]) * controlScale, p1[1] + (p2[1] - p0[1]) * controlScale];
+		const c2 = [p2[0] - (p3[0] - p1[0]) * controlScale, p2[1] - (p3[1] - p1[1]) * controlScale];
+		path += ` C ${format(c1)} ${format(c2)} ${format(p2)}`;
+	}
+	return closed ? `${path} Z` : path;
+}
+
 function rectanglePoints(start, end, shape, size) {
 	if (!start || !end) return [];
 	let [x1, y1] = start;
@@ -202,11 +237,21 @@ export function renderTopoSvg({
 		.attr('preserveAspectRatio', 'none');
 
 	const outlines = (topo.outlines || []).map((outline, index) => ({ ...outline, key: outline.id || index }));
-	outlinesLayer.selectAll('polygon.outline-fill').data(outlines.filter((outline) => outline.fillColor && getOutlinePoints(outline, size).length > 2), (outline) => outline.key).join('polygon')
-		.attr('class', 'outline-fill').attr('points', (outline) => pointsToSvg(getOutlinePoints(outline, size), size))
+	const outlinePath = (outline) => {
+		const points = getOutlinePoints(outline, size);
+		const closed = isClosedShape(points);
+		const curvedPath = outline.curve?.enabled
+			? pointsToSmoothSvgPath(points, { closed, tension: outline.curve.tension, ...size })
+			: null;
+		if (curvedPath) return curvedPath;
+		const straightPoints = pointsToSvg(points, size);
+		return straightPoints ? `M ${straightPoints.replaceAll(' ', ' L ')}${closed ? ' Z' : ''}` : null;
+	};
+	outlinesLayer.selectAll('path.outline-fill').data(outlines.filter((outline) => outline.fillColor && getOutlinePoints(outline, size).length > 2), (outline) => outline.key).join('path')
+		.attr('class', 'outline-fill').attr('d', outlinePath)
 		.attr('fill', (outline) => outline.fillColor).attr('fill-opacity', (outline) => outline.fillOpacity ?? 0.3);
-	outlinesLayer.selectAll('polyline.rock-outline').data(outlines, (outline) => outline.key).join('polyline')
-		.attr('class', 'rock-outline').attr('fill', 'none').attr('points', (outline) => pointsToSvg(getOutlinePoints(outline, size), size))
+	outlinesLayer.selectAll('path.rock-outline').data(outlines, (outline) => outline.key).join('path')
+		.attr('class', 'rock-outline').attr('fill', 'none').attr('d', outlinePath)
 		.attr('stroke', (outline) => getOutlineLineStyle(outline.lineStyle).stroke)
 		.attr('stroke-width', (outline) => getOutlineLineStyle(outline.lineStyle).width)
 		.attr('stroke-dasharray', (outline) => getOutlineLineStyle(outline.lineStyle).dash)

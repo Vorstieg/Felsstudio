@@ -8,6 +8,10 @@
 	import { outlineLineStyles } from './topo-properties-utils.js';
 	import TopoJsonEditor from './TopoJsonEditor.svelte';
 	import { rockTypes } from '$lib/config.js';
+	import {
+		DEFAULT_OUTLINE_CURVE_TENSION,
+		PILLAR_OUTLINE_CURVE_TENSION
+	} from '$lib/assets/js/outline-geometry.js';
 
 	let {
 		showMapModal = $bindable(false),
@@ -38,6 +42,24 @@
 			(outline) => outline.id !== selectedOutline.id
 		);
 		userState.ui.selectedOutlineId = null;
+	}
+
+	function setSelectedOutlineCurved(enabled) {
+		const defaultTension =
+			selectedOutline.shape?.preset === 'pillar'
+				? PILLAR_OUTLINE_CURVE_TENSION
+				: DEFAULT_OUTLINE_CURVE_TENSION;
+		selectedOutline.curve = {
+			enabled,
+			tension: selectedOutline.curve?.tension ?? defaultTension
+		};
+	}
+
+	function setSelectedOutlineCurveTension(tension) {
+		selectedOutline.curve = {
+			enabled: Boolean(selectedOutline.curve?.enabled),
+			tension: Number(tension)
+		};
 	}
 </script>
 
@@ -236,6 +258,31 @@
 							<option value={style.id}>{style.label}</option>
 						{/each}
 					</select>
+					<label class="flex items-center justify-between gap-2 text-ui-label">
+						<span>{$_('ui.curved_outline')}</span>
+						<input
+							type="checkbox"
+							checked={Boolean(selectedOutline.curve?.enabled)}
+							onchange={(event) => setSelectedOutlineCurved(event.currentTarget.checked)}
+						/>
+					</label>
+					{#if selectedOutline.curve?.enabled}
+						<div class="space-y-0.5">
+							<label for="outline-curve-tension" class="text-ui-label block">
+								{$_('ui.curve_amount')}
+							</label>
+							<input
+								id="outline-curve-tension"
+								type="range"
+								min="0"
+								max="1"
+								step="0.05"
+								value={selectedOutline.curve.tension ?? DEFAULT_OUTLINE_CURVE_TENSION}
+								oninput={(event) => setSelectedOutlineCurveTension(event.currentTarget.value)}
+								class="w-full"
+							/>
+						</div>
+					{/if}
 				</div>
 			{/if}
 

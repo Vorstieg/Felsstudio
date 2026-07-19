@@ -306,6 +306,8 @@
 		"outline_style_descent": "Descent",
 		"outline_style_variant": "Variant",
 		"outline_style_rope": "Rope",
+		"curved_outline": "Curved outline",
+		"curve_amount": "Curve amount",
 		"set_vertex": "Set Vertex",
 		"undo_vertex": "Undo Vertex",
 		"finalize": "Finalize",

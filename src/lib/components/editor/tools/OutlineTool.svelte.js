@@ -5,9 +5,11 @@ import { findBrushImageEdge } from '$lib/assets/js/brush-edge-assist.js';
 import {
 	CIRCLE_SEGMENTS,
 	DEFAULT_FREEHAND_SMOOTHING_PX,
+	DEFAULT_OUTLINE_CURVE_TENSION,
 	FREEHAND_POINT_SPACING_PX,
 	OUTLINE_PRESETS,
 	OUTLINE_SHAPE_TYPES,
+	PILLAR_OUTLINE_CURVE_TENSION,
 	createCirclePoints,
 	createOutlineRecord,
 	createPresetShape,
@@ -69,6 +71,8 @@ export class OutlineTool {
 	gridSize = 0.01; // 1% of canvas
 	fillColor = $state(null);
 	fillOpacity = $state(0.3);
+	curveEnabled = $state(false);
+	curveTension = $state(DEFAULT_OUTLINE_CURVE_TENSION);
 	freehandSmoothingPx = $state(DEFAULT_FREEHAND_SMOOTHING_PX);
 	// Diameter of the canvas brush used by the brush-to-outline assist.
 	brushSizePx = $state(36);
@@ -353,6 +357,7 @@ export class OutlineTool {
 				// area fill from the paint-mask fallback.
 				fillColor: shape?.edgeTracked ? null : this.fillColor,
 				fillOpacity: this.fillOpacity,
+				curve: { enabled: this.curveEnabled, tension: this.curveTension },
 				canvasSize: this.canvasSize
 			})
 		);
@@ -431,6 +436,9 @@ export class OutlineTool {
 	setPreset(preset) {
 		if (!OUTLINE_PRESETS.some((item) => item.id === preset)) return;
 		this.preset = preset;
+		if (preset === 'pillar' && this.curveEnabled) {
+			this.curveTension = PILLAR_OUTLINE_CURVE_TENSION;
+		}
 		this.mode = 'preset';
 		this.cancel();
 	}
@@ -444,5 +452,12 @@ export class OutlineTool {
 	// Clear fill
 	clearFill() {
 		this.fillColor = null;
+	}
+
+	setCurveEnabled(enabled) {
+		this.curveEnabled = enabled;
+		if (enabled && this.preset === 'pillar') {
+			this.curveTension = PILLAR_OUTLINE_CURVE_TENSION;
+		}
 	}
 }

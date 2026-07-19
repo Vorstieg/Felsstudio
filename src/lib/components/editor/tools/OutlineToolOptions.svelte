@@ -95,6 +95,32 @@
 		</div>
 
 		<div class="flex flex-col gap-2">
+			<label class="flex items-center gap-2 text-xs font-medium text-warm-gray-600">
+				<input
+					type="checkbox"
+					checked={outlineTool?.curveEnabled || false}
+					onchange={(event) => outlineTool?.setCurveEnabled(event.currentTarget.checked)}
+					class="h-4 w-4 rounded border-black/20 text-creator-blue focus:ring-creator-blue"
+				/>
+				<span>{$_('ui.curved_outline')}</span>
+			</label>
+			{#if outlineTool?.curveEnabled}
+				<label class="flex items-center gap-2 text-xs font-medium text-warm-gray-600">
+					<span class="w-20">{$_('ui.curve_amount')}</span>
+					<input
+						type="range"
+						min="0"
+						max="1"
+						step="0.05"
+						bind:value={outlineTool.curveTension}
+						class="min-w-0 flex-1"
+					/>
+					<span class="w-8 text-right">{outlineTool.curveTension}</span>
+				</label>
+			{/if}
+		</div>
+
+		<div class="flex flex-col gap-2">
 			<div class="flex items-center gap-2">
 				<label class="text-xs font-medium text-warm-gray-600">{$_('ui.snap_to_grid')}</label>
 				<button

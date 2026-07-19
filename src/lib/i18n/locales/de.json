@@ -307,6 +307,8 @@
 		"outline_style_descent": "Abstieg",
 		"outline_style_variant": "Variante",
 		"outline_style_rope": "Seil",
+		"curved_outline": "Geschwungener Umriss",
+		"curve_amount": "Kurvenstärke",
 		"set_vertex": "Punkt setzen",
 		"undo_vertex": "Punkt rückgängig",
 		"finalize": "Abschließen",
