@@ -2,6 +2,7 @@
 export function renderBackgroundLayer({ svg, layers, topo, baseWidth, baseHeight }) {
 	const layer = layers.background;
 	const image = topo.image2D;
+	const fit = topo.backgroundFit === 'cover' ? 'slice' : 'meet';
 	layer
 		.selectAll('image.bg-image')
 		.data(image ? [image] : [])
@@ -15,7 +16,9 @@ export function renderBackgroundLayer({ svg, layers, topo, baseWidth, baseHeight
 		.attr('y', 0)
 		.attr('width', baseWidth)
 		.attr('height', baseHeight)
-		.attr('preserveAspectRatio', 'none');
+		// The image is a background asset, not the coordinate system. Never stretch it
+		// to a new canvas aspect ratio because that would mislead annotation placement.
+		.attr('preserveAspectRatio', `xMidYMid ${fit}`);
 
 	layer
 		.selectAll('rect.blank-bg')

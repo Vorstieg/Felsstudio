@@ -1,13 +1,12 @@
 <script>
 	import { _ } from 'svelte-i18n';
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 
 	let {
 		workSpaceWrapper,
 		filteredLocations = [],
 		isLoading = false,
 		searchQuery = $bindable(''),
+		startNewEntry,
 		loadFromEntry
 	} = $props();
 	let expandedCragId = $state(null);
@@ -15,7 +14,7 @@
 </script>
 
 {#if workSpaceWrapper.isCragEditor()}
-	<button class="btn-primary w-full" onclick={() => goto(resolve(workSpaceWrapper.path))}>
+	<button class="btn-primary w-full" onclick={startNewEntry}>
 		<i class="fa-solid fa-plus mr-2"></i>{$_('ui.new_crag')}
 	</button>
 {/if}

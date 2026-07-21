@@ -31,6 +31,8 @@ const {
 	pointsToSvg,
 	prepareOutlinesForExport,
 	setOutlinePoint,
+	simplifyClosedPoints,
+	simplifyPoints,
 	translateOutline,
 	updatePresetOutline
 } = await vite.ssrLoadModule('/src/lib/assets/js/outline-geometry.js');
@@ -100,6 +102,39 @@ const closedSmoothPath = pointsToSmoothSvgPath(closed, {
 });
 assert.match(closedSmoothPath, / Z$/, 'closed smooth outlines close their path');
 assert.equal(isClosedPath(closed), true);
+const noisyClosed = [
+	[0, 0],
+	[0.25, 0],
+	[0.5, 0],
+	[1, 0],
+	[1, 1],
+	[0, 1],
+	[0, 0]
+];
+const simplifiedClosed = simplifyClosedPoints(noisyClosed, 2, { baseWidth: 100, baseHeight: 100 });
+assert.deepEqual(simplifiedClosed, [
+	[0, 0],
+	[1, 0],
+	[1, 1],
+	[0, 1],
+	[0, 0]
+]);
+assert.deepEqual(
+	simplifyPoints(
+		[
+			[0, 0],
+			[0.5, 0.001],
+			[1, 0]
+		],
+		1,
+		{ baseWidth: 100, baseHeight: 100 }
+	),
+	[
+		[0, 0],
+		[1, 0]
+	],
+	'open outlines retain the existing simplifier'
+);
 assert.deepEqual(movePathVertex(closed, 0, [-1, -1]), [
 	[-1, -1],
 	[2, 0],
@@ -369,6 +404,25 @@ assert.ok(edgePath.confidence > 0.15, 'the edge result reports useful confidence
 assert.ok(
 	edgePath.points.every(([, y]) => Math.abs(y - 0.52) < 0.03),
 	'the tracked path follows the image edge'
+);
+const letterboxedEdgePath = findBrushImageEdge(
+	{ width: 100, height: 100, data: edgeData },
+	[
+		[0.3, 0.52],
+		[0.7, 0.52]
+	],
+	{
+		canvasSize: { baseWidth: 200, baseHeight: 100 },
+		// A square image contained in this landscape canvas starts at x = 50.
+		imagePlacement: { x: 50, y: 0, width: 100, height: 100 },
+		brushRadiusPx: 9,
+		minimumConfidence: 0.15
+	}
+);
+assert.ok(letterboxedEdgePath, 'a letterboxed image still finds a painted edge');
+assert.ok(
+	letterboxedEdgePath.points.every(([, y]) => Math.abs(y - 0.52) < 0.03),
+	'edge points remain in canvas coordinates when the image is letterboxed'
 );
 assert.equal(
 	findBrushImageEdge({ width: 100, height: 100, data: edgeData }, [[0.5, 0.5]], {

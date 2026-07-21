@@ -54,7 +54,7 @@ export function renderSymbolsLayer({
 		.attr(
 			'transform',
 			(d) =>
-				`translate(${(d.position2D?.[0] || 0) * baseWidth}, ${(d.position2D?.[1] || 0) * baseHeight}) rotate(${d.rotation2D || 0}) scale(${d.scale2D || 1})`
+				`translate(${(d.position2D?.[0] || 0) * baseWidth}, ${(d.position2D?.[1] || 0) * baseHeight}) rotate(${d.rotation2D || 0})`
 		)
 		.attr('opacity', (d) =>
 			selectedSymbolInstance?.id === d.id || isSelected('symbol', d.id) ? 0.9 : 1
@@ -136,6 +136,10 @@ export function renderSymbolsLayer({
 		.attr('href', (d) => {
 			const meta = topoSymbols.find((s) => s.id === d.type);
 			return meta?.icon || `${base}/icons/topo-symbols/${d.type}.svg`;
+		})
+		.attr('transform', (d) => {
+			const scale = d.scale2D || 1;
+			return `scale(${scale * (d.scaleX2D || 1)}, ${scale * (d.scaleY2D || 1)})`;
 		});
 
 	symbolEditTool?.render({ symbolGroups, activeTool, selectedSymbolInstance, canvasInput });

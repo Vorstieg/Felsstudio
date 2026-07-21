@@ -1,5 +1,11 @@
 import { EditablePathEditTool } from './EditablePathEditTool.svelte.js';
-import { applyPresetSemanticHandle } from '$lib/assets/js/outline-geometry.js';
+import {
+	applyPresetSemanticHandle,
+	getOutlinePoints,
+	isClosedShape,
+	simplifyClosedPoints,
+	simplifyPoints
+} from '$lib/assets/js/outline-geometry.js';
 
 /** Editing interactions for persisted 2D rock outlines. */
 export class OutlineEditTool extends EditablePathEditTool {
@@ -13,6 +19,7 @@ export class OutlineEditTool extends EditablePathEditTool {
 		isSelected,
 		selectObject,
 		getIsShiftPressed,
+		getMobileSelectionMode,
 		beginSelectionMove
 	} = {}) {
 		super({
@@ -29,11 +36,40 @@ export class OutlineEditTool extends EditablePathEditTool {
 		this.isSelected = isSelected || (() => false);
 		this.selectObject = selectObject || (() => {});
 		this.getIsShiftPressed = getIsShiftPressed || (() => false);
+		this.getMobileSelectionMode = getMobileSelectionMode || (() => false);
 		this.beginSelectionMove = beginSelectionMove || (() => null);
 	}
 
 	getOutline(id) {
 		return this.getTopo().outlines.find((outline) => outline.id === id) || null;
+	}
+
+	simplifyOutline(id, tolerancePx) {
+		const outline = this.getOutline(id);
+		const tolerance = Number(tolerancePx);
+		if (!outline || !Number.isFinite(tolerance) || tolerance <= 0) return null;
+
+		const points = getOutlinePoints(outline, this.getCanvasSize());
+		if (points.length <= 2) return null;
+		const simplified = isClosedShape(points)
+			? simplifyClosedPoints(points, tolerance, this.getCanvasSize())
+			: simplifyPoints(points, tolerance, this.getCanvasSize());
+		if (simplified.length >= points.length || simplified.length < (isClosedShape(points) ? 4 : 2)) {
+			return { changed: false, pointCount: points.length, tolerance };
+		}
+
+		// Keep freehand/brush metadata (including edge tracking), but make the
+		// simplified vertices authoritative for both rendering and export.
+		outline.shape = { ...(outline.shape || { type: 'polyline' }), points2D: simplified };
+		outline.points2D = simplified;
+		outline.closed = isClosedShape(simplified);
+		this.saveHistory();
+		return {
+			changed: true,
+			previousPointCount: points.length,
+			pointCount: simplified.length,
+			tolerance
+		};
 	}
 
 	createSemanticInteraction(handle) {
@@ -86,6 +122,14 @@ export class OutlineEditTool extends EditablePathEditTool {
 		const mouse = canvasInput.normalizeEvent(event)?.point;
 		if (!mouse) return false;
 		event.stopPropagation?.();
+		if (event?.identifier != null && this.getMobileSelectionMode()) {
+			this.selectObject('outline', outline.id, true);
+			return true;
+		}
+		if (this.getIsShiftPressed()) {
+			this.selectObject('outline', outline.id, true);
+			return true;
+		}
 
 		if (!this.isSelected('outline', outline.id)) {
 			this.selectObject('outline', outline.id, this.getIsShiftPressed());

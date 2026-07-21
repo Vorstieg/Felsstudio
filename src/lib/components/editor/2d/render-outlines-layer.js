@@ -106,7 +106,9 @@ export function renderOutlinesLayer({
 		.attr('stroke-dasharray', (d) => getOutlineLineStyle(d.lineStyle).dash)
 		.attr('stroke-linecap', 'round')
 		.attr('stroke-linejoin', 'round')
-		.style('pointer-events', canInteract ? 'auto' : 'none');
+		// Keep the visible stroke out of hit testing so clicks directly on the
+		// outline reach the wider hit area rendered immediately below it.
+		.style('pointer-events', 'none');
 
 	// Filled shapes (for closed outlines with fill)
 	const outlineFillSelection = outlinesLayer

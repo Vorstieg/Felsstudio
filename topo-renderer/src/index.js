@@ -5,6 +5,7 @@ export { fixpointSymbols, topoSymbols } from './symbols.js';
 export const ROUTE_LINE_STYLES = {
 	red: { stroke: '#dc2626', width: 4, dash: null },
 	redDashed: { stroke: '#dc2626', width: 4, dash: '18 12' },
+	redDotted: { stroke: '#dc2626', width: 4, dash: '1 10' },
 	variant: { stroke: '#8f8a84', width: 3, dash: '8 8' }
 };
 
@@ -59,7 +60,10 @@ export function pointsToSmoothSvgPath(
 		points[0]?.[0] === points.at(-1)?.[0] && points[0]?.[1] === points.at(-1)?.[1];
 	const vertices = closed && hasRepeatedClosingPoint ? points.slice(0, -1) : points;
 	if (vertices.length < 3) return null;
-	const amount = Math.min(1, Math.max(0, Number.isFinite(Number(tension)) ? Number(tension) : 0.45));
+	const amount = Math.min(
+		1,
+		Math.max(0, Number.isFinite(Number(tension)) ? Number(tension) : 0.45)
+	);
 	const svgVertices = vertices.map(([x, y]) => [x * baseWidth, y * baseHeight]);
 	const pointAt = (index) => {
 		if (closed) return svgVertices[(index + svgVertices.length) % svgVertices.length];
@@ -98,7 +102,10 @@ function rectanglePoints(start, end, shape, size) {
 		x1 -= dx;
 		y1 -= dy;
 	} else if (shape.square) {
-		const length = Math.max(Math.abs(x2 - x1) * size.baseWidth, Math.abs(y2 - y1) * size.baseHeight);
+		const length = Math.max(
+			Math.abs(x2 - x1) * size.baseWidth,
+			Math.abs(y2 - y1) * size.baseHeight
+		);
 		x2 = x1 + Math.sign(x2 - x1 || 1) * (length / size.baseWidth);
 		y2 = y1 + Math.sign(y2 - y1 || 1) * (length / size.baseHeight);
 	}
@@ -106,7 +113,13 @@ function rectanglePoints(start, end, shape, size) {
 	const maxX = Math.max(x1, x2);
 	const minY = Math.min(y1, y2);
 	const maxY = Math.max(y1, y2);
-	return [[minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY], [minX, minY]];
+	return [
+		[minX, minY],
+		[maxX, minY],
+		[maxX, maxY],
+		[minX, maxY],
+		[minX, minY]
+	];
 }
 
 function circlePoints(shape, size) {
@@ -169,7 +182,9 @@ export function formatVariantLabel(variant, variantIndex) {
 }
 
 function isMultiPitch(route) {
-	return Array.isArray(route.type) ? route.type.includes('multi-pitch') : route.type === 'multi-pitch';
+	return Array.isArray(route.type)
+		? route.type.includes('multi-pitch')
+		: route.type === 'multi-pitch';
 }
 
 /** Turns topo JSON into the individual lines rendered by a topo viewer. */
@@ -177,27 +192,29 @@ export function getRenderableRoutes(routes = []) {
 	return routes.flatMap((route, routeIndex) => {
 		const makeLine = (item, kind, index, label) =>
 			item?.points2D?.length
-				? [{
-					id: route.id,
-					key: `${route.id}-${kind}-${item.id || index}`,
-					kind,
-					points2D: item.points2D,
-					label,
-					lineStyle: item.lineStyle || route.lineStyle,
-					labelOffset2D: item.labelOffset2D,
-					route,
-					item
-				}]
+				? [
+						{
+							id: route.id,
+							key: `${route.id}-${kind}-${item.id || index}`,
+							kind,
+							points2D: item.points2D,
+							label,
+							lineStyle: item.lineStyle || route.lineStyle,
+							labelOffset2D: item.labelOffset2D,
+							route,
+							item
+						}
+					]
 				: [];
 
 		if (!isMultiPitch(route)) return makeLine(route, 'main', routeIndex, routeIndex + 1);
 		return [
-			...((route.pitches || []).flatMap((pitch, index) =>
+			...(route.pitches || []).flatMap((pitch, index) =>
 				makeLine(pitch, 'pitch', index, formatPitchLabel(pitch, index))
-			)),
-			...((route.variants || []).flatMap((variant, index) =>
+			),
+			...(route.variants || []).flatMap((variant, index) =>
 				makeLine(variant, 'variant', index, formatVariantLabel(variant, index))
-			))
+			)
 		];
 	});
 }
@@ -229,14 +246,23 @@ export function renderTopoSvg({
 	const routesLayer = layer('routes-layer');
 	const symbolsLayer = layer('symbols-layer');
 
-	background.selectAll('image.bg-image').data(topo.image2D ? [topo.image2D] : []).join(
-		(enter) => enter.append('image').attr('class', 'bg-image'),
-		(update) => update,
-		(exit) => exit.remove()
-	).attr('href', (image) => image).attr('width', baseWidth).attr('height', baseHeight)
-		.attr('preserveAspectRatio', 'none');
+	background
+		.selectAll('image.bg-image')
+		.data(topo.image2D ? [topo.image2D] : [])
+		.join(
+			(enter) => enter.append('image').attr('class', 'bg-image'),
+			(update) => update,
+			(exit) => exit.remove()
+		)
+		.attr('href', (image) => image)
+		.attr('width', baseWidth)
+		.attr('height', baseHeight)
+		.attr('preserveAspectRatio', `xMidYMid ${topo.backgroundFit === 'cover' ? 'slice' : 'meet'}`);
 
-	const outlines = (topo.outlines || []).map((outline, index) => ({ ...outline, key: outline.id || index }));
+	const outlines = (topo.outlines || []).map((outline, index) => ({
+		...outline,
+		key: outline.id || index
+	}));
 	const outlinePath = (outline) => {
 		const points = getOutlinePoints(outline, size);
 		const closed = isClosedShape(points);
@@ -245,49 +271,114 @@ export function renderTopoSvg({
 			: null;
 		if (curvedPath) return curvedPath;
 		const straightPoints = pointsToSvg(points, size);
-		return straightPoints ? `M ${straightPoints.replaceAll(' ', ' L ')}${closed ? ' Z' : ''}` : null;
+		return straightPoints
+			? `M ${straightPoints.replaceAll(' ', ' L ')}${closed ? ' Z' : ''}`
+			: null;
 	};
-	outlinesLayer.selectAll('path.outline-fill').data(outlines.filter((outline) => outline.fillColor && getOutlinePoints(outline, size).length > 2), (outline) => outline.key).join('path')
-		.attr('class', 'outline-fill').attr('d', outlinePath)
-		.attr('fill', (outline) => outline.fillColor).attr('fill-opacity', (outline) => outline.fillOpacity ?? 0.3);
-	outlinesLayer.selectAll('path.rock-outline').data(outlines, (outline) => outline.key).join('path')
-		.attr('class', 'rock-outline').attr('fill', 'none').attr('d', outlinePath)
+	outlinesLayer
+		.selectAll('path.outline-fill')
+		.data(
+			outlines.filter((outline) => outline.fillColor && getOutlinePoints(outline, size).length > 2),
+			(outline) => outline.key
+		)
+		.join('path')
+		.attr('class', 'outline-fill')
+		.attr('d', outlinePath)
+		.attr('fill', (outline) => outline.fillColor)
+		.attr('fill-opacity', (outline) => outline.fillOpacity ?? 0.3);
+	outlinesLayer
+		.selectAll('path.rock-outline')
+		.data(outlines, (outline) => outline.key)
+		.join('path')
+		.attr('class', 'rock-outline')
+		.attr('fill', 'none')
+		.attr('d', outlinePath)
 		.attr('stroke', (outline) => getOutlineLineStyle(outline.lineStyle).stroke)
 		.attr('stroke-width', (outline) => getOutlineLineStyle(outline.lineStyle).width)
 		.attr('stroke-dasharray', (outline) => getOutlineLineStyle(outline.lineStyle).dash)
-		.attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round');
+		.attr('stroke-linecap', 'round')
+		.attr('stroke-linejoin', 'round');
 
-	const lines = getRenderableRoutes(routes).map((line) => ({ ...line, points: pointsToSvg(line.points2D, size) }));
-	const groups = routesLayer.selectAll('g.route-group').data(lines, (line) => line.key).join((enter) => {
-		const group = enter.append('g').attr('class', 'route-group');
-		group.append('polyline').attr('class', 'hit-area');
-		group.append('polyline').attr('class', 'visible-line');
-		group.append('text').attr('class', 'route-label');
-		return group;
-	});
+	const lines = getRenderableRoutes(routes).map((line) => ({
+		...line,
+		points: pointsToSvg(line.points2D, size)
+	}));
+	const groups = routesLayer
+		.selectAll('g.route-group')
+		.data(lines, (line) => line.key)
+		.join((enter) => {
+			const group = enter.append('g').attr('class', 'route-group');
+			group.append('polyline').attr('class', 'hit-area');
+			group.append('polyline').attr('class', 'visible-line');
+			group.append('text').attr('class', 'route-label');
+			return group;
+		});
 	groups.each(function (line) {
 		const group = select(this);
 		const highlighted = line.id === selectedRouteId || line.id === hoveredRouteId;
-		const style = getRouteLineStyle(line.lineStyle || (line.kind === 'variant' ? 'variant' : 'red'));
-		group.on('click', (event) => { event.stopPropagation(); onRouteSelect(line.route); })
-			.on('mouseenter', () => onRouteHover(line.id)).on('mouseleave', () => onRouteHover(null));
-		group.select('.hit-area').attr('points', line.points).attr('fill', 'none').attr('stroke', 'transparent')
-			.attr('stroke-width', getHitAreaSize(7)).attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round');
-		group.select('.visible-line').attr('points', line.points).attr('fill', 'none')
-			.attr('stroke', highlighted ? '#3b82f6' : style.stroke).attr('stroke-width', highlighted ? style.width + 2 : style.width)
-			.attr('stroke-dasharray', style.dash).attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round');
+		const style = getRouteLineStyle(
+			line.lineStyle || (line.kind === 'variant' ? 'variant' : 'red')
+		);
+		group
+			.on('click', (event) => {
+				event.stopPropagation();
+				onRouteSelect(line.route);
+			})
+			.on('mouseenter', () => onRouteHover(line.id))
+			.on('mouseleave', () => onRouteHover(null));
+		group
+			.select('.hit-area')
+			.attr('points', line.points)
+			.attr('fill', 'none')
+			.attr('stroke', 'transparent')
+			.attr('stroke-width', getHitAreaSize(7))
+			.attr('stroke-linecap', 'round')
+			.attr('stroke-linejoin', 'round');
+		group
+			.select('.visible-line')
+			.attr('points', line.points)
+			.attr('fill', 'none')
+			.attr('stroke', highlighted ? '#3b82f6' : style.stroke)
+			.attr('stroke-width', highlighted ? style.width + 2 : style.width)
+			.attr('stroke-dasharray', style.dash)
+			.attr('stroke-linecap', 'round')
+			.attr('stroke-linejoin', 'round');
 		const offset = line.labelOffset2D || [0, 10 / baseHeight];
-		group.select('.route-label').attr('x', (line.points2D[0][0] + offset[0]) * baseWidth)
-			.attr('y', (line.points2D[0][1] + offset[1]) * baseHeight).attr('font-size', 20).attr('font-weight', 'bold')
-			.attr('text-anchor', 'middle').attr('fill', highlighted ? '#3b82f6' : style.stroke).text(line.label);
+		group
+			.select('.route-label')
+			.attr('x', (line.points2D[0][0] + offset[0]) * baseWidth)
+			.attr('y', (line.points2D[0][1] + offset[1]) * baseHeight)
+			.attr('font-size', 20)
+			.attr('font-weight', 'bold')
+			.attr('text-anchor', 'middle')
+			.attr('fill', highlighted ? '#3b82f6' : style.stroke)
+			.text(line.label);
 	});
 
-	symbolsLayer.selectAll('g.symbol-group').data((topo.fixPoints || []).filter((symbol) => symbol.position2D), (symbol) => symbol.id).join((enter) => {
-		const group = enter.append('g').attr('class', 'symbol-group'); group.append('image'); return group;
-	}).attr('transform', (symbol) => `translate(${symbol.position2D[0] * baseWidth}, ${symbol.position2D[1] * baseHeight}) rotate(${symbol.rotation2D || 0}) scale(${symbol.scale2D || 1})`)
+	symbolsLayer
+		.selectAll('g.symbol-group')
+		.data(
+			(topo.fixPoints || []).filter((symbol) => symbol.position2D),
+			(symbol) => symbol.id
+		)
+		.join((enter) => {
+			const group = enter.append('g').attr('class', 'symbol-group');
+			group.append('image');
+			return group;
+		})
+		.attr('transform', (symbol) => {
+			const scale = symbol.scale2D || 1;
+			return `translate(${symbol.position2D[0] * baseWidth}, ${symbol.position2D[1] * baseHeight}) rotate(${symbol.rotation2D || 0}) scale(${scale * (symbol.scaleX2D || 1)}, ${scale * (symbol.scaleY2D || 1)})`;
+		})
 		.each(function (symbol) {
 			const meta = symbols.find((candidate) => candidate.id === symbol.type);
 			const width = meta?.width || 24;
-			select(this).select('image').attr('width', width).attr('height', meta?.height || width).attr('x', -width / 2).attr('y', -(meta?.height || width) / 2).attr('href', meta?.icon || symbolHref(symbol.type));
+			select(this)
+				.select('image')
+				.attr('width', width)
+				.attr('height', meta?.height || width)
+				.attr('x', -width / 2)
+				.attr('y', -(meta?.height || width) / 2)
+				.attr('href', meta?.icon || symbolHref(symbol.type));
 		});
 }

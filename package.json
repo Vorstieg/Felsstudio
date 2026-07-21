@@ -6,6 +6,8 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"test:outline": "node scripts/test-outline-geometry.mjs",
+		"test:selection": "node scripts/test-selection-geometry.mjs",
+		"test:symbol-distortion": "node scripts/test-symbol-distortion.mjs",
 		"lint": "prettier --ignore-path .gitignore --check . && eslint --ignore-path .gitignore .",
 		"format": "prettier --ignore-path .gitignore --write ."
 	},

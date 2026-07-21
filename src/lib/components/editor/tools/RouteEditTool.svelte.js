@@ -2,7 +2,6 @@ import { EditablePathEditTool } from './EditablePathEditTool.svelte.js';
 
 /** Editing controls and mutations for persisted 2D routes, pitches, and variants. */
 export class RouteEditTool extends EditablePathEditTool {
-
 	constructor({
 		getTopo,
 		getActiveTool,
@@ -11,6 +10,7 @@ export class RouteEditTool extends EditablePathEditTool {
 		isSelected,
 		selectObject,
 		getIsShiftPressed,
+		getMobileSelectionMode,
 		beginSelectionMove,
 		setDrawingTarget,
 		saveHistory
@@ -28,6 +28,7 @@ export class RouteEditTool extends EditablePathEditTool {
 		this.isSelected = isSelected || (() => false);
 		this.selectObject = selectObject || (() => {});
 		this.getIsShiftPressed = getIsShiftPressed || (() => false);
+		this.getMobileSelectionMode = getMobileSelectionMode || (() => false);
 		this.beginSelectionMove = beginSelectionMove || (() => null);
 		this.setDrawingTarget = setDrawingTarget || (() => {});
 	}
@@ -39,6 +40,14 @@ export class RouteEditTool extends EditablePathEditTool {
 		event.stopPropagation?.();
 
 		const { id, pitchId = null, variantId = null } = routeTarget;
+		if (event?.identifier != null && this.getMobileSelectionMode()) {
+			this.selectObject('route', id, true);
+			return true;
+		}
+		if (this.getIsShiftPressed()) {
+			this.selectObject('route', id, true);
+			return true;
+		}
 		if (!this.isSelected('route', id)) this.selectObject('route', id, this.getIsShiftPressed());
 		this.setDrawingTarget(
 			pitchId

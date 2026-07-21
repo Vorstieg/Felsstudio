@@ -22,6 +22,21 @@ export function createTopo2DEditorController({ getTopo, ui }) {
 		selectedItems.clear();
 	}
 
+	function syncUiSelection() {
+		clearUiSelection();
+		selectedSymbolInstance = null;
+		for (const itemKey of selectedItems) {
+			const [type, id] = itemKey.split(':');
+			if (type === 'route') ui.selectedRouteId = id;
+			if (type === 'outline') ui.selectedOutlineId = id;
+			if (type === 'text') ui.selectedTextLabelId = id;
+			if (type === 'symbol') {
+				ui.selectedFixpointId = id;
+				selectedSymbolInstance = getTopo().fixPoints.find((symbol) => symbol.id === id) || null;
+			}
+		}
+	}
+
 	function isSelected(type, id) {
 		return selectedItems.has(`${type}:${id}`);
 	}
@@ -32,6 +47,7 @@ export function createTopo2DEditorController({ getTopo, ui }) {
 		const itemKey = `${type}:${id}`;
 		if (multi && selectedItems.has(itemKey)) {
 			selectedItems.delete(itemKey);
+			syncUiSelection();
 			return;
 		}
 
@@ -43,6 +59,16 @@ export function createTopo2DEditorController({ getTopo, ui }) {
 			ui.selectedFixpointId = id;
 			selectedSymbolInstance = getTopo().fixPoints.find((symbol) => symbol.id === id) || null;
 		}
+	}
+
+	function selectItems(items, mode = 'replace') {
+		if (mode === 'replace') selectedItems.clear();
+		items.forEach(({ type, id }) => {
+			const key = `${type}:${id}`;
+			if (mode === 'subtract') selectedItems.delete(key);
+			else selectedItems.add(key);
+		});
+		syncUiSelection();
 	}
 
 	function startInteraction(kind, details) {
@@ -71,6 +97,7 @@ export function createTopo2DEditorController({ getTopo, ui }) {
 		clearSelection,
 		isSelected,
 		selectObject,
+		selectItems,
 		startInteraction,
 		endInteraction
 	};

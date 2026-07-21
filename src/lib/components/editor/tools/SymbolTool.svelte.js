@@ -18,7 +18,11 @@ export class SymbolTool {
 			type: this.selectedType,
 			position2D: [point.x, point.y],
 			rotation2D: 0,
-			scale2D: 1
+			scale2D: 1,
+			// Independent multipliers allow a symbol to be stretched without
+			// changing the meaning of the legacy, proportional scale2D value.
+			scaleX2D: 1,
+			scaleY2D: 1
 		});
 		this.saveHistory();
 	}

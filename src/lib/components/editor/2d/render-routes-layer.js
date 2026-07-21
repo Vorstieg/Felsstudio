@@ -90,7 +90,9 @@ export function renderRoutesLayer({
 			'stroke-dasharray',
 			(route) => getRouteLineStyle(route.routeObj?.lineStyle || route.parentRoute?.lineStyle).dash
 		)
-		.style('pointer-events', canInteract ? 'auto' : 'none')
+		// The transparent hit area is intentionally wider than the visual path.
+		// Let it receive every route click, including clicks on the visible line.
+		.style('pointer-events', 'none')
 		.on('mousedown', handleRouteDown)
 		.on('touchstart', handleRouteTouch)
 		.on('click', (event, route) => {

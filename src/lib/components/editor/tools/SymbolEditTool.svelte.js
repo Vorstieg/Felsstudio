@@ -14,6 +14,7 @@ export class SymbolEditTool {
 		selectObject,
 		getSelectionSize,
 		getIsShiftPressed,
+		getMobileSelectionMode,
 		beginSelectionMove,
 		getSelectedSymbolId,
 		saveHistory
@@ -26,6 +27,7 @@ export class SymbolEditTool {
 		this.selectObject = selectObject || (() => {});
 		this.getSelectionSize = getSelectionSize || (() => 0);
 		this.getIsShiftPressed = getIsShiftPressed || (() => false);
+		this.getMobileSelectionMode = getMobileSelectionMode || (() => false);
 		this.beginSelectionMove = beginSelectionMove || (() => null);
 		this.getSelectedSymbolId = getSelectedSymbolId || (() => null);
 		this.saveHistory = saveHistory || (() => {});
@@ -33,6 +35,23 @@ export class SymbolEditTool {
 
 	getSymbol(id) {
 		return this.getTopo().fixPoints.find((symbol) => symbol.id === id) || null;
+	}
+
+	getPointerDelta(symbol, mouse) {
+		const { baseWidth = 1, baseHeight = 1 } = this.getCanvasSize();
+		return {
+			x: (mouse.x - symbol.position2D[0]) * baseWidth,
+			y: (mouse.y - symbol.position2D[1]) * baseHeight
+		};
+	}
+
+	getLocalPointerDelta(symbol, mouse) {
+		const { x: dx, y: dy } = this.getPointerDelta(symbol, mouse);
+		const angle = -((symbol.rotation2D || 0) * Math.PI) / 180;
+		return {
+			x: dx * Math.cos(angle) - dy * Math.sin(angle),
+			y: dx * Math.sin(angle) + dy * Math.cos(angle)
+		};
 	}
 
 	createMoveInteraction(symbol, mouse) {
@@ -49,16 +68,20 @@ export class SymbolEditTool {
 		return symbol?.position2D ? { kind: 'rotate-symbol', id: symbol.id } : null;
 	}
 
-	createScaleInteraction(symbol, mouse) {
+	createScaleInteraction(symbol, mouse, axis = null) {
 		if (!symbol?.position2D) return null;
-		const { baseWidth = 1, baseHeight = 1 } = this.getCanvasSize();
-		const dx = (mouse.x - symbol.position2D[0]) * baseWidth;
-		const dy = (mouse.y - symbol.position2D[1]) * baseHeight;
+		const { x: dx, y: dy } = this.getLocalPointerDelta(symbol, mouse);
 		return {
-			kind: 'scale-symbol',
+			kind: axis ? `scale-symbol-${axis}` : 'scale-symbol',
 			id: symbol.id,
-			startDist: Math.hypot(dx, dy),
-			startScale: symbol.scale2D || 1
+			axis,
+			startDist: axis === 'x' ? Math.abs(dx) : axis === 'y' ? Math.abs(dy) : Math.hypot(dx, dy),
+			startScale:
+				axis === 'x'
+					? symbol.scaleX2D || 1
+					: axis === 'y'
+						? symbol.scaleY2D || 1
+						: symbol.scale2D || 1
 		};
 	}
 
@@ -70,7 +93,17 @@ export class SymbolEditTool {
 		let interaction;
 		if (action === 'rotate') interaction = this.createRotateInteraction(symbol);
 		else if (action === 'scale') interaction = this.createScaleInteraction(symbol, mouse);
+		else if (action === 'scale-x') interaction = this.createScaleInteraction(symbol, mouse, 'x');
+		else if (action === 'scale-y') interaction = this.createScaleInteraction(symbol, mouse, 'y');
 		else {
+			if (event?.identifier != null && this.getMobileSelectionMode()) {
+				this.selectObject('symbol', symbolId, true);
+				return true;
+			}
+			if (this.getIsShiftPressed()) {
+				this.selectObject('symbol', symbolId, true);
+				return true;
+			}
 			if (!this.isSelected('symbol', symbolId)) {
 				this.selectObject('symbol', symbolId, this.getIsShiftPressed());
 			}
@@ -101,7 +134,15 @@ export class SymbolEditTool {
 
 	onMouseMove(_event, mouse) {
 		const interaction = this.getInteraction();
-		if (!['move-symbol', 'rotate-symbol', 'scale-symbol'].includes(interaction?.kind)) {
+		if (
+			![
+				'move-symbol',
+				'rotate-symbol',
+				'scale-symbol',
+				'scale-symbol-x',
+				'scale-symbol-y'
+			].includes(interaction?.kind)
+		) {
 			return false;
 		}
 
@@ -115,18 +156,26 @@ export class SymbolEditTool {
 			return true;
 		}
 
-		const { baseWidth = 1, baseHeight = 1 } = this.getCanvasSize();
-		const dx = (mouse.x - symbol.position2D[0]) * baseWidth;
-		const dy = (mouse.y - symbol.position2D[1]) * baseHeight;
 		if (interaction.kind === 'rotate-symbol') {
+			const { x: dx, y: dy } = this.getPointerDelta(symbol, mouse);
 			symbol.rotation2D = (Math.atan2(dy, dx) * (180 / Math.PI) + 90) % 360;
 			return true;
 		}
-		if (interaction.kind === 'scale-symbol' && interaction.startDist > 0) {
-			symbol.scale2D = Math.max(
+		const { x: dx, y: dy } = this.getLocalPointerDelta(symbol, mouse);
+		if (interaction.startDist > 0 && interaction.kind.startsWith('scale-symbol')) {
+			const distance =
+				interaction.axis === 'x'
+					? Math.abs(dx)
+					: interaction.axis === 'y'
+						? Math.abs(dy)
+						: Math.hypot(dx, dy);
+			const value = Math.max(
 				0.2,
-				Math.min(5, interaction.startScale * (Math.hypot(dx, dy) / interaction.startDist))
+				Math.min(5, interaction.startScale * (distance / interaction.startDist))
 			);
+			if (interaction.axis === 'x') symbol.scaleX2D = value;
+			else if (interaction.axis === 'y') symbol.scaleY2D = value;
+			else symbol.scale2D = value;
 			return true;
 		}
 		return false;
@@ -182,13 +231,20 @@ export class SymbolEditTool {
 			const selected =
 				selectedSymbolInstance?.id === symbol.id || tool.isSelected('symbol', symbol.id);
 			const meta = topoSymbols.find((item) => item.id === symbol.type);
-			const baseSize = meta?.width || 24;
-			const radius = baseSize / 2;
-			const showTransformControls = selected && activeTool === tool.id;
+			const baseWidth = meta?.width || 24;
+			const baseHeight = meta?.height || 24;
+			const scale = symbol.scale2D || 1;
+			const scaleX = scale * (symbol.scaleX2D || 1);
+			const scaleY = scale * (symbol.scaleY2D || 1);
+			// Selection is the regular way to edit a symbol in the 2D editor.
+			const showTransformControls = selected && (activeTool === tool.id || activeTool === 'select');
 			const boxPadding = 5;
-			const boxSize = baseSize + boxPadding * 2;
-			const boxOffset = -(radius + boxPadding);
-			const gizmoSize = boxSize / 4;
+			const boxX = -((baseWidth * scaleX) / 2 + boxPadding);
+			const boxY = -((baseHeight * scaleY) / 2 + boxPadding);
+			const boxWidth = baseWidth * scaleX + boxPadding * 2;
+			const boxHeight = baseHeight * scaleY + boxPadding * 2;
+			const gizmoSize = 3;
+			const controlStroke = 2;
 
 			group
 				.selectAll('rect.bounding-box')
@@ -199,10 +255,10 @@ export class SymbolEditTool {
 				.attr('stroke', '#3b82f6')
 				.attr('stroke-width', 1)
 				.attr('stroke-dasharray', '2,2')
-				.attr('x', boxOffset)
-				.attr('y', boxOffset)
-				.attr('width', boxSize)
-				.attr('height', boxSize);
+				.attr('x', boxX)
+				.attr('y', boxY)
+				.attr('width', boxWidth)
+				.attr('height', boxHeight);
 
 			group
 				.selectAll('line.rotation-stalk')
@@ -212,9 +268,9 @@ export class SymbolEditTool {
 				.attr('stroke', '#3b82f6')
 				.attr('stroke-width', 1)
 				.attr('x1', 0)
-				.attr('y1', boxOffset)
+				.attr('y1', boxY)
 				.attr('x2', 0)
-				.attr('y2', boxOffset - 20);
+				.attr('y2', boxY - 20);
 
 			group
 				.selectAll('circle.rotate-gizmo')
@@ -224,14 +280,52 @@ export class SymbolEditTool {
 				.attr('fill', '#f59e0b')
 				.attr('stroke', 'white')
 				.attr('cx', 0)
-				.attr('cy', boxOffset - 20)
+				.attr('cy', boxY - 20)
 				.attr('r', gizmoSize)
-				.attr('stroke-width', 2 / (symbol.scale2D || 1))
+				.attr('stroke-width', controlStroke)
 				.on('mousedown', (event, item) =>
 					tool.handlePointerDown(event, item.id, 'rotate', canvasInput)
 				)
 				.on('touchstart', (event, item) =>
 					tool.handleTouchStart(event, item.id, 'rotate', canvasInput)
+				)
+				.on('click', (event) => event.stopPropagation());
+
+			group
+				.selectAll('circle.scale-x-gizmo')
+				.data(showTransformControls ? [symbol] : [])
+				.join('circle')
+				.attr('class', 'gizmo scale-x-gizmo cursor-ew-resize')
+				.attr('fill', '#3b82f6')
+				.attr('stroke', 'white')
+				.attr('cx', boxX + boxWidth)
+				.attr('cy', 0)
+				.attr('r', gizmoSize)
+				.attr('stroke-width', controlStroke)
+				.on('mousedown', (event, item) =>
+					tool.handlePointerDown(event, item.id, 'scale-x', canvasInput)
+				)
+				.on('touchstart', (event, item) =>
+					tool.handleTouchStart(event, item.id, 'scale-x', canvasInput)
+				)
+				.on('click', (event) => event.stopPropagation());
+
+			group
+				.selectAll('circle.scale-y-gizmo')
+				.data(showTransformControls ? [symbol] : [])
+				.join('circle')
+				.attr('class', 'gizmo scale-y-gizmo cursor-ns-resize')
+				.attr('fill', '#3b82f6')
+				.attr('stroke', 'white')
+				.attr('cx', 0)
+				.attr('cy', boxY + boxHeight)
+				.attr('r', gizmoSize)
+				.attr('stroke-width', controlStroke)
+				.on('mousedown', (event, item) =>
+					tool.handlePointerDown(event, item.id, 'scale-y', canvasInput)
+				)
+				.on('touchstart', (event, item) =>
+					tool.handleTouchStart(event, item.id, 'scale-y', canvasInput)
 				)
 				.on('click', (event) => event.stopPropagation());
 
@@ -242,10 +336,10 @@ export class SymbolEditTool {
 				.attr('class', 'gizmo scale-gizmo cursor-nwse-resize')
 				.attr('fill', '#3b82f6')
 				.attr('stroke', 'white')
-				.attr('cx', -boxOffset)
-				.attr('cy', -boxOffset)
+				.attr('cx', boxX + boxWidth)
+				.attr('cy', boxY + boxHeight)
 				.attr('r', gizmoSize)
-				.attr('stroke-width', 2 / (symbol.scale2D || 1))
+				.attr('stroke-width', controlStroke)
 				.on('mousedown', (event, item) =>
 					tool.handlePointerDown(event, item.id, 'scale', canvasInput)
 				)
@@ -255,9 +349,9 @@ export class SymbolEditTool {
 				.on('click', (event) => event.stopPropagation());
 
 			group
-				.selectAll('circle.selection-circle')
+				.selectAll('ellipse.selection-circle')
 				.data(selected ? [symbol] : [])
-				.join('circle')
+				.join('ellipse')
 				.attr('class', 'selection-circle')
 				.attr('fill', 'none')
 				.attr('stroke', '#3b82f6')
@@ -265,7 +359,8 @@ export class SymbolEditTool {
 				.attr('stroke-dasharray', '4')
 				.attr('cx', 0)
 				.attr('cy', 0)
-				.attr('r', radius + 10);
+				.attr('rx', (baseWidth * scaleX) / 2 + 10)
+				.attr('ry', (baseHeight * scaleY) / 2 + 10);
 		});
 	}
 }

@@ -151,6 +151,13 @@
 			scale: parsed.scale ?? 1,
 			image2D: parsed.image2D ?? null,
 			imageAspectRatio: parsed.imageAspectRatio ?? 1.5,
+			canvasAspectRatio:
+				Number.isFinite(Number(parsed.canvasAspectRatio)) && Number(parsed.canvasAspectRatio) > 0
+					? Number(parsed.canvasAspectRatio)
+					: Number.isFinite(Number(parsed.imageAspectRatio)) && Number(parsed.imageAspectRatio) > 0
+						? Number(parsed.imageAspectRatio)
+						: 1.5,
+			backgroundFit: parsed.backgroundFit === 'cover' ? 'cover' : 'contain',
 			editorMode: parsed.editorMode || currentMode
 		};
 		userState.ui.selectedRouteId = null;

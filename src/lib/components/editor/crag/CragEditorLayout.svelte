@@ -163,7 +163,7 @@
 			type="button"
 			class="flex h-10 items-center justify-center gap-1.5 rounded-sm border border-black/15 bg-warm-white px-3 text-[10px] font-bold uppercase tracking-widest text-creator-blue transition-none hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40"
 			onclick={onStartTrackCut}
-			disabled={editingTrackIndex === null || !canEditTrack}
+			disabled={(editingTrackIndex === null && (!isRoutePathDrawing || trackDraftMode !== 'editing')) || !canEditTrack}
 		>
 			<i class="fa-solid fa-scissors text-xs"></i>
 			Cut track

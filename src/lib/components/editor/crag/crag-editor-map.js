@@ -234,6 +234,7 @@ export function buildEditorFeatureCollection({
 	savedTracks = [],
 	routes = [],
 	selectedRouteKey = null,
+	editingRoutePath = null,
 	drawingPoints = [],
 	visibleDrawingPointIndexes = [],
 	draggingTrackPointIndex = null,
@@ -295,7 +296,8 @@ export function buildEditorFeatureCollection({
 		});
 	});
 	routes.forEach(({ key, route }) => {
-		for (const path of route?.assets?.paths || []) {
+		for (const [pathIndex, path] of (route?.assets?.paths || []).entries()) {
+			if (editingRoutePath?.key === key && editingRoutePath?.pathIndex === pathIndex) continue;
 			if (path?.path?.type !== 'LineString' || path.path.coordinates?.length < 2) continue;
 			features.push({
 				type: 'Feature',
@@ -303,6 +305,9 @@ export function buildEditorFeatureCollection({
 				properties: {
 					feature: 'route',
 					key,
+					documentPath: key.slice(0, key.lastIndexOf(':')),
+					routeId: route.id,
+					pathIndex,
 					name: route.name || 'Unnamed route',
 					selected: key === selectedRouteKey
 				}

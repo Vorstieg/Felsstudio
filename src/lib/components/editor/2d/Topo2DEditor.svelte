@@ -27,11 +27,16 @@
 	import { createTopo2DRenderContext } from './create-topo-render-context.js';
 	import { createTopoHistory } from './create-topo-history.svelte.js';
 	import { createCanvasInput } from './create-canvas-input.svelte.js';
+	import { referenceFixpoint, snapRoutePointToFixpoint } from './route-fixpoint-snap.js';
+	import { createTopoClipboard } from './topo-clipboard.js';
+	import { createSelectionRegion, getRegionSelection } from './selection-geometry.js';
+	import { renderSelectionRegion } from './render-selection-region.js';
 
 	let {
 		activeTool = $bindable('select'),
 		selectedSymbol = 'bolt',
 		selectedOutlineStyle = 'rock',
+		snapRoutesToFixpoints = $bindable(false),
 		drawingTarget = $bindable(null),
 		hasPendingChanges = $bindable(false)
 	} = $props();
@@ -45,13 +50,30 @@
 		beginTextEdit,
 		getCanvasSize: () => ({ baseWidth, baseHeight }),
 		getImageSrc: () => userState.topo.image2D,
+		getImageFit: () => userState.topo.backgroundFit ?? 'contain',
 		getDrawingTarget: () => drawingTarget,
 		setDrawingTarget: (target) => (drawingTarget = target),
 		clearSelection
 	};
+	function snapRoutePoint(point) {
+		return snapRoutePointToFixpoint(point, userState.topo.fixPoints, {
+			enabled: snapRoutesToFixpoints,
+			canvasSize: { baseWidth, baseHeight }
+		});
+	}
 	const tools = {
-		route: new RouteTool({ ...toolConfig, mode: 'route' }),
-		multipitch: new RouteTool({ ...toolConfig, mode: 'multipitch' }),
+		route: new RouteTool({
+			...toolConfig,
+			mode: 'route',
+			snapPoint: snapRoutePoint,
+			referenceFixpoint
+		}),
+		multipitch: new RouteTool({
+			...toolConfig,
+			mode: 'multipitch',
+			snapPoint: snapRoutePoint,
+			referenceFixpoint
+		}),
 		symbol: new SymbolTool(toolConfig),
 		fixpoint: new SymbolTool(toolConfig),
 		text: new TextTool(toolConfig),
@@ -66,6 +88,7 @@
 			isSelected,
 			selectObject,
 			getIsShiftPressed: () => isShiftPressed,
+			getMobileSelectionMode: () => mobileSelectionMode,
 			beginSelectionMove: collectDraggingSelection,
 			setDrawingTarget: (target) => (drawingTarget = target),
 			saveHistory: () => history.save()
@@ -79,6 +102,7 @@
 			isSelected,
 			selectObject,
 			getIsShiftPressed: () => isShiftPressed,
+			getMobileSelectionMode: () => mobileSelectionMode,
 			beginSelectionMove: collectDraggingSelection,
 			saveHistory: () => history.save()
 		}),
@@ -91,6 +115,7 @@
 			selectObject,
 			getSelectionSize: () => editor.selectedItems.size,
 			getIsShiftPressed: () => isShiftPressed,
+			getMobileSelectionMode: () => mobileSelectionMode,
 			getSelectedSymbolId: () => userState.ui.selectedFixpointId,
 			saveHistory: () => history.save(),
 			beginSelectionMove: (mouse) => ({
@@ -157,7 +182,8 @@
 	);
 
 	$effect(() => {
-		const isMultiPitchRouteTarget = activeTool === 'multipitch' && drawingTarget?.type === 'newPitch';
+		const isMultiPitchRouteTarget =
+			activeTool === 'multipitch' && drawingTarget?.type === 'newPitch';
 		hasPendingChanges =
 			(currentRoutePoints?.length || 0) > 0 ||
 			(currentOutlinePoints?.length || 0) > 0 ||
@@ -171,6 +197,7 @@
 		getTopo: () => userState.topo,
 		ui: userState.ui
 	});
+	const clipboard = createTopoClipboard();
 	const editablePaths = createEditablePathResolver({
 		getTopo: () => userState.topo,
 		getCanvasSize: () => ({ baseWidth, baseHeight })
@@ -180,6 +207,7 @@
 	let editingTextOriginalValue = $state('');
 	let editingTextNeedsFocus = false;
 	let isShiftPressed = $state(false);
+	let mobileSelectionMode = $state(false);
 
 	const history = createTopoHistory({
 		getTopo: () => userState.topo,
@@ -193,7 +221,9 @@
 	const saveHistory = () => history.save();
 	const canvasInput = createCanvasInput({
 		getActiveTool: () => activeTool,
-		getAspectRatio: () => userState.topo.imageAspectRatio,
+		getAspectRatio: () =>
+			userState.topo.canvasAspectRatio ?? userState.topo.imageAspectRatio ?? 1.5,
+		getMobileSelectionMode: () => mobileSelectionMode,
 		onDown: handleCanvasDown,
 		onMove: handleCanvasMove,
 		onUp: handleCanvasUp,
@@ -224,6 +254,11 @@
 	/* Canvas setup and input lifecycle live in createCanvasInput. */
 	onMount(() => {
 		if (!svgElement || !gElement) return;
+		// Migrate old topographies lazily: their current canvas appearance becomes permanent.
+		if (!userState.topo.canvasAspectRatio) {
+			userState.topo.canvasAspectRatio = userState.topo.imageAspectRatio || 1.5;
+		}
+		if (!userState.topo.backgroundFit) userState.topo.backgroundFit = 'contain';
 		canvasInput.setElements({ svg: svgElement, content: gElement });
 
 		// Initialize ID counters from existing data to avoid collisions
@@ -235,9 +270,9 @@
 		return () => canvasInput.destroy();
 	});
 
-	// Update base dimensions when image aspect ratio changes
+	// Canvas dimensions change only when its explicit logical aspect ratio changes.
 	$effect(() => {
-		if (userState.topo.imageAspectRatio) {
+		if (userState.topo.canvasAspectRatio ?? userState.topo.imageAspectRatio) {
 			canvasInput.refreshDimensions();
 		}
 	});
@@ -256,9 +291,20 @@
 			return;
 		}
 
-		// If in selection mode, clicking empty space clears selection (unless Shift is pressed)
-		if (activeTool === 'select' && !isShiftPressed) {
-			clearSelection();
+		if (activeTool === 'select') {
+			editor.startInteraction('selection-region', {
+				start: point,
+				end: point,
+				mode:
+					input.isTouch && mobileSelectionMode
+						? 'add'
+						: event.altKey
+							? 'subtract'
+							: input.shiftKey
+								? 'add'
+								: 'replace'
+			});
+			return;
 		}
 
 		const textLabelIdsBefore =
@@ -285,7 +331,9 @@
 		currentTool.onMouseMove(event, mouse);
 
 		const interaction = editor.interaction;
-		if (interaction?.kind === 'move-selection') {
+		if (interaction?.kind === 'selection-region') {
+			interaction.end = mouse;
+		} else if (interaction?.kind === 'move-selection') {
 			const deltaX = mouse.x - interaction.startMouse.x;
 			const deltaY = mouse.y - interaction.startMouse.y;
 
@@ -310,17 +358,24 @@
 				}
 			});
 		} else if (interaction?.kind === 'move-point') {
+			const snapped = snapRoutePoint(mouse);
+			const route = interaction.routeId
+				? userState.topo.routes.find((candidate) => candidate.id === interaction.routeId)
+				: null;
+			if (route) referenceFixpoint(route, snapped.fixPointId);
 			editablePaths
 				.resolve(interaction)
-				?.movePoint(interaction.pointIndex, [mouse.x, mouse.y]);
+				?.movePoint(interaction.pointIndex, [snapped.point.x, snapped.point.y]);
 		} else if (interaction?.kind === 'transform-preset-outline') {
 			tools.outlineEdit.applySemanticTransform(interaction, mouse);
 		} else if (
 			interaction?.kind === 'move-symbol' ||
 			interaction?.kind === 'rotate-symbol' ||
-			interaction?.kind === 'scale-symbol'
+			interaction?.kind === 'scale-symbol' ||
+			interaction?.kind === 'scale-symbol-x' ||
+			interaction?.kind === 'scale-symbol-y'
 		) {
-			currentTool.onMouseMove(event, mouse);
+			tools.symbolEdit.onMouseMove(event, mouse);
 		} else if (interaction?.kind === 'move-route-label') {
 			const route = userState.topo.routes.find((r) => r.id === interaction.routeId);
 			if (route) {
@@ -351,7 +406,19 @@
 		const { point, sourceEvent: event } = input;
 		currentTool.onMouseUp(event, point);
 
-		if (editor.endInteraction()) saveHistory();
+		const interaction = editor.endInteraction();
+		if (interaction?.kind === 'selection-region') {
+			const region = createSelectionRegion(interaction.start, interaction.end);
+			const moved = Math.hypot(region.right - region.left, region.bottom - region.top) > 0.005;
+			if (moved) {
+				editor.selectItems(
+					getRegionSelection(userState.topo, region, { baseWidth, baseHeight }),
+					interaction.mode
+				);
+			} else if (interaction.mode === 'replace') {
+				clearSelection();
+			}
+		} else if (interaction) saveHistory();
 	}
 
 	function isSelected(type, id) {
@@ -360,18 +427,6 @@
 
 	function selectObject(type, id, multi = false) {
 		editor.selectObject(type, id, multi);
-		if(type ==='symbol'){
-			activeTool = 'symbolEdit'
-		}
-		else if (type === 'route') {
-			activeTool = 'routeEdit';
-		}
-		else if (type === 'outline') {
-			activeTool = 'outlineEdit';
-		}
-		else {
-			activeTool = 'select'
-		}
 	}
 
 	function handleObjectMouseDown(event, { type, id, pitchId = null, variantId = null }) {
@@ -380,6 +435,11 @@
 		const mouse = canvasInput.normalizeEvent(event)?.point;
 		if (!mouse) return;
 
+		const isTouch = event?.identifier != null;
+		if (isTouch && mobileSelectionMode) {
+			selectObject(type, id, true);
+			return;
+		}
 		if (!isSelected(type, id)) {
 			selectObject(type, id, isShiftPressed);
 		}
@@ -477,6 +537,11 @@
 		const paths = [];
 		const symbols = [];
 		const texts = [];
+		// A route is selected as one object, even though it may render several
+		// pitch/variant paths. When moving multiple selected objects, move every
+		// path belonging to each route instead of narrowing the route under the
+		// pointer to its active pitch.
+		const isMultiSelection = editor.selectedItems.size > 1;
 		const addPath = (target) => {
 			const path = editablePaths.resolve(target);
 			if (path?.getPoints().length) paths.push({ target, snapshot: path.snapshot() });
@@ -489,11 +554,15 @@
 				const r = userState.topo.routes.find((rt) => rt.id === id);
 				if (r) {
 					const selectedPitchId =
-						drawingTarget?.type === 'pitch' && drawingTarget.routeId === r.id
+						!isMultiSelection &&
+						drawingTarget?.type === 'pitch' &&
+						drawingTarget.routeId === r.id
 							? drawingTarget.pitchId
 							: null;
 					const selectedVariantId =
-						drawingTarget?.type === 'variant' && drawingTarget.routeId === r.id
+						!isMultiSelection &&
+						drawingTarget?.type === 'variant' &&
+						drawingTarget.routeId === r.id
 							? drawingTarget.variantId
 							: null;
 
@@ -550,12 +619,12 @@
 		event?.stopPropagation?.();
 		const mouse = canvasInput.normalizeEvent(event)?.point;
 		if (!mouse || !label.position2D) return;
-		selectObject('text', label.id, isShiftPressed);
-		editor.startInteraction('move-text', {
-			id: label.id,
-			startPos: [...label.position2D],
-			startMouse: mouse
-		});
+		if (event?.identifier != null && mobileSelectionMode) {
+			selectObject('text', label.id, true);
+			return;
+		}
+		if (!isSelected('text', label.id)) selectObject('text', label.id, isShiftPressed);
+		editor.startInteraction('move-selection', collectDraggingSelection(mouse));
 	}
 
 	function handleLabelMouseDown(event, { routeId, pitchId, variantId }) {
@@ -583,8 +652,39 @@
 		return currentTool;
 	}
 
+	export function simplifySelectedOutline(tolerancePx) {
+		const outlineId = userState.ui.selectedOutlineId;
+		return outlineId ? tools.outlineEdit.simplifyOutline(outlineId, tolerancePx) : null;
+	}
+
 	function handleKeyDown(event) {
 		if (editingTextLabelId) return;
+		const isShortcut = event.ctrlKey || event.metaKey;
+		const isTextInput = event.target?.closest?.(
+			'input, textarea, select, [contenteditable="true"]'
+		);
+
+		if (isShortcut && !isTextInput && event.key.toLowerCase() === 'c') {
+			if (clipboard.copy({ topo: userState.topo, selectedItems: editor.selectedItems })) {
+				event.preventDefault();
+			}
+			return;
+		}
+
+		if (isShortcut && !isTextInput && event.key.toLowerCase() === 'v') {
+			const pasted = clipboard.paste({
+				topo: userState.topo,
+				canvasSize: { baseWidth, baseHeight }
+			});
+			if (pasted.length) {
+				event.preventDefault();
+				editor.clearSelection();
+				pasted.forEach(({ type, id }) => editor.selectObject(type, id, true));
+				activeTool = 'select';
+				saveHistory();
+			}
+			return;
+		}
 
 		// Track shift key for multi-select
 		if (event.key === 'Shift') {
@@ -673,17 +773,15 @@
 			redo();
 		}
 	}
-
-
 	onMount(() => {
+		const handleKeyUp = (event) => {
+			if (event.key === 'Shift') isShiftPressed = false;
+		};
 		window.addEventListener('keydown', handleKeyDown);
-		window.addEventListener('keyup', (event) => {
-			if (event.key === 'Shift') {
-				isShiftPressed = false;
-			}
-		});
+		window.addEventListener('keyup', handleKeyUp);
 		return () => {
 			window.removeEventListener('keydown', handleKeyDown);
+			window.removeEventListener('keyup', handleKeyUp);
 		};
 	});
 
@@ -696,8 +794,7 @@
 
 		// Interaction state check for suppressing handles/gizmos
 		// We suppress handles when moving OBJECTS, but NOT when moving POINTS
-		const isAnyInteractionActive =
-			editor.interaction && editor.interaction.kind !== 'move-point';
+		const isAnyInteractionActive = editor.interaction && editor.interaction.kind !== 'move-point';
 
 		const layers = createTopoLayerStack(gElement);
 		const {
@@ -771,6 +868,16 @@
 		tools.multipitch.render(renderContext);
 		renderSymbolsLayer(renderContext);
 		renderTextLabelsLayer(renderContext);
+		const selectionInteraction = editor.interaction;
+		renderSelectionRegion({
+			layers,
+			region:
+				selectionInteraction?.kind === 'selection-region'
+					? createSelectionRegion(selectionInteraction.start, selectionInteraction.end)
+					: null,
+			baseWidth,
+			baseHeight
+		});
 	}
 
 	// Trigger D3 render on state changes
@@ -847,6 +954,8 @@
 				s.position2D[1];
 				s.rotation2D;
 				s.scale2D;
+				s.scaleX2D;
+				s.scaleY2D;
 			}
 		}
 		for (const t of userState.topo.textLabels || []) {
@@ -885,6 +994,7 @@
 			editingText: editingTextLabelId,
 			editingTextValue,
 			selectedItems: editor.selectedItems.size,
+			selectionInteraction: editor.interaction?.kind,
 			transform: transform,
 			base: { baseWidth, baseHeight }
 		};
@@ -897,9 +1007,20 @@
 	class="relative w-full h-full bg-gray-100 rounded-lg overflow-hidden"
 	style="touch-action: none;"
 >
+	<button
+		type="button"
+		class="absolute right-3 top-3 z-10 rounded bg-white/95 px-3 py-2 text-sm font-semibold shadow md:hidden"
+		class:bg-creator-blue={mobileSelectionMode}
+		class:text-white={mobileSelectionMode}
+		aria-pressed={mobileSelectionMode}
+		onclick={() => (mobileSelectionMode = !mobileSelectionMode)}
+	>
+		{mobileSelectionMode ? 'Done selecting' : 'Select multiple'}
+	</button>
 	<svg
 		bind:this={svgElement}
 		viewBox="0 0 {baseWidth} {baseHeight}"
+		preserveAspectRatio="xMidYMid meet"
 		class="w-full h-full cursor-{activeTool === 'eraser' ? 'crosshair' : 'crosshair'}"
 		style="touch-action: none;"
 		role="application"

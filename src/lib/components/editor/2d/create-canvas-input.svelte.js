@@ -10,6 +10,7 @@ import { vibrateOnAction } from '$lib/assets/js/mobile-utils.js';
 export function createCanvasInput({
 	getActiveTool,
 	getAspectRatio,
+	getMobileSelectionMode,
 	onDown,
 	onMove,
 	onUp,
@@ -28,7 +29,10 @@ export function createCanvasInput({
 	function updateDimensions() {
 		if (!svgElement) return;
 		const rect = svgElement.getBoundingClientRect();
-		const ratio = getAspectRatio() || rect.width / rect.height;
+		const requestedRatio = Number(getAspectRatio());
+		const viewportRatio = rect.width > 0 && rect.height > 0 ? rect.width / rect.height : 1.5;
+		const ratio =
+			Number.isFinite(requestedRatio) && requestedRatio > 0 ? requestedRatio : viewportRatio;
 		baseWidth = 1000;
 		baseHeight = 1000 / ratio;
 	}
@@ -88,11 +92,11 @@ export function createCanvasInput({
 					return (
 						event.touches?.length >= 2 ||
 						((['symbolEdit', 'routeEdit', 'outlineEdit'].includes(getActiveTool()) ||
-							getActiveTool() === 'select') &&
+							(getActiveTool() === 'select' && !getMobileSelectionMode?.())) &&
 							event.touches?.length === 1)
 					);
 				}
-				return event.type === 'mousedown' && event.button === 0 && getActiveTool() === 'select';
+				return false;
 			})
 			.touchable(() => true)
 			.on('zoom', (event) => updateTransform(event.transform));
@@ -121,7 +125,7 @@ export function createCanvasInput({
 				return;
 			}
 			if (getActiveTool() === 'select') {
-				onDown?.(normalizeEvent(event, event.touches[0]));
+				if (getMobileSelectionMode?.()) onDown?.(normalizeEvent(event, event.touches[0]));
 				return;
 			}
 			event.preventDefault();
@@ -142,6 +146,11 @@ export function createCanvasInput({
 				return;
 			}
 			const touch = Array.from(event.touches).find((item) => item.identifier === activeTouchId);
+			if (!touch && getActiveTool() === 'select' && getMobileSelectionMode?.()) {
+				const selectionTouch = event.touches[0];
+				if (selectionTouch) onMove?.(normalizeEvent(event, selectionTouch));
+				return;
+			}
 			if (!touch) return;
 			event.preventDefault();
 			onMove?.(normalizeEvent(event, touch));
@@ -156,6 +165,11 @@ export function createCanvasInput({
 					emptyTouch = null;
 					return;
 				}
+			}
+			if (getActiveTool() === 'select' && getMobileSelectionMode?.()) {
+				const touch = event.changedTouches[0];
+				if (touch) onUp?.(normalizeEvent(event, touch));
+				return;
 			}
 			if (activeTouchId === null) return;
 			if (Array.from(event.touches).some((item) => item.identifier === activeTouchId)) return;

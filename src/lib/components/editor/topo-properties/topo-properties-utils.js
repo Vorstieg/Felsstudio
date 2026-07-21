@@ -3,6 +3,7 @@ import { generateId, generateSymbolId } from '$lib/assets/js/id-utils.js';
 export const routeLineStyles = [
 	{ id: 'red', label: 'Red' },
 	{ id: 'redDashed', label: 'Red dashed' },
+	{ id: 'redDotted', label: 'Red dotted' },
 	{ id: 'variant', label: 'Variant' }
 ];
 

@@ -8,6 +8,38 @@
 	let urlInput = $state('');
 	let showUrlInput = $state(false);
 	let isDragging = $state(false);
+	let hasEstablishedCanvas = Boolean(userState.topo.image2D);
+
+	/**
+	 * The topo canvas is a stable coordinate system. A replacement image must not
+	 * redefine it, otherwise every existing route and outline appears stretched.
+	 */
+	function setBackgroundImage(imageData, imageAspectRatio) {
+		const topo = userState.topo;
+		const hasCanvasAspectRatio =
+			Number.isFinite(topo.canvasAspectRatio) && topo.canvasAspectRatio > 0;
+		const hasBackground = Boolean(topo.image2D);
+		const hasAnnotations = [topo.routes, topo.outlines, topo.fixPoints, topo.textLabels].some(
+			(items) => Array.isArray(items) && items.length > 0
+		);
+
+		if (!hasBackground && !hasAnnotations && !hasEstablishedCanvas) {
+			// A first image may define a genuinely blank topo's canvas.
+			topo.canvasAspectRatio = imageAspectRatio;
+		} else if (!hasCanvasAspectRatio) {
+			const legacyAspectRatio = Number(topo.imageAspectRatio);
+			topo.canvasAspectRatio =
+				hasBackground && Number.isFinite(legacyAspectRatio) && legacyAspectRatio > 0
+					? legacyAspectRatio
+					: imageAspectRatio;
+		}
+
+		// This remains metadata about the image itself; only canvasAspectRatio is stable.
+		topo.imageAspectRatio = imageAspectRatio;
+		topo.backgroundFit ??= 'contain';
+		topo.image2D = imageData;
+		hasEstablishedCanvas = true;
+	}
 
 	function handleFileSelect(event) {
 		const file = event.target.files?.[0];
@@ -26,8 +58,7 @@
 		reader.onload = (e) => {
 			const img = new Image();
 			img.onload = () => {
-				userState.topo.image2D = e.target.result;
-				userState.topo.imageAspectRatio = img.width / img.height;
+				setBackgroundImage(e.target.result, img.width / img.height);
 			};
 			img.src = e.target.result;
 		};
@@ -45,8 +76,7 @@
 			canvas.height = img.height;
 			const ctx = canvas.getContext('2d');
 			ctx.drawImage(img, 0, 0);
-			userState.topo.image2D = canvas.toDataURL();
-			userState.topo.imageAspectRatio = img.width / img.height;
+			setBackgroundImage(canvas.toDataURL(), img.width / img.height);
 			showUrlInput = false;
 			urlInput = '';
 		};
@@ -74,7 +104,7 @@
 
 	function removeImage() {
 		userState.topo.image2D = null;
-		userState.topo.imageAspectRatio = 1.5;
+		showUrlInput = false;
 	}
 
 	async function handleCameraCapture() {
@@ -109,8 +139,7 @@
 				canvas.width = video.videoWidth;
 				canvas.height = video.videoHeight;
 				canvas.getContext('2d').drawImage(video, 0, 0);
-				userState.topo.image2D = canvas.toDataURL();
-				userState.topo.imageAspectRatio = canvas.width / canvas.height;
+				setBackgroundImage(canvas.toDataURL(), canvas.width / canvas.height);
 				stream.getTracks().forEach((track) => track.stop());
 				document.body.removeChild(modal);
 			};
@@ -136,20 +165,77 @@
 	<div class="panel p-2.5 mb-2 shadow-sm border border-black/15">
 		<div class="flex items-center justify-between mb-2">
 			<h4 class="text-ui-label text-near-black !m-0">{$_('ui.background_image')}</h4>
-			<button class="text-rose-600 hover:text-rose-700 text-micro-data font-bold uppercase transition-none" onclick={removeImage}>
-				<i class="fa-solid fa-trash-can mr-1"></i> {$_('ui.remove')}
+			<button
+				class="text-rose-600 hover:text-rose-700 text-micro-data font-bold uppercase transition-none"
+				onclick={removeImage}
+			>
+				<i class="fa-solid fa-trash-can mr-1"></i>
+				{$_('ui.remove')}
 			</button>
 		</div>
 		<div class="relative group">
-            <img
-                src={userState.topo.image2D}
-                alt="Topo background"
-                class="w-full rounded-sm border border-black/10"
-            />
-            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-none flex items-center justify-center pointer-events-none">
-                <span class="text-white text-micro-data font-bold uppercase">{$_('ui.background_image')}</span>
-            </div>
-        </div>
+			<img
+				src={userState.topo.image2D}
+				alt="Topo background"
+				class="w-full rounded-sm border border-black/10"
+			/>
+			<div
+				class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-none flex items-center justify-center pointer-events-none"
+			>
+				<span class="text-white text-micro-data font-bold uppercase"
+					>{$_('ui.background_image')}</span
+				>
+			</div>
+		</div>
+		<div class="mt-2 space-y-1.5">
+			<div class="flex gap-1.5">
+				<button
+					class="btn-primary flex-1 !bg-white !text-near-black border border-black/15 hover:!bg-black/5"
+					onclick={() => fileInput?.click()}
+				>
+					<i class="fa-solid fa-arrow-right-arrow-left mr-2 opacity-60"></i>{$_('ui.replace_image')}
+				</button>
+				<button
+					class="btn-primary !bg-white !text-near-black border border-black/15 hover:!bg-black/5"
+					onclick={() => (showUrlInput = !showUrlInput)}
+					aria-label={$_('ui.load_url')}
+				>
+					<i class="fa-solid fa-link opacity-60"></i>
+				</button>
+				<button
+					class="btn-primary !bg-white !text-near-black border border-black/15 hover:!bg-black/5"
+					onclick={handleCameraCapture}
+					aria-label={$_('ui.camera')}
+				>
+					<i class="fa-solid fa-camera opacity-60"></i>
+				</button>
+			</div>
+			<div class="flex items-center justify-between gap-2">
+				<label for="background-fit" class="text-micro-data text-warm-gray-500"
+					>{$_('ui.background_fit')}</label
+				>
+				<select
+					id="background-fit"
+					class="input-studio !w-auto !py-1 text-micro-data"
+					value={userState.topo.backgroundFit ?? 'contain'}
+					onchange={(event) => (userState.topo.backgroundFit = event.currentTarget.value)}
+				>
+					<option value="contain">{$_('ui.fit_contain')}</option>
+					<option value="cover">{$_('ui.fit_cover')}</option>
+				</select>
+			</div>
+			{#if showUrlInput}
+				<div class="flex flex-col gap-1.5 pt-1">
+					<input
+						type="text"
+						bind:value={urlInput}
+						placeholder={$_('ui.image_url_placeholder')}
+						class="input-studio w-full"
+					/>
+					<button class="btn-primary w-full" onclick={handleUrlLoad}>{$_('ui.load')}</button>
+				</div>
+			{/if}
+		</div>
 	</div>
 {:else}
 	<div class="panel p-2.5 mb-2 shadow-sm border border-black/15 bg-white">
@@ -197,25 +283,22 @@
 						placeholder={$_('ui.image_url_placeholder')}
 						class="input-studio w-full"
 					/>
-					<button
-						class="btn-primary w-full"
-						onclick={handleUrlLoad}
-					>
+					<button class="btn-primary w-full" onclick={handleUrlLoad}>
 						{$_('ui.load')}
 					</button>
 				</div>
 			{/if}
 		</div>
-
-		<input type="file" bind:this={fileInput} onchange={handleFileSelect} accept="image/*" hidden />
-
-		<input
-			type="file"
-			bind:this={cameraInput}
-			onchange={handleFileSelect}
-			accept="image/*"
-			capture="environment"
-			hidden
-		/>
 	</div>
 {/if}
+
+<input type="file" bind:this={fileInput} onchange={handleFileSelect} accept="image/*" hidden />
+
+<input
+	type="file"
+	bind:this={cameraInput}
+	onchange={handleFileSelect}
+	accept="image/*"
+	capture="environment"
+	hidden
+/>

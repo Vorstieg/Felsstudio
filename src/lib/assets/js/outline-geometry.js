@@ -453,6 +453,36 @@ export function simplifyPoints(
 	return [points[0], points[endIndex]];
 }
 
+/**
+ * Simplifies a closed outline without treating its duplicate final point as a
+ * line endpoint. This is intentionally a conservative, local reduction: it
+ * removes raster-like near-collinear vertices while retaining the contour's
+ * closure and at least three vertices.
+ */
+export function simplifyClosedPoints(
+	points,
+	tolerancePx = DEFAULT_FREEHAND_SMOOTHING_PX,
+	canvasSize = {}
+) {
+	if (!isClosedPath(points) || points.length <= 4 || tolerancePx <= 0) return points || [];
+
+	const polygon = points.slice(0, -1);
+	let simplified = polygon;
+	// A second pass catches runs of very short, nearly straight brush vertices
+	// exposed after the first pass, while remaining deliberately conservative.
+	for (let pass = 0; pass < 2 && simplified.length > 3; pass += 1) {
+		const next = simplified.filter((point, index, current) => {
+			const previous = current[(index - 1 + current.length) % current.length];
+			const following = current[(index + 1) % current.length];
+			return perpendicularDistancePx(point, previous, following, canvasSize) > tolerancePx;
+		});
+		if (next.length < 3 || next.length === simplified.length) break;
+		simplified = next;
+	}
+
+	return [...simplified, [...simplified[0]]];
+}
+
 export function isClosedShape(points = []) {
 	return isClosedPath(points);
 }

@@ -348,7 +348,12 @@
 	}
 
 	function startTrackCut() {
-		if (editingTrackIndex === null || currentTrackPoints.length < 2 || isRoutePathDrawing) return;
+		const isEditingRoutePath = routePathDrawingTarget && trackDraftMode === 'editing';
+		if (
+			(editingTrackIndex === null && !isEditingRoutePath) ||
+			currentTrackPoints.length < 2
+		)
+			return;
 		activeTool = 'cut';
 		resetTrackCut();
 	}
@@ -367,7 +372,14 @@
 
 	function confirmTrackCut() {
 		if (!pendingTrackCut) return;
-		if (splitEditingTrack(pendingTrackCut.startCoordinates, pendingTrackCut.endCoordinates)) resetTrackCut();
+		const wasSplit = routePathDrawingTarget
+			? splitRoutePath(
+					routePathDrawingTarget,
+					pendingTrackCut.startCoordinates,
+					pendingTrackCut.endCoordinates
+				)
+			: splitEditingTrack(pendingTrackCut.startCoordinates, pendingTrackCut.endCoordinates);
+		if (wasSplit) resetTrackCut();
 	}
 
 	function initTrackCutDragHandlers() {
@@ -433,14 +445,26 @@
 		if (
 			activeTool === 'track' &&
 			!routePathDrawingTarget &&
-			currentTrackPoints.length === 0 &&
-			map.getLayer('tracks-line-saved')
+			currentTrackPoints.length === 0
 		) {
-			const features = map.queryRenderedFeatures(e.point, { layers: ['tracks-line-saved'] });
-			const trackIndex = Number(features[0]?.properties?.trackIndex);
-			if (Number.isInteger(trackIndex)) {
-				editTrack(trackIndex);
-				return;
+			if (map.getLayer('routes-line')) {
+				const routeFeature = map.queryRenderedFeatures(e.point, { layers: ['routes-line'] })[0];
+				const path = routeFeature?.properties?.documentPath;
+				const routeId = routeFeature?.properties?.routeId;
+				const pathIndex = Number(routeFeature?.properties?.pathIndex);
+				if (path && routeId && Number.isInteger(pathIndex)) {
+					editRoutePath(path, routeId, pathIndex);
+					return;
+				}
+			}
+
+			if (map.getLayer('tracks-line-saved')) {
+				const trackFeature = map.queryRenderedFeatures(e.point, { layers: ['tracks-line-saved'] })[0];
+				const trackIndex = Number(trackFeature?.properties?.trackIndex);
+				if (Number.isInteger(trackIndex)) {
+					editTrack(trackIndex);
+					return;
+				}
 			}
 		}
 
@@ -676,6 +700,12 @@
 		const source = map?.getSource('crag-editor-data');
 		if (!source) return;
 		const drawingPoints = $state.snapshot(currentTrackPoints) || [];
+		const editingRoutePath = routePathDrawingTarget
+			? {
+					key: `${routePathDrawingTarget.path}:${routePathDrawingTarget.routeId}`,
+					pathIndex: routePathDrawingTarget.pathIndex
+				}
+			: null;
 		source.setData(
 			buildEditorFeatureCollection({
 				sectors: $state.snapshot(cragEditorState.crag.sectors) || [],
@@ -687,6 +717,7 @@
 					}))
 				),
 				selectedRouteKey,
+				editingRoutePath,
 				drawingPoints,
 				visibleDrawingPointIndexes: visibleDrawingPointIndexes(drawingPoints),
 				selectedSectorId,
@@ -987,6 +1018,27 @@
 
 		routePathDrawingTarget = { path, routeId, pathIndex };
 		editRoutePathTrack(coordinates);
+	}
+
+	function splitRoutePath({ path, routeId, pathIndex }, startCoordinates, endCoordinates) {
+		if (startCoordinates.length < 2 || endCoordinates.length < 2) return false;
+		const document = cragEditorState.routeDocuments.find((entry) => entry.path === path);
+		const route = document?.data.routes?.find((entry) => entry.id === routeId);
+		const paths = route?.assets?.paths;
+		const pathAssets = Array.isArray(paths) ? paths : paths ? [paths] : [];
+		const pathAsset = pathAssets[pathIndex];
+		if (!pathAsset) return false;
+
+		updateRoutePaths(path, routeId, (assets) => [
+			...assets.slice(0, pathIndex),
+			{ ...pathAsset, path: { type: 'LineString', coordinates: startCoordinates } },
+			{ ...pathAsset, path: { type: 'LineString', coordinates: endCoordinates } },
+			...assets.slice(pathIndex + 1)
+		]);
+		cancelTrackEdit();
+		activeTab = 'sectors';
+		activeTool = 'position';
+		return true;
 	}
 
 	function updateRoutePath(path, routeId, pathIndex, field, value) {

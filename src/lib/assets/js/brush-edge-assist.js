@@ -17,6 +17,20 @@ function canvasMetrics(canvasSize = {}) {
 	};
 }
 
+function imagePlacementMetrics(imageData, canvas, placement) {
+	if (!placement) {
+		return { x: 0, y: 0, width: canvas.width, height: canvas.height };
+	}
+	const width = Number(placement.width);
+	const height = Number(placement.height);
+	return {
+		x: Number(placement.x) || 0,
+		y: Number(placement.y) || 0,
+		width: width > 0 ? width : canvas.width,
+		height: height > 0 ? height : canvas.height
+	};
+}
+
 function cleanStroke(strokePoints, canvasSize, minimumDistance = 0.5) {
 	const { width, height } = canvasMetrics(canvasSize);
 	const result = [];
@@ -44,7 +58,10 @@ function interpolateStroke(stroke, spacing) {
 }
 
 /** Creates a predicate for the union of the round dabs painted by a stroke. */
-export function createBrushMaskPredicate(strokePoints, { brushRadiusPx = 18, canvasSize = {} } = {}) {
+export function createBrushMaskPredicate(
+	strokePoints,
+	{ brushRadiusPx = 18, canvasSize = {} } = {}
+) {
 	const radius = Math.max(Number(brushRadiusPx) || 0, 0);
 	const stroke = interpolateStroke(cleanStroke(strokePoints, canvasSize), Math.max(radius / 2, 1));
 	return (normalizedPoint) => {
@@ -78,25 +95,36 @@ function sobel(imageData, x, y) {
 	};
 }
 
-function pointInImageMask(point, imageData, contains) {
-	if (point[0] < 1 || point[1] < 1 || point[0] >= imageData.width - 1 || point[1] >= imageData.height - 1) return false;
-	return !contains || contains([point[0] / imageData.width, point[1] / imageData.height]);
+function pointInImageMask(point, imageData, contains, toMaskPoint) {
+	if (
+		point[0] < 1 ||
+		point[1] < 1 ||
+		point[0] >= imageData.width - 1 ||
+		point[1] >= imageData.height - 1
+	)
+		return false;
+	return !contains || contains(toMaskPoint(point));
 }
 
-function candidatesAt(anchor, tangent, radius, step, imageData, contains) {
+function candidatesAt(anchor, tangent, radius, step, imageData, contains, toMaskPoint) {
 	const normal = [-tangent[1], tangent[0]];
 	const candidates = [];
 	for (let offset = -radius; offset <= radius + 0.01; offset += step) {
 		const point = [anchor[0] + normal[0] * offset, anchor[1] + normal[1] * offset];
-		if (!pointInImageMask(point, imageData, contains)) continue;
+		if (!pointInImageMask(point, imageData, contains, toMaskPoint)) continue;
 		const gradient = sobel(imageData, point[0], point[1]);
 		const magnitude = Math.hypot(gradient.x, gradient.y);
 		// A photographed boundary has a gradient perpendicular to its line. This
 		// reduces attraction to cracks which run along the painted stroke.
-		const directional = magnitude > 1e-6
-			? Math.abs((gradient.x * normal[0] + gradient.y * normal[1]) / magnitude)
-			: 0;
-		candidates.push({ point, offset, score: Math.min(magnitude / 2.5, 1) * (0.35 + 0.65 * directional) });
+		const directional =
+			magnitude > 1e-6
+				? Math.abs((gradient.x * normal[0] + gradient.y * normal[1]) / magnitude)
+				: 0;
+		candidates.push({
+			point,
+			offset,
+			score: Math.min(magnitude / 2.5, 1) * (0.35 + 0.65 * directional)
+		});
 	}
 	return candidates;
 }
@@ -115,33 +143,57 @@ export function findBrushImageEdge(
 	{
 		canvasSize = {},
 		brushRadiusPx = 18,
+		// The photograph can be letterboxed or cropped inside the stable topo
+		// canvas. This is its rendered rectangle in canvas pixels.
+		imagePlacement,
 		maskContains,
 		sampleSpacingPx = 5,
 		candidateSpacingPx = 2,
 		minimumConfidence = 0.32
 	} = {}
 ) {
-	if (!imageData?.data || !Number.isFinite(imageData.width) || !Number.isFinite(imageData.height)) return null;
+	if (!imageData?.data || !Number.isFinite(imageData.width) || !Number.isFinite(imageData.height))
+		return null;
 	const canvas = canvasMetrics(canvasSize);
+	const placement = imagePlacementMetrics(imageData, canvas, imagePlacement);
 	const stroke = cleanStroke(strokePoints, canvasSize);
 	if (stroke.length < 2) return null;
-	const scaleX = imageData.width / canvas.width;
-	const scaleY = imageData.height / canvas.height;
-	const imageStroke = interpolateStroke(stroke.map(([x, y]) => [x * scaleX, y * scaleY]), Math.max(sampleSpacingPx, 2));
+	const scaleX = imageData.width / placement.width;
+	const scaleY = imageData.height / placement.height;
+	const imageStroke = interpolateStroke(
+		stroke.map(([x, y]) => [(x - placement.x) * scaleX, (y - placement.y) * scaleY]),
+		Math.max(sampleSpacingPx, 2)
+	);
 	if (imageStroke.length < 2) return null;
-	const radius = Math.max(brushRadiusPx * (scaleX + scaleY) / 2, candidateSpacingPx);
-	const contains = maskContains ?? createBrushMaskPredicate(strokePoints, { brushRadiusPx, canvasSize });
+	const radius = Math.max((brushRadiusPx * (scaleX + scaleY)) / 2, candidateSpacingPx);
+	const contains =
+		maskContains ?? createBrushMaskPredicate(strokePoints, { brushRadiusPx, canvasSize });
+	const toMaskPoint = ([x, y]) => [
+		((x / imageData.width) * placement.width + placement.x) / canvas.width,
+		((y / imageData.height) * placement.height + placement.y) / canvas.height
+	];
 	const layers = imageStroke.map((anchor, index) => {
 		const before = imageStroke[Math.max(0, index - 1)];
 		const after = imageStroke[Math.min(imageStroke.length - 1, index + 1)];
 		const length = Math.max(distance(before, after), 1e-6);
-		return candidatesAt(anchor, [(after[0] - before[0]) / length, (after[1] - before[1]) / length], radius, Math.max(candidateSpacingPx, 1), imageData, contains);
+		return candidatesAt(
+			anchor,
+			[(after[0] - before[0]) / length, (after[1] - before[1]) / length],
+			radius,
+			Math.max(candidateSpacingPx, 1),
+			imageData,
+			contains,
+			toMaskPoint
+		);
 	});
 	if (layers.some((layer) => !layer.length)) return null;
 
 	// Viterbi-style dynamic programming rewards a strong edge but penalizes
 	// jumps, yielding one continuous path instead of noisy independent snaps.
-	layers[0].forEach((candidate) => { candidate.total = candidate.score; candidate.previous = -1; });
+	layers[0].forEach((candidate) => {
+		candidate.total = candidate.score;
+		candidate.previous = -1;
+	});
 	for (let layerIndex = 1; layerIndex < layers.length; layerIndex++) {
 		const previous = layers[layerIndex - 1];
 		for (const candidate of layers[layerIndex]) {
@@ -149,19 +201,29 @@ export function findBrushImageEdge(
 			let bestIndex = -1;
 			for (let index = 0; index < previous.length; index++) {
 				const prior = previous[index];
-				const penalty = Math.min(Math.abs(candidate.offset - prior.offset) / Math.max(radius, 1), 1) * 0.55;
-				if (prior.total - penalty > best) { best = prior.total - penalty; bestIndex = index; }
+				const penalty =
+					Math.min(Math.abs(candidate.offset - prior.offset) / Math.max(radius, 1), 1) * 0.55;
+				if (prior.total - penalty > best) {
+					best = prior.total - penalty;
+					bestIndex = index;
+				}
 			}
 			candidate.total = candidate.score + best;
 			candidate.previous = bestIndex;
 		}
 	}
-	let index = layers.at(-1).reduce((best, candidate, candidateIndex, layer) => candidate.total > layer[best].total ? candidateIndex : best, 0);
+	let index = layers
+		.at(-1)
+		.reduce(
+			(best, candidate, candidateIndex, layer) =>
+				candidate.total > layer[best].total ? candidateIndex : best,
+			0
+		);
 	const path = [];
 	const scores = [];
 	for (let layerIndex = layers.length - 1; layerIndex >= 0; layerIndex--) {
 		const candidate = layers[layerIndex][index];
-		path.push([candidate.point[0] / imageData.width, candidate.point[1] / imageData.height]);
+		path.push(toMaskPoint(candidate.point));
 		scores.push(candidate.score);
 		index = candidate.previous;
 	}

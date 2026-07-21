@@ -21,7 +21,10 @@ export const userState = $state({
 		scale: 1,
 		// 2D TOPO Editor fields
 		image2D: null, // Base64 data URL or external URL, null for blank canvas
-		imageAspectRatio: 1.5, // Width/Height ratio for responsive rendering
+		imageAspectRatio: 1.5, // Width/Height ratio of the source image
+		// The coordinate space for annotations. It must not change when a background is replaced.
+		canvasAspectRatio: 1.5,
+		backgroundFit: 'contain',
 		editorMode: '3d' // '2d' | '3d' - which editor is active
 	},
 	// UI State for the editor
@@ -102,6 +105,8 @@ export const userState = $state({
 			scale: 1,
 			image2D: null,
 			imageAspectRatio: 1.5,
+			canvasAspectRatio: 1.5,
+			backgroundFit: 'contain',
 			editorMode: '3d'
 		};
 		if (this.ui.modelUrl) {

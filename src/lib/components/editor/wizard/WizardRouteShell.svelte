@@ -65,6 +65,20 @@
 		userState.ui.lastSaved = new Date().toISOString();
 	}
 
+	async function startNewEntry() {
+		if (workSpaceWrapper.isCragEditor()) {
+			const [{ cragEditorState }, { storage }, { CRAG_SESSION_KEY }] = await Promise.all([
+				import('$lib/state/crag-editor.svelte.js'),
+				import('$lib/assets/js/storage-utils.js'),
+				import('$lib/components/editor/crag/crag-editor-options.js')
+			]);
+			cragEditorState.reset();
+			storage.remove(CRAG_SESSION_KEY);
+		}
+
+		goto(resolve(workSpaceWrapper.path));
+	}
+
 	class WorkSpace {
 		constructor(path) {
 			this.path = path;
@@ -241,6 +255,7 @@
 					{filteredLocations}
 					{isLoading}
 					bind:searchQuery
+					{startNewEntry}
 					{loadFromEntry}
 				/>
 			</div>

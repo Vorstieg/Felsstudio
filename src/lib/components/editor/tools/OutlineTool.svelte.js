@@ -83,10 +83,11 @@ export class OutlineTool {
 	brushOutlinePoints = $state([]);
 	brushGeneration = 0;
 
-	constructor({ saveHistory, getCanvasSize, getImageSrc } = {}) {
+	constructor({ saveHistory, getCanvasSize, getImageSrc, getImageFit } = {}) {
 		this.saveHistory = saveHistory || (() => {});
 		this.getCanvasSize = getCanvasSize || (() => ({ baseWidth: 1, baseHeight: 1 }));
 		this.getImageSrc = getImageSrc || (() => null);
+		this.getImageFit = getImageFit || (() => 'contain');
 	}
 
 	onMouseDown(event, point) {
@@ -249,7 +250,10 @@ export class OutlineTool {
 			image.src = imageSrc;
 			await image.decode();
 			const maximumDimension = 1400;
-			const scale = Math.min(1, maximumDimension / Math.max(image.naturalWidth, image.naturalHeight));
+			const scale = Math.min(
+				1,
+				maximumDimension / Math.max(image.naturalWidth, image.naturalHeight)
+			);
 			const width = Math.max(2, Math.round(image.naturalWidth * scale));
 			const height = Math.max(2, Math.round(image.naturalHeight * scale));
 			const canvas = document.createElement('canvas');
@@ -258,9 +262,21 @@ export class OutlineTool {
 			const context = canvas.getContext('2d', { willReadFrequently: true });
 			if (!context) return null;
 			context.drawImage(image, 0, 0, width, height);
+			const canvasSize = this.canvasSize;
+			const imageScale =
+				this.getImageFit?.() === 'cover'
+					? Math.max(canvasSize.baseWidth / width, canvasSize.baseHeight / height)
+					: Math.min(canvasSize.baseWidth / width, canvasSize.baseHeight / height);
+			const imagePlacement = {
+				width: width * imageScale,
+				height: height * imageScale,
+				x: (canvasSize.baseWidth - width * imageScale) / 2,
+				y: (canvasSize.baseHeight - height * imageScale) / 2
+			};
 			return findBrushImageEdge(context.getImageData(0, 0, width, height), strokePoints, {
-				canvasSize: this.canvasSize,
-				brushRadiusPx: this.brushSizePx / 2
+				canvasSize,
+				brushRadiusPx: this.brushSizePx / 2,
+				imagePlacement
 			});
 		} catch {
 			// File URLs and externally-hosted images can deny canvas pixel access.
