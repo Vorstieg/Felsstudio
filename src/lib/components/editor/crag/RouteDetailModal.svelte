@@ -10,7 +10,9 @@
 		onAddRoutePath = () => {},
 		onEditRoutePath = () => {},
 		onUpdateRoutePath = () => {},
-		onRemoveRoutePath = () => {}
+		onRemoveRoutePath = () => {},
+		onMoveRoutePath = () => {},
+		routeDocuments = []
 	} = $props();
 
 	let route = $derived(routeEntry?.route ?? null);
@@ -23,6 +25,13 @@
 	function paths() {
 		const routePaths = route?.assets?.paths;
 		return Array.isArray(routePaths) ? routePaths : routePaths ? [routePaths] : [];
+	}
+
+	function movePath(event, pathIndex) {
+		const [targetPath, targetRouteId] = event.currentTarget.value.split('\u0000');
+		if (!targetPath || !targetRouteId) return;
+		onMoveRoutePath(document.path, route.id, pathIndex, targetPath, targetRouteId);
+		event.currentTarget.value = '';
 	}
 
 	function addPitch() {
@@ -139,7 +148,7 @@
 						<p class="text-micro-data text-warm-gray-500">No paths attached.</p>
 					{:else}
 						{#each paths() as pathAsset, pathIndex}
-							<div class="grid grid-cols-[7rem_1fr_1.5rem_1.5rem] gap-1 rounded-sm border border-black/10 bg-white p-1">
+							<div class="grid grid-cols-[7rem_1fr_7rem_1.5rem_1.5rem] gap-1 rounded-sm border border-black/10 bg-white p-1">
 								<select class="input-studio min-w-0" value={pathAsset.role || 'main'} onchange={(event) => onUpdateRoutePath(document.path, route.id, pathIndex, 'role', event.currentTarget.value)}>
 									<option value="approach">Approach</option>
 									<option value="main">Main</option>
@@ -147,6 +156,18 @@
 									<option value="variant">Variant</option>
 								</select>
 								<input class="input-studio min-w-0" value={pathAsset.label || ''} placeholder="Label" onchange={(event) => onUpdateRoutePath(document.path, route.id, pathIndex, 'label', event.currentTarget.value)} />
+								<select class="input-studio min-w-0" value="" aria-label="Move path to another route" onchange={(event) => movePath(event, pathIndex)}>
+									<option value="" disabled>Move to…</option>
+									{#each routeDocuments as targetDocument}
+										{#each targetDocument.data?.routes || [] as targetRoute}
+											{#if targetDocument.path !== document.path || targetRoute.id !== route.id}
+												<option value={`${targetDocument.path}\u0000${targetRoute.id}`}>
+													{targetRoute.name || 'Unnamed route'} ({targetDocument.sectorId || 'crag'})
+												</option>
+											{/if}
+										{/each}
+									{/each}
+								</select>
 								<button type="button" class="text-warm-gray-400 hover:text-creator-blue" title="Edit path" onclick={() => onEditRoutePath(document.path, route.id, pathIndex)}><i class="fa-solid fa-pencil text-[10px]"></i></button>
 								<button type="button" class="text-warm-gray-300 hover:text-rose-600" title="Remove path" onclick={() => onRemoveRoutePath(document.path, route.id, pathIndex)}><i class="fa-solid fa-xmark text-[10px]"></i></button>
 							</div>

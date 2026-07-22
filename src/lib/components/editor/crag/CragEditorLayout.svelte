@@ -79,7 +79,8 @@
 		onEditRoutePath = () => {},
 		onUpdateRoutePath = () => {},
 		onRemoveRoutePath = () => {},
-		onDeleteRoute = () => {}
+		onDeleteRoute = () => {},
+		onPlanGenerated = () => {}
 	} = $props();
 
 	let trimPointIndex = $state(0);
@@ -233,6 +234,7 @@
 
 <CragEditorSidebar
 		{inspectorShadow}
+		{map}
 		bind:activeTab
 		{detectedAssets}
 		{editingTrackIndex}
@@ -274,6 +276,7 @@
 		{onUpdateRoutePath}
 		{onRemoveRoutePath}
 		{onDeleteRoute}
+		{onPlanGenerated}
 	/>
 
 {#if vertexDeleteUndo}

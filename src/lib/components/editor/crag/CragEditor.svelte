@@ -41,7 +41,8 @@
 	import {
 		buildEditorFeatureCollection,
 		createIconMarkerElement,
-		ensureCragEditorLayers
+		ensureCragEditorLayers,
+		syncFlightPlanPreview
 	} from '$lib/components/editor/crag/crag-editor-map.js';
 	import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.js';
 	import { generateRouteId } from '$lib/assets/js/id-utils.js';
@@ -66,6 +67,8 @@
 	let activeTool = $state('position'); // 'position' | 'transit' | 'parking' | 'track'
 	let activeTab = $state('info'); // 'info' | 'registry'
 	let selectedSectorId = $state(null);
+	// Preview state is replaced whenever the user generates another mission.
+	let flightPlan = $state(null);
 	let selectedRouteKey = $state(null);
 	let selectedRouteEntry = $derived.by(() => {
 		if (!selectedRouteKey) return null;
@@ -723,9 +726,16 @@
 				selectedSectorId,
 				selectedSectorVertex,
 				editingTrackIndex,
-				draggingTrackPointIndex: untrack(() => activeTrackDragState?.pointIndex ?? null)
+				draggingTrackPointIndex: untrack(() => activeTrackDragState?.pointIndex ?? null),
+				flightPlan: $state.snapshot(flightPlan)
 			})
 		);
+		syncFlightPlanPreview(map, $state.snapshot(flightPlan));
+	}
+
+	function handleFlightPlanGenerated(plan) {
+		flightPlan = plan;
+		syncEditorData();
 	}
 
 	async function saveToServer() {
@@ -1052,6 +1062,33 @@
 	function removeRoutePath(path, routeId, pathIndex) {
 		updateRoutePaths(path, routeId, (paths) => paths.filter((_, index) => index !== pathIndex));
 	}
+
+	function moveRoutePath(sourcePath, sourceRouteId, pathIndex, targetPath, targetRouteId) {
+		const sourceDocument = cragEditorState.routeDocuments.find((entry) => entry.path === sourcePath);
+		const targetDocument = cragEditorState.routeDocuments.find((entry) => entry.path === targetPath);
+		const sourceRoute = sourceDocument?.data.routes?.find((route) => route.id === sourceRouteId);
+		const targetRoute = targetDocument?.data.routes?.find((route) => route.id === targetRouteId);
+		const sourcePaths = sourceRoute?.assets?.paths;
+		const pathAssets = Array.isArray(sourcePaths) ? sourcePaths : sourcePaths ? [sourcePaths] : [];
+		const pathAsset = pathAssets[pathIndex];
+
+		if (!sourceDocument || !targetDocument || !sourceRoute || !targetRoute || !pathAsset) return;
+
+		if (sourceRoute === targetRoute) return;
+
+		sourceRoute.assets = {
+			...(sourceRoute.assets || {}),
+			paths: pathAssets.filter((_, index) => index !== pathIndex)
+		};
+		const targetPaths = targetRoute.assets?.paths;
+		targetRoute.assets = {
+			...(targetRoute.assets || {}),
+			paths: [...(Array.isArray(targetPaths) ? targetPaths : targetPaths ? [targetPaths] : []), pathAsset]
+		};
+		sourceDocument.dirty = true;
+		targetDocument.dirty = true;
+		selectedRouteKey = `${targetPath}:${targetRouteId}`;
+	}
 </script>
 
 <CragEditorMap
@@ -1089,6 +1126,7 @@
 	{commonEquipment}
 	{saveStatus}
 	{saveError}
+	onPlanGenerated={handleFlightPlanGenerated}
 	routeDocuments={cragEditorState.routeDocuments}
 	{selectedRouteKey}
 	onBack={() => goto(base + '/')}
@@ -1148,6 +1186,8 @@
 	onEditRoutePath={editRoutePath}
 	onUpdateRoutePath={updateRoutePath}
 	onRemoveRoutePath={removeRoutePath}
+	onMoveRoutePath={moveRoutePath}
+	routeDocuments={cragEditorState.routeDocuments}
 />
 
 {#if activeTool === 'cut'}

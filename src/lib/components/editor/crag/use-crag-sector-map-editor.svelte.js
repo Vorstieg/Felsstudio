@@ -35,7 +35,6 @@ export function useCragSectorMapEditor({
 		const map = getMap();
 		if (!map || areSectorEditHandlersReady) return;
 		areSectorEditHandlersReady = true;
-		map.dragRotate?.disable();
 		map.touchZoomRotate?.disableRotation();
 
 		map.on('click', 'sector-polygons-fill', (e) => {
@@ -157,6 +156,7 @@ export function useCragSectorMapEditor({
 		map.dragPan.enable();
 		map.touchZoomRotate.enable();
 		map.touchZoomRotate?.disableRotation();
+		map.dragRotate?.enable();
 		map.getCanvas().style.cursor = '';
 	}
 

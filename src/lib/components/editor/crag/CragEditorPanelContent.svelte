@@ -5,9 +5,11 @@
 	import { getGeometryCenter } from '$lib/assets/js/sector-utils.js';
 	import { fileUrl } from '$lib/api/felslager.js';
 	import CragHierarchyPlacement from './CragHierarchyPlacement.svelte';
+	import CragFlightPlanPanel from './CragFlightPlanPanel.svelte';
 
 	let {
 		showTabs = true,
+		map = null,
 		activeTab = $bindable('info'),
 		detectedAssets = [],
 		editingTrackIndex = null,
@@ -49,7 +51,8 @@
 		onEditRoutePath = () => {},
 		onUpdateRoutePath = () => {},
 		onRemoveRoutePath = () => {},
-		onDeleteRoute = () => {}
+		onDeleteRoute = () => {},
+		onPlanGenerated = () => {}
 	} = $props();
 
 	let selectedSector = $derived(
@@ -506,6 +509,13 @@
 							<span class="text-micro-data text-warm-gray-400">Crag default</span>
 						{/if}
 					</div>
+
+					<CragFlightPlanPanel
+						sector={sector}
+						cragName={cragEditorState.crag.name}
+						{map}
+						onPlanGenerated={onPlanGenerated}
+					/>
 				</div>
 			{/if}
 		</div>

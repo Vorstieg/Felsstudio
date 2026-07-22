@@ -23,9 +23,14 @@
 			style: `${base}/${mapStyle}.json`,
 			center: [coords[0], coords[1]],
 			zoom: 13,
+			bearing: 0,
+			pitch: 0,
+			maxPitch: 85,
+			dragRotate: true,
+			touchPitch: true,
+			pitchWithRotate: true,
 			attributionControl: false
 		});
-
 		map.on('style.load', () => {
 			currentLoadedStyle = mapStyle;
 			isMapLoaded = true;
@@ -54,5 +59,5 @@
 </script>
 
 <div class="h-screen w-screen absolute overflow-hidden bg-warm-white">
-	<div bind:this={mapElement} class="w-full h-full grayscale-[0.2]"></div>
+	<div bind:this={mapElement} class="w-full h-full"></div>
 </div>
