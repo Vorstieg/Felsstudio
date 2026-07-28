@@ -39,7 +39,7 @@
 			const query = searchQuery.toLowerCase();
 			if (query === '') return true;
 
-			const sectors = l.properties.sectors || [];
+			const sectors = l.properties?.sectors ?? [];
 			const sectorMatch = sectors.some(
 				(sector) =>
 					(sector.name || '').toLowerCase().includes(query) ||
@@ -48,8 +48,8 @@
 			);
 
 			return (
-				l.properties.name.toLowerCase().includes(query) ||
-				l.properties.path.toLowerCase().includes(query) ||
+				(l.properties?.name ?? '').toLowerCase().includes(query) ||
+				(l.properties?.path ?? '').toLowerCase().includes(query) ||
 				sectorMatch
 			);
 		})

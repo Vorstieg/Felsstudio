@@ -42,11 +42,11 @@ const fetchCrags = async ({ offset = 0, limit = cragsPerPage, search = '' } = {}
 	if (search) {
 		const query = search.toLowerCase();
 		sortedCrags = sortedCrags.filter((crag) => {
-			const sectors = crag.properties.sectors || [];
+			const sectors = crag.properties?.sectors ?? [];
 			return (
-				crag.properties.name.toLowerCase().includes(query) ||
-				crag.properties.type.includes(search) ||
-				crag.properties.path.toLowerCase().includes(query) ||
+				(crag.properties?.name ?? '').toLowerCase().includes(query) ||
+				(crag.properties?.type?.includes(search) ?? false) ||
+				(crag.properties?.path ?? '').toLowerCase().includes(query) ||
 				sectors.some(
 					(sector) =>
 						(sector.name || '').toLowerCase().includes(query) ||
