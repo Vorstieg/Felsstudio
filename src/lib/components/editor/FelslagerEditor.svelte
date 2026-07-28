@@ -2,15 +2,17 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
+	import { page } from '$app/stores';
 	import { _ } from 'svelte-i18n';
-	import { listDir, readFile, writeFile, deleteFile } from '$lib/api/felslager.js';
+	import { listDir, readFile, writeFile, deleteFile, fileUrl, renameFile } from '$lib/api/felslager.js';
 	import { authState } from '$lib/api/auth.svelte.js';
 
-	let currentPath = $state('');
+	let currentPath = $derived($page.url.searchParams.get('path') || '');
 	let items = $state([]);
 	let loadingItems = $state(false);
 
 	let selectedFile = $state(null);
+	let selectedFileType = $state(null);
 	let fileContent = $state('');
 	let saving = $state(false);
 	let error = $state(null);
@@ -55,7 +57,6 @@
 				...item,
 				path: cleanPath ? `${cleanPath}/${item.name}` : item.name
 			}));
-			currentPath = cleanPath;
 		} catch (e) {
 			error = e.message;
 		} finally {
@@ -63,27 +64,44 @@
 		}
 	}
 
-	onMount(() => {
-		loadDirectory('');
+	$effect(() => {
+		// Only run when currentPath changes
+		loadDirectory(currentPath);
 	});
 
 	async function openItem(item) {
 		if (item.type === 'dir') {
 			searchQuery = '';
-			await loadDirectory(item.path);
 			selectedFile = null;
+			selectedFileType = null;
 			fileContent = '';
-		} else if (item.name.endsWith('.json')) {
-			try {
-				const res = await readFile(item.path);
-				fileContent = await res.text();
-				selectedFile = item;
-				error = null;
-			} catch (e) {
-				error = e.message;
-			}
+			const url = new URL(window.location.href);
+			url.searchParams.set('path', item.path);
+			goto(url.toString(), { keepFocus: true });
 		} else {
-			error = `Cannot edit ${item.name}. Only .json files are supported.`;
+			const lowerName = item.name.toLowerCase();
+			const isJson = lowerName.endsWith('.json');
+			const isImage = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico'].some(ext => lowerName.endsWith(ext));
+			const isBinary = ['.zip', '.pdf', '.mp4', '.mp3', '.wav', '.exe', '.bin'].some(ext => lowerName.endsWith(ext));
+
+			if (isImage) {
+				selectedFile = item;
+				selectedFileType = 'image';
+				fileContent = '';
+				error = null;
+			} else if (!isBinary) {
+				try {
+					const res = await readFile(item.path);
+					fileContent = await res.text();
+					selectedFile = item;
+					selectedFileType = isJson ? 'json' : 'text';
+					error = null;
+				} catch (e) {
+					error = e.message;
+				}
+			} else {
+				error = `Cannot open ${item.name}. Unsupported file type.`;
+			}
 		}
 	}
 
@@ -91,9 +109,18 @@
 		if (!currentPath) return;
 		const parts = currentPath.split('/').filter(Boolean);
 		parts.pop();
-		loadDirectory(parts.join('/'));
 		selectedFile = null;
+		selectedFileType = null;
 		fileContent = '';
+		
+		const newPath = parts.join('/');
+		const url = new URL(window.location.href);
+		if (newPath) {
+			url.searchParams.set('path', newPath);
+		} else {
+			url.searchParams.delete('path');
+		}
+		goto(url.toString(), { keepFocus: true });
 	}
 
 	function saveFile() {
@@ -106,13 +133,44 @@
 		saving = true;
 		error = null;
 		try {
-			// Validate JSON before saving
-			JSON.parse(fileContent);
-			await writeFile(selectedFile.path, fileContent, 'application/json');
+			if (selectedFileType === 'json') {
+				// Validate JSON before saving
+				JSON.parse(fileContent);
+				await writeFile(selectedFile.path, fileContent, 'application/json');
+			} else {
+				await writeFile(selectedFile.path, fileContent, 'text/plain');
+			}
 		} catch (e) {
 			error = e.message;
 		} finally {
 			saving = false;
+		}
+	}
+
+	function renameItem(item, e) {
+		e.stopPropagation();
+		const newName = prompt(`Enter new name for ${item.name}:`, item.name);
+		if (!newName || newName === item.name) return;
+		
+		const parts = item.path.split('/');
+		parts.pop();
+		const basePath = parts.join('/');
+		const newPath = basePath ? `${basePath}/${newName}` : newName;
+		
+		if (!authState.requireAuth(() => renameItemAction(item, newPath))) return;
+		renameItemAction(item, newPath);
+	}
+
+	async function renameItemAction(item, newPath) {
+		try {
+			await renameFile(item.path, newPath);
+			if (selectedFile?.path === item.path) {
+				selectedFile.path = newPath;
+				selectedFile.name = newPath.split('/').pop();
+			}
+			await loadDirectory(currentPath);
+		} catch (err) {
+			error = err.message;
 		}
 	}
 
@@ -128,12 +186,22 @@
 			await deleteFile(item.path);
 			if (selectedFile?.path === item.path) {
 				selectedFile = null;
+				selectedFileType = null;
 				fileContent = '';
 			}
 			await loadDirectory(currentPath);
 		} catch (err) {
 			error = err.message;
 		}
+	}
+	
+	function getFileIcon(item) {
+		if (item.type === 'dir') return 'fa-folder text-amber-500';
+		const name = item.name.toLowerCase();
+		if (['.png', '.jpg', '.jpeg', '.svg', '.gif', '.webp', '.ico'].some(e => name.endsWith(e))) return 'fa-image text-emerald-500';
+		if (name.endsWith('.json')) return 'fa-file-code text-creator-blue';
+		if (['.txt', '.md', '.csv'].some(e => name.endsWith(e))) return 'fa-file-lines text-warm-gray-400';
+		return 'fa-file text-warm-gray-400';
 	}
 	
 	let breadcrumbs = $derived(currentPath ? currentPath.split('/').filter(Boolean) : []);
@@ -145,8 +213,8 @@
 		<div class="flex items-center gap-4">
 			<button
 				class="tool-btn"
-				onclick={() => goto(base + '/')}
-				title={$_('ui.back_to_launcher')}
+				onclick={() => currentPath ? navigateUp() : goto(base + '/')}
+				title={currentPath ? 'Go up' : $_('ui.back_to_launcher')}
 			>
 				<i class="fa-solid fa-arrow-left"></i>
 			</button>
@@ -156,7 +224,7 @@
 			</div>
 		</div>
 		<div class="flex gap-2">
-			{#if selectedFile}
+			{#if selectedFile && selectedFileType !== 'image'}
 				<button class="btn-primary px-4" onclick={saveFile} disabled={saving}>
 					{saving ? $_('save.saving') : $_('save.save_to_server')}
 				</button>
@@ -193,14 +261,14 @@
 			<div class="px-3 py-2 border-b border-black/15 bg-warm-gray-100 flex items-center gap-2 overflow-x-auto text-micro-data whitespace-nowrap">
 				<button 
 					class="text-warm-gray-500 hover:text-creator-blue transition-colors cursor-pointer flex items-center justify-center w-6 h-6 rounded-sm hover:bg-black/5"
-					onclick={() => loadDirectory('')}>
+					onclick={() => { const u = new URL(window.location.href); u.searchParams.delete('path'); goto(u.toString(), { keepFocus: true }); }}>
 					<i class="fa-solid fa-house"></i>
 				</button>
 				{#each breadcrumbs as part, i}
 					<span class="text-black/30">/</span>
 					<button 
 						class="text-warm-gray-500 hover:text-creator-blue transition-colors cursor-pointer px-1.5 py-1 rounded-sm hover:bg-black/5"
-						onclick={() => loadDirectory(breadcrumbs.slice(0, i + 1).join('/'))}>
+						onclick={() => { const u = new URL(window.location.href); u.searchParams.set('path', breadcrumbs.slice(0, i + 1).join('/')); goto(u.toString(), { keepFocus: true }); }}>
 						{part}
 					</button>
 				{/each}
@@ -233,7 +301,7 @@
 										onkeydown={(e) => { if (e.key === 'Enter') openItem(item); }}
 									>
 										<div class="flex items-center gap-3">
-											<i class="fa-solid {item.type === 'dir' ? 'fa-folder text-amber-500' : 'fa-file-code text-warm-gray-400'} w-4 text-center"></i>
+											<i class="fa-solid {getFileIcon(item)} w-4 text-center"></i>
 											<span class="font-medium {selectedFile?.path === item.path ? 'text-creator-blue' : 'text-near-black'}">{item.name}</span>
 										</div>
 										<span class="text-micro-data text-warm-gray-400 mt-1 truncate pl-7">
@@ -281,16 +349,25 @@
 										onclick={() => openItem(item)}
 									>
 										<div class="flex items-center gap-3 truncate">
-											<i class="fa-solid {item.type === 'dir' ? 'fa-folder text-amber-500' : 'fa-file-code text-warm-gray-400'} w-4 text-center"></i>
+											<i class="fa-solid {getFileIcon(item)} w-4 text-center"></i>
 											<span class="truncate font-medium {selectedFile?.path === item.path ? 'text-creator-blue' : 'text-near-black'}">{item.name}</span>
 										</div>
-										<button 
-											class="text-warm-gray-300 hover:text-rose-600 hover:bg-rose-50 w-6 h-6 rounded flex items-center justify-center transition-colors"
-											onclick={(e) => deleteItem(item, e)}
-											title={$_('ui.delete')}
-										>
-											<i class="fa-solid fa-trash-can text-[11px]"></i>
-										</button>
+										<div class="flex items-center gap-1">
+											<button 
+												class="text-warm-gray-300 hover:text-creator-blue hover:bg-creator-blue/10 w-6 h-6 rounded flex items-center justify-center transition-colors"
+												onclick={(e) => renameItem(item, e)}
+												title="Rename"
+											>
+												<i class="fa-solid fa-pen text-[11px]"></i>
+											</button>
+											<button 
+												class="text-warm-gray-300 hover:text-rose-600 hover:bg-rose-50 w-6 h-6 rounded flex items-center justify-center transition-colors"
+												onclick={(e) => deleteItem(item, e)}
+												title={$_('ui.delete')}
+											>
+												<i class="fa-solid fa-trash-can text-[11px]"></i>
+											</button>
+										</div>
 									</div>
 								</li>
 							{/each}
@@ -313,24 +390,34 @@
 
 			{#if selectedFile}
 				<div class="flex items-center gap-2 p-3 border-b border-black/15 bg-white text-micro-data">
-					<i class="fa-solid fa-file-code text-creator-blue"></i>
+					<i class="fa-solid {selectedFileType === 'image' ? 'fa-image text-emerald-500' : (selectedFileType === 'json' ? 'fa-file-code text-creator-blue' : 'fa-file-lines text-warm-gray-400')}"></i>
 					<span class="font-bold text-near-black">{selectedFile.name}</span>
-					<span class="text-warm-gray-300 ml-2">Editing</span>
+					<span class="text-warm-gray-300 ml-2">{selectedFileType === 'image' ? 'Viewing' : 'Editing'}</span>
 				</div>
 				<div class="flex-1 bg-warm-white p-4 overflow-hidden relative">
-					<textarea
-						class="absolute inset-4 bg-white panel-inner p-4 font-sans text-body-text leading-relaxed resize-none custom-scrollbar outline-none focus:ring-1 focus:ring-creator-blue focus:border-creator-blue transition-shadow"
-						bind:value={fileContent}
-						spellcheck="false"
-					></textarea>
+					{#if selectedFileType === 'image'}
+						<div class="absolute inset-4 bg-white panel-inner flex items-center justify-center p-4">
+							<img 
+								src={fileUrl(selectedFile.path)} 
+								alt={selectedFile.name} 
+								class="max-w-full max-h-full object-contain" 
+							/>
+						</div>
+					{:else}
+						<textarea
+							class="absolute inset-4 bg-white panel-inner p-4 font-sans text-body-text leading-relaxed resize-none custom-scrollbar outline-none focus:ring-1 focus:ring-creator-blue focus:border-creator-blue transition-shadow"
+							bind:value={fileContent}
+							spellcheck="false"
+						></textarea>
+					{/if}
 				</div>
 			{:else}
 				<div class="flex-1 flex flex-col items-center justify-center text-warm-gray-300 bg-white">
 					<div class="w-16 h-16 rounded-full bg-warm-gray-100 flex items-center justify-center mb-4">
-						<i class="fa-solid fa-file-code text-2xl opacity-50"></i>
+						<i class="fa-solid fa-file text-2xl opacity-50"></i>
 					</div>
 					<p class="text-section-title text-warm-gray-500">Select a file</p>
-					<p class="text-body-text mt-2 text-center max-w-xs">Choose a JSON file from the explorer to view and edit its contents.</p>
+					<p class="text-body-text mt-2 text-center max-w-xs">Choose a file from the explorer to view or edit its contents.</p>
 				</div>
 			{/if}
 		</div>

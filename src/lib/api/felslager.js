@@ -173,6 +173,26 @@ export async function deleteFile(path) {
 }
 
 /**
+ * Rename/Move a file or directory. Requires authentication.
+ * @param {string} oldPath
+ * @param {string} newPath
+ * @returns {Promise<Response>}
+ */
+export async function renameFile(oldPath, newPath) {
+	const url = `${BASE_URL}/${normalizePath(oldPath)}`;
+	const headers = {
+		...authHeaders(),
+		'Destination': encodeURIComponent(normalizePath(newPath))
+	};
+	const res = await fetch(url, { method: 'MOVE', headers });
+	if (!res.ok) {
+		if (isAuthRejected(res)) clearCredentials();
+		throw new Error(`Failed to rename ${oldPath}: ${res.status} ${res.statusText}`);
+	}
+	return res;
+}
+
+/**
  * Build the full public URL for a file (for use in <img src>, model loaders, etc.)
  * @param {string} path - Path relative to the API root
  * @returns {string}

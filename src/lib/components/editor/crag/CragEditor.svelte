@@ -757,7 +757,7 @@
 				const image = cragEditorState.crag.assets.images[i];
 				if (image._file) {
 					const imagePath = topo.getImagePath(image.name, i);
-					await writeFile(topo.getImagePath(image.name, i), image.type || image._file.type);
+					await writeFile(topo.getImagePath(image.name, i), image._file, image.type || image._file.type);
 					uploadedImages.push({ name: image.name, path: imagePath, type: image.type, size: image.size });
 				} else {
 					uploadedImages.push({

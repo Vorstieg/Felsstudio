@@ -44,6 +44,14 @@ export class Topo {
 		return `${this._getPath()}-${kind}${suffix}.json`;
 	}
 	getImagePath(name, index = 0) {
-		return `${this.getBaseName()}-image${index > 0 ? '-' + index : ''}-${slugifyName(name)}`;
+		const lastDot = name.lastIndexOf('.');
+		let ext = '';
+		let baseName = name;
+		if (lastDot > 0) {
+			ext = name.substring(lastDot).toLowerCase();
+			baseName = name.substring(0, lastDot);
+		}
+		const slug = slugifyName(baseName) || 'img';
+		return `${this._getPath()}-image${index > 0 ? '-' + index : ''}-${slug}${ext}`;
 	}
 }
