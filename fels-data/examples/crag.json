@@ -1,0 +1,31 @@
+{
+	"type": "Feature",
+	"properties": {
+		"id": "lausbubenwande",
+		"name": "Lausbubenwände",
+		"path": "europe/austria/lower-austria/mödling/",
+		"type": ["sports-climbing", "bouldering", "trad"],
+		"tags": [],
+		"security": "Gut",
+		"rock_type": "",
+		"description_de": "Die Lausbubenwände sind nur 5 Minuten vom Efeugrat entfernt. Jedoch ist der Fels wesentlich weniger abgegriffen.",
+		"description_en": "The Lausbubenwände are only 5 minutes away from the Efeugrat. However, the rock is much less polished.",
+		"equipment": [],
+		"assets": { "images": [] },
+		"sectors": [
+			{ "id": "untere-lausbubenwand", "name": "Untere Lausbubenwand" },
+			{ "id": "obere-lausbubenwand", "name": "Obere Lausbubenwand" }
+		],
+		"topo": { "site": "", "link": "" },
+		"geometry": {
+			"type": "Point",
+			"coordinates": [16.272240073630343, 48.080403726320185]
+		},
+		"date": "2026-07-10",
+		"updated": "2026-07-29"
+	},
+	"geometry": {
+		"type": "Point",
+		"coordinates": [16.272240073630343, 48.080403726320185]
+	}
+}

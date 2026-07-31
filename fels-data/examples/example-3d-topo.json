@@ -1,0 +1,55 @@
+{
+	"id": "efeugrat",
+	"name": "Efeugrat",
+	"crag_id": "",
+	"sector_id": "",
+	"description": "",
+	"rock": "granite",
+	"tags": [],
+	"routes": [
+		{
+			"id": "1",
+			"name": "Der Galgen",
+			"grade": "5a",
+			"_gradeScale": "french",
+			"points": [
+				[0, 0, 0],
+				[0.02, 1, 0.01]
+			],
+			"orientation": [-0.53, 0.4, 0.74],
+			"fixPoints": ["fix-1"],
+			"boltAmount": 5,
+			"length": 13,
+			"points2D": [
+				[0.08, 0.69],
+				[0.13, 0.55]
+			]
+		}
+	],
+	"fixPoints": [
+		{
+			"id": "fix-1",
+			"type": "belay",
+			"position": [0.02, 1, 0.01],
+			"position2D": [0.13, 0.55]
+		}
+	],
+	"outlines": [
+		{
+			"id": "outline-1",
+			"points2D": [
+				[0.05, 0.7],
+				[0.75, 0.7]
+			]
+		}
+	],
+	"textLabels": [],
+	"date": "2026-01-13",
+	"updated": "2026-07-08",
+	"coordinates": [16.27037143528025, 48.080740531304905],
+	"altitude": 253.30919911722066,
+	"image2D": null,
+	"imageAspectRatio": 1.5,
+	"editorMode": "3d",
+	"author": "Vorstieg Software"
+}

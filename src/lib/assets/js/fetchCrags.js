@@ -2,6 +2,8 @@ import { cragsPerPage } from '$lib/config';
 import { listDir, readJson } from '$lib/api/felslager.js';
 import { normalizeAccessCollection } from '$lib/assets/js/access-geojson.js';
 
+/** @typedef {import('@vorstieg/fels-data/types').CragFeature} CragFeature */
+
 function isEntryJsonFile(file) {
 	if (file.type !== 'file') return false;
 	if (!file.path.endsWith('.json')) return false;
@@ -20,7 +22,7 @@ const fetchCrags = async ({ offset = 0, limit = cragsPerPage, search = '' } = {}
 		await Promise.all(
 			entryFiles.map(async (file) => {
 				try {
-					const data = await readJson(file.path);
+					const data = await /** @type {Promise<CragFeature>} */ (readJson(file.path));
 					if (data.sector_id) return null;
 
 					data.properties = data.properties || {};
@@ -71,7 +73,8 @@ const fetchCrags = async ({ offset = 0, limit = cragsPerPage, search = '' } = {}
 
 export async function loadAccessCollection(topo, cragEditorState) {
 	try {
-		cragEditorState.access = normalizeAccessCollection(await readJson(topo.getAccessPath()));
+		const data = await readJson(topo.getAccessPath());
+		cragEditorState.access = normalizeAccessCollection(data);
 	} catch {
 		cragEditorState.access = normalizeAccessCollection(null);
 	}

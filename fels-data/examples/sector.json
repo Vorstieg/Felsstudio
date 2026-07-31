@@ -1,0 +1,38 @@
+{
+	"type": "Feature",
+	"crag_id": "lausbubenwande",
+	"sector_id": "obere-lausbubenwand",
+	"properties": {
+		"id": "obere-lausbubenwand",
+		"name": "Obere Lausbubenwand",
+		"sort": 20,
+		"type": ["sports-climbing", "trad", "bouldering"],
+		"tags": [],
+		"security": "Gut",
+		"rock_type": "",
+		"description_de": "",
+		"description_en": "",
+		"approach_de": "",
+		"approach_en": "",
+		"topo": { "site": "", "link": "" },
+		"assets": { "topos": [], "images": [], "models": [], "approaches": [] },
+		"path": "lower-austria/mödling/obere-lausbubenwand",
+		"equipment": [],
+		"date": "2026-05-22",
+		"updated": "2026-05-22"
+	},
+	"geometry": {
+		"type": "Polygon",
+		"coordinates": [
+			[
+				[16.27193513439289, 48.08014255504011],
+				[16.272249683925935, 48.080096789387],
+				[16.272491036056692, 48.080096789387],
+				[16.272504444508456, 48.08021660339185],
+				[16.272280122197003, 48.08024014687638],
+				[16.27195689038129, 48.08026091107314],
+				[16.27193513439289, 48.08014255504011]
+			]
+		]
+	}
+}

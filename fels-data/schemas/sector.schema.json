@@ -1,0 +1,44 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "https://schemas.vorstieg.com/fels-data/sector.schema.json",
+	"title": "Fels sector entry",
+	"description": "A sector entry stored as a GeoJSON Feature below a crag directory.",
+	"type": "object",
+	"required": ["type", "properties", "geometry"],
+	"properties": {
+		"type": { "const": "Feature" },
+		"crag_id": { "type": "string", "minLength": 1 },
+		"sector_id": { "type": "string", "minLength": 1 },
+		"properties": { "$ref": "#/$defs/sectorProperties" },
+		"geometry": {
+			"$ref": "https://schemas.vorstieg.com/fels-data/crag.schema.json#/$defs/pointOrAreaGeometry"
+		}
+	},
+	"additionalProperties": true,
+	"$defs": {
+		"sectorProperties": {
+			"type": "object",
+			"required": ["id", "name", "sort", "type", "tags", "assets"],
+			"properties": {
+				"id": { "type": "string", "minLength": 1 },
+				"name": { "type": "string", "minLength": 1 },
+				"sort": { "type": "number" },
+				"type": { "type": "array", "items": { "type": "string" } },
+				"tags": { "type": "array", "items": { "type": "string" } },
+				"security": { "type": "string" },
+				"rock_type": { "type": "string" },
+				"description_de": { "type": "string" },
+				"description_en": { "type": "string" },
+				"approach_de": { "type": "string" },
+				"approach_en": { "type": "string" },
+				"topo": { "type": "object" },
+				"assets": { "type": "object" },
+				"path": { "type": "string" },
+				"equipment": { "type": "array" },
+				"date": { "type": "string" },
+				"updated": { "type": "string" }
+			},
+			"additionalProperties": true
+		}
+	}
+}

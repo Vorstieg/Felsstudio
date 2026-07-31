@@ -1,32 +1,44 @@
 import { Vector3 } from 'three';
 
-export const userState = $state({
-	topo: {
-		name: '',
-		crag_id: '',
+/** @typedef {import('@vorstieg/fels-data/types').TopoDocument} TopoDocument */
+/**
+ * @typedef {TopoDocument & {
+ *   modelOffset: number[],
+ *   wallAzimuth: number,
+ *   scale: number,
+ *   canvasAspectRatio: number,
+ *   backgroundFit: string
+ * }} EditorTopo
+ */
+
+/** @type {EditorTopo} */
+const initialTopo = {
+	name: '',
+			crag_id: '',
 		sector_id: '',
-		description: '',
-		rock: 'granite',
-		tags: [],
-		routes: [],
-		fixPoints: [], // Unified markers: [{id, type, position: [x,y,z], position2D: [x,y], rotation2D, scale2D}]
-		outlines: [], // Rock outlines: [{id, points2D: [[x,y], ...]}]
-		textLabels: [],
-		date: '',
-		updated: '',
-		modelOffset: [0, 0, 0],
-		coordinates: [0, 0],
-		wallAzimuth: 0,
-		altitude: 0,
-		scale: 1,
-		// 2D TOPO Editor fields
-		image2D: null, // Base64 data URL or external URL, null for blank canvas
-		imageAspectRatio: 1.5, // Width/Height ratio of the source image
-		// The coordinate space for annotations. It must not change when a background is replaced.
-		canvasAspectRatio: 1.5,
-		backgroundFit: 'contain',
-		editorMode: '3d' // '2d' | '3d' - which editor is active
-	},
+	description: '',
+	rock: 'granite',
+	tags: [],
+	routes: [],
+	fixPoints: [], // Unified markers: [{id, type, position: [x,y,z], position2D: [x,y], rotation2D, scale2D}]
+	outlines: [], // Rock outlines: [{id, points2D: [[x,y], ...]}]
+	textLabels: [],
+	date: '',
+	updated: '',
+	modelOffset: [0, 0, 0],
+	coordinates: [0, 0],
+	wallAzimuth: 0,
+	altitude: 0,
+	scale: 1,
+	image2D: null,
+	imageAspectRatio: 1.5,
+	canvasAspectRatio: 1.5,
+	backgroundFit: 'contain',
+	editorMode: '3d'
+};
+
+export const userState = $state({
+	topo: initialTopo,
 	// UI State for the editor
 	ui: {
 		workspace: null, // '3d-create' | '3d-edit' | '2d-create' | '2d-edit'
@@ -85,30 +97,7 @@ export const userState = $state({
 	},
 
 	reset() {
-		this.topo = {
-			name: '',
-			crag_id: '',
-			sector_id: '',
-			description: '',
-			rock: 'granite',
-			tags: [],
-			routes: [],
-			fixPoints: [],
-			outlines: [],
-			textLabels: [],
-			date: '',
-			updated: '',
-			modelOffset: [0, 0, 0],
-			coordinates: [0, 0],
-			wallAzimuth: 0,
-			altitude: 0,
-			scale: 1,
-			image2D: null,
-			imageAspectRatio: 1.5,
-			canvasAspectRatio: 1.5,
-			backgroundFit: 'contain',
-			editorMode: '3d'
-		};
+		this.topo = { ...initialTopo, routes: [], fixPoints: [], outlines: [], textLabels: [] };
 		if (this.ui.modelUrl) {
 			URL.revokeObjectURL(this.ui.modelUrl);
 		}
