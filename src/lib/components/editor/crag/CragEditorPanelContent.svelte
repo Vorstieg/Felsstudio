@@ -35,8 +35,7 @@
 		onSetHoverHighlight = () => {},
 		onClearDetectedAssets = () => {},
 		onAddDetectedAsset = () => {},
-		onRemoveTransit = () => {},
-		onRemoveParking = () => {},
+		onRemoveAccessFeature = () => {},
 		onEditTrack = () => {},
 		onRemoveTrack = () => {},
 		onFinalizeTrack = () => {},
@@ -58,6 +57,10 @@
 	let selectedSector = $derived(
 		(cragEditorState.crag.sectors || []).find((sector) => sector.id === selectedSectorId)
 	);
+	let accessFeatures = $derived(cragEditorState.access?.features || []);
+	let transitFeatures = $derived(accessFeatures.filter((feature) => feature.properties?.kind === 'transit'));
+	let parkingFeatures = $derived(accessFeatures.filter((feature) => feature.properties?.kind === 'parking'));
+	let approachFeatures = $derived(accessFeatures.filter((feature) => feature.properties?.kind === 'approach'));
 	let pendingCragImageCount = $derived(
 		(cragEditorState.crag.assets?.images || []).filter((image) => image?._file).length
 	);
@@ -148,7 +151,7 @@
 	<button
 		class="flex-1 px-2 py-1.5 rounded-sm text-ui-label transition-none {activeTab === 'registry' ? 'bg-white shadow-sm text-near-black' : 'text-warm-gray-500 hover:bg-black/5'}"
 		onclick={() => activeTab = 'registry'}><i class="fa-solid fa-layer-group mr-1.5"></i> Registry <span
-		class="ml-1 text-micro-data {activeTab === 'registry' ? 'text-warm-gray-400' : 'text-warm-gray-400'}">{cragEditorState.transit.length + cragEditorState.parking.length + cragEditorState.tracks.length}</span>
+		class="ml-1 text-micro-data {activeTab === 'registry' ? 'text-warm-gray-400' : 'text-warm-gray-400'}">{accessFeatures.length}</span>
 	</button>
 	<button
 		class="flex-1 px-2 py-1.5 rounded-sm text-ui-label transition-none {activeTab === 'sectors' ? 'bg-white shadow-sm text-near-black' : 'text-warm-gray-500 hover:bg-black/5'}"
@@ -536,8 +539,8 @@
 								<div class="flex items-center gap-2">
 									<div
 										class="w-6 h-6 rounded-sm bg-black/5 flex items-center justify-center text-warm-gray-500 text-micro-data">
-										{#if asset.type === 'parking'}<i
-											class="fa-solid fa-square-parking"></i>{:else if asset.type === 'bus'}<i
+										{#if asset.kind === 'parking'}<i
+											class="fa-solid fa-square-parking"></i>{:else if asset.mode === 'bus'}<i
 											class="fa-solid fa-bus"></i>{:else}<i class="fa-solid fa-train"></i>{/if}
 									</div>
 									<div class="min-w-0"><p
@@ -554,14 +557,14 @@
 				</div>
 			{/if}
 
-			{#if cragEditorState.transit.length === 0 && cragEditorState.parking.length === 0 && cragEditorState.tracks.length === 0 && detectedAssets.length === 0}
+			{#if accessFeatures.length === 0 && detectedAssets.length === 0}
 				<div class="bg-warm-white rounded-sm p-6 text-center border border-black/15 mt-2">
 					<i class="fa-solid fa-layer-group text-2xl text-warm-gray-300 mb-2 block"></i>
 					<p class="text-ui-label text-warm-gray-500">Inventory Empty</p>
 				</div>
 			{/if}
 
-			{#each cragEditorState.transit as point}
+			{#each transitFeatures as point}
 				<div class="panel-inner p-2 flex flex-col gap-2 transition-none border-black/10 hover:border-creator-blue">
 					<div class="flex justify-between items-center">
 						<div class="flex items-center gap-2">
@@ -569,19 +572,19 @@
 								class="w-6 h-6 rounded-sm bg-black/5 text-warm-gray-500 flex items-center justify-center border border-black/10">
 								<i class="fa-solid fa-bus text-[10px]"></i></div>
 							<span class="text-ui-label text-near-black !m-0">Transit Point</span></div>
-						<button onclick={() => onRemoveTransit(point.id)}
+						<button onclick={() => onRemoveAccessFeature(point.id)}
 										class="w-6 h-6 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600 transition-none flex items-center justify-center">
 							<i class="fa-solid fa-trash-can text-[10px]"></i></button>
 					</div>
-					<div class="flex gap-1.5"><select bind:value={point.type} class="input-studio w-16 !px-1 appearance-none">
+					<div class="flex gap-1.5"><select bind:value={point.properties.mode} class="input-studio w-16 !px-1 appearance-none">
 						<option value="bus">Bus</option>
 						<option value="train">Train</option>
-					</select><input type="text" bind:value={point.name} class="input-studio flex-1"
+					</select><input type="text" bind:value={point.properties.name} class="input-studio flex-1"
 													placeholder="Station Name" /></div>
 				</div>
 			{/each}
 
-			{#each cragEditorState.parking as park}
+			{#each parkingFeatures as park}
 				<div
 					class="panel-inner p-2 flex justify-between items-center transition-none border-black/10 hover:border-creator-blue">
 					<div class="flex items-center gap-2">
@@ -589,13 +592,13 @@
 							class="w-6 h-6 rounded-sm bg-black/5 flex items-center justify-center text-warm-gray-500 border border-black/10">
 							<i class="fa-solid fa-square-parking text-[10px]"></i></div>
 						<span class="text-ui-label text-near-black !m-0">Parking Space</span></div>
-					<button onclick={() => onRemoveParking(park.id)}
+					<button onclick={() => onRemoveAccessFeature(park.id)}
 									class="w-6 h-6 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600 transition-none flex items-center justify-center">
 						<i class="fa-solid fa-trash-can text-[10px]"></i></button>
 				</div>
 			{/each}
 
-			{#each cragEditorState.tracks as track, i}
+			{#each approachFeatures as track, i}
 				<div class="panel-inner p-2 flex flex-col gap-2 transition-none border-black/10 hover:border-creator-blue">
 					<div class="flex justify-between items-center">
 						<div class="flex items-center gap-2">
@@ -604,18 +607,18 @@
 								<i class="fa-solid fa-route text-[10px]"></i></div>
 							<span class="text-ui-label text-near-black !m-0">Approach Track</span></div>
 						<div class="flex items-center gap-1">
-							<button onclick={() => onEditTrack(i)}
+							<button onclick={() => onEditTrack(track.id)}
 											class="w-6 h-6 rounded-sm text-warm-gray-400 hover:bg-creator-blue/10 hover:text-creator-blue transition-none flex items-center justify-center"
 											title="Edit approach track">
 								<i class="fa-solid fa-pen text-[10px]"></i></button>
-							<button onclick={() => onRemoveTrack(i)}
+							<button onclick={() => onRemoveTrack(track.id)}
 											class="w-6 h-6 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600 transition-none flex items-center justify-center"
 											title="Delete approach track">
 								<i class="fa-solid fa-trash-can text-[10px]"></i></button>
 						</div>
 					</div>
-					<input type="text" bind:value={track.name} class="input-studio w-full" placeholder="Track Name" />
-					{#if editingTrackIndex === i}
+					<input type="text" bind:value={track.properties.name} class="input-studio w-full" placeholder="Track Name" />
+					{#if editingTrackIndex === track.id}
 						<div class="flex items-center gap-1.5">
 							<button onclick={onFinalizeTrack}
 											class="flex-1 bg-creator-blue text-white rounded-sm py-1 text-micro-data font-bold uppercase tracking-widest">

@@ -43,21 +43,3 @@ export async function buildRoutedDraft(waypoints = []) {
 	}
 	return routedPoints;
 }
-
-export function removeTrackByIndex(tracks = [], index) {
-	return tracks.filter((_, i) => i !== index);
-}
-
-export function updateTrackCoordinates(tracks = [], index, coordinates) {
-	return tracks.map((track, i) => (i === index ? { ...track, coordinates } : track));
-}
-
-export function appendNewTrack(tracks = [], coordinates) {
-	return [
-		...tracks,
-		{
-			name: 'Transit Track ' + (tracks.length + 1),
-			coordinates
-		}
-	];
-}

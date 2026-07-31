@@ -63,8 +63,7 @@
 		onSetHoverHighlight = () => {},
 		onClearDetectedAssets = () => {},
 		onAddDetectedAsset = () => {},
-		onRemoveTransit = () => {},
-		onRemoveParking = () => {},
+		onRemoveAccessFeature = () => {},
 		onEditTrack = () => {},
 		onRemoveTrack = () => {},
 		onFinalizeTrack = () => {},
@@ -260,8 +259,7 @@
 		{onSetHoverHighlight}
 		{onClearDetectedAssets}
 		{onAddDetectedAsset}
-		{onRemoveTransit}
-		{onRemoveParking}
+		{onRemoveAccessFeature}
 		{onEditTrack}
 		{onRemoveTrack}
 		{onFinalizeTrack}

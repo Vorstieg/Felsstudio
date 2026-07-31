@@ -2,22 +2,28 @@ import maplibregl from 'maplibre-gl';
 import * as turf from '@turf/turf';
 import { base } from '$app/paths';
 import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
+import { createAccessFeature, createAccessId } from '$lib/assets/js/access-geojson.js';
 import { createIconMarkerElement } from '$lib/components/editor/crag/crag-editor-map.js';
 import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.js';
 
 export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 	let detectedAssets = $state([]);
-	let transitMarkers = $state([]);
-	let parkingMarkers = $state([]);
+	let pointMarkers = $state([]);
 	let hoverMarker = null;
 	let areDetectionPointHandlersReady = false;
 
+	const accessFeatures = () => cragEditorState.access.features || [];
+	const pointFeatures = () =>
+		accessFeatures().filter((feature) => feature.geometry?.type === 'Point');
+
+	function replaceFeatures(features) {
+		cragEditorState.access = { ...cragEditorState.access, features };
+	}
+
 	function cleanup() {
 		if (hoverMarker) hoverMarker.remove();
-		transitMarkers.forEach((item) => item.marker.remove());
-		parkingMarkers.forEach((item) => item.marker.remove());
-		transitMarkers = [];
-		parkingMarkers = [];
+		pointMarkers.forEach(({ marker }) => marker.remove());
+		pointMarkers = [];
 	}
 
 	function clearDetectedAssets() {
@@ -36,40 +42,46 @@ export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 			const props = feature.properties;
 			const cls = props.class || '';
 			const sub = props.subclass || '';
-			const assetCoords =
+			const coordinates =
 				feature.geometry.type === 'Point'
 					? feature.geometry.coordinates
 					: turf.centroid(feature).geometry.coordinates;
-			const key = `${props.name || 'unnamed'}-${assetCoords[0].toFixed(4)},${assetCoords[1].toFixed(4)}`;
+			const key = `${props.name || 'unnamed'}-${coordinates[0].toFixed(4)},${coordinates[1].toFixed(4)}`;
 			if (seen.has(key)) return;
 			seen.add(key);
 
-			let type = null;
-			if (cls === 'parking' || sub === 'parking') type = 'parking';
+			let kind = null;
+			let mode = null;
+			if (cls === 'parking' || sub === 'parking') kind = 'parking';
 			else if (
 				['bus', 'bus_stop', 'transit'].includes(cls) ||
 				['bus_stop', 'bus_station', 'transit'].includes(sub)
-			)
-				type = 'bus';
-			else if (['railway', 'station', 'subway'].includes(cls) || ['station', 'halt'].includes(sub))
-				type = 'train';
-			if (!type) return;
-			if (filterType === 'parking' && type !== 'parking') return;
-			if (filterType === 'transit' && type !== 'bus' && type !== 'train') return;
-
-			const distance = turf.distance(turf.point(coords), turf.point(assetCoords)) * 1000;
+			) {
+				kind = 'transit';
+				mode = 'bus';
+			} else if (
+				['railway', 'station', 'subway'].includes(cls) ||
+				['station', 'halt'].includes(sub)
+			) {
+				kind = 'transit';
+				mode = 'train';
+			}
+			if (!kind || (filterType && kind !== filterType)) return;
+			const distance = turf.distance(turf.point(coords), turf.point(coordinates)) * 1000;
 			if (distance > 15000) return;
-			const asset = {
-				id: Math.random().toString(36).substr(2, 9),
-				name: props.name || (type === 'parking' ? 'Parking Area' : 'Station'),
-				type,
-				coordinates: assetCoords,
-				distance
-			};
-			const exists = [...cragEditorState.transit, ...cragEditorState.parking].some(
-				(item) => turf.distance(turf.point(item.coordinates), turf.point(asset.coordinates)) < 0.01
+			const exists = pointFeatures().some(
+				(item) =>
+					turf.distance(turf.point(item.geometry.coordinates), turf.point(coordinates)) < 0.01
 			);
-			if (!exists) suggestions.push(asset);
+			if (!exists)
+				suggestions.push({
+					id: createAccessId('suggestion'),
+					name: props.name || (kind === 'parking' ? 'Parking Area' : 'Station'),
+					kind,
+					mode,
+					coordinates,
+					distance
+				});
 		});
 		detectedAssets = suggestions.sort((a, b) => a.distance - b.distance).slice(0, 100);
 	}
@@ -78,37 +90,32 @@ export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 		const map = getMap();
 		if (!map || areDetectionPointHandlersReady) return;
 		areDetectionPointHandlersReady = true;
-
 		map.on('mousemove', (event) => {
 			if (!map.getLayer('detection-points') || detectedAssets.length === 0) return;
-			const hitRadius = getMapHitRadius(8);
+			const radius = getMapHitRadius(8);
 			const features = map.queryRenderedFeatures(
 				[
-					[event.point.x - hitRadius, event.point.y - hitRadius],
-					[event.point.x + hitRadius, event.point.y + hitRadius]
+					[event.point.x - radius, event.point.y - radius],
+					[event.point.x + radius, event.point.y + radius]
 				],
 				{ layers: ['detection-points'] }
 			);
-			if (features.length > 0) map.getCanvas().style.cursor = 'pointer';
-			else if (map.getCanvas().style.cursor === 'pointer') map.getCanvas().style.cursor = '';
+			map.getCanvas().style.cursor = features.length > 0 ? 'pointer' : '';
 		});
-
 		map.on('mouseleave', () => {
 			if (map.getCanvas().style.cursor === 'pointer') map.getCanvas().style.cursor = '';
 		});
 	}
 
 	function syncDetectionHighlights() {
-		const map = getMap();
-		if (!map || !getIsMapLoaded()) return;
-		const source = map.getSource('detection-highlights');
+		const source = getMap()?.getSource('detection-highlights');
 		if (!source) return;
 		source.setData({
 			type: 'FeatureCollection',
 			features: detectedAssets.map((asset) => ({
 				type: 'Feature',
 				geometry: { type: 'Point', coordinates: asset.coordinates },
-				properties: { type: asset.type, id: asset.id }
+				properties: { kind: asset.kind, id: asset.id }
 			}))
 		});
 	}
@@ -120,118 +127,86 @@ export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 		if (!asset) return;
 		const el = document.createElement('div');
 		el.className = 'hover-ghost-marker pointer-events-none';
-		el.style.width = '44px';
-		el.style.height = '44px';
-		el.style.borderRadius = '50%';
-		el.style.border = '4px solid #0075de';
-		el.style.backgroundColor = 'rgba(0, 117, 222, 0.2)';
-		el.style.boxShadow = '0 0 15px rgba(0, 117, 222, 0.3)';
-		el.innerHTML = `<div class="w-full h-full flex items-center justify-center text-creator-blue"><i class="fa-solid ${asset.type === 'parking' ? 'fa-square-parking' : asset.type === 'bus' ? 'fa-bus' : 'fa-train'} text-xl"></i></div>`;
+		el.style.cssText =
+			'width:44px;height:44px;border-radius:50%;border:4px solid #0075de;background:rgba(0,117,222,.2);box-shadow:0 0 15px rgba(0,117,222,.3)';
+		const icon =
+			asset.kind === 'parking'
+				? 'fa-square-parking'
+				: asset.mode === 'train'
+					? 'fa-train'
+					: 'fa-bus';
+		el.innerHTML = `<div class="w-full h-full flex items-center justify-center text-creator-blue"><i class="fa-solid ${icon} text-xl"></i></div>`;
 		hoverMarker = new maplibregl.Marker({ element: el }).setLngLat(asset.coordinates).addTo(map);
 		map.easeTo({ center: asset.coordinates, duration: 400 });
 	}
 
+	function addAccessPoint(kind, coordinates, properties = {}) {
+		const feature = createAccessFeature({
+			id: createAccessId(kind),
+			kind,
+			geometry: { type: 'Point', coordinates },
+			properties
+		});
+		replaceFeatures([...accessFeatures(), feature]);
+		createPointMarker(feature);
+		return feature.id;
+	}
+
 	function addDetectedAsset(asset) {
 		if (hoverMarker) hoverMarker.remove();
-		if (asset.type === 'parking') addParkingPoint(asset.coordinates);
-		else {
-			const id = Math.random().toString(36).substr(2, 9);
-			const point = { id, name: asset.name, type: asset.type, coordinates: asset.coordinates };
-			cragEditorState.transit = [...cragEditorState.transit, point];
-			createTransitMarker(point);
-		}
+		addAccessPoint(asset.kind, asset.coordinates, {
+			name: asset.name,
+			...(asset.mode ? { mode: asset.mode } : {})
+		});
 		detectedAssets = detectedAssets.filter((item) => item.id !== asset.id);
 	}
 
-	function addTransitPoint(lngLat) {
-		const id = Math.random().toString(36).substr(2, 9);
-		const point = { id, name: 'New Station', type: 'bus', coordinates: lngLat };
-		cragEditorState.transit = [...cragEditorState.transit, point];
-		createTransitMarker(point);
+	function addTransitPoint(coordinates) {
+		return addAccessPoint('transit', coordinates, { name: 'New Station', mode: 'bus' });
+	}
+	function addParkingPoint(coordinates) {
+		return addAccessPoint('parking', coordinates);
 	}
 
-	function createTransitMarker(point) {
+	function createPointMarker(feature) {
 		const map = getMap();
 		if (!map) return;
+		const kind = feature.properties.kind;
+		const iconName = kind === 'parking' ? 'parking' : feature.properties.mode || 'bus';
 		const marker = new maplibregl.Marker({
 			element: createIconMarkerElement({
-				className: 'transit-marker group cursor-move',
-				iconUrl: `${base}/icons/${point.type}.png`,
+				className: `${kind}-marker cursor-move`,
+				iconUrl: `${base}/icons/${iconName}.png`,
 				size: getMapMarkerSize(24)
 			}),
 			draggable: true
 		})
-			.setLngLat(point.coordinates)
+			.setLngLat(feature.geometry.coordinates)
 			.addTo(map);
 		marker.on('dragend', () => {
 			const pos = marker.getLngLat();
-			const list = $state.snapshot(cragEditorState.transit);
-			const idx = list.findIndex((item) => item.id === point.id);
-			if (idx !== -1) cragEditorState.transit[idx].coordinates = [pos.lng, pos.lat];
+			const item = accessFeatures().find((candidate) => candidate.id === feature.id);
+			if (item) item.geometry.coordinates = [pos.lng, pos.lat];
 		});
-		transitMarkers.push({ id: point.id, marker });
-	}
-
-	function addParkingPoint(lngLat) {
-		const id = Math.random().toString(36).substr(2, 9);
-		const point = { id, coordinates: lngLat };
-		cragEditorState.parking = [...cragEditorState.parking, point];
-		createParkingMarker(point);
-	}
-
-	function createParkingMarker(point) {
-		const map = getMap();
-		if (!map) return;
-		const marker = new maplibregl.Marker({
-			element: createIconMarkerElement({
-				className: 'parking-marker cursor-move',
-				iconUrl: `${base}/icons/parking.png`,
-				size: getMapMarkerSize(24)
-			}),
-			draggable: true
-		})
-			.setLngLat(point.coordinates)
-			.addTo(map);
-		marker.on('dragend', () => {
-			const pos = marker.getLngLat();
-			const list = $state.snapshot(cragEditorState.parking);
-			const idx = list.findIndex((item) => item.id === point.id);
-			if (idx !== -1) cragEditorState.parking[idx].coordinates = [pos.lng, pos.lat];
-		});
-		parkingMarkers.push({ id: point.id, marker });
+		pointMarkers.push({ id: feature.id, marker });
 	}
 
 	function syncAccessMarkers() {
-		transitMarkers.forEach((item) => item.marker.remove());
-		parkingMarkers.forEach((item) => item.marker.remove());
-		transitMarkers = [];
-		parkingMarkers = [];
-		cragEditorState.transit.forEach((point) => createTransitMarker(point));
-		cragEditorState.parking.forEach((point) => createParkingMarker(point));
+		pointMarkers.forEach(({ marker }) => marker.remove());
+		pointMarkers = [];
+		pointFeatures().forEach(createPointMarker);
 	}
 
-	function removeTransit(id) {
-		cragEditorState.transit = cragEditorState.transit.filter((point) => point.id !== id);
-		const item = transitMarkers.find((marker) => marker.id === id);
-		if (item) {
-			item.marker.remove();
-			transitMarkers = transitMarkers.filter((marker) => marker.id !== id);
-		}
-	}
-
-	function removeParking(id) {
-		cragEditorState.parking = cragEditorState.parking.filter((point) => point.id !== id);
-		const item = parkingMarkers.find((marker) => marker.id === id);
-		if (item) {
-			item.marker.remove();
-			parkingMarkers = parkingMarkers.filter((marker) => marker.id !== id);
-		}
+	function removeAccessFeature(id) {
+		replaceFeatures(accessFeatures().filter((feature) => feature.id !== id));
+		const item = pointMarkers.find((marker) => marker.id === id);
+		if (item) item.marker.remove();
+		pointMarkers = pointMarkers.filter((marker) => marker.id !== id);
 	}
 
 	function scanForActiveTool() {
 		const tool = getActiveTool();
-		if (tool === 'parking' || tool === 'transit')
-			scanNearbyAssets(tool === 'parking' ? 'parking' : 'transit');
+		if (tool === 'parking' || tool === 'transit') scanNearbyAssets(tool);
 		else clearDetectedAssets();
 	}
 
@@ -248,11 +223,9 @@ export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 		addDetectedAsset,
 		addTransitPoint,
 		addParkingPoint,
-		createTransitMarker,
-		createParkingMarker,
+		createPointMarker,
 		syncAccessMarkers,
-		removeTransit,
-		removeParking,
+		removeAccessFeature,
 		cleanup
 	};
 }

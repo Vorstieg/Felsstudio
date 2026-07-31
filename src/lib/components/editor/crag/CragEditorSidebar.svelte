@@ -23,9 +23,7 @@
 		},
 		onClearDetectedAssets = () => {
 		}, onAddDetectedAsset = () => {
-		}, onRemoveTransit = () => {
-		},
-		onRemoveParking = () => {
+		}, onRemoveAccessFeature = () => {
 		}, onEditTrack = () => {
 		}, onRemoveTrack = () => {
 		},
@@ -51,7 +49,7 @@
 			id: 'registry',
 			label: 'Registry',
 			icon: 'fa-layer-group',
-			count: cragEditorState.transit.length + cragEditorState.parking.length + cragEditorState.tracks.length
+			count: (cragEditorState.access?.features || []).length
 		},
 		{ id: 'sectors', label: 'Sectors', icon: 'fa-table-cells-large', count: cragEditorState.crag.sectors?.length || 0 }
 	]);
@@ -67,7 +65,7 @@
 			{securityOptions} {rockTypes} {commonEquipment} {saveStatus} {onAddEquipmentItem}
 			{onRemoveEquipmentItem} {onAddCragImages} {onRemoveCragImage} {onAddSector} {onDuplicateSector}
 			{onRemoveSector} {onMoveSector} {onFocusSector} {onSetSectorGeometryType} {onSetHoverHighlight}
-			{onClearDetectedAssets} {onAddDetectedAsset} {onRemoveTransit} {onRemoveParking} {onEditTrack}
+			{onClearDetectedAssets} {onAddDetectedAsset} {onRemoveAccessFeature} {onEditTrack}
 			{onRemoveTrack} {onFinalizeTrack} {onCancelTrackEdit}
 		/>
 	{/snippet}

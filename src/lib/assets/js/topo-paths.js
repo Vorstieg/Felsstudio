@@ -39,9 +39,8 @@ export class Topo {
 	getFileName() {
 		return this.getBaseName() + '.json';
 	}
-	getCragAssetPath(kind, index = 0) {
-		const suffix = index > 0 ? `-${index}` : '';
-		return `${this._getPath()}-${kind}${suffix}.json`;
+	getAccessPath() {
+		return `${this._getPath()}-access.json`;
 	}
 	getImagePath(name, index = 0) {
 		const lastDot = name.lastIndexOf('.');

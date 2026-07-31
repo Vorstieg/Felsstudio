@@ -809,7 +809,7 @@ export function ensureCragEditorLayers(map) {
 
 export function buildEditorFeatureCollection({
 	sectors = [],
-	savedTracks = [],
+	savedAccessFeatures = [],
 	routes = [],
 	selectedRouteKey = null,
 	editingRoutePath = null,
@@ -866,14 +866,16 @@ export function buildEditorFeatureCollection({
 			});
 		});
 	});
-	savedTracks.forEach((track, index) => {
-		if (editingTrackIndex === index || !(track.coordinates?.length > 1)) return;
-		features.push({
-			type: 'Feature',
-			geometry: { type: 'LineString', coordinates: track.coordinates },
-			properties: { name: track.name, state: 'saved', trackIndex: index }
+	savedAccessFeatures
+		.filter((feature) => feature.properties?.kind === 'approach')
+		.forEach((track) => {
+			if (editingTrackIndex === track.id || !(track.geometry?.coordinates?.length > 1)) return;
+			features.push({
+				type: 'Feature',
+				geometry: track.geometry,
+				properties: { ...track.properties, state: 'saved', accessFeatureId: track.id }
+			});
 		});
-	});
 	routes.forEach(({ key, route }) => {
 		for (const [pathIndex, path] of (route?.assets?.paths || []).entries()) {
 			if (editingRoutePath?.key === key && editingRoutePath?.pathIndex === pathIndex) continue;

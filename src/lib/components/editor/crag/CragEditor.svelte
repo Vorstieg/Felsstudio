@@ -137,8 +137,7 @@
 	const addDetectedAsset = (...args) => accessEditor.addDetectedAsset(...args);
 	const addTransitPoint = (...args) => accessEditor.addTransitPoint(...args);
 	const addParkingPoint = (...args) => accessEditor.addParkingPoint(...args);
-	const removeTransit = (...args) => accessEditor.removeTransit(...args);
-	const removeParking = (...args) => accessEditor.removeParking(...args);
+	const removeAccessFeature = (...args) => accessEditor.removeAccessFeature(...args);
 
 	const sectorMapEditor = useCragSectorMapEditor({
 		getMap: () => map,
@@ -165,9 +164,7 @@
 			!cragEditorState.crag.description_en &&
 			(cragEditorState.crag.equipment || []).length === 0 &&
 			(cragEditorState.crag.sectors || []).length === 0 &&
-			(cragEditorState.transit || []).length === 0 &&
-			(cragEditorState.parking || []).length === 0 &&
-			(cragEditorState.tracks || []).length === 0
+			(cragEditorState.access?.features || []).length === 0
 		);
 	}
 
@@ -176,17 +173,13 @@
 		if (!session) return;
 
 		cragEditorState.crag = session.crag || cragEditorState.crag;
-		cragEditorState.transit = session.transit || [];
-		cragEditorState.parking = session.parking || [];
-		cragEditorState.tracks = session.tracks || [];
+		cragEditorState.access = session.access || { type: 'FeatureCollection', version: 1, features: [] };
 	}
 
 	function saveLatestCragSession() {
 		storage.set(CRAG_SESSION_KEY, {
 			crag: $state.snapshot(cragEditorState.crag),
-			transit: $state.snapshot(cragEditorState.transit),
-			parking: $state.snapshot(cragEditorState.parking),
-			tracks: $state.snapshot(cragEditorState.tracks),
+			access: $state.snapshot(cragEditorState.access),
 			updated: new Date().toISOString()
 		});
 	}
@@ -463,9 +456,9 @@
 
 			if (map.getLayer('tracks-line-saved')) {
 				const trackFeature = map.queryRenderedFeatures(e.point, { layers: ['tracks-line-saved'] })[0];
-				const trackIndex = Number(trackFeature?.properties?.trackIndex);
-				if (Number.isInteger(trackIndex)) {
-					editTrack(trackIndex);
+				const accessFeatureId = trackFeature?.properties?.accessFeatureId;
+				if (accessFeatureId) {
+					editTrack(accessFeatureId);
 					return;
 				}
 			}
@@ -514,9 +507,7 @@
 
 		const sessionString = JSON.stringify({
 			crag: cragEditorState.crag,
-			transit: cragEditorState.transit,
-			parking: cragEditorState.parking,
-			tracks: cragEditorState.tracks
+				access: cragEditorState.access
 		});
 
 		if (sessionString) {
@@ -712,7 +703,7 @@
 		source.setData(
 			buildEditorFeatureCollection({
 				sectors: $state.snapshot(cragEditorState.crag.sectors) || [],
-				savedTracks: $state.snapshot(cragEditorState.tracks) || [],
+				savedAccessFeatures: $state.snapshot(cragEditorState.access?.features) || [],
 				routes: (cragEditorState.routeDocuments || []).flatMap((document) =>
 					(document.data?.routes || []).map((route) => ({
 						key: `${document.path}:${route.id}`,
@@ -794,32 +785,7 @@
 				});
 			}
 
-			for (let i = 0; i < cragEditorState.transit.length; i++) {
-				const transit = cragEditorState.transit[i];
-				await writeJson(topo.getCragAssetPath('transit', i), {
-					type: 'Feature',
-					properties: { name: transit.name, type: transit.type },
-					geometry: { type: 'Point', coordinates: transit.coordinates }
-				});
-			}
-
-			for (let i = 0; i < cragEditorState.parking.length; i++) {
-				const parking = cragEditorState.parking[i];
-				await writeJson(topo.getCragAssetPath('parking', i), {
-					type: 'Feature',
-					properties: { type: 'parking-space' },
-					geometry: { type: 'Point', coordinates: parking.coordinates }
-				});
-			}
-
-			for (let i = 0; i < cragEditorState.tracks.length; i++) {
-				const track = cragEditorState.tracks[i];
-				await writeJson(topo.getCragAssetPath('transit-track', i), {
-					type: 'Feature',
-					properties: {},
-					geometry: { type: 'LineString', coordinates: track.coordinates }
-				});
-			}
+			await writeJson(topo.getAccessPath(), $state.snapshot(cragEditorState.access));
 
 			for (const document of cragEditorState.routeDocuments) {
 				if (document.dirty) await writeJson(document.path, document.data);
@@ -1159,8 +1125,7 @@
 	onSetHoverHighlight={setHoverHighlight}
 	onClearDetectedAssets={accessEditor.clearDetectedAssets}
 	onAddDetectedAsset={addDetectedAsset}
-	onRemoveTransit={removeTransit}
-	onRemoveParking={removeParking}
+	onRemoveAccessFeature={removeAccessFeature}
 	onEditTrack={editTrack}
 	onRemoveTrack={removeTrack}
 	onFinalizeTrack={finalizeTrack}

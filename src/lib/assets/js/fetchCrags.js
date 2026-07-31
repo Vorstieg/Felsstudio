@@ -1,5 +1,6 @@
 import { cragsPerPage } from '$lib/config';
 import { listDir, readJson } from '$lib/api/felslager.js';
+import { normalizeAccessCollection } from '$lib/assets/js/access-geojson.js';
 
 function isEntryJsonFile(file) {
 	if (file.type !== 'file') return false;
@@ -68,41 +69,11 @@ const fetchCrags = async ({ offset = 0, limit = cragsPerPage, search = '' } = {}
 	return sortedCrags;
 };
 
-export async function loadGeoJsonFiles(topo, cragEditorState) {
+export async function loadAccessCollection(topo, cragEditorState) {
 	try {
-		const dirFiles = await listDir(topo.path);
-		for (const f of dirFiles) {
-			if (f.type !== 'file' || !f.name.endsWith('.json') || f.name === `${topo.getBaseName()}.json`)
-				continue;
-			try {
-				if (f.name.includes('-transit-track')) {
-					const data = await readJson(`${topo.path}/${f.name}`);
-					cragEditorState.tracks.push({
-						id: Math.random().toString(36).substr(2, 9),
-						name: data.properties.name || 'Approach Track',
-						coordinates: data.geometry.coordinates
-					});
-				} else if (f.name.includes('-transit')) {
-					const data = await readJson(`${topo.path}/${f.name}`);
-					cragEditorState.transit.push({
-						id: Math.random().toString(36).substr(2, 9),
-						name: data.properties.name,
-						type: data.properties.type || 'bus',
-						coordinates: data.geometry.coordinates
-					});
-				} else if (f.name.includes('-parking')) {
-					const data = await readJson(`${topo.path}/${f.name}`);
-					cragEditorState.parking.push({
-						id: Math.random().toString(36).substr(2, 9),
-						coordinates: data.geometry.coordinates
-					});
-				}
-			} catch {
-				/* skip unreadable files */
-			}
-		}
+		cragEditorState.access = normalizeAccessCollection(await readJson(topo.getAccessPath()));
 	} catch {
-		/* directory listing may fail */
+		cragEditorState.access = normalizeAccessCollection(null);
 	}
 }
 

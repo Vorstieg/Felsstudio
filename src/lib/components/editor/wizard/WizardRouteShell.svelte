@@ -4,7 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { fileUrl, listDir, readJson } from '$lib/api/felslager.js';
-	import { loadGeoJsonFiles } from '$lib/assets/js/fetchCrags.js';
+	import { loadAccessCollection } from '$lib/assets/js/fetchCrags.js';
 	import { draftsState } from '$lib/state/drafts.svelte.js';
 	import { userState } from '$lib/state/editor.svelte.js';
 	import { Topo } from '$lib/assets/js/topo-paths.js';
@@ -159,7 +159,7 @@
 					/* crag file may not exist */
 				}
 				cragEditorState.crag.path = topo.path;
-				await loadGeoJsonFiles(topo, cragEditorState);
+				await loadAccessCollection(topo, cragEditorState);
 
 			} else if (workSpaceWrapper.is2DEditor()) {
 				try {
