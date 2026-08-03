@@ -69,13 +69,4 @@
 			{onRemoveTrack} {onFinalizeTrack} {onCancelTrackEdit}
 		/>
 	{/snippet}
-	{#snippet footer()}
-		<div class="flex justify-between items-center">
-			<span class="text-ui-label text-warm-gray-500 m-0!">GPS</span>
-			<div class="font-mono text-micro-data text-creator-blue font-bold">
-				{cragEditorState.crag.geometry.coordinates[1].toFixed(5)}
-				, {cragEditorState.crag.geometry.coordinates[0].toFixed(5)}
-			</div>
-		</div>
-	{/snippet}
 </DetailsComponent>
