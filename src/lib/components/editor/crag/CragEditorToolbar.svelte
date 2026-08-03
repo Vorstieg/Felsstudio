@@ -6,7 +6,6 @@
 	let {
 		map = null,
 		activeTool = $bindable('position'),
-		mapStyle = $bindable('transport'),
 		currentTrackPoints = [],
 		trackDraftMode = 'routing',
 		isRoutingTrack = false,
@@ -53,19 +52,5 @@
 >
 	{#snippet mobileSearch()}
 		<MapSearch {map} embedded />
-	{/snippet}
-	{#snippet controls()}
-		<div
-			class="hidden items-center gap-1 rounded-sm border border-black/10 bg-black/5 p-0.5 xl:flex"
-		>
-			{#each ['transport', 'satellite', 'terrain'] as style}
-				<button
-					type="button"
-					onclick={() => (mapStyle = style)}
-					class={`rounded-sm px-2 py-1 text-[9px] font-bold uppercase tracking-wider transition-none ${mapStyle === style ? 'bg-white text-near-black shadow-sm' : 'text-warm-gray-400 hover:bg-black/5'}`}
-					>{style}</button
-				>
-			{/each}
-		</div>
 	{/snippet}
 </ToolBar>

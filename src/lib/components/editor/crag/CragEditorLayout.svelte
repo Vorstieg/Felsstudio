@@ -1,5 +1,6 @@
 <script>
 	import MapSearch from '$lib/components/editor/MapSearch.svelte';
+	import MapStyleControl from '$lib/components/editor/MapStyleControl.svelte';
 	import CragEditorToolbar from '$lib/components/editor/crag/CragEditorToolbar.svelte';
 	import CragEditorSidebar from '$lib/components/editor/crag/CragEditorSidebar.svelte';
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
@@ -107,7 +108,6 @@
 <CragEditorToolbar
 	{map}
 	bind:activeTool
-	bind:mapStyle
 		{currentTrackPoints}
 		{trackDraftMode}
 		{isRoutingTrack}
@@ -124,6 +124,8 @@
 	status={saveStatus}
 	errorMessage={saveError}
 />
+
+<MapStyleControl bind:mapStyle {isExpanded} />
 
 <button
 	type="button"
