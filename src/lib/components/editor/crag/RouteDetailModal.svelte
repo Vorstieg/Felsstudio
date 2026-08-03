@@ -99,12 +99,12 @@
 					<div>
 						<label class="text-ui-label block" for="route-type">Type</label>
 						<select id="route-type" class="input-studio w-full" bind:value={route.type}>
-							<option value="sports-climbing">SC</option>
-							<option value="bouldering">B</option>
-							<option value="trad">T</option>
-							<option value="multi-pitch">MP</option>
-							<option value="alpine-tour">HT</option>
-							<option value="via-ferrata">KS</option>
+							<option value="sports-climbing">Sportklettern</option>
+							<option value="bouldering">Bouldern</option>
+							<option value="trad">Trad</option>
+							<option value="multi-pitch">Multipitch</option>
+							<option value="alpine-tour">Hochtour</option>
+							<option value="via-ferrata">Klettersteig</option>
 						</select>
 					</div>
 				</div>
