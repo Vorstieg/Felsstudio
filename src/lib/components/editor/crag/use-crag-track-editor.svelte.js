@@ -33,6 +33,7 @@ export function useCragTrackEditor({
 	let isSnappingEnabled = $state(true);
 	let isRoutingTrack = $state(false);
 	let draggingTrackPoint = $state(null);
+	let selectedTrackPointIndex = $state(null);
 	let areTrackPointDragHandlersReady = false;
 	let trackEditHistory = [];
 	const approachFeatures = () =>
@@ -100,6 +101,7 @@ export function useCragTrackEditor({
 		routeDraftWaypoints = [];
 		editingTrackIndex = null;
 		clearDraftHistory();
+		selectedTrackPointIndex = null;
 		setActiveTool('track');
 	}
 
@@ -136,6 +138,26 @@ export function useCragTrackEditor({
 			return;
 		}
 		if (currentTrackPoints.length > 0) currentTrackPoints = currentTrackPoints.slice(0, -1);
+	}
+
+	function insertTrackPoint(index, coordinate) {
+		if (!Array.isArray(coordinate) || currentTrackPoints.length < 2) return false;
+		saveDraftHistory();
+		const points = $state.snapshot(currentTrackPoints);
+		points.splice(index, 0, [...coordinate]);
+		currentTrackPoints = points;
+		selectedTrackPointIndex = index;
+		return true;
+	}
+
+	function removeTrackPoint(index) {
+		if (currentTrackPoints.length <= 2 || !currentTrackPoints[index]) return false;
+		saveDraftHistory();
+		currentTrackPoints = $state
+			.snapshot(currentTrackPoints)
+			.filter((_, pointIndex) => pointIndex !== index);
+		selectedTrackPointIndex = null;
+		return true;
 	}
 
 	function useEditedTrackPoints(points) {
@@ -282,6 +304,7 @@ export function useCragTrackEditor({
 		routeDraftWaypoints = [];
 		trackDraftMode = 'editing';
 		clearDraftHistory();
+		selectedTrackPointIndex = null;
 		setActiveTool('track');
 		setActiveTab('registry');
 		fitTrackBounds(track.geometry.coordinates);
@@ -294,6 +317,7 @@ export function useCragTrackEditor({
 		routeDraftWaypoints = [];
 		trackDraftMode = 'editing';
 		clearDraftHistory();
+		selectedTrackPointIndex = null;
 		setActiveTool('track');
 		setActiveTab('sectors');
 		fitTrackBounds(coordinates);
@@ -310,6 +334,7 @@ export function useCragTrackEditor({
 		routeDraftWaypoints = [];
 		editingTrackIndex = null;
 		clearDraftHistory();
+		selectedTrackPointIndex = null;
 	}
 
 	function fitTrackBounds(points) {
@@ -348,17 +373,29 @@ export function useCragTrackEditor({
 
 		initMapPointDragHandlers({
 			map,
-			layers: ['tracks-points-drawing'],
+			layers: ['tracks-points-drawing', 'tracks-point-midpoints'],
 			canDrag: () => getActiveTool() === 'track' && trackDraftMode === 'editing',
-			getDragState: (event) => {
+			getDragState: (event, layerId) => {
 				const pointIndex = Number(event.features?.[0]?.properties?.pointIndex);
-				return Number.isInteger(pointIndex) ? { pointIndex } : null;
+				return Number.isInteger(pointIndex)
+					? { pointIndex, isMidpoint: layerId === 'tracks-point-midpoints' }
+					: null;
 			},
-			onDragStart: ({ pointIndex }) => {
+			onDragStart: (drag, event) => {
+				if (drag.isMidpoint) {
+					if (
+						!event.lngLat ||
+						!insertTrackPoint(drag.pointIndex, [event.lngLat.lng, event.lngLat.lat])
+					)
+						return false;
+				} else {
+					saveTrackPointMoveHistory(drag.pointIndex, currentTrackPoints[drag.pointIndex]);
+				}
+				const pointIndex = drag.pointIndex;
 				const coordinate = $state.snapshot(currentTrackPoints)[pointIndex];
 				if (!coordinate) return;
-				saveTrackPointMoveHistory(pointIndex, coordinate);
 				draggingTrackPoint = { pointIndex, coordinate: [...coordinate] };
+				selectedTrackPointIndex = pointIndex;
 				onTrackPointDragStart();
 			},
 			onDragMove: ({ pointIndex }, event) => {
@@ -376,6 +413,17 @@ export function useCragTrackEditor({
 				setSuppressNextMapClick(true);
 			}
 		});
+
+		const deleteTrackPoint = (event) => {
+			if (getActiveTool() !== 'track') return;
+			const pointIndex = Number(event.features?.[0]?.properties?.pointIndex);
+			if (!Number.isInteger(pointIndex) || !removeTrackPoint(pointIndex)) return;
+			event.originalEvent?.stopPropagation?.();
+			setSuppressNextMapClick(true);
+			onTrackPointDragEnd();
+		};
+		map.on('click', 'tracks-point-delete', deleteTrackPoint);
+		map.on('touchstart', 'tracks-point-delete', deleteTrackPoint);
 	}
 
 	return {
@@ -397,11 +445,16 @@ export function useCragTrackEditor({
 		get draggingTrackPoint() {
 			return draggingTrackPoint;
 		},
+		get selectedTrackPointIndex() {
+			return selectedTrackPointIndex;
+		},
 		addTrackPoint,
 		handleTrackConfirm,
 		startRoutingDraft,
 		setTrackDraftMode,
 		undoTrackPoint,
+		insertTrackPoint,
+		removeTrackPoint,
 		reverseTrack,
 		trimTrackStart,
 		trimTrackEnd,

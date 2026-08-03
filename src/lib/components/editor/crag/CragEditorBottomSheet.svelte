@@ -13,9 +13,8 @@
 		securityOptions = [],
 		rockTypes = [],
 		commonEquipment = [],
-		selectedSectorId = $bindable(null),
+		selectedObject = $bindable(null),
 		routeDocuments = [],
-		selectedRouteKey = null,
 		saveStatus = 'idle',
 		onAddEquipmentItem = () => {},
 		onRemoveEquipmentItem = () => {},
@@ -67,9 +66,8 @@
 			
 			<CragEditorPanelContent
 				bind:activeTab
-				bind:selectedSectorId
+				bind:selectedObject
 				{routeDocuments}
-				{selectedRouteKey}
 				{detectedAssets}
 				{editingTrackIndex}
 				{cragTypes}

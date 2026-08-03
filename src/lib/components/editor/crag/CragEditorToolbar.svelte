@@ -5,7 +5,7 @@
 
 	let {
 		map = null,
-		activeTool = $bindable('position'),
+		activeTool = $bindable('select'),
 		toolOptionsOpen = $bindable(false),
 		currentTrackPoints = [],
 		trackDraftMode = 'routing',
@@ -24,6 +24,7 @@
 	} = $props();
 
 	let tools = $derived([
+		{ id: 'select', icon: 'fa-arrow-pointer', label: 'Select' },
 		{ id: 'position', icon: 'fa-location-crosshairs', label: 'Crag Position' },
 		{ id: 'parking', icon: 'fa-square-parking', label: 'Parking Spot' },
 		{ id: 'transit', icon: 'fa-bus', label: 'Transit Station' },
@@ -43,7 +44,7 @@
 <ToolBar
 	bind:activeTool
 	bind:toolOptionsOpen
-	neutralTool="position"
+	neutralTool="select"
 	{tools}
 	{onBack}
 	undo={activeTool === 'track'

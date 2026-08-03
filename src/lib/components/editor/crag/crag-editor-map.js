@@ -640,7 +640,10 @@ export function ensureCragEditorLayers(map) {
 			source: 'crag-editor-data',
 			filter: ['==', ['get', 'state'], 'saved'],
 			layout: { 'line-join': 'round', 'line-cap': 'round' },
-			paint: { 'line-color': '#31302e', 'line-width': 4 }
+			paint: {
+				'line-color': ['case', ['==', ['get', 'selected'], true], '#0075de', '#31302e'],
+				'line-width': ['case', ['==', ['get', 'selected'], true], 6, 4]
+			}
 		});
 	if (!map.getLayer('tracks-line-drawing'))
 		map.addLayer({
@@ -669,13 +672,42 @@ export function ensureCragEditorLayers(map) {
 			id: 'tracks-points-drawing',
 			type: 'circle',
 			source: 'crag-editor-data',
-			filter: ['all', ['==', ['get', 'type'], 'Point'], ['==', ['get', 'state'], 'drawing']],
+			filter: ['==', ['get', 'feature'], 'track-vertex'],
 			paint: {
 				'circle-radius': drawingPointRadius,
 				'circle-color': '#ffffff',
 				'circle-stroke-width': 2,
 				'circle-stroke-color': '#0075de'
 			}
+		});
+	if (!map.getLayer('tracks-point-midpoints'))
+		map.addLayer({
+			id: 'tracks-point-midpoints',
+			type: 'circle',
+			source: 'crag-editor-data',
+			filter: ['==', ['get', 'feature'], 'track-midpoint'],
+			paint: {
+				'circle-radius': 5,
+				'circle-color': '#f59e0b',
+				'circle-stroke-width': 2,
+				'circle-stroke-color': '#ffffff'
+			}
+		});
+	if (!map.getLayer('tracks-point-delete'))
+		map.addLayer({
+			id: 'tracks-point-delete',
+			type: 'symbol',
+			source: 'crag-editor-data',
+			filter: ['==', ['get', 'feature'], 'track-vertex-delete'],
+			layout: {
+				'text-field': '×',
+				'text-font': ['Noto Sans Bold'],
+				'text-size': deleteTextSize,
+				'text-offset': [0.85, -0.85],
+				'text-allow-overlap': true,
+				'text-ignore-placement': true
+			},
+			paint: { 'text-color': '#ffffff', 'text-halo-color': '#dc2626', 'text-halo-width': 6 }
 		});
 	if (!map.getSource('tracks-drag-overlay'))
 		map.addSource('tracks-drag-overlay', {
@@ -811,12 +843,13 @@ export function buildEditorFeatureCollection({
 	sectors = [],
 	savedAccessFeatures = [],
 	routes = [],
-	selectedRouteKey = null,
+	selectedObject = null,
 	editingRoutePath = null,
 	drawingPoints = [],
 	visibleDrawingPointIndexes = [],
+	editingDrawingPath = false,
+	selectedTrackPointIndex = null,
 	draggingTrackPointIndex = null,
-	selectedSectorId = null,
 	selectedSectorVertex = null,
 	editingTrackIndex = null,
 	flightPlan = null
@@ -824,7 +857,7 @@ export function buildEditorFeatureCollection({
 	const features = [];
 	sectors.forEach((sector) => {
 		if (sector.geometry?.type !== 'Polygon') return;
-		const isSelected = selectedSectorId === sector.id;
+		const isSelected = selectedObject?.type === 'sector' && selectedObject.id === sector.id;
 		features.push({
 			type: 'Feature',
 			geometry: sector.geometry,
@@ -873,7 +906,12 @@ export function buildEditorFeatureCollection({
 			features.push({
 				type: 'Feature',
 				geometry: track.geometry,
-				properties: { ...track.properties, state: 'saved', accessFeatureId: track.id }
+				properties: {
+					...track.properties,
+					state: 'saved',
+					accessFeatureId: track.id,
+					selected: selectedObject?.type === 'approach' && track.id === selectedObject.id
+				}
 			});
 		});
 	routes.forEach(({ key, route }) => {
@@ -890,7 +928,7 @@ export function buildEditorFeatureCollection({
 					routeId: route.id,
 					pathIndex,
 					name: route.name || 'Unnamed route',
-					selected: key === selectedRouteKey
+					selected: selectedObject?.type === 'route' && key === selectedObject.key
 				}
 			});
 		}
@@ -915,8 +953,43 @@ export function buildEditorFeatureCollection({
 		features.push({
 			type: 'Feature',
 			geometry: { type: 'Point', coordinates: drawingPoints[pointIndex] },
-			properties: { type: 'Point', state: 'drawing', pointIndex }
+			properties: { feature: 'track-vertex', type: 'Point', state: 'drawing', pointIndex }
 		});
+	}
+	if (editingDrawingPath && drawingPoints.length > 1) {
+		for (let index = 0; index < drawingPoints.length - 1; index += 1) {
+			const first = drawingPoints[index];
+			const second = drawingPoints[index + 1];
+			features.push({
+				type: 'Feature',
+				geometry: {
+					type: 'Point',
+					coordinates: [(first[0] + second[0]) / 2, (first[1] + second[1]) / 2]
+				},
+				properties: {
+					feature: 'track-midpoint',
+					type: 'Point',
+					state: 'drawing',
+					pointIndex: index + 1
+				}
+			});
+		}
+		if (
+			selectedTrackPointIndex !== null &&
+			drawingPoints.length > 2 &&
+			drawingPoints[selectedTrackPointIndex]
+		) {
+			features.push({
+				type: 'Feature',
+				geometry: { type: 'Point', coordinates: drawingPoints[selectedTrackPointIndex] },
+				properties: {
+					feature: 'track-vertex-delete',
+					type: 'Point',
+					state: 'drawing',
+					pointIndex: selectedTrackPointIndex
+				}
+			});
+		}
 	}
 	return { type: 'FeatureCollection', features };
 }

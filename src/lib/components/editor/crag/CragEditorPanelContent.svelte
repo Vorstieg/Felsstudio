@@ -18,9 +18,8 @@
 		securityOptions = [],
 		rockTypes = [],
 		commonEquipment = [],
-		selectedSectorId = $bindable(null),
+		selectedObject = $bindable(null),
 		routeDocuments = [],
-		selectedRouteKey = null,
 		saveStatus = 'idle',
 		onAddEquipmentItem = () => {},
 		onRemoveEquipmentItem = () => {},
@@ -55,7 +54,9 @@
 	} = $props();
 
 	let selectedSector = $derived(
-		(cragEditorState.crag.sectors || []).find((sector) => sector.id === selectedSectorId)
+		selectedObject?.type === 'sector'
+			? (cragEditorState.crag.sectors || []).find((sector) => sector.id === selectedObject.id)
+			: null
 	);
 	let accessFeatures = $derived(cragEditorState.access?.features || []);
 	let transitFeatures = $derived(accessFeatures.filter((feature) => feature.properties?.kind === 'transit'));
@@ -93,7 +94,7 @@
 
 	function selectedSectorRoute(sectorId) {
 		return sectorRoutes(sectorId).find(
-			({ document, route }) => selectedRouteKey === routeKey(document, route)
+			({ document, route }) => selectedObject?.type === 'route' && selectedObject.key === routeKey(document, route)
 		);
 	}
 
@@ -110,7 +111,7 @@
 
 	function updateSelectedSectorId(sector, value) {
 		sector.id = value;
-		selectedSectorId = value;
+		selectedObject = value ? { type: 'sector', id: value } : null;
 	}
 
 	function ensureCragAssets() {
@@ -303,7 +304,7 @@
 						<thead class="text-warm-gray-400"><tr><th class="pb-1 font-bold">Route</th><th class="pb-1 font-bold">Type</th><th class="pb-1 font-bold">Paths</th><th></th></tr></thead>
 						<tbody>
 							{#each parentRoutes.slice(0, routePanelIsCollapsed('crag') ? 3 : parentRoutes.length) as { document, route }}
-								<tr class="border-t border-black/10 {selectedRouteKey === routeKey(document, route) ? 'bg-creator-blue/5 text-creator-blue' : ''}">
+								<tr class="border-t border-black/10 {selectedObject?.type === 'route' && selectedObject.key === routeKey(document, route) ? 'bg-creator-blue/5 text-creator-blue' : ''}">
 									<td><button class="w-full py-1.5 text-left font-bold" onclick={() => onSelectRoute(document.path, route.id)}>{route.name || 'Unnamed route'}</button></td>
 									<td>{route.type || 'route'}</td><td>{route.assets?.paths?.filter((path) => path.path?.coordinates?.length > 1).length || 0}</td>
 									<td><button class="text-warm-gray-300 hover:text-rose-600" title="Delete route" onclick={() => onDeleteRoute(document.path, route.id)}><i class="fa-solid fa-trash-can"></i></button></td>
@@ -334,17 +335,17 @@
 
 			<div class="space-y-1">
 				{#each cragEditorState.crag.sectors || [] as sector, i}
-					{@const isSelected = selectedSectorId === sector.id}
+					{@const isSelected = selectedObject?.type === 'sector' && selectedObject.id === sector.id}
 					{@const routes = sectorRoutes(sector.id)}
 					<div
 						class="w-full panel-inner p-2 text-left border-black/10 hover:border-creator-blue transition-none cursor-pointer {isSelected ? 'border-creator-blue bg-creator-blue/5' : ''}"
 						role="button"
 						tabindex="0"
-						onclick={() => { selectedSectorId = sector.id; ensureSectorCollections(sector); onFocusSector(sector); }}
+						onclick={() => { selectedObject = { type: 'sector', id: sector.id }; ensureSectorCollections(sector); onFocusSector(sector); }}
 						onkeydown={(e) => {
 							if (e.key === 'Enter' || e.key === ' ') {
 								e.preventDefault();
-								selectedSectorId = sector.id;
+								selectedObject = { type: 'sector', id: sector.id };
 								ensureSectorCollections(sector);
 								onFocusSector(sector);
 							}
@@ -380,7 +381,7 @@
 								<thead class="text-warm-gray-400"><tr><th class="py-1 font-bold">Route</th><th class="py-1 font-bold">Type</th><th class="py-1 font-bold">Paths</th><th></th></tr></thead>
 								<tbody>
 									{#each routes.slice(0, routePanelIsCollapsed(`sector:${sector.id}`) ? 3 : routes.length) as { document, route }}
-										<tr class="border-t border-black/10 {selectedRouteKey === routeKey(document, route) ? 'bg-creator-blue/5 text-creator-blue' : ''}">
+										<tr class="border-t border-black/10 {selectedObject?.type === 'route' && selectedObject.key === routeKey(document, route) ? 'bg-creator-blue/5 text-creator-blue' : ''}">
 											<td><button class="w-full py-1 text-left font-bold" onclick={(e) => { e.stopPropagation(); onSelectRoute(document.path, route.id); }}>{route.name || 'Unnamed route'}</button></td>
 											<td>{route.type || 'route'}</td><td>{route.assets?.paths?.filter((path) => path.path?.coordinates?.length > 1).length || 0}</td>
 											<td><button class="text-warm-gray-300 hover:text-rose-600" title="Delete route" onclick={(e) => { e.stopPropagation(); onDeleteRoute(document.path, route.id); }}><i class="fa-solid fa-trash-can"></i></button></td>

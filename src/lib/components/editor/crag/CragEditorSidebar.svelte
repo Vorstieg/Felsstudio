@@ -6,7 +6,7 @@
 	let {
 		inspectorShadow = true, map = null, activeTab = $bindable('info'), detectedAssets = [], editingTrackIndex = null,
 		cragTypes = [], availableTags = [], securityOptions = [], rockTypes = [], commonEquipment = [],
-		selectedSectorId = $bindable(null), saveStatus = 'idle', onAddEquipmentItem = () => {
+		selectedObject = $bindable(null), saveStatus = 'idle', onAddEquipmentItem = () => {
 		},
 		onRemoveEquipmentItem = () => {
 		}, onAddCragImages = () => {
@@ -29,7 +29,7 @@
 		},
 		onFinalizeTrack = () => {
 		}, onCancelTrackEdit = () => {
-		}, routeDocuments = [], selectedRouteKey = null, onAddParentRoute = () => {
+		}, routeDocuments = [], onAddParentRoute = () => {
 		}, onAddSectorRoute = () => {
 		}, onSelectRoute = () => {
 		}, onUpdateRouteName = () => {
@@ -59,8 +59,8 @@
                   width="20rem">
 	{#snippet children()}
 		<CragEditorPanelContent
-			bind:activeTab bind:selectedSectorId showTabs={false} {map} {detectedAssets} {editingTrackIndex} {cragTypes}
-				{routeDocuments} {selectedRouteKey} {onAddParentRoute} {onAddSectorRoute} {onSelectRoute} {onUpdateRouteName} {onUpdateRoute} {onAddRoutePath} {onEditRoutePath} {onUpdateRoutePath} {onRemoveRoutePath} {onDeleteRoute} {onPlanGenerated}
+			bind:activeTab bind:selectedObject showTabs={false} {map} {detectedAssets} {editingTrackIndex} {cragTypes}
+				{routeDocuments} {onAddParentRoute} {onAddSectorRoute} {onSelectRoute} {onUpdateRouteName} {onUpdateRoute} {onAddRoutePath} {onEditRoutePath} {onUpdateRoutePath} {onRemoveRoutePath} {onDeleteRoute} {onPlanGenerated}
 			{availableTags}
 			{securityOptions} {rockTypes} {commonEquipment} {saveStatus} {onAddEquipmentItem}
 			{onRemoveEquipmentItem} {onAddCragImages} {onRemoveCragImage} {onAddSector} {onDuplicateSector}

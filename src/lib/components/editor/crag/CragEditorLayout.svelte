@@ -14,14 +14,13 @@
 		isMedium = false,
 		isLandscape = false,
 		CragEditorBottomSheet,
-		activeTool = $bindable('position'),
+		activeTool = $bindable('select'),
 		toolOptionsOpen = $bindable(false),
 		mapStyle = $bindable('transport'),
 		activeTab = $bindable('info'),
 		detectedAssets = [],
-		selectedSectorId = $bindable(null),
+		selectedObject = $bindable(null),
 		routeDocuments = [],
-		selectedRouteKey = null,
 		currentTrackPoints = [],
 		editingTrackIndex = null,
 		trackDraftMode = 'routing',
@@ -258,13 +257,12 @@
 		{detectedAssets}
 		{editingTrackIndex}
 		{routeDocuments}
-		{selectedRouteKey}
 		{cragTypes}
 		{availableTags}
 		{securityOptions}
 		{rockTypes}
 		{commonEquipment}
-		bind:selectedSectorId
+		bind:selectedObject
 		{saveStatus}
 		{onAddEquipmentItem}
 		{onRemoveEquipmentItem}

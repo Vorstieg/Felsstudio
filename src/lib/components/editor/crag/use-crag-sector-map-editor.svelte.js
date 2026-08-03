@@ -6,14 +6,15 @@ import {
 	moveGeometryVertex,
 	removeGeometryVertex
 } from '$lib/assets/js/geometry-path-adapters.js';
+import { initMapPointDragHandlers } from '$lib/components/editor/map-point-drag-handlers.js';
 
 export function useCragSectorMapEditor({
 	getMap,
 	getActiveTool,
 	setActiveTool,
 	setActiveTab,
-	getSelectedSectorId,
-	setSelectedSectorId,
+	getSelectedObject,
+	setSelectedObject,
 	setSuppressNextMapClick,
 	onUpdateSectorCoordinates
 }) {
@@ -24,6 +25,15 @@ export function useCragSectorMapEditor({
 	let draggingSectorMarkerId = $state(null);
 	let vertexDeleteUndoTimer = null;
 	let areSectorEditHandlersReady = false;
+
+	function selectSector(id) {
+		setSelectedObject(id ? { type: 'sector', id } : null);
+	}
+
+	function isSelectedSector(id) {
+		const selection = getSelectedObject();
+		return selection?.type === 'sector' && selection.id === id;
+	}
 
 	function cleanup() {
 		clearTimeout(vertexDeleteUndoTimer);
@@ -41,46 +51,78 @@ export function useCragSectorMapEditor({
 			const sectorId = e.features?.[0]?.properties?.id;
 			if (!sectorId) return;
 			setSuppressNextMapClick(true);
-			setSelectedSectorId(sectorId);
+			selectSector(sectorId);
 			selectedSectorVertex = null;
 			setActiveTab('sectors');
-			setActiveTool('position');
 		});
 		map.on('mouseenter', 'sector-polygons-fill', () => {
-			if (getActiveTool() === 'position') map.getCanvas().style.cursor = 'pointer';
+			if (['select', 'position'].includes(getActiveTool()))
+				map.getCanvas().style.cursor = 'pointer';
 		});
 		map.on('mouseleave', 'sector-polygons-fill', () => {
 			if (!draggingSectorVertex) map.getCanvas().style.cursor = '';
 		});
 		map.on('mouseenter', 'sector-vertices', () => {
-			if (getActiveTool() === 'position') map.getCanvas().style.cursor = 'move';
+			if (['select', 'position'].includes(getActiveTool())) map.getCanvas().style.cursor = 'move';
 		});
 		map.on('mouseleave', 'sector-vertices', () => {
 			if (!draggingSectorVertex) map.getCanvas().style.cursor = '';
 		});
 		map.on('mouseenter', 'sector-vertex-midpoints', () => {
-			if (getActiveTool() === 'position') map.getCanvas().style.cursor = 'copy';
+			if (['select', 'position'].includes(getActiveTool())) map.getCanvas().style.cursor = 'copy';
 		});
 		map.on('mouseleave', 'sector-vertex-midpoints', () => {
 			if (!draggingSectorVertex) map.getCanvas().style.cursor = '';
 		});
 		map.on('mouseenter', 'sector-vertex-delete', () => {
-			if (getActiveTool() === 'position') map.getCanvas().style.cursor = 'pointer';
+			if (['select', 'position'].includes(getActiveTool()))
+				map.getCanvas().style.cursor = 'pointer';
 		});
 		map.on('mouseleave', 'sector-vertex-delete', () => {
 			if (!draggingSectorVertex) map.getCanvas().style.cursor = '';
 		});
 		map.on('click', 'sector-vertex-delete', deleteSelectedSectorVertex);
 		map.on('touchstart', 'sector-vertex-delete', deleteSelectedSectorVertex);
-		map.on('mousedown', 'sector-vertices', startSectorVertexDrag);
-		map.on('touchstart', 'sector-vertices', startSectorVertexDrag);
-		map.on('mousedown', 'sector-vertex-midpoints', startSectorMidpointDrag);
-		map.on('touchstart', 'sector-vertex-midpoints', startSectorMidpointDrag);
-		map.on('mousemove', moveSectorVertexDrag);
-		map.on('touchmove', moveSectorVertexDrag);
-		map.on('mouseup', endSectorVertexDrag);
-		map.on('touchend', endSectorVertexDrag);
-		map.on('touchcancel', endSectorVertexDrag);
+		initMapPointDragHandlers({
+			map,
+			layers: ['sector-vertices', 'sector-vertex-midpoints'],
+			canDrag: () => ['select', 'position'].includes(getActiveTool()),
+			getDragState: (event, layerId) => {
+				const properties = event.features?.[0]?.properties || {};
+				const sectorId = properties.sectorId;
+				const vertexIndex = Number(
+					layerId === 'sector-vertex-midpoints' ? properties.insertIndex : properties.vertexIndex
+				);
+				if (!sectorId || !Number.isInteger(vertexIndex)) return null;
+				return { sectorId, vertexIndex, isMidpoint: layerId === 'sector-vertex-midpoints' };
+			},
+			onDragStart: (drag, event) => {
+				const lngLat = getMapEventLngLat(event);
+				if (drag.isMidpoint && !lngLat) return false;
+				selectSector(drag.sectorId);
+				selectedSectorVertex = { sectorId: drag.sectorId, vertexIndex: drag.vertexIndex };
+				if (drag.isMidpoint) {
+					updateSectorGeometry(drag.sectorId, (geometry) =>
+						insertGeometryVertex(geometry, drag.vertexIndex, lngLat)
+					);
+				}
+				draggingSectorVertex = drag;
+				map.dragRotate?.disable();
+			},
+			onDragMove: (drag, event) => {
+				const lngLat = getMapEventLngLat(event);
+				if (!lngLat) return;
+				updateSectorGeometry(drag.sectorId, (geometry) =>
+					moveGeometryVertex(geometry, drag.vertexIndex, lngLat)
+				);
+			},
+			onDragEnd: () => {
+				draggingSectorVertex = null;
+				setSuppressNextMapClick(true);
+				map.dragRotate?.enable();
+				map.touchZoomRotate?.disableRotation();
+			}
+		});
 	}
 
 	function getMapEventLngLat(event) {
@@ -96,83 +138,18 @@ export function useCragSectorMapEditor({
 		});
 	}
 
-	function startSectorVertexDrag(event) {
-		const map = getMap();
-		if (getActiveTool() !== 'position') return;
-		const properties = event.features?.[0]?.properties || {};
-		const sectorId = properties.sectorId;
-		const vertexIndex = Number(properties.vertexIndex);
-		if (!sectorId || !Number.isInteger(vertexIndex)) return;
-		event.preventDefault();
-		event.originalEvent?.stopPropagation?.();
-		setSelectedSectorId(sectorId);
-		selectedSectorVertex = { sectorId, vertexIndex };
-		draggingSectorVertex = { sectorId, vertexIndex };
-		map.dragPan.disable();
-		map.touchZoomRotate.disable();
-		map.dragRotate?.disable();
-		map.getCanvas().style.cursor = 'move';
-	}
-
-	function startSectorMidpointDrag(event) {
-		const map = getMap();
-		if (getActiveTool() !== 'position') return;
-		const lngLat = getMapEventLngLat(event);
-		if (!lngLat) return;
-		const properties = event.features?.[0]?.properties || {};
-		const sectorId = properties.sectorId;
-		const insertIndex = Number(properties.insertIndex);
-		if (!sectorId || !Number.isInteger(insertIndex)) return;
-		event.preventDefault();
-		event.originalEvent?.stopPropagation?.();
-		setSelectedSectorId(sectorId);
-		selectedSectorVertex = { sectorId, vertexIndex: insertIndex };
-		updateSectorGeometry(sectorId, (geometry) =>
-			insertGeometryVertex(geometry, insertIndex, lngLat)
-		);
-		draggingSectorVertex = { sectorId, vertexIndex: insertIndex };
-		map.dragPan.disable();
-		map.touchZoomRotate.disable();
-		map.dragRotate?.disable();
-		map.getCanvas().style.cursor = 'move';
-	}
-
-	function moveSectorVertexDrag(event) {
-		if (!draggingSectorVertex) return;
-		const lngLat = getMapEventLngLat(event);
-		if (!lngLat) return;
-		event.preventDefault();
-		event.originalEvent?.stopPropagation?.();
-		updateSectorGeometry(draggingSectorVertex.sectorId, (geometry) =>
-			moveGeometryVertex(geometry, draggingSectorVertex.vertexIndex, lngLat)
-		);
-	}
-
-	function endSectorVertexDrag() {
-		const map = getMap();
-		if (!draggingSectorVertex) return;
-		draggingSectorVertex = null;
-		setSuppressNextMapClick(true);
-		map.dragPan.enable();
-		map.touchZoomRotate.enable();
-		map.touchZoomRotate?.disableRotation();
-		map.dragRotate?.enable();
-		map.getCanvas().style.cursor = '';
-	}
-
 	function cloneGeometry(geometry) {
 		return geometry ? JSON.parse(JSON.stringify(geometry)) : geometry;
 	}
 
 	function deleteSelectedSectorVertex(event) {
-		if (getActiveTool() !== 'position') return;
+		if (!['select', 'position'].includes(getActiveTool())) return;
 		const properties = event.features?.[0]?.properties || {};
 		const sectorId = properties.sectorId;
 		const vertexIndex = Number(properties.vertexIndex);
 		if (!sectorId || !Number.isInteger(vertexIndex)) return;
-		event.preventDefault();
 		setSuppressNextMapClick(true);
-		setSelectedSectorId(sectorId);
+		selectSector(sectorId);
 		selectedSectorVertex = null;
 		const sector = (cragEditorState.crag.sectors || []).find((item) => item.id === sectorId);
 		if (!sector?.geometry) return;
@@ -188,7 +165,7 @@ export function useCragSectorMapEditor({
 		if (!vertexDeleteUndo) return;
 		const { sectorId, geometry } = vertexDeleteUndo;
 		updateSectorGeometry(sectorId, () => cloneGeometry(geometry));
-		setSelectedSectorId(sectorId);
+		selectSector(sectorId);
 		selectedSectorVertex = null;
 		vertexDeleteUndo = null;
 		clearTimeout(vertexDeleteUndoTimer);
@@ -204,21 +181,20 @@ export function useCragSectorMapEditor({
 			if (!Array.isArray(coordinates) || coordinates.length < 2) return;
 			const el = document.createElement('button');
 			el.type = 'button';
-			el.className = `sector-marker ${getSelectedSectorId() === sector.id ? 'is-selected' : ''}`;
+			el.className = `sector-marker ${isSelectedSector(sector.id) ? 'is-selected' : ''}`;
 			el.title = sector.name || sector.id || 'Sector';
 			el.innerHTML = `<span>${sector.id || 'S'}</span>`;
 			el.addEventListener('click', (event) => {
 				event.stopPropagation();
-				setSelectedSectorId(sector.id);
+				selectSector(sector.id);
 				setActiveTab('sectors');
-				setActiveTool('position');
 			});
 			const marker = new maplibregl.Marker({ element: el, draggable: true })
 				.setLngLat(coordinates)
 				.addTo(map);
 			marker.on('dragstart', () => {
 				draggingSectorMarkerId = sector.id;
-				setSelectedSectorId(sector.id);
+				selectSector(sector.id);
 				setActiveTab('sectors');
 			});
 			marker.on('drag', () => {
