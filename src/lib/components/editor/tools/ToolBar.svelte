@@ -5,16 +5,15 @@
 	import { viewport } from '$lib/state/viewport.svelte.js';
 
 	let {
-		title = '',
 		activeTool = $bindable(null),
 		deselectedTool = null,
 		tools = [],
-		onBack = null,
 		undo = null,
 		redo = null,
 		finish = null,
 		cancel = null,
 		save = null,
+		mobileSearch,
 		controls,
 		children
 	} = $props();
@@ -41,23 +40,8 @@
 <div class="fixed top-2 left-2 right-2 z-50">
 	<div class="panel flex items-center justify-between gap-2 bg-white p-1.5 shadow-panel">
 		<div class="flex min-w-0 items-center gap-2.5">
-			{#if onBack}
-				<button
-					type="button"
-					class="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-black/10 bg-black/5 text-near-black transition-none hover:bg-black/10 md:h-7 md:w-7"
-					onclick={onBack}
-					title={$_('ui.back_to_launcher')}
-					aria-label={$_('ui.back_to_launcher')}
-				>
-					<i class="fa-solid fa-arrow-left text-[11px]"></i>
-				</button>
-			{/if}
-			{#if title}
-				<h1 class="truncate px-1 text-section-title leading-none sm:mr-2">{title}</h1>
-			{/if}
 
 			{#if !isCompact}
-				<div class="h-5 w-px bg-black/15"></div>
 				<div class="flex items-center gap-1">
 					{#each tools.filter((tool) => !tool.hidden) as tool}
 						<button
@@ -76,6 +60,10 @@
 				{@render controls?.()}
 			{/if}
 		</div>
+
+		{#if mobileSearch && isCompact}
+			<div class="min-w-0 flex-1">{@render mobileSearch()}</div>
+		{/if}
 
 		<div class="flex shrink-0 items-center gap-1.5 md:gap-3">
 			{#if !isCompact}

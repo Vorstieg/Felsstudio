@@ -54,11 +54,9 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 </script>
 
 <ToolBar
-	title={$_('ui.2d_studio')}
 	bind:activeTool
 	deselectedTool="select"
 	{tools}
-	onBack={() => goto(base + '/')}
 	undo={onUndo ? { label: `${$_('ui.undo_desc')} (Ctrl+Z)`, run: onUndo } : null}
 	redo={onRedo ? { label: `${$_('ui.redo_desc')} (Ctrl+Y)`, run: onRedo } : null}
 	finish={hasPendingChanges && onFinishRoute

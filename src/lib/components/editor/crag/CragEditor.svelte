@@ -595,14 +595,6 @@
 		return closestPoint || originalLngLat;
 	}
 
-	function setCragPositionFromSearch(coordinates) {
-		if (!coordinates) return;
-		setCragPosition(coordinates);
-		if (activeTool === 'parking' || activeTool === 'transit') {
-			scanNearbyAssets(activeTool === 'parking' ? 'parking' : 'transit');
-		}
-	}
-
 	function setCragPosition(coordinates) {
 		cragEditorState.crag.geometry.coordinates = coordinates;
 		if (cragMarker) cragMarker.setLngLat(coordinates);
@@ -1110,7 +1102,6 @@
 	onSimplifyTrack={simplifyTrack}
 	onGpxUpload={handleGpxUpload}
 	onExport={saveToServer}
-	onUseSearchPosition={setCragPositionFromSearch}
 	onLocateUser={locateUser}
 	onAddEquipmentItem={addEquipmentItem}
 	onRemoveEquipmentItem={removeEquipmentItem}

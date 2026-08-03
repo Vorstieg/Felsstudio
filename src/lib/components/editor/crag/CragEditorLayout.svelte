@@ -50,7 +50,6 @@
 		onSimplifyTrack = () => {},
 		onGpxUpload = () => {},
 		onExport = () => {},
-		onUseSearchPosition = () => {},
 		onLocateUser = () => {},
 		onAddEquipmentItem = () => {},
 		onRemoveEquipmentItem = () => {},
@@ -102,9 +101,11 @@
 			? `${result.previousPointCount} → ${result.pointCount} points at ${result.tolerance} m tolerance.`
 			: `No further simplification at ${result.tolerance} m. Increase tolerance.`;
 	}
+
 </script>
 
 <CragEditorToolbar
+	{map}
 	bind:activeTool
 	bind:mapStyle
 		{currentTrackPoints}
@@ -226,8 +227,8 @@
 {/if}
 
 {#if isExpanded}
-	<div class="fixed top-14 left-2 z-50 w-[min(24rem,calc(100vw-1rem))] md:right-auto">
-		<MapSearch {map} onUsePosition={onUseSearchPosition} />
+	<div class="fixed top-14 left-2 z-50 w-[min(24rem,calc(100vw-1rem))]">
+		<MapSearch {map} />
 	</div>
 {/if}
 

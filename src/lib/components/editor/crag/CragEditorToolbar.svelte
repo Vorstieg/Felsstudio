@@ -1,8 +1,10 @@
 <script>
 	import { _ } from 'svelte-i18n';
 	import ToolBar from '$lib/components/editor/tools/ToolBar.svelte';
+	import MapSearch from '$lib/components/editor/MapSearch.svelte';
 
 	let {
+		map = null,
 		activeTool = $bindable('position'),
 		mapStyle = $bindable('transport'),
 		currentTrackPoints = [],
@@ -38,7 +40,6 @@
 </script>
 
 <ToolBar
-	title={$_('ui.crag_studio')}
 	bind:activeTool
 	{tools}
 	{onBack}
@@ -57,6 +58,9 @@
 			: null}
 	save={{ status, errorMessage, run: onExport }}
 >
+	{#snippet mobileSearch()}
+		<MapSearch {map} embedded />
+	{/snippet}
 	{#snippet controls()}
 		<div
 			class="hidden items-center gap-1 rounded-sm border border-black/10 bg-black/5 p-0.5 xl:flex"

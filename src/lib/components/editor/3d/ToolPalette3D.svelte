@@ -16,7 +16,6 @@
 
 </script>
 <ToolBar
-	title={$_('ui.3d_studio')}
 	bind:activeTool
 	tools={[
 				{
@@ -67,7 +66,6 @@
 					}
 				}
 			]}
-	onBack={() => goto(resolve("/"))}
 	save={{ status: saveStatus, errorMessage: saveError, run: combinedExport }}
 >
 	{#snippet controls()}
