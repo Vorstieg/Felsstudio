@@ -18,7 +18,6 @@
 		onUndoTrackPoint = () => {},
 		onConfirmTrackCut = () => {},
 		onCancelTrackCut = () => {},
-		onLocateUser = () => {},
 		onExport = () => {},
 		status = 'idle',
 		errorMessage = ''
@@ -29,12 +28,6 @@
 		{ id: 'parking', icon: 'fa-square-parking', label: 'Parking Spot' },
 		{ id: 'transit', icon: 'fa-bus', label: 'Transit Station' },
 		{ id: 'track', icon: 'fa-route', label: 'Approach Track', onSelect: onStartRoutingDraft },
-		{
-			id: 'locate',
-			icon: 'fa-location-crosshairs',
-			label: 'Use current location',
-			onSelect: onLocateUser
-		}
 	]);
 	let canFinishTrack = $derived(activeTool === 'track' && currentTrackPoints.length > 1);
 </script>

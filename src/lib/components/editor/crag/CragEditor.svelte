@@ -600,13 +600,12 @@
 		if (cragMarker) cragMarker.setLngLat(coordinates);
 	}
 
-	function locateUser() {
+	function centerMapOnUser() {
 		if (!navigator.geolocation || !map) return;
 		navigator.geolocation.getCurrentPosition(
 			(position) => {
 				const coordinates = [position.coords.longitude, position.coords.latitude];
 				map.easeTo({ center: coordinates, zoom: Math.max(map.getZoom(), 15), duration: 500 });
-				if (activeTool === 'position' && !selectedSectorId) setCragPosition(coordinates);
 			},
 			() => {
 			},
@@ -1102,7 +1101,7 @@
 	onSimplifyTrack={simplifyTrack}
 	onGpxUpload={handleGpxUpload}
 	onExport={saveToServer}
-	onLocateUser={locateUser}
+	onCenterMapOnUser={centerMapOnUser}
 	onAddEquipmentItem={addEquipmentItem}
 	onRemoveEquipmentItem={removeEquipmentItem}
 	onAddCragImages={addCragImages}

@@ -50,7 +50,7 @@
 		onSimplifyTrack = () => {},
 		onGpxUpload = () => {},
 		onExport = () => {},
-		onLocateUser = () => {},
+		onCenterMapOnUser = () => {},
 		onAddEquipmentItem = () => {},
 		onRemoveEquipmentItem = () => {},
 		onAddSector = () => {},
@@ -120,11 +120,24 @@
 		{onUndoTrackPoint}
 		{onConfirmTrackCut}
 		{onCancelTrackCut}
-	{onLocateUser}
 	{onExport}
 	status={saveStatus}
 	errorMessage={saveError}
 />
+
+<button
+	type="button"
+	class="fixed z-40 flex h-10 w-10 items-center justify-center rounded-full border border-black/15 bg-white text-warm-gray-600 shadow-panel transition-none hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-creator-blue"
+	style:right={isExpanded ? 'calc(20rem + 1.25rem)' : '1.25rem'}
+	style:bottom={isExpanded
+		? '1.25rem'
+		: 'calc(var(--info-panel-height, 0px) + max(0.75rem, env(safe-area-inset-bottom)))'}
+	onclick={onCenterMapOnUser}
+	title="Center map on current location"
+	aria-label="Center map on current location"
+>
+	<i class="fa-solid fa-location-crosshairs text-sm"></i>
+</button>
 
 {#if activeTool === 'track'}
 	<ToolOptions title={$_('ui.track_tool_options')} onClose={onCancelTrackEdit}>

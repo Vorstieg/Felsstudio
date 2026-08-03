@@ -21,9 +21,9 @@ export function resize(element) {
 
 	function calculateTargetHeights() {
 		const screenHeight = window.innerHeight;
-		targetHeights = [screenHeight * 0.14, screenHeight * 0.5, screenHeight * 0.9];
+		targetHeights = [screenHeight * 0.05, screenHeight * 0.5, screenHeight * 0.9];
 
-		minHeight = screenHeight * 0.14;
+		minHeight = screenHeight * 0.05;
 		maxTop = screenHeight - minHeight;
 
 		// If it hasn't been explicitly dragged yet, keep the CSS variable in sync with window.innerHeight
