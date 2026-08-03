@@ -65,11 +65,13 @@
 	let saveError = $state('');
 
 	let activeTool = $state('position'); // 'position' | 'transit' | 'parking' | 'track'
+	let toolOptionsOpen = $state(false);
 	let activeTab = $state('info'); // 'info' | 'registry'
 	let selectedSectorId = $state(null);
 	// Preview state is replaced whenever the user generates another mission.
 	let flightPlan = $state(null);
 	let selectedRouteKey = $state(null);
+
 	let selectedRouteEntry = $derived.by(() => {
 		if (!selectedRouteKey) return null;
 		return cragEditorState.routeDocuments
@@ -1066,6 +1068,7 @@
 	{isLandscape}
 	{CragEditorBottomSheet}
 	bind:activeTool
+	bind:toolOptionsOpen
 	bind:mapStyle
 	bind:activeTab
 	{detectedAssets}

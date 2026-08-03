@@ -6,6 +6,7 @@
 	let {
 		map = null,
 		activeTool = $bindable('position'),
+		toolOptionsOpen = $bindable(false),
 		currentTrackPoints = [],
 		trackDraftMode = 'routing',
 		isRoutingTrack = false,
@@ -26,13 +27,23 @@
 		{ id: 'position', icon: 'fa-location-crosshairs', label: 'Crag Position' },
 		{ id: 'parking', icon: 'fa-square-parking', label: 'Parking Spot' },
 		{ id: 'transit', icon: 'fa-bus', label: 'Transit Station' },
-		{ id: 'track', icon: 'fa-route', label: 'Approach Track', onSelect: onStartRoutingDraft },
+		{
+			id: 'track',
+			icon: 'fa-route',
+			label: 'Approach Track',
+			hasOptions: true,
+			onSelect: ({ isActive }) => {
+				if (!isActive) onStartRoutingDraft();
+			}
+		},
 	]);
 	let canFinishTrack = $derived(activeTool === 'track' && currentTrackPoints.length > 1);
 </script>
 
 <ToolBar
 	bind:activeTool
+	bind:toolOptionsOpen
+	neutralTool="position"
 	{tools}
 	{onBack}
 	undo={activeTool === 'track'

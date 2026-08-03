@@ -18,7 +18,7 @@
 </script>
 
 {#if isOutlineTool}
-	<ToolOptions title={$_('ui.outline_tool_options')} {onClose}>
+	<ToolOptions title={$_('ui.outline_tool_options')} open={true} {onClose}>
 
 		<div class="flex flex-col gap-2">
 			<label class="text-xs font-medium text-warm-gray-600">{$_('ui.drawing_mode')}</label>

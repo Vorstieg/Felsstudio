@@ -15,6 +15,7 @@
 		isLandscape = false,
 		CragEditorBottomSheet,
 		activeTool = $bindable('position'),
+		toolOptionsOpen = $bindable(false),
 		mapStyle = $bindable('transport'),
 		activeTab = $bindable('info'),
 		detectedAssets = [],
@@ -108,6 +109,7 @@
 <CragEditorToolbar
 	{map}
 	bind:activeTool
+	bind:toolOptionsOpen
 		{currentTrackPoints}
 		{trackDraftMode}
 		{isRoutingTrack}
@@ -125,7 +127,7 @@
 	errorMessage={saveError}
 />
 
-<MapStyleControl bind:mapStyle {isExpanded} />
+<MapStyleControl bind:mapStyle {isExpanded} {toolOptionsOpen} />
 
 <button
 	type="button"
@@ -133,7 +135,9 @@
 	style:right={isExpanded ? 'calc(20rem + 1.25rem)' : '1.25rem'}
 	style:bottom={isExpanded
 		? '1.25rem'
-		: 'calc(var(--info-panel-height, 0px) + max(0.75rem, env(safe-area-inset-bottom)))'}
+		: toolOptionsOpen
+			? 'calc(var(--mobile-tool-dock-height, 7.5rem) + var(--mobile-tool-options-height, 0px) + max(0.75rem, env(safe-area-inset-bottom)))'
+			: 'calc(var(--info-panel-height, 0px) + var(--mobile-tool-dock-height, 7.5rem) + max(0.75rem, env(safe-area-inset-bottom)))'}
 	onclick={onCenterMapOnUser}
 	title="Center map on current location"
 	aria-label="Center map on current location"
@@ -141,8 +145,8 @@
 	<i class="fa-solid fa-location-crosshairs text-sm"></i>
 </button>
 
-{#if activeTool === 'track'}
-	<ToolOptions title={$_('ui.track_tool_options')} onClose={onCancelTrackEdit}>
+{#if toolOptionsOpen && activeTool === 'track'}
+	<ToolOptions title={$_('ui.track_tool_options')} open={toolOptionsOpen} onClose={() => (toolOptionsOpen = false)}>
 		<div class="flex flex-col gap-2">
 			<div class="text-xs font-medium text-warm-gray-600">{$_('ui.drawing_mode')}</div>
 			<div class="grid grid-cols-2 gap-1">

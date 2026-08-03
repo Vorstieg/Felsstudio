@@ -10,7 +10,8 @@
 	let {
 		showMapModal = $bindable(false),
 		drawingTarget = $bindable(null),
-		activeTool = $bindable('route')
+		activeTool = $bindable('route'),
+		toolOptionsOpen = false
 	} = $props();
 
 	let activeTab = $state('info');
@@ -181,7 +182,7 @@
 	]);
 </script>
 
-<DetailsComponent title={$_('ui.properties')} subtitle={$_('ui.topo_inspector')} {tabs} bind:activeTab onTabChange={switchTab} width="20rem">
+<DetailsComponent title={$_('ui.properties')} subtitle={$_('ui.topo_inspector')} {tabs} bind:activeTab onTabChange={switchTab} width="20rem" visualSuperseded={toolOptionsOpen}>
 	{#snippet headerActions()}
 		<button class="h-6 w-6 rounded-sm text-warm-gray-300 hover:bg-black/5 hover:text-near-black" onclick={toggleJsonEditor} title="Edit topo JSON" aria-label="Edit topo JSON"><i class="fa-solid fa-code text-[10px]"></i></button>
 	{/snippet}

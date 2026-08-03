@@ -9,6 +9,7 @@
 		onTabChange = (tab) => (activeTab = tab),
 		width = '20rem',
 		shadow = true,
+		visualSuperseded = false,
 		footer,
 		headerActions,
 		children
@@ -63,7 +64,7 @@
 	<div class="fixed inset-0 z-40 pointer-events-none">
 		<div
 			use:resize
-			class="fixed left-0 right-0 z-50 flex flex-col bg-white shadow-panel rounded-t-4xl border-t border-black/10 overflow-hidden pointer-events-auto"
+			class="fixed left-0 right-0 z-50 flex flex-col bg-white shadow-panel rounded-t-4xl border-t border-black/10 overflow-hidden pointer-events-auto {visualSuperseded ? 'invisible' : ''}"
 			role="dialog"
 			aria-label={title}
 		>

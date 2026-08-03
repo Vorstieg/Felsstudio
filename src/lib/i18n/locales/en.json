@@ -194,6 +194,7 @@
 		"load_model": "Import 3D Model",
 		"load_json": "Load Topo JSON",
 		"tools": "Tools",
+		"select": "Select",
 		"route": "Route",
 		"outline": "Outline",
 		"fixpoint": "Fixpoint",
