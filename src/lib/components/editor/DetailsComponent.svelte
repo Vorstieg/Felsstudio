@@ -15,7 +15,9 @@
 		children
 	} = $props();
 
-	let isDesktop = $state(false);
+	// Resolve the initial layout from the browser width so desktop does not
+	// briefly render the mobile bottom-sheet variant during hydration.
+	let isDesktop = $state(typeof window !== 'undefined' && window.innerWidth > 1024);
 
 	onMount(() => {
 		const updateLayout = () => (isDesktop = window.innerWidth > 1024);
