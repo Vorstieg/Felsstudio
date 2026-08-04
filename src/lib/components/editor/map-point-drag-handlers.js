@@ -9,7 +9,21 @@ export function initMapPointDragHandlers({
 }) {
 	if (!map) return () => {};
 	let draggingState = null;
+	let pendingMoveEvent = null;
+	let moveFrame = null;
 	const cleanups = [];
+
+	function scheduleMove(event) {
+		pendingMoveEvent = event;
+		if (moveFrame !== null) return;
+		moveFrame = requestAnimationFrame(() => {
+			moveFrame = null;
+			if (!draggingState || !pendingMoveEvent) return;
+			const moveEvent = pendingMoveEvent;
+			pendingMoveEvent = null;
+			onDragMove(draggingState, moveEvent);
+		});
+	}
 
 	function addMapHandler(...args) {
 		map.on(...args);
@@ -37,6 +51,15 @@ export function initMapPointDragHandlers({
 
 	function finishDrag(event, { touch = false } = {}) {
 		if (!draggingState) return;
+		if (moveFrame !== null) {
+			cancelAnimationFrame(moveFrame);
+			moveFrame = null;
+		}
+		if (pendingMoveEvent) {
+			const moveEvent = pendingMoveEvent;
+			pendingMoveEvent = null;
+			onDragMove(draggingState, moveEvent);
+		}
 		const finishedState = draggingState;
 		draggingState = null;
 		onDragEnd(finishedState, event);
@@ -58,13 +81,13 @@ export function initMapPointDragHandlers({
 
 	addMapHandler('mousemove', (event) => {
 		if (!draggingState) return;
-		onDragMove(draggingState, event);
+		scheduleMove(event);
 	});
 
 	addMapHandler('touchmove', (event) => {
 		if (!draggingState) return;
 		event.originalEvent?.stopPropagation?.();
-		onDragMove(draggingState, event);
+		scheduleMove(event);
 	});
 
 	addMapHandler('mouseup', (event) => finishDrag(event));
@@ -72,6 +95,8 @@ export function initMapPointDragHandlers({
 	addMapHandler('touchcancel', (event) => finishDrag(event, { touch: true }));
 
 	return () => {
+		if (moveFrame !== null) cancelAnimationFrame(moveFrame);
+		pendingMoveEvent = null;
 		for (const cleanup of cleanups) cleanup();
 	};
 }

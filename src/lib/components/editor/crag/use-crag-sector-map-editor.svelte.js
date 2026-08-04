@@ -1,7 +1,9 @@
 import maplibregl from 'maplibre-gl';
 import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
 import { getGeometryCenter } from '$lib/assets/js/sector-utils.js';
+import { getEditablePath, getPathMidpoints } from '$lib/assets/js/path-geometry.js';
 import {
+	getGeometryPath,
 	insertGeometryVertex,
 	moveGeometryVertex,
 	removeGeometryVertex
@@ -16,12 +18,14 @@ export function useCragSectorMapEditor({
 	getSelectedObject,
 	setSelectedObject,
 	setSuppressNextMapClick,
-	onUpdateSectorCoordinates
+	onUpdateSectorCoordinates,
+	onCommitSectorGeometry = () => {}
 }) {
 	let sectorMarkers = $state([]);
 	let selectedSectorVertex = $state(null);
 	let vertexDeleteUndo = $state(null);
 	let draggingSectorVertex = null;
+	let draggingSectorGeometry = null;
 	let draggingSectorMarkerId = $state(null);
 	let vertexDeleteUndoTimer = null;
 	let areSectorEditHandlersReady = false;
@@ -39,6 +43,50 @@ export function useCragSectorMapEditor({
 		clearTimeout(vertexDeleteUndoTimer);
 		sectorMarkers.forEach((item) => item.marker.remove());
 		sectorMarkers = [];
+		clearSectorDragPreview();
+	}
+
+	function setSectorDragPreview(geometry) {
+		const source = getMap()?.getSource('sector-drag-overlay');
+		if (!source || geometry?.type !== 'Polygon') return;
+		const path = getGeometryPath(geometry);
+		const features = [{ type: 'Feature', properties: {}, geometry }];
+		getEditablePath(path, { closed: true }).forEach((point, vertexIndex) => {
+			features.push({
+				type: 'Feature',
+				properties: { feature: 'sector-vertex', vertexIndex },
+				geometry: { type: 'Point', coordinates: point }
+			});
+		});
+		getPathMidpoints(path, { closed: true }).forEach((midpoint) => {
+			features.push({
+				type: 'Feature',
+				properties: { feature: 'sector-midpoint', insertIndex: midpoint.insertIndex },
+				geometry: { type: 'Point', coordinates: midpoint.point }
+			});
+		});
+		const draggedVertex = draggingSectorVertex?.vertexIndex;
+		if (draggedVertex !== undefined && getEditablePath(path, { closed: true }).length > 3) {
+			features.push({
+				type: 'Feature',
+				properties: { feature: 'sector-vertex-delete', vertexIndex: draggedVertex },
+				geometry: {
+					type: 'Point',
+					coordinates: getEditablePath(path, { closed: true })[draggedVertex]
+				}
+			});
+		}
+		source.setData({
+			type: 'FeatureCollection',
+			features
+		});
+	}
+
+	function clearSectorDragPreview() {
+		getMap()?.getSource('sector-drag-overlay')?.setData({
+			type: 'FeatureCollection',
+			features: []
+		});
 	}
 
 	function initSectorEditHandlers() {
@@ -99,24 +147,36 @@ export function useCragSectorMapEditor({
 			onDragStart: (drag, event) => {
 				const lngLat = getMapEventLngLat(event);
 				if (drag.isMidpoint && !lngLat) return false;
+				const sector = (cragEditorState.crag.sectors || []).find(
+					(item) => item.id === drag.sectorId
+				);
+				if (!sector?.geometry) return false;
 				selectSector(drag.sectorId);
 				selectedSectorVertex = { sectorId: drag.sectorId, vertexIndex: drag.vertexIndex };
-				if (drag.isMidpoint) {
-					updateSectorGeometry(drag.sectorId, (geometry) =>
-						insertGeometryVertex(geometry, drag.vertexIndex, lngLat)
-					);
-				}
+				draggingSectorGeometry = drag.isMidpoint
+					? insertGeometryVertex(sector.geometry, drag.vertexIndex, lngLat)
+					: sector.geometry;
 				draggingSectorVertex = drag;
+				setSectorDragPreview(draggingSectorGeometry);
 				map.dragRotate?.disable();
 			},
 			onDragMove: (drag, event) => {
 				const lngLat = getMapEventLngLat(event);
 				if (!lngLat) return;
-				updateSectorGeometry(drag.sectorId, (geometry) =>
-					moveGeometryVertex(geometry, drag.vertexIndex, lngLat)
+				if (!draggingSectorGeometry) return;
+				draggingSectorGeometry = moveGeometryVertex(
+					draggingSectorGeometry,
+					drag.vertexIndex,
+					lngLat
 				);
+				setSectorDragPreview(draggingSectorGeometry);
 			},
 			onDragEnd: () => {
+				if (draggingSectorVertex && draggingSectorGeometry) {
+					onCommitSectorGeometry(draggingSectorVertex.sectorId, draggingSectorGeometry);
+				}
+				draggingSectorGeometry = null;
+				clearSectorDragPreview();
 				draggingSectorVertex = null;
 				setSuppressNextMapClick(true);
 				map.dragRotate?.enable();
@@ -220,6 +280,9 @@ export function useCragSectorMapEditor({
 		},
 		get draggingSectorMarkerId() {
 			return draggingSectorMarkerId;
+		},
+		get draggingSectorVertex() {
+			return draggingSectorVertex;
 		},
 		initSectorEditHandlers,
 		syncSectorMarkers,

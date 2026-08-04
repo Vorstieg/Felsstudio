@@ -23,6 +23,8 @@ export function useCragTrackEditor({
 	getRoutePathTarget = () => null,
 	onSaveRoutePath = () => {},
 	onRoutePathDrawingEnd = () => {},
+	onPathFinished = () => {},
+	onPathCancelled = () => {},
 	onTrackPointDragStart = () => {},
 	onTrackPointDragEnd = () => {}
 }) {
@@ -263,6 +265,7 @@ export function useCragTrackEditor({
 			setActiveTool('position');
 			resetDraft();
 			onRoutePathDrawingEnd();
+			onPathFinished();
 			return;
 		}
 
@@ -281,6 +284,7 @@ export function useCragTrackEditor({
 			currentTrackPoints = [];
 			routeDraftWaypoints = [];
 			clearDraftHistory();
+			onPathFinished();
 			return;
 		}
 
@@ -327,6 +331,7 @@ export function useCragTrackEditor({
 		const routePathTarget = getRoutePathTarget();
 		resetDraft();
 		if (routePathTarget) onRoutePathDrawingEnd();
+		onPathCancelled();
 	}
 
 	function resetDraft() {
@@ -353,6 +358,7 @@ export function useCragTrackEditor({
 				setActiveTool('position');
 				resetDraft();
 				onRoutePathDrawingEnd();
+				onPathFinished();
 				return;
 			}
 			const feature = createAccessFeature({

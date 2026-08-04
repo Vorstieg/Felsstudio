@@ -100,6 +100,8 @@
 		getRoutePathTarget: () => routePathDrawingTarget,
 		onSaveRoutePath: saveRoutePathCoordinates,
 		onRoutePathDrawingEnd: () => (routePathDrawingTarget = null),
+		onPathFinished: () => (selectedObject = null),
+		onPathCancelled: () => (selectedObject = null),
 		onTrackPointDragStart: () => syncEditorData(),
 		onTrackPointDragEnd: () => syncEditorData()
 	});
@@ -154,7 +156,8 @@
 		getSelectedObject: () => selectedObject,
 		setSelectedObject: (value) => (selectedObject = value),
 		setSuppressNextMapClick: (value) => (suppressNextMapClick = value),
-		onUpdateSectorCoordinates: updateSectorCoordinates
+		onUpdateSectorCoordinates: updateSectorCoordinates,
+		onCommitSectorGeometry: (id, geometry) => updateSectorGeometry(id, () => geometry)
 	});
 	let selectedSectorVertex = $derived(sectorMapEditor.selectedSectorVertex);
 	let vertexDeleteUndo = $derived(sectorMapEditor.vertexDeleteUndo);
@@ -274,6 +277,8 @@
 		if (!activeTrackDragState) return { type: 'FeatureCollection', features: [] };
 		const { pointIndex, coordinate } = activeTrackDragState;
 		const features = [];
+		const dragPoints = [...currentTrackPoints];
+		dragPoints[pointIndex] = coordinate;
 		if (currentTrackPoints[pointIndex - 1]) {
 			features.push({
 				type: 'Feature',
@@ -297,6 +302,24 @@
 		features.push({
 			type: 'Feature',
 			properties: { feature: 'track-drag-point' },
+			geometry: { type: 'Point', coordinates: coordinate }
+		});
+		for (let index = 0; index < dragPoints.length - 1; index += 1) {
+			const first = dragPoints[index];
+			const second = dragPoints[index + 1];
+			if (!first || !second) continue;
+			features.push({
+				type: 'Feature',
+				properties: { feature: 'track-midpoint', pointIndex: index + 1 },
+				geometry: {
+					type: 'Point',
+					coordinates: [(first[0] + second[0]) / 2, (first[1] + second[1]) / 2]
+				}
+			});
+		}
+		features.push({
+			type: 'Feature',
+			properties: { feature: 'track-vertex-delete', pointIndex },
 			geometry: { type: 'Point', coordinates: coordinate }
 		});
 		return { type: 'FeatureCollection', features };
@@ -589,7 +612,7 @@
 		selectedSectorVertex;
 		draggingSectorMarkerId;
 		untrack(() => {
-			if (!draggingSectorMarkerId) syncSectorMarkers();
+			if (!draggingSectorMarkerId && !sectorMapEditor.draggingSectorVertex) syncSectorMarkers();
 			syncEditorData();
 		});
 	});
@@ -676,6 +699,12 @@
 		});
 	}
 
+	function updateSectorGeometry(id, updater) {
+		cragEditorState.crag.sectors = (cragEditorState.crag.sectors || []).map((sector) =>
+			sector.id === id ? { ...sector, geometry: updater(sector.geometry) } : sector
+		);
+	}
+
 	function setSectorGeometryType(id, type) {
 		cragEditorState.crag.sectors = (cragEditorState.crag.sectors || []).map((sector) => {
 			if (sector.id !== id || sector.geometry?.type === type) return sector;
@@ -758,6 +787,7 @@
 				editingDrawingPath: trackDraftMode === 'editing',
 				selectedTrackPointIndex: trackEditor.selectedTrackPointIndex,
 				selectedSectorVertex,
+				draggingSectorVertex: untrack(() => sectorMapEditor.draggingSectorVertex),
 				editingTrackIndex,
 				draggingTrackPointIndex: untrack(() => activeTrackDragState?.pointIndex ?? null),
 				flightPlan: $state.snapshot(flightPlan)
