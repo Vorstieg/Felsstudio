@@ -86,10 +86,11 @@
 		);
 	}
 
-	@media (min-width: 768px) {
+	@media (min-width: 1025px) {
 		.tool-options-surface {
 			bottom: auto;
 			max-height: calc(100dvh - 5rem);
 		}
 	}
+
 </style>

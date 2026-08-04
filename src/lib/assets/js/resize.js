@@ -6,7 +6,6 @@ export function resize(element) {
 	top.direction = 'north';
 	top.classList.add('grabber');
 	top.classList.add('top');
-	top.classList.add('sm:hidden');
 
 	let active = null,
 		initialRect = null,
@@ -64,7 +63,10 @@ export function resize(element) {
 	}
 
 	function isMobile() {
-		return window.innerWidth < 640;
+		// DetailsComponent uses its sheet layout up to the expanded breakpoint.
+		// This includes phones held in landscape, which are commonly wider than
+		// 640px while still needing the draggable bottom sheet.
+		return window.innerWidth <= 1024;
 	}
 
 	function snapToClosestHeight() {

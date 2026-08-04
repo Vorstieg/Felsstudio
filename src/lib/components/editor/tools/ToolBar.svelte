@@ -96,7 +96,7 @@
 {#if isCompact}
 	<div class="fixed inset-x-0 z-50 flex justify-center pointer-events-none" style={`bottom: calc(${toolOptionsOpen ? '0px' : 'var(--info-panel-height, 0px)'} + max(0.75rem, env(safe-area-inset-bottom))); transition: var(--info-panel-transition, none); visibility: ${toolOptionsOpen ? 'visible' : 'var(--mobile-toolbar-visibility, visible)'};`}>
 		<div use:observeMobileDock class="flex w-full flex-col gap-0 pointer-events-auto">
-			<div class="panel flex w-full items-center gap-1 overflow-x-auto rounded-none border-x-0 p-1.5 shadow-panel">
+			<div class="panel flex w-full items-center justify-center gap-1 overflow-x-auto rounded-none border-x-0 p-1.5 shadow-panel">
 			{#each tools.filter((tool) => !tool.hidden) as tool}
 				<ToolButton {tool} active={activeTool === tool.id} compact onclick={() => selectTool(tool)} />
 			{/each}

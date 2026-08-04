@@ -14,5 +14,5 @@
 	aria-pressed={active}
 >
 	<i class={`fa-solid ${tool.icon}`}></i>
-	<span class={compact ? 'ml-1.5 hidden sm:inline' : 'hidden xl:inline'}>{tool.label}</span>
+	<span class={compact ? 'hidden' : 'inline'}>{tool.label}</span>
 </button>
