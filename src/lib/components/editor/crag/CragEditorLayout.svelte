@@ -42,6 +42,8 @@
 		onHandleTrackConfirm = () => {},
 		onCancelTrackEdit = () => {},
 		onUndoTrackPoint = () => {},
+		onUndo = () => {},
+		canUndo = false,
 		onStartTrackCut = () => {},
 		onConfirmTrackCut = () => {},
 		onCancelTrackCut = () => {},
@@ -120,6 +122,8 @@
 	{onHandleTrackConfirm}
 	{onCancelTrackEdit}
 		{onUndoTrackPoint}
+	{onUndo}
+	{canUndo}
 		{onConfirmTrackCut}
 		{onCancelTrackCut}
 	{onExport}

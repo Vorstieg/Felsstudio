@@ -91,8 +91,24 @@ export function normalizeTopoPaths(data = {}) {
 }
 
 export function ensureTopoPaths(data) {
-	const result = normalizeTopoPaths(data);
-	return result.data.paths;
+	if (!data || typeof data !== 'object') return { type: 'FeatureCollection', features: [] };
+
+	const routes = Array.isArray(data.routes) ? data.routes : [];
+	const hasLegacyRoutes = routes.some(
+		(route) => route?.assets?.paths != null || !Array.isArray(route?.pathRefs)
+	);
+	const hasValidPaths =
+		data.paths?.type === 'FeatureCollection' && Array.isArray(data.paths.features);
+
+	if (!hasValidPaths || hasLegacyRoutes) {
+		const result = normalizeTopoPaths(data);
+		// Keep the normalized collection on the caller's document. Mutating helpers
+		// must operate on the document itself, not on normalizeTopoPaths' clone.
+		data.paths = result.data.paths;
+		if (result.migrated) data.routes = result.data.routes;
+	}
+
+	return data.paths;
 }
 
 export function findTopoPath(data, pathId) {

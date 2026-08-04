@@ -47,7 +47,7 @@
 	import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.js';
 	import { generateId, generateRouteId } from '$lib/assets/js/id-utils.js';
 	import { rockTypes } from '$lib/config.js';
-	import { assignTopoPath, createPathFeature, deleteTopoPath, findTopoPath, routesUsingTopoPath, splitTopoPath } from '$lib/assets/js/topo-document-paths.js';
+	import { assignTopoPath, createPathFeature, deleteTopoPath, findTopoPath, splitTopoPath } from '$lib/assets/js/topo-document-paths.js';
 	import { createRouteEditController } from './route-editing.js';
 
 	let { inspectorShadow = true } = $props();
@@ -72,6 +72,7 @@
 	let selectedObject = $state(null);
 	// Preview state is replaced whenever the user generates another mission.
 	let flightPlan = $state(null);
+	let deletedRoutePathUndo = $state(null);
 
 	let selectedRouteEntry = $derived.by(() => {
 		if (selectedObject?.type !== 'route') return null;
@@ -1036,9 +1037,15 @@
 	function deleteRoute(path, routeId) {
 		const document = cragEditorState.routeDocuments.find((entry) => entry.path === path);
 		if (!document) return;
-		document.data.routes = (document.data.routes || []).filter((route) => route.id !== routeId);
+		const routeKey = `${path}:${routeId}`;
+		const isSelectedRoute = selectedObject?.type === 'route' && selectedObject.key === routeKey;
+		const isDraftForRoute = routeEditDraft?.documentPath === path && String(routeEditDraft.routeId) === String(routeId);
+		// Cancel before removing the route so the editor cannot commit a draft
+		// against a route that has just been deleted.
+		if (isDraftForRoute) cancelTrackEdit();
+		document.data.routes = (document.data.routes || []).filter((route) => String(route.id) !== String(routeId));
 		document.dirty = true;
-		if (selectedObject?.type === 'route' && selectedObject.key === `${path}:${routeId}`) selectObject(null);
+		if (isSelectedRoute || isDraftForRoute) selectObject(null);
 	}
 
 	function selectRoute(path, routeId) {
@@ -1159,11 +1166,32 @@
 	function deleteRoutePath(path, pathId) {
 		const document = cragEditorState.routeDocuments.find((entry) => entry.path === path);
 		if (!document || !findTopoPath(document.data, pathId)) return false;
-		const count = routesUsingTopoPath(document.data, pathId).length;
-		if (typeof window !== 'undefined' && !window.confirm(`Delete this path and remove it from ${count} route${count === 1 ? '' : 's'}?`)) return false;
+		const feature = findTopoPath(document.data, pathId);
+		const routeRefs = (document.data.routes || [])
+			.filter((route) => (route.pathRefs || []).some((ref) => String(ref.pathId) === String(pathId)))
+			.map((route) => ({ id: route.id, pathRefs: JSON.parse(JSON.stringify(route.pathRefs)) }));
 		const deleted = deleteTopoPath(document.data, pathId);
-		if (deleted) document.dirty = true;
+		if (deleted) {
+			deletedRoutePathUndo = { path, feature: JSON.parse(JSON.stringify(feature)), routeRefs };
+			document.dirty = true;
+			if (routeEditDraft?.pathId === pathId && routeEditDraft?.documentPath === path) cancelTrackEdit();
+		}
 		return deleted;
+	}
+
+	function undoDeleteRoutePath() {
+		const undo = deletedRoutePathUndo;
+		if (!undo) return false;
+		const document = cragEditorState.routeDocuments.find((entry) => entry.path === undo.path);
+		if (!document || findTopoPath(document.data, undo.feature.id)) return false;
+		document.data.paths.features = [...(document.data.paths?.features || []), undo.feature];
+		for (const savedRoute of undo.routeRefs) {
+			const route = document.data.routes?.find((item) => String(item.id) === String(savedRoute.id));
+			if (route) route.pathRefs = savedRoute.pathRefs;
+		}
+		document.dirty = true;
+		deletedRoutePathUndo = null;
+		return true;
 	}
 
 </script>
@@ -1212,6 +1240,8 @@
 	onHandleTrackConfirm={handleTrackConfirm}
 	onCancelTrackEdit={cancelTrackEdit}
 	onUndoTrackPoint={undoTrackPoint}
+	onUndo={undoDeleteRoutePath}
+	canUndo={deletedRoutePathUndo !== null}
 	onStartTrackCut={startTrackCut}
 	onConfirmTrackCut={confirmTrackCut}
 	onCancelTrackCut={resetTrackCut}

@@ -16,6 +16,8 @@
 		onHandleTrackConfirm = () => {},
 		onCancelTrackEdit = () => {},
 		onUndoTrackPoint = () => {},
+		onUndo = () => {},
+		canUndo = false,
 		onConfirmTrackCut = () => {},
 		onCancelTrackCut = () => {},
 		onExport = () => {},
@@ -50,7 +52,7 @@
 	{onBack}
 	undo={activeTool === 'track'
 		? { label: 'Undo', run: onUndoTrackPoint, disabled: currentTrackPoints.length === 0 }
-		: null}
+		: canUndo ? { label: 'Undo', run: onUndo } : null}
 	finish={canFinishTrack
 		? { label: $_('ui.finish'), run: onHandleTrackConfirm, disabled: isRoutingTrack }
 		: activeTool === 'cut' && hasPendingTrackCut

@@ -50,6 +50,7 @@ test('manages, migrates, and validates topo document paths', () => {
 	assert.equal(unassignTopoPath(migrated.data, 'route-1', pathId), true);
 	assert.equal(routesUsingTopoPath(migrated.data, pathId).length, 1);
 	assert.equal(deleteTopoPath(migrated.data, pathId), true);
+	assert.equal(migrated.data.paths.features.length, 0);
 	assert.equal(migrated.data.routes[1].pathRefs.length, 0);
 	assert.deepEqual(validateTopoPaths(migrated.data), []);
 
