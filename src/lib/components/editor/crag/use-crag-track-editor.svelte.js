@@ -277,7 +277,6 @@ export function useCragTrackEditor({
 		const routePathTarget = getRoutePathTarget();
 		if (routePathTarget) {
 			onSaveRoutePath(routePathTarget, coordinates);
-			setActiveTab('sectors');
 			setActiveTool('position');
 			resetDraft();
 			onRoutePathDrawingEnd();
@@ -326,7 +325,7 @@ export function useCragTrackEditor({
 	}
 
 	function editRoutePath(coordinates) {
-		if (coordinates.length < 2) return;
+		if (!Array.isArray(coordinates)) return;
 		activeTrackTarget = getRoutePathTarget() ? { kind: 'route-path', ...getRoutePathTarget() } : null;
 		currentTrackPoints = coordinates.map((point) => [...point]);
 		routeDraftWaypoints = [];
@@ -334,8 +333,7 @@ export function useCragTrackEditor({
 		clearDraftHistory();
 		selectedTrackPointIndex = null;
 		setActiveTool('track');
-		setActiveTab('sectors');
-		fitTrackBounds(coordinates);
+		if (coordinates.length > 1) fitTrackBounds(coordinates);
 	}
 
 	function cancelTrackEdit() {
@@ -343,6 +341,18 @@ export function useCragTrackEditor({
 		resetDraft();
 		if (routePathTarget) onRoutePathDrawingEnd();
 		onPathCancelled();
+	}
+
+	function commitRoutePathEdit() {
+		const routePathTarget = getRoutePathTarget();
+		if (!routePathTarget) return false;
+		if (currentTrackPoints.length > 1) {
+			onSaveRoutePath(routePathTarget, $state.snapshot(currentTrackPoints));
+		}
+		setActiveTool('position');
+		resetDraft();
+		onRoutePathDrawingEnd();
+		return true;
 	}
 
 	function resetDraft() {
@@ -365,7 +375,6 @@ export function useCragTrackEditor({
 			const routePathTarget = getRoutePathTarget();
 			if (routePathTarget) {
 				onSaveRoutePath(routePathTarget, points);
-				setActiveTab('sectors');
 				setActiveTool('position');
 				resetDraft();
 				onRoutePathDrawingEnd();
@@ -482,6 +491,7 @@ export function useCragTrackEditor({
 		editTrack,
 		editRoutePath,
 		cancelTrackEdit,
+		commitRoutePathEdit,
 		handleGpxUpload,
 		initTrackPointDragHandlers
 	};
