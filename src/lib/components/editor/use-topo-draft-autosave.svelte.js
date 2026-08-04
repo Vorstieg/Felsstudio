@@ -55,7 +55,7 @@ export function useTopoDraftAutosave({
 		};
 
 		void (async () => {
-			draftsState.init();
+			draftsState.load();
 			if (
 				!userState.ui.activeDraftId &&
 				(shouldRestore ? shouldRestore() : isBlankTopoSession(currentSession()))

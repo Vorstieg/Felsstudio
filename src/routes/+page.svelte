@@ -9,7 +9,7 @@
 	let brokenDraftId = $state(null);
 
 	onMount(() => {
-		draftsState.init();
+		draftsState.load();
 	});
 
 	function handleSelect(wizardRoute) {
