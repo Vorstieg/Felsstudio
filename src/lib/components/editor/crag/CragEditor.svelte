@@ -64,7 +64,7 @@
 	let saveStatus = $state('idle');
 	let saveError = $state('');
 
-	let activeTool = $state('select'); // 'select' | 'position' | 'transit' | 'parking' | 'track'
+	let activeTool = $state('select'); // 'select' | 'position' | 'transit' | 'parking' | 'hut' | 'track'
 	let toolOptionsOpen = $state(false);
 	let activeTab = $state('info'); // 'info' | 'registry'
 	let selectedObject = $state(null);
@@ -146,6 +146,7 @@
 	const addDetectedAsset = (...args) => accessEditor.addDetectedAsset(...args);
 	const addTransitPoint = (...args) => accessEditor.addTransitPoint(...args);
 	const addParkingPoint = (...args) => accessEditor.addParkingPoint(...args);
+	const addHutPoint = (...args) => accessEditor.addHutPoint(...args);
 	const removeAccessFeature = (...args) => accessEditor.removeAccessFeature(...args);
 
 	const sectorMapEditor = useCragSectorMapEditor({
@@ -571,6 +572,8 @@
 			addTransitPoint(lngLat);
 		} else if (activeTool === 'parking') {
 			addParkingPoint(lngLat);
+		} else if (activeTool === 'hut') {
+			addHutPoint(lngLat);
 		} else if (activeTool === 'track') {
 			await addTrackPoint(lngLat);
 		}
@@ -619,9 +622,9 @@
 
 	$effect(() => {
 		const tool = activeTool;
-		if (tool === 'parking' || tool === 'transit') {
+		if (tool === 'parking' || tool === 'transit' || tool === 'hut') {
 			setTimeout(() => {
-				if (activeTool === tool) scanNearbyAssets(tool === 'parking' ? 'parking' : 'transit');
+				if (activeTool === tool) scanNearbyAssets(tool);
 			}, 300);
 		} else {
 			accessEditor.clearDetectedAssets();
@@ -743,8 +746,8 @@
 		cragMarker.on('dragend', () => {
 			const pos = cragMarker.getLngLat();
 			cragEditorState.crag.geometry.coordinates = [pos.lng, pos.lat];
-			if (activeTool === 'parking' || activeTool === 'transit')
-				scanNearbyAssets(activeTool === 'parking' ? 'parking' : 'transit');
+			if (activeTool === 'parking' || activeTool === 'transit' || activeTool === 'hut')
+				scanNearbyAssets(activeTool);
 		});
 
 		syncSectorMarkers();

@@ -4,13 +4,26 @@ import { getMapHitRadius, getTouchTargetSize } from '$lib/assets/js/mobile-utils
 import { PathLayer, ScatterplotLayer } from '@deck.gl/layers';
 import { MapboxOverlay } from '@deck.gl/mapbox';
 
-export function createIconMarkerElement({ className, iconUrl, size = 24 }) {
+export function createIconMarkerElement({ className, iconUrl, iconClass = null, size = 24 }) {
 	const el = document.createElement('div');
 	el.className = className;
 	el.style.width = `${size}px`;
 	el.style.height = `${size}px`;
-	el.style.backgroundImage = `url(${iconUrl})`;
-	el.style.backgroundSize = 'cover';
+	if (iconClass) {
+		el.classList.add(
+			'flex',
+			'items-center',
+			'justify-center',
+			'rounded-full',
+			'bg-white',
+			'text-amber-700',
+			'shadow'
+		);
+		el.innerHTML = `<i class="${iconClass}" aria-hidden="true"></i>`;
+	} else {
+		el.style.backgroundImage = `url(${iconUrl})`;
+		el.style.backgroundSize = 'cover';
+	}
 	return el;
 }
 

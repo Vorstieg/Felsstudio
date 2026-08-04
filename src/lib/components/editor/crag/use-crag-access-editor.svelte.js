@@ -65,6 +65,11 @@ export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 			) {
 				kind = 'transit';
 				mode = 'train';
+			} else if (
+				['lodging', 'hotel', 'hut', 'cabin'].includes(cls) ||
+				['alpine_hut', 'hut', 'cabin', 'guesthouse', 'hostel'].includes(sub)
+			) {
+				kind = 'hut';
 			}
 			if (!kind || (filterType && kind !== filterType)) return;
 			const distance = turf.distance(turf.point(coords), turf.point(coordinates)) * 1000;
@@ -76,7 +81,9 @@ export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 			if (!exists)
 				suggestions.push({
 					id: createAccessId('suggestion'),
-					name: props.name || (kind === 'parking' ? 'Parking Area' : 'Station'),
+					name:
+						props.name ||
+						(kind === 'parking' ? 'Parking Area' : kind === 'hut' ? 'Mountain Hut' : 'Station'),
 					kind,
 					mode,
 					coordinates,
@@ -132,9 +139,11 @@ export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 		const icon =
 			asset.kind === 'parking'
 				? 'fa-square-parking'
-				: asset.mode === 'train'
-					? 'fa-train'
-					: 'fa-bus';
+				: asset.kind === 'hut'
+					? 'fa-house'
+					: asset.mode === 'train'
+						? 'fa-train'
+						: 'fa-bus';
 		el.innerHTML = `<div class="w-full h-full flex items-center justify-center text-creator-blue"><i class="fa-solid ${icon} text-xl"></i></div>`;
 		hoverMarker = new maplibregl.Marker({ element: el }).setLngLat(asset.coordinates).addTo(map);
 		map.easeTo({ center: asset.coordinates, duration: 400 });
@@ -167,6 +176,9 @@ export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 	function addParkingPoint(coordinates) {
 		return addAccessPoint('parking', coordinates);
 	}
+	function addHutPoint(coordinates) {
+		return addAccessPoint('hut', coordinates, { name: 'Mountain Hut' });
+	}
 
 	function createPointMarker(feature) {
 		const map = getMap();
@@ -176,7 +188,8 @@ export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 		const marker = new maplibregl.Marker({
 			element: createIconMarkerElement({
 				className: `${kind}-marker cursor-move`,
-				iconUrl: `${base}/icons/${iconName}.png`,
+				iconUrl: kind === 'hut' ? null : `${base}/icons/${iconName}.png`,
+				iconClass: kind === 'hut' ? 'fa-solid fa-house' : null,
 				size: getMapMarkerSize(24)
 			}),
 			draggable: true
@@ -206,7 +219,7 @@ export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 
 	function scanForActiveTool() {
 		const tool = getActiveTool();
-		if (tool === 'parking' || tool === 'transit') scanNearbyAssets(tool);
+		if (tool === 'parking' || tool === 'transit' || tool === 'hut') scanNearbyAssets(tool);
 		else clearDetectedAssets();
 	}
 
@@ -223,6 +236,7 @@ export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 		addDetectedAsset,
 		addTransitPoint,
 		addParkingPoint,
+		addHutPoint,
 		createPointMarker,
 		syncAccessMarkers,
 		removeAccessFeature,
