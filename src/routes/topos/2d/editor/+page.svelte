@@ -1,6 +1,6 @@
 <script>
 	import ToolPalette2D from '$lib/components/editor/2d/ToolPalette2D.svelte';
-	import { userState } from '$lib/state/editor.svelte.js';
+	import { createTopoEditorSession, provideTopoEditorSession } from '$lib/state/topo-session.svelte.js';
 	import { useTopoDraftAutosave } from '$lib/components/editor/use-topo-draft-autosave.svelte.js';
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
 	import Topo2DEditor from '$lib/components/editor/2d/Topo2DEditor.svelte';
@@ -11,8 +11,10 @@
 	import { writeJson } from '$lib/api/felslager.js';
 	import { topoSymbols } from '@vorstieg/topo-renderer';
 	import { _ } from 'svelte-i18n';
+	import { browser } from '$app/environment';
 
 	let activeTool = $state('select');
+	const userState = provideTopoEditorSession(createTopoEditorSession());
 	let toolOptionsOpen = $state(false);
 	let selectedOutlineStyle = $state('rock');
 	let drawingTarget = $state(null);
@@ -32,12 +34,12 @@
 
 
 	useTopoDraftAutosave({
+		session: userState,
+		draftId: browser ? new URL(window.location.href).searchParams.get('draft') : null,
 		editorMode: '2d',
 		getWorkspace: () => 'topos/2d/editor',
 		restoreSession: (session, id) => {
-			userState.reset();
-			userState.topo = session.topo || session;
-			userState.ui.activeDraftId = id;
+			userState.loadSession(session, id);
 			initializeIdCounters(userState.topo);
 		},
 		getSaveSignature: () => JSON.stringify(userState.topo)

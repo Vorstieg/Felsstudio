@@ -1,5 +1,6 @@
 <script>
-	import { userState } from '$lib/state/editor.svelte.js';
+	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	const userState = getTopoEditorSession();
 	import { runClusteringPipeline } from '$lib/assets/js/clustering.js';
 	import { _ } from 'svelte-i18n';
 

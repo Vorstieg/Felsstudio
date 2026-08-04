@@ -1,6 +1,7 @@
 <script>
 	import { useTask, useThrelte } from '@threlte/core';
-	import { userState } from '$lib/state/editor.svelte.js';
+	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	const userState = getTopoEditorSession();
 	import * as THREE from 'three';
 	import { CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 	import { onMount } from 'svelte';

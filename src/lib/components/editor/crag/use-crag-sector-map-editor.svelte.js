@@ -1,5 +1,4 @@
 import maplibregl from 'maplibre-gl';
-import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
 import { getGeometryCenter } from '$lib/assets/js/sector-utils.js';
 import { getEditablePath, getPathMidpoints } from '$lib/assets/js/path-geometry.js';
 import {
@@ -11,6 +10,7 @@ import {
 import { initMapPointDragHandlers } from '$lib/components/editor/map-point-drag-handlers.js';
 
 export function useCragSectorMapEditor({
+	state,
 	getMap,
 	getActiveTool,
 	setActiveTool,
@@ -147,7 +147,7 @@ export function useCragSectorMapEditor({
 			onDragStart: (drag, event) => {
 				const lngLat = getMapEventLngLat(event);
 				if (drag.isMidpoint && !lngLat) return false;
-				const sector = (cragEditorState.crag.sectors || []).find(
+				const sector = (state.crag.sectors || []).find(
 					(item) => item.id === drag.sectorId
 				);
 				if (!sector?.geometry) return false;
@@ -192,10 +192,8 @@ export function useCragSectorMapEditor({
 	}
 
 	function updateSectorGeometry(id, updater) {
-		cragEditorState.crag.sectors = (cragEditorState.crag.sectors || []).map((sector) => {
-			if (sector.id !== id) return sector;
-			return { ...sector, geometry: updater(sector.geometry) };
-		});
+		const sector = (state.crag.sectors || []).find((item) => item.id === id);
+		if (sector) onCommitSectorGeometry(id, updater(sector.geometry));
 	}
 
 	function cloneGeometry(geometry) {
@@ -211,7 +209,7 @@ export function useCragSectorMapEditor({
 		setSuppressNextMapClick(true);
 		selectSector(sectorId);
 		selectedSectorVertex = null;
-		const sector = (cragEditorState.crag.sectors || []).find((item) => item.id === sectorId);
+		const sector = (state.crag.sectors || []).find((item) => item.id === sectorId);
 		if (!sector?.geometry) return;
 		vertexDeleteUndo = { sectorId, geometry: cloneGeometry(sector.geometry) };
 		clearTimeout(vertexDeleteUndoTimer);
@@ -236,7 +234,7 @@ export function useCragSectorMapEditor({
 		if (!map) return;
 		sectorMarkers.forEach((item) => item.marker.remove());
 		sectorMarkers = [];
-		(cragEditorState.crag.sectors || []).forEach((sector) => {
+		(state.crag.sectors || []).forEach((sector) => {
 			const coordinates = getGeometryCenter(sector.geometry);
 			if (!Array.isArray(coordinates) || coordinates.length < 2) return;
 			const el = document.createElement('button');

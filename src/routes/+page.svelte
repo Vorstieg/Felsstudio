@@ -3,7 +3,6 @@
 	import { _ } from 'svelte-i18n';
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
-	import { userState } from '$lib/state/editor.svelte.js';
 	import { draftsState } from '$lib/state/drafts.svelte.js';
 
 	let brokenDraftId = $state(null);
@@ -106,24 +105,11 @@
 								brokenDraftId = null;
 								const session = await draftsState.getById(draft.id);
 								if (session) {
-									userState.reset();
 									const topo = session.topo || session;
-									userState.topo = topo;
-
-									if (session.clustering) {
-										userState.clustering = { ...userState.clustering, ...session.clustering };
-									}
-
-									if (session.glbBlob) {
-										userState.ui.glbBlob = session.glbBlob;
-										userState.ui.modelUrl = URL.createObjectURL(session.glbBlob);
-									}
-
-									userState.ui.activeDraftId = draft.id;
-									userState.ui.workspace = topo.editorMode === '2d'
-												? 'topos/2d/editor'
-												: 'topos/3d/editor';
-									goto(`${base}/${userState.ui.workspace}`);
+					const workspace = topo.editorMode === '2d'
+							? 'topos/2d/editor'
+							: 'topos/3d/editor';
+					goto(`${base}/${workspace}?draft=${encodeURIComponent(draft.id)}`);
 								} else {
 									brokenDraftId = draft.id;
 								}

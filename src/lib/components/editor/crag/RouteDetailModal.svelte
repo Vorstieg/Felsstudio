@@ -2,28 +2,30 @@
 	import PitchComponent from '$lib/components/editor/topo-properties/PitchComponent.svelte';
 	import { createVariant } from '$lib/components/editor/topo-properties/topo-properties-utils.js';
 	import { generateId } from '$lib/assets/js/id-utils.js';
+	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
+	import { getCragEditorController } from '$lib/state/crag-controller-context.svelte.js';
+
+	const cragEditorState = getCragEditorSession();
+	const { routes } = getCragEditorController();
+	const {
+		onUpdateRoute,
+		onAddRoutePath,
+		onAssignExistingRoutePath,
+		onCreateRoutePathFromAccess,
+		onEditRoutePath,
+		onUpdateRoutePath,
+		onRemoveRoutePath,
+		onDeleteRoutePath
+	} = routes;
+	let accessFeatures = $derived(cragEditorState.access.features);
 
 	let {
 		routeEntry = null,
 		onClose = () => {},
-		onChange = () => {},
-		onAddRoutePath = () => {},
-		onAssignRoutePath = () => {},
-		onCreateRoutePathFromAccess = () => {},
-		onEditRoutePath = () => {},
-		onUpdateRoutePath = () => {},
-		onRemoveRoutePath = () => {},
-		onDeleteRoutePath = () => {},
-		routeDocuments = [],
-		accessFeatures = []
 	} = $props();
 
 	let route = $derived(routeEntry?.route ?? null);
 	let document = $derived(routeEntry?.document ?? null);
-
-	function touch() {
-		if (document && route) onChange(document.path, route.id);
-	}
 
 	function paths() { return (route?.pathRefs || []).map((ref) => ({ ...ref, feature: document?.data?.paths?.features?.find((item) => String(item.id) === String(ref.pathId)) })); }
 	function availablePaths() {
@@ -33,7 +35,7 @@
 	function availableAccessPaths() { return accessFeatures.filter((feature) => feature.properties?.kind === 'approach' && feature.geometry?.coordinates?.length > 1); }
 
 	function addPitch() {
-		route.pitches = [
+		onUpdateRoute(document.path, route.id, 'pitches', [
 			...(route.pitches || []),
 			{
 				id: generateId('pitch'),
@@ -45,23 +47,35 @@
 				lineStyle: '',
 				type: 'pitch'
 			}
-		];
-		touch();
+		]);
 	}
 
 	function removePitch(index) {
-		route.pitches = route.pitches.filter((_, pitchIndex) => pitchIndex !== index);
-		touch();
+		onUpdateRoute(document.path, route.id, 'pitches', route.pitches.filter((_, pitchIndex) => pitchIndex !== index));
 	}
 
 	function addVariant() {
-		route.variants = [...(route.variants || []), createVariant({ ...route, variants: route.variants || [] })];
-		touch();
+		onUpdateRoute(document.path, route.id, 'variants', [...(route.variants || []), createVariant({ ...route, variants: route.variants || [] })]);
 	}
 
 	function removeVariant(index) {
-		route.variants = route.variants.filter((_, variantIndex) => variantIndex !== index);
-		touch();
+		onUpdateRoute(document.path, route.id, 'variants', route.variants.filter((_, variantIndex) => variantIndex !== index));
+	}
+
+	function updatePitch(index, field, value) {
+		onUpdateRoute(document.path, route.id, 'pitches', (route.pitches || []).map((pitch, pitchIndex) =>
+			pitchIndex === index ? { ...pitch, [field]: value } : pitch
+		));
+	}
+
+	function updateVariant(index, field, value) {
+		onUpdateRoute(document.path, route.id, 'variants', (route.variants || []).map((variant, variantIndex) =>
+			variantIndex === index ? { ...variant, [field]: value } : variant
+		));
+	}
+
+	function updateRouteField(field, value) {
+		onUpdateRoute(document.path, route.id, field, value);
 	}
 </script>
 
@@ -92,11 +106,11 @@
 				<div class="grid grid-cols-[1fr_7rem] gap-2">
 					<div>
 						<label class="text-ui-label block" for="route-name">Route name</label>
-						<input id="route-name" class="input-studio w-full" bind:value={route.name} placeholder="Route name" />
+					<input id="route-name" class="input-studio w-full" value={route.name || ''} oninput={(event) => onUpdateRoute(document.path, route.id, 'name', event.currentTarget.value)} placeholder="Route name" />
 					</div>
 					<div>
 						<label class="text-ui-label block" for="route-type">Type</label>
-						<select id="route-type" class="input-studio w-full" bind:value={route.type}>
+						<select id="route-type" class="input-studio w-full" value={route.type || ''} onchange={(event) => onUpdateRoute(document.path, route.id, 'type', event.currentTarget.value)}>
 							<option value="sports-climbing">Sportklettern</option>
 							<option value="bouldering">Bouldern</option>
 							<option value="trad">Trad</option>
@@ -114,7 +128,7 @@
 							<button type="button" class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-creator-blue" onclick={addPitch}>+ Add</button>
 						</div>
 						{#each route.pitches || [] as pitch, index}
-							<PitchComponent {pitch} kind="pitch" {index} inheritLineStyle={true} onRemove={(_, index) => removePitch(index)} onChange={touch} />
+							<PitchComponent {pitch} kind="pitch" {index} inheritLineStyle={true} onRemove={(_, index) => removePitch(index)} onFieldChange={(field, value) => updatePitch(index, field, value)} />
 						{/each}
 						<div class="space-y-2 border-t border-black/10 pt-2">
 							<div class="flex items-center justify-between">
@@ -122,17 +136,17 @@
 								<button type="button" class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-creator-blue" onclick={addVariant}>+ Add</button>
 							</div>
 							{#each route.variants || [] as variant, index}
-								<PitchComponent pitch={variant} kind="variant" {index} defaultLineStyle="variant" onRemove={(_, index) => removeVariant(index)} onChange={touch} />
+								<PitchComponent pitch={variant} kind="variant" {index} defaultLineStyle="variant" onRemove={(_, index) => removeVariant(index)} onFieldChange={(field, value) => updateVariant(index, field, value)} />
 							{/each}
 						</div>
 					</div>
 				{:else}
-					<PitchComponent pitch={route} showBoltCount={route.type === 'sports-climbing'} onChange={touch} />
+					<PitchComponent pitch={route} showBoltCount={route.type === 'sports-climbing'} onFieldChange={updateRouteField} />
 				{/if}
 
 				<div>
 					<label class="text-ui-label block" for="route-description">Description</label>
-					<textarea id="route-description" class="input-studio w-full resize-none" rows="3" bind:value={route.description} placeholder="Description"></textarea>
+					<textarea id="route-description" class="input-studio w-full resize-none" rows="3" value={route.description || ''} oninput={(event) => onUpdateRoute(document.path, route.id, 'description', event.currentTarget.value)} placeholder="Description"></textarea>
 				</div>
 
 				<div class="space-y-1 border-t border-black/10 pt-3">
@@ -144,7 +158,7 @@
 					</div>
 					{#if availablePaths().length > 0}
 						<div class="flex items-center gap-1">
-							<select class="input-studio min-w-0 flex-1" aria-label="Assign existing path" onchange={(event) => { const pathId = event.currentTarget.value; if (pathId) onAssignRoutePath(document.path, route.id, pathId); event.currentTarget.value = ''; }}>
+							<select class="input-studio min-w-0 flex-1" aria-label="Assign existing path" onchange={(event) => { const pathId = event.currentTarget.value; if (pathId) onAssignExistingRoutePath(document.path, route.id, pathId); event.currentTarget.value = ''; }}>
 								<option value="" disabled selected>Assign existing path…</option>
 								{#each availablePaths() as feature}
 									<option value={feature.id}>{feature.properties?.name || feature.id}</option>

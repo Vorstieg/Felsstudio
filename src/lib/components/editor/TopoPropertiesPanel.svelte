@@ -1,7 +1,8 @@
 <script>
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
-	import { userState } from '$lib/state/editor.svelte.js';
+	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	const userState = getTopoEditorSession();
 	import DetailsComponent from './DetailsComponent.svelte';
 	import TopoInfoPanel from './topo-properties/TopoInfoPanel.svelte';
 	import TopoRoutesPanel from './topo-properties/TopoRoutesPanel.svelte';

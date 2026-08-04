@@ -1,11 +1,11 @@
-import { userState } from '$lib/state/editor.svelte.js';
 import { generateSymbolId } from '$lib/assets/js/id-utils.js';
 
 export class SymbolTool {
 	id = 'symbol';
 	// No state needed for symbol tool currently as it places on click
 
-	constructor({ saveHistory } = {}) {
+	constructor({ state, saveHistory } = {}) {
+		this.state = state;
 		this.saveHistory = saveHistory || (() => {});
 	}
 
@@ -13,7 +13,7 @@ export class SymbolTool {
 
 	onMouseDown(event, point) {
 		const symbolId = generateSymbolId();
-		userState.topo.fixPoints.push({
+		this.state.topo.fixPoints.push({
 			id: symbolId,
 			type: this.selectedType,
 			position2D: [point.x, point.y],

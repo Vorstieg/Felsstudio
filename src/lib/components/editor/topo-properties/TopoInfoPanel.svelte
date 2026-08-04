@@ -1,5 +1,6 @@
 <script>
-	import { userState } from '$lib/state/editor.svelte.js';
+	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	const userState = getTopoEditorSession();
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
 	import ImageUploader from '$lib/components/editor/ImageUploader.svelte';
 	import ClusteringMap from '$lib/components/editor/ClusteringMap.svelte';

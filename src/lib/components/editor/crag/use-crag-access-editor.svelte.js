@@ -1,23 +1,22 @@
 import maplibregl from 'maplibre-gl';
 import * as turf from '@turf/turf';
 import { base } from '$app/paths';
-import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
 import { createAccessFeature, createAccessId } from '$lib/assets/js/access-geojson.js';
 import { createIconMarkerElement } from '$lib/components/editor/crag/crag-editor-map.js';
 import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.js';
 
-export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
+export function useCragAccessEditor({ state, getMap, getIsMapLoaded, getActiveTool }) {
 	let detectedAssets = $state([]);
 	let pointMarkers = $state([]);
 	let hoverMarker = null;
 	let areDetectionPointHandlersReady = false;
 
-	const accessFeatures = () => cragEditorState.access.features || [];
+	const accessFeatures = () => state.access.features || [];
 	const pointFeatures = () =>
 		accessFeatures().filter((feature) => feature.geometry?.type === 'Point');
 
 	function replaceFeatures(features) {
-		cragEditorState.access = { ...cragEditorState.access, features };
+		state.replaceAccessFeatures(features);
 	}
 
 	function cleanup() {
@@ -34,7 +33,7 @@ export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 	function scanNearbyAssets(filterType = null) {
 		const map = getMap();
 		if (!map || !getIsMapLoaded()) return;
-		const coords = $state.snapshot(cragEditorState.crag.geometry.coordinates);
+		const coords = $state.snapshot(state.crag.geometry.coordinates);
 		const features = map.querySourceFeatures('maptiler_planet', { sourceLayer: 'poi' });
 		const suggestions = [];
 		const seen = new Set();
@@ -198,8 +197,12 @@ export function useCragAccessEditor({ getMap, getIsMapLoaded, getActiveTool }) {
 			.addTo(map);
 		marker.on('dragend', () => {
 			const pos = marker.getLngLat();
-			const item = accessFeatures().find((candidate) => candidate.id === feature.id);
-			if (item) item.geometry.coordinates = [pos.lng, pos.lat];
+			const coordinates = [pos.lng, pos.lat];
+			if (accessFeatures().some((candidate) => candidate.id === feature.id)) {
+				replaceFeatures(accessFeatures().map((item) => item.id === feature.id
+					? { ...item, geometry: { ...item.geometry, coordinates } }
+					: item));
+			}
 		});
 		pointMarkers.push({ id: feature.id, marker });
 	}

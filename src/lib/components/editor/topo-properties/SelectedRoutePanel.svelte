@@ -1,5 +1,6 @@
 <script>
-	import { userState } from '$lib/state/editor.svelte.js';
+	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	const userState = getTopoEditorSession();
 	import { cragTypes } from '$lib/components/editor/crag/crag-editor-options.js';
 	import { availableRouteTags, convertRouteType } from '$lib/assets/js/topo-utils.js';
 	import { snapToSmallestHeight } from '$lib/assets/js/resize.js';

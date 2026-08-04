@@ -1,5 +1,16 @@
 <script>
-	import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
+	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
+	import { getCragEditorController } from '$lib/state/crag-controller-context.svelte.js';
+	import { availableTags, cragTypes, securityOptions } from './crag-editor-options.js';
+	import { rockTypes } from '$lib/config.js';
+	const cragEditorState = getCragEditorSession();
+	const { sectors, routes } = getCragEditorController();
+	const {
+		onAddSector, onDuplicateSector, onRemoveSector, onMoveSector, onFocusSector,
+		onSetSectorGeometryType, onPlanGenerated
+	} = sectors;
+	const { onAddParentRoute, onAddSectorRoute, onSelectRoute, onDeleteRoute } = routes;
+	let routeDocuments = $derived(cragEditorState.routeDocuments);
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
 	import { getGeometryCenter } from '$lib/assets/js/sector-utils.js';
 	import CragFlightPlanPanel from './CragFlightPlanPanel.svelte';
@@ -7,34 +18,7 @@
 
 	let {
 		map = null,
-		selectedObject = $bindable(null),
-		cragTypes = [],
-		availableTags = [],
-		securityOptions = [],
-		rockTypes = [],
-		routeDocuments = [],
-		onAddSector = () => {
-		},
-		onDuplicateSector = () => {
-		},
-		onRemoveSector = () => {
-		},
-		onMoveSector = () => {
-		},
-		onFocusSector = () => {
-		},
-		onSetSectorGeometryType = () => {
-		},
-		onAddParentRoute = () => {
-		},
-		onAddSectorRoute = () => {
-		},
-		onSelectRoute = () => {
-		},
-		onDeleteRoute = () => {
-		},
-		onPlanGenerated = () => {
-		}
+		selectedObject = $bindable(null)
 	} = $props();
 	let selectedSector = $derived(selectedObject?.type === 'sector' ? (cragEditorState.crag.sectors || []).find((sector) => sector.id === selectedObject.id) : null);
 	let parentRoutes = $derived(routeDocuments.flatMap((document) => document.sectorId ? [] : (document.data?.routes || []).map((route) => ({
@@ -49,19 +33,8 @@
 		})));
 	}
 
-	function ensureSectorCollections(sector) {
-		if (!sector.type) sector.type = [];
-		if (!sector.tags) sector.tags = [];
-		if (!sector.topo) sector.topo = { site: '', link: '' };
-		if (!sector.assets) sector.assets = { topos: [], images: [], models: [] };
-		if (!sector.assets.topos) sector.assets.topos = [];
-		if (!sector.assets.images) sector.assets.images = [];
-		if (!sector.assets.models) sector.assets.models = [];
-		if (!sector.assets.approaches) sector.assets.approaches = [];
-	}
-
 	function updateSelectedSectorId(sector, value) {
-		sector.id = value;
+		cragEditorState.updateSector(sector.id, 'id', value);
 		selectedObject = value ? { type: 'sector', id: value } : null;
 	}
 
@@ -72,7 +45,6 @@
 
 	function selectSector(sector) {
 		selectedObject = { type: 'sector', id: sector.id };
-		ensureSectorCollections(sector);
 		onFocusSector(sector);
 	}
 </script>
@@ -138,7 +110,7 @@
 			</div>
 		{/each}
 	</div>
-	{#if selectedSector}{@const sector = selectedSector}{@const _normalizedSector = ensureSectorCollections(sector)}
+	{#if selectedSector}{@const sector = selectedSector}
 		<div class="space-y-3 pt-3 border-t border-black/15">
 			<div class="flex items-center justify-between"><h3 class="text-ui-label text-near-black !m-0">Selected Sector</h3>
 				<div class="flex items-center gap-1">
@@ -150,7 +122,8 @@
 			</div>
 			<div class="grid grid-cols-2 gap-2">
 				<div class="space-y-0.5"><label class="text-ui-label block">Name</label><input type="text"
-				                                                                               bind:value={sector.name}
+	                                                                               value={sector.name}
+	                                                                               oninput={(event) => cragEditorState.updateSector(sector.id, 'name', event.currentTarget.value)}
 				                                                                               class="input-studio w-full"
 				                                                                               placeholder="Sector name" />
 				</div>
@@ -169,7 +142,7 @@
 				</div>
 			</div>
 			<div class="grid grid-cols-2 gap-2">
-				<div class="space-y-0.5"><label class="text-ui-label block">Security</label><select bind:value={sector.security}
+				<div class="space-y-0.5"><label class="text-ui-label block">Security</label><select value={sector.security} onchange={(event) => cragEditorState.updateSector(sector.id, 'security', event.currentTarget.value)}
 				                                                                                    class="input-studio w-full appearance-none">
 					<option value="">Crag default</option>
 					{#each securityOptions as opt}
@@ -177,7 +150,7 @@
 					{/each}
 				</select></div>
 				<div class="space-y-0.5"><label class="text-ui-label block">Rock Type</label><select
-					bind:value={sector.rock_type} class="input-studio w-full appearance-none">
+					value={sector.rock_type} onchange={(event) => cragEditorState.updateSector(sector.id, 'rock_type', event.currentTarget.value)} class="input-studio w-full appearance-none">
 					<option value="">Crag default</option>
 					{#each rockTypes as opt}
 						<option value={opt}>{opt}</option>
@@ -185,19 +158,19 @@
 				</select></div>
 			</div>
 			<div class="space-y-0.5"><label class="text-ui-label block">Sector Type</label>
-				<TagSelector bind:selectedTags={sector.type} availableTags={cragTypes} />
+				<TagSelector selectedTags={sector.type} availableTags={cragTypes} onChange={(value) => cragEditorState.updateSector(sector.id, 'type', value)} />
 			</div>
 			<div class="space-y-0.5"><label class="text-ui-label block">Tags</label>
-				<TagSelector bind:selectedTags={sector.tags} availableTags={availableTags} />
+				<TagSelector selectedTags={sector.tags} availableTags={availableTags} onChange={(value) => cragEditorState.updateSector(sector.id, 'tags', value)} />
 			</div>
 			<div class="space-y-0.5 pt-2 border-t border-black/15"><label class="text-ui-label block">Description (DE)</label><textarea
-				bind:value={sector.description_de} rows="2" class="input-studio w-full resize-none"></textarea></div>
+				value={sector.description_de} oninput={(event) => cragEditorState.updateSector(sector.id, 'description_de', event.currentTarget.value)} rows="2" class="input-studio w-full resize-none"></textarea></div>
 			<div class="space-y-0.5"><label class="text-ui-label block">Description (EN)</label><textarea
-				bind:value={sector.description_en} rows="2" class="input-studio w-full resize-none"></textarea></div>
+				value={sector.description_en} oninput={(event) => cragEditorState.updateSector(sector.id, 'description_en', event.currentTarget.value)} rows="2" class="input-studio w-full resize-none"></textarea></div>
 			<div class="space-y-0.5"><label class="text-ui-label block">Approach (DE)</label><textarea
-				bind:value={sector.approach_de} rows="2" class="input-studio w-full resize-none"></textarea></div>
+				value={sector.approach_de} oninput={(event) => cragEditorState.updateSector(sector.id, 'approach_de', event.currentTarget.value)} rows="2" class="input-studio w-full resize-none"></textarea></div>
 			<div class="space-y-0.5"><label class="text-ui-label block">Approach (EN)</label><textarea
-				bind:value={sector.approach_en} rows="2" class="input-studio w-full resize-none"></textarea></div>
+				value={sector.approach_en} oninput={(event) => cragEditorState.updateSector(sector.id, 'approach_en', event.currentTarget.value)} rows="2" class="input-studio w-full resize-none"></textarea></div>
 			<div class="flex items-center justify-between bg-white rounded-sm border border-black/15 p-2"><span
 				class="text-ui-label text-warm-gray-500 !m-0">{sector.geometry?.type === 'Polygon' ? 'Center' : 'Position'}</span>
 				{#if formatGeometryCenter(sector.geometry)}<span

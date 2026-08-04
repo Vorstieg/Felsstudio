@@ -1,33 +1,19 @@
 <script>
 	import { _ } from 'svelte-i18n';
-	import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
+	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
+	import { getCragEditorController } from '$lib/state/crag-controller-context.svelte.js';
+	const cragEditorState = getCragEditorSession();
+	const { access, tracks, routes } = getCragEditorController();
+	const {
+		onAddRoutePath, onEditRoutePath, onDeleteRoutePath
+	} = routes;
+	const { onSetHoverHighlight, onClearDetectedAssets, onAddDetectedAsset, onRemoveAccessFeature } = access;
+	const { onEditTrack, onRemoveTrack, onFinalizeTrack, onCancelTrackEdit } = tracks;
+	let routeDocuments = $derived(cragEditorState.routeDocuments);
 
 	let {
 		detectedAssets = [],
-		activeTrackTarget = null,
-		routeDocuments = [],
-		onAddRoutePath = () => {
-		},
-		onEditRoutePath = () => {
-		},
-		onDeleteRoutePath = () => {
-		},
-		onSetHoverHighlight = () => {
-		},
-		onClearDetectedAssets = () => {
-		},
-		onAddDetectedAsset = () => {
-		},
-		onRemoveAccessFeature = () => {
-		},
-		onEditTrack = () => {
-		},
-		onRemoveTrack = () => {
-		},
-		onFinalizeTrack = () => {
-		},
-		onCancelTrackEdit = () => {
-		}
+		activeTrackTarget = null
 	} = $props();
 	let accessFeatures = $derived(cragEditorState.access?.features || []);
 	let transitFeatures = $derived(

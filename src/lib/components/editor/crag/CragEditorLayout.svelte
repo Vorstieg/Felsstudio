@@ -5,7 +5,19 @@
 	import CragEditorSidebar from '$lib/components/editor/crag/CragEditorSidebar.svelte';
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
 	import { _ } from 'svelte-i18n';
-
+	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
+	import { getCragEditorController } from '$lib/state/crag-controller-context.svelte.js';
+	const cragEditorState = getCragEditorSession();
+	const {
+		toolbar,
+		history
+	} = getCragEditorController();
+	const {
+		onBack, onStartRoutingDraft, onSetTrackDraftMode, onHandleTrackConfirm, onCancelTrackEdit,
+		onUndoTrackPoint, onStartTrackCut, onConfirmTrackCut, onCancelTrackCut, onReverseTrack,
+		onTrimTrackStart, onTrimTrackEnd, onSimplifyTrack, onGpxUpload, onExport, onCenterMapOnUser
+	} = toolbar;
+	const { onUndo, onRedo } = history;
 	let {
 		inspectorShadow = true,
 		map,
@@ -13,77 +25,25 @@
 		isCompact = false,
 		isMedium = false,
 		isLandscape = false,
-		CragEditorBottomSheet,
 		activeTool = $bindable('select'),
 		toolOptionsOpen = $bindable(false),
 		mapStyle = $bindable('transport'),
 		activeTab = $bindable('info'),
 		detectedAssets = [],
 		selectedObject = $bindable(null),
-		routeDocuments = [],
 		currentTrackPoints = [],
 		activeTrackTarget = null,
 		trackDraftMode = 'routing',
 		isRoutingTrack = false,
 		hasPendingTrackCut = false,
 		isRoutePathDrawing = false,
-		cragTypes = [],
-		availableTags = [],
-		securityOptions = [],
-		rockTypes = [],
-		commonEquipment = [],
-		onAddCragImages = () => {},
-		onRemoveCragImage = () => {},
 		saveStatus = 'idle',
 		saveError = '',
-		onBack = () => {},
-		onStartRoutingDraft = () => {},
-		onSetTrackDraftMode = () => {},
-		onHandleTrackConfirm = () => {},
-		onCancelTrackEdit = () => {},
-		onUndoTrackPoint = () => {},
-		onUndo = () => {},
-		canUndo = false,
-		onStartTrackCut = () => {},
-		onConfirmTrackCut = () => {},
-		onCancelTrackCut = () => {},
-		onReverseTrack = () => {},
-		onTrimTrackStart = () => {},
-		onTrimTrackEnd = () => {},
-		onSimplifyTrack = () => {},
-		onGpxUpload = () => {},
-		onExport = () => {},
-		onCenterMapOnUser = () => {},
-		onAddEquipmentItem = () => {},
-		onRemoveEquipmentItem = () => {},
-		onAddSector = () => {},
-		onDuplicateSector = () => {},
-		onRemoveSector = () => {},
-		onMoveSector = () => {},
-		onSetSectorGeometryType = () => {},
-		onFocusSector = () => {},
-		onSetHoverHighlight = () => {},
-		onClearDetectedAssets = () => {},
-		onAddDetectedAsset = () => {},
-		onRemoveAccessFeature = () => {},
-		onEditTrack = () => {},
-		onRemoveTrack = () => {},
-		onFinalizeTrack = () => {},
 		vertexDeleteUndo = null,
-		onUndoSectorVertexDelete = () => {},
-		onAddParentRoute = () => {},
-		onAddSectorRoute = () => {},
-		onSelectRoute = () => {},
-		onUpdateRouteName = () => {},
-		onUpdateRoute = () => {},
-		onAddRoutePath = () => {},
-		onEditRoutePath = () => {},
-		onUpdateRoutePath = () => {},
-		onRemoveRoutePath = () => {},
-		onDeleteRoutePath = () => {},
-		onDeleteRoute = () => {},
-		onPlanGenerated = () => {}
 	} = $props();
+
+	let canUndo = $derived(cragEditorState.canUndo);
+	let canRedo = $derived(cragEditorState.canRedo);
 
 	let trimPointIndex = $state(0);
 	let simplifyToleranceMeters = $state(10);
@@ -122,8 +82,10 @@
 	{onHandleTrackConfirm}
 	{onCancelTrackEdit}
 		{onUndoTrackPoint}
-	{onUndo}
+		{onUndo}
+	{onRedo}
 	{canUndo}
+	{canRedo}
 		{onConfirmTrackCut}
 		{onCancelTrackCut}
 	{onExport}
@@ -261,44 +223,8 @@
 		bind:activeTab
 		{detectedAssets}
 		{activeTrackTarget}
-		{routeDocuments}
-		{cragTypes}
-		{availableTags}
-		{securityOptions}
-		{rockTypes}
-		{commonEquipment}
 		bind:selectedObject
 		{saveStatus}
-		{onAddEquipmentItem}
-		{onRemoveEquipmentItem}
-		{onAddCragImages}
-		{onRemoveCragImage}
-		{onAddSector}
-		{onDuplicateSector}
-		{onRemoveSector}
-		{onMoveSector}
-		{onSetSectorGeometryType}
-		{onFocusSector}
-		{onSetHoverHighlight}
-		{onClearDetectedAssets}
-		{onAddDetectedAsset}
-		{onRemoveAccessFeature}
-		{onEditTrack}
-		{onRemoveTrack}
-		{onFinalizeTrack}
-		{onCancelTrackEdit}
-		{onAddParentRoute}
-		{onAddSectorRoute}
-		{onSelectRoute}
-		{onUpdateRouteName}
-		{onUpdateRoute}
-		{onAddRoutePath}
-		{onEditRoutePath}
-		{onUpdateRoutePath}
-		{onRemoveRoutePath}
-		{onDeleteRoutePath}
-		{onDeleteRoute}
-		{onPlanGenerated}
 	/>
 
 {#if vertexDeleteUndo}

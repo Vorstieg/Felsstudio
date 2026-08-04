@@ -1,22 +1,21 @@
-import { userState } from '$lib/state/editor.svelte.js';
-
 export class EraserTool {
 	id = 'eraser';
 
-	constructor({ saveHistory } = {}) {
+	constructor({ state, saveHistory } = {}) {
+		this.state = state;
 		this.saveHistory = saveHistory || (() => {});
 	}
 
 	onMouseDown(event, point) {
 		// Eraser logic
-		const clickedSymbol = userState.topo.fixPoints.find((s) => {
+		const clickedSymbol = this.state.topo.fixPoints.find((s) => {
 			if (!s.position2D) return false;
 			const dx = Math.abs(s.position2D[0] - point.x);
 			const dy = Math.abs(s.position2D[1] - point.y);
 			return dx < 0.02 && dy < 0.02; // Tolerance
 		});
 		if (clickedSymbol) {
-			userState.topo.fixPoints = userState.topo.fixPoints.filter((s) => s.id !== clickedSymbol.id);
+			this.state.topo.fixPoints = this.state.topo.fixPoints.filter((s) => s.id !== clickedSymbol.id);
 			this.saveHistory();
 		}
 		// Eraser also deletes points via handlePointMouseDown in Topo2DEditor (which I preserved).

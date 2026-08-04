@@ -1,7 +1,6 @@
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { Box3, Vector3 } from 'three';
-import { userState } from '$lib/state/editor.svelte.js';
 
 /**
  * Creates a GLTFLoader configured for all GLB/GLTF files used by the app.
@@ -20,12 +19,11 @@ export function createGltfLoader() {
  * @param {File | Blob} file
  * @returns {Promise<import('three').Group>}
  */
-export async function loadGlbIntoEditorState(file) {
+export async function loadGlbIntoEditorState(file, session) {
+	if (!session) throw new Error('A topo editor session is required to load a GLB');
 	const loader = createGltfLoader();
 	const buffer = await file.arrayBuffer();
-	if (userState.ui.modelUrl) URL.revokeObjectURL(userState.ui.modelUrl);
-	userState.ui.modelUrl = URL.createObjectURL(file);
-	userState.ui.glbBlob = file;
+	session.setModelFile(file);
 
 	return new Promise((resolve, reject) => {
 		loader.parse(
@@ -36,7 +34,7 @@ export async function loadGlbIntoEditorState(file) {
 				if (!box.isEmpty()) {
 					const center = new Vector3();
 					box.getCenter(center);
-					userState.topo.modelOffset = center.negate().toArray();
+					session.topo.modelOffset = center.negate().toArray();
 				}
 				resolve(gltf.scene);
 			},

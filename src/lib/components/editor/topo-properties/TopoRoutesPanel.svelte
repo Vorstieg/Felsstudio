@@ -1,5 +1,6 @@
 <script>
-	import { userState } from '$lib/state/editor.svelte.js';
+	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	const userState = getTopoEditorSession();
 	import { _ } from 'svelte-i18n';
 	import { snapToBiggestHeight } from '$lib/assets/js/resize.js';
 	import SelectedRoutePanel from '$lib/components/editor/topo-properties/SelectedRoutePanel.svelte';

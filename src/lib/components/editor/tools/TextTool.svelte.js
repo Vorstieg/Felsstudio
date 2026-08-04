@@ -1,10 +1,10 @@
-import { userState } from '$lib/state/editor.svelte.js';
 import { generateId } from '$lib/assets/js/id-utils.js';
 
 export class TextTool {
 	id = 'text';
 
-	constructor({ saveHistory, beginTextEdit } = {}) {
+	constructor({ state, saveHistory, beginTextEdit } = {}) {
+		this.state = state;
 		this.saveHistory = saveHistory || (() => {});
 		this.beginTextEdit = beginTextEdit || (() => {});
 	}
@@ -13,8 +13,8 @@ export class TextTool {
 		event.stopPropagation();
 		const id = generateId('text');
 
-		if (!userState.topo.textLabels) userState.topo.textLabels = [];
-		userState.topo.textLabels.push({
+		if (!this.state.topo.textLabels) this.state.topo.textLabels = [];
+		this.state.topo.textLabels.push({
 			id,
 			text: 'Text',
 			position2D: [point.x, point.y],
@@ -22,7 +22,7 @@ export class TextTool {
 			color: '#23201d',
 			fontWeight: 700
 		});
-		userState.ui.selectedTextLabelId = id;
+		this.state.ui.selectedTextLabelId = id;
 		this.saveHistory();
 		this.beginTextEdit(id);
 	}

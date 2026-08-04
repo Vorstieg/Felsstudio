@@ -1,4 +1,3 @@
-import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
 import { parseGpx } from '$lib/assets/js/route-path-utils.js';
 import { initMapPointDragHandlers } from '$lib/components/editor/map-point-drag-handlers.js';
 import {
@@ -15,6 +14,7 @@ import {
 import { createAccessFeature, createAccessId } from '$lib/assets/js/access-geojson.js';
 
 export function useCragTrackEditor({
+	state,
 	getMap,
 	getActiveTool,
 	setActiveTool,
@@ -29,19 +29,16 @@ export function useCragTrackEditor({
 	onTrackPointDragEnd = () => {},
 	getTrackFeature = (target) => {
 		if (target?.kind !== 'access') return null;
-		return cragEditorState.access.features.find((feature) => feature.id === target.featureId) || null;
+		return state.access.features.find((feature) => feature.id === target.featureId) || null;
 	},
 	saveTrackGeometry = (target, coordinates) => {
 		if (target?.kind !== 'access') return false;
-		cragEditorState.access = {
-			...cragEditorState.access,
-			features: cragEditorState.access.features.map((feature) => feature.id === target.featureId ? { ...feature, geometry: { type: 'LineString', coordinates } } : feature)
-		};
+		state.replaceAccessFeatures(state.access.features.map((feature) => feature.id === target.featureId ? { ...feature, geometry: { type: 'LineString', coordinates } } : feature));
 		return true;
 	},
 	removeTrackTarget = (target) => {
 		if (target?.kind !== 'access') return false;
-		cragEditorState.access = { ...cragEditorState.access, features: cragEditorState.access.features.filter((feature) => feature.id !== target.featureId) };
+		state.replaceAccessFeatures(state.access.features.filter((feature) => feature.id !== target.featureId));
 		return true;
 	}
 }) {
@@ -56,17 +53,14 @@ export function useCragTrackEditor({
 	let areTrackPointDragHandlersReady = false;
 	let trackEditHistory = [];
 	const approachFeatures = () =>
-		cragEditorState.access.features.filter((feature) => feature.properties?.kind === 'approach');
+		state.access.features.filter((feature) => feature.properties?.kind === 'approach');
 	const replaceApproaches = (features) => {
-		cragEditorState.access = {
-			...cragEditorState.access,
-			features: [
-				...cragEditorState.access.features.filter(
+		state.replaceAccessFeatures([
+				...state.access.features.filter(
 					(feature) => feature.properties?.kind !== 'approach'
 				),
 				...features
-			]
-		};
+		]);
 	};
 
 	function createDraftSnapshot() {

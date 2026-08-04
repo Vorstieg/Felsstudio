@@ -1,5 +1,6 @@
 <script>
-	import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
+	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
+	const cragEditorState = getCragEditorSession();
 	import CragEditorInfoTab from './CragEditorInfoTab.svelte';
 	import CragEditorRegistryTab from './CragEditorRegistryTab.svelte';
 	import CragEditorSectorsTab from './CragEditorSectorsTab.svelte';
@@ -10,40 +11,8 @@
 		activeTab = $bindable('info'),
 		detectedAssets = [],
 		activeTrackTarget = null,
-		cragTypes = [],
-		availableTags = [],
-		securityOptions = [],
-		rockTypes = [],
-		commonEquipment = [],
 		selectedObject = $bindable(null),
-		routeDocuments = [],
-		onEditRoutePath = () => {},
-		onDeleteRoutePath = () => {},
-		onAddRoutePath = () => {},
-		saveStatus = 'idle',
-		onAddEquipmentItem = () => {},
-		onRemoveEquipmentItem = () => {},
-		onAddCragImages = () => {},
-		onRemoveCragImage = () => {},
-		onAddSector = () => {},
-		onDuplicateSector = () => {},
-		onRemoveSector = () => {},
-		onMoveSector = () => {},
-		onFocusSector = () => {},
-		onSetSectorGeometryType = () => {},
-		onSetHoverHighlight = () => {},
-		onClearDetectedAssets = () => {},
-		onAddDetectedAsset = () => {},
-		onRemoveAccessFeature = () => {},
-		onEditTrack = () => {},
-		onRemoveTrack = () => {},
-		onFinalizeTrack = () => {},
-		onCancelTrackEdit = () => {},
-		onAddParentRoute = () => {},
-		onAddSectorRoute = () => {},
-		onSelectRoute = () => {},
-		onDeleteRoute = () => {},
-		onPlanGenerated = () => {}
+		saveStatus = 'idle'
 	} = $props();
 </script>
 
@@ -63,10 +32,10 @@
 
 <div class="overflow-y-auto flex-1 p-3 pt-0 custom-scrollbar bg-transparent">
 	{#if activeTab === 'info'}
-		<CragEditorInfoTab {cragTypes} {availableTags} {securityOptions} {rockTypes} {commonEquipment} {saveStatus} {onAddEquipmentItem} {onRemoveEquipmentItem} {onAddCragImages} {onRemoveCragImage} />
+		<CragEditorInfoTab {saveStatus} />
 	{:else if activeTab === 'registry'}
-		<CragEditorRegistryTab {detectedAssets} {activeTrackTarget} {routeDocuments} {onAddRoutePath} {onEditRoutePath} {onDeleteRoutePath} {onSetHoverHighlight} {onClearDetectedAssets} {onAddDetectedAsset} {onRemoveAccessFeature} {onEditTrack} {onRemoveTrack} {onFinalizeTrack} {onCancelTrackEdit} />
+		<CragEditorRegistryTab {detectedAssets} {activeTrackTarget} />
 	{:else}
-		<CragEditorSectorsTab {map} bind:selectedObject {cragTypes} {availableTags} {securityOptions} {rockTypes} {routeDocuments} {onAddSector} {onDuplicateSector} {onRemoveSector} {onMoveSector} {onFocusSector} {onSetSectorGeometryType} {onAddParentRoute} {onAddSectorRoute} {onSelectRoute} {onDeleteRoute} {onPlanGenerated} />
+		<CragEditorSectorsTab {map} bind:selectedObject />
 	{/if}
 </div>
