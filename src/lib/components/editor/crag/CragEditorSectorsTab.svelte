@@ -3,6 +3,7 @@
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
 	import { getGeometryCenter } from '$lib/assets/js/sector-utils.js';
 	import CragFlightPlanPanel from './CragFlightPlanPanel.svelte';
+	import CragEditorRouteTable from './CragEditorRouteTable.svelte';
 
 	let {
 		map = null,
@@ -40,30 +41,12 @@
 		document,
 		route
 	}))));
-	let collapsedRoutePanels = $state({});
 
 	function sectorRoutes(sectorId) {
 		return routeDocuments.flatMap((document) => document.sectorId !== sectorId ? [] : (document.data?.routes || []).map((route) => ({
 			document,
 			route
 		})));
-	}
-
-	function routeKey(document, route) {
-		return `${document.path}:${route.id}`;
-	}
-
-	function routePathCount(document, route) {
-		const features = new Set((document.data?.paths?.features || []).filter((feature) => feature.geometry?.type === 'LineString' && feature.geometry.coordinates?.length > 1).map((feature) => String(feature.id)));
-		return (route.pathRefs || []).filter((ref) => features.has(String(ref.pathId))).length;
-	}
-
-	function routePanelIsCollapsed(panelId) {
-		return collapsedRoutePanels[panelId] !== false;
-	}
-
-	function toggleRoutePanel(panelId) {
-		collapsedRoutePanels[panelId] = !routePanelIsCollapsed(panelId);
 	}
 
 	function ensureSectorCollections(sector) {
@@ -111,41 +94,7 @@
 			</button>
 		</div>
 		{#if parentRoutes.length === 0}<p class="text-micro-data text-warm-gray-400">No parent routes.</p>{:else}
-			<table class="w-full text-left text-micro-data">
-				<thead class="text-warm-gray-400">
-				<tr>
-					<th class="pb-1 font-bold">Route</th>
-					<th class="pb-1 font-bold">Type</th>
-					<th class="pb-1 font-bold">Paths</th>
-					<th></th>
-				</tr>
-				</thead>
-				<tbody>
-				{#each parentRoutes.slice(0, routePanelIsCollapsed('crag') ? 3 : parentRoutes.length) as { document, route }}
-					<tr
-						class="border-t border-black/10 {selectedObject?.type === 'route' && selectedObject.key === routeKey(document, route) ? 'bg-creator-blue/5 text-creator-blue' : ''}">
-						<td>
-							<button class="w-full py-1.5 text-left font-bold"
-							        onclick={() => onSelectRoute(document.path, route.id)}>{route.name || 'Unnamed route'}</button>
-						</td>
-						<td>{route.type || 'route'}</td>
-						<td>{routePathCount(document, route)}</td>
-						<td>
-							<button class="text-warm-gray-300 hover:text-rose-600" title="Delete route"
-							        onclick={() => onDeleteRoute(document.path, route.id)}><i class="fa-solid fa-trash-can"></i>
-							</button>
-						</td>
-					</tr>
-				{/each}
-				</tbody>
-			</table>
-			{#if parentRoutes.length > 3}
-				<button
-					class="mt-2 flex w-full items-center justify-center gap-1 rounded-sm border border-black/10 bg-white px-2 py-1.5 text-micro-data font-bold text-creator-blue"
-					onclick={() => toggleRoutePanel('crag')}><i
-					class={`fa-solid ${routePanelIsCollapsed('crag') ? 'fa-chevron-down' : 'fa-chevron-up'} text-[10px]`}></i>{routePanelIsCollapsed('crag') ? `Show ${parentRoutes.length - 3} more route${parentRoutes.length === 4 ? '' : 's'}` : 'Show fewer routes'}
-				</button>
-			{/if}
+			<CragEditorRouteTable routes={parentRoutes} {selectedObject} {onSelectRoute} {onDeleteRoute} />
 		{/if}
 	</div>
 	{#if !cragEditorState.crag.sectors || cragEditorState.crag.sectors.length === 0}
@@ -182,44 +131,9 @@
 					</div>
 				</div>
 				{#if routes.length > 0}
-					<table class="mt-2 w-full border-t border-black/10 text-left text-micro-data">
-						<thead class="text-warm-gray-400">
-						<tr>
-							<th class="py-1 font-bold">Route</th>
-							<th class="py-1 font-bold">Type</th>
-							<th class="py-1 font-bold">Paths</th>
-							<th></th>
-						</tr>
-						</thead>
-						<tbody>
-						{#each routes.slice(0, routePanelIsCollapsed(`sector:${sector.id}`) ? 3 : routes.length) as {
-							document,
-							route
-						}}
-							<tr
-								class="border-t border-black/10 {selectedObject?.type === 'route' && selectedObject.key === routeKey(document, route) ? 'bg-creator-blue/5 text-creator-blue' : ''}">
-								<td>
-									<button class="w-full py-1 text-left font-bold"
-									        onclick={(e) => { e.stopPropagation(); onSelectRoute(document.path, route.id); }}>{route.name || 'Unnamed route'}</button>
-								</td>
-								<td>{route.type || 'route'}</td>
-								<td>{routePathCount(document, route)}</td>
-								<td>
-									<button class="text-warm-gray-300 hover:text-rose-600" title="Delete route"
-									        onclick={(e) => { e.stopPropagation(); onDeleteRoute(document.path, route.id); }}><i
-										class="fa-solid fa-trash-can"></i></button>
-								</td>
-							</tr>
-						{/each}
-						</tbody>
-					</table>
-					{#if routes.length > 3}
-						<button
-							class="mt-2 flex w-full items-center justify-center gap-1 rounded-sm border border-black/10 bg-white px-2 py-1.5 text-micro-data font-bold text-creator-blue"
-							onclick={(e) => { e.stopPropagation(); toggleRoutePanel(`sector:${sector.id}`); }}><i
-							class={`fa-solid ${routePanelIsCollapsed(`sector:${sector.id}`) ? 'fa-chevron-down' : 'fa-chevron-up'} text-[10px]`}></i>{routePanelIsCollapsed(`sector:${sector.id}`) ? `Show ${routes.length - 3} more route${routes.length === 4 ? '' : 's'}` : 'Show fewer routes'}
-						</button>
-					{/if}
+					<div class="mt-2 border-t border-black/10">
+						<CragEditorRouteTable routes={routes} {selectedObject} {onSelectRoute} {onDeleteRoute} />
+					</div>
 				{/if}
 			</div>
 		{/each}
