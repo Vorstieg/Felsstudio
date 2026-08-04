@@ -11,6 +11,7 @@
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
 	import { loadGlbIntoEditorState } from '$lib/assets/js/gltf-loader.js';
 	import EntryPicker from '$lib/components/editor/wizard/EntryPicker.svelte';
+	import { normalizeTopoPaths } from '$lib/assets/js/topo-document-paths.js';
 
 	let { workspace, titleKey, actionLabelKey, locations = [] } = $props();
 
@@ -148,7 +149,8 @@
 							topoDocuments.map(async ({ sectorId, sectorTopo }) => {
 								try {
 									const path = sectorTopo.getTopoPath();
-									return { path, sectorId, data: await readJson(path), dirty: false };
+									const normalized = normalizeTopoPaths(await readJson(path));
+									return { path, sectorId, data: normalized.data, dirty: normalized.migrated };
 								} catch {
 									return null;
 								}
@@ -163,14 +165,14 @@
 
 			} else if (workSpaceWrapper.is2DEditor()) {
 				try {
-					userState.topo = { ...userState.topo, ...(await readJson(topo.getTopoPath())) };
+					userState.topo = { ...userState.topo, ...normalizeTopoPaths(await readJson(topo.getTopoPath())).data };
 				} catch {
 					/* no topo yet */
 				}
 				userState.topo.editorMode = '2d';
 			} else {
 				try {
-					const topoData = await readJson(topo.getTopoPath());
+					const topoData = normalizeTopoPaths(await readJson(topo.getTopoPath())).data;
 					userState.topo = { ...userState.topo, ...topoData };
 					loadedTopo = workspace === 'topos/3d/editor' ? loadedTopo : true;
 					initializeIdCounters(userState.topo);

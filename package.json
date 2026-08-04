@@ -10,6 +10,8 @@
 		"test:symbol-distortion": "node scripts/test-symbol-distortion.mjs",
 		"test:flight-plan": "node scripts/test-flight-plan-generator.mjs",
 		"test:flight-plan-kml": "node scripts/test-flight-plan-kml.mjs",
+		"test:topo-paths": "node scripts/test-topo-document-paths.mjs",
+		"test:topo-properties-paths": "node scripts/test-topo-properties-paths.mjs",
 		"lint": "prettier --ignore-path .gitignore --check . && eslint --ignore-path .gitignore .",
 		"format": "prettier --ignore-path .gitignore --write .",
 		"data:validate": "npm run validate --prefix fels-data"

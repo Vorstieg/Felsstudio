@@ -4,7 +4,7 @@
 	import CragEditorPanelContent from './CragEditorPanelContent.svelte';
 
 	let {
-		inspectorShadow = true, map = null, activeTab = $bindable('info'), detectedAssets = [], editingTrackIndex = null,
+		inspectorShadow = true, map = null, activeTab = $bindable('info'), detectedAssets = [], activeTrackTarget = null,
 		cragTypes = [], availableTags = [], securityOptions = [], rockTypes = [], commonEquipment = [],
 		selectedObject = $bindable(null), saveStatus = 'idle', onAddEquipmentItem = () => {
 		},
@@ -38,6 +38,7 @@
 		}, onEditRoutePath = () => {
 		}, onUpdateRoutePath = () => {
 		}, onRemoveRoutePath = () => {
+		}, onDeleteRoutePath = () => {
 		}, onDeleteRoute = () => {
 		}, onPlanGenerated = () => {
 		}
@@ -59,8 +60,8 @@
                   width="20rem">
 	{#snippet children()}
 		<CragEditorPanelContent
-			bind:activeTab bind:selectedObject showTabs={false} {map} {detectedAssets} {editingTrackIndex} {cragTypes}
-				{routeDocuments} {onAddParentRoute} {onAddSectorRoute} {onSelectRoute} {onUpdateRouteName} {onUpdateRoute} {onAddRoutePath} {onEditRoutePath} {onUpdateRoutePath} {onRemoveRoutePath} {onDeleteRoute} {onPlanGenerated}
+			bind:activeTab bind:selectedObject showTabs={false} {map} {detectedAssets} {activeTrackTarget} {cragTypes}
+			{routeDocuments} {onEditRoutePath} {onDeleteRoutePath} {onAddParentRoute} {onAddSectorRoute} {onSelectRoute} {onUpdateRouteName} {onUpdateRoute} {onAddRoutePath} {onUpdateRoutePath} {onRemoveRoutePath} {onDeleteRoute} {onPlanGenerated}
 			{availableTags}
 			{securityOptions} {rockTypes} {commonEquipment} {saveStatus} {onAddEquipmentItem}
 			{onRemoveEquipmentItem} {onAddCragImages} {onRemoveCragImage} {onAddSector} {onDuplicateSector}

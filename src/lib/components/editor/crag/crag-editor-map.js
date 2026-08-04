@@ -680,6 +680,19 @@ export function ensureCragEditorLayers(map) {
 				'line-opacity': 0.9
 			}
 		});
+	if (!map.getLayer('route-paths-line'))
+		map.addLayer({
+			id: 'route-paths-line',
+			type: 'line',
+			source: 'crag-editor-data',
+			filter: ['==', ['get', 'feature'], 'route-path'],
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': ['case', ['==', ['get', 'selected'], true], '#f59e0b', '#7c3aed'],
+				'line-width': ['case', ['==', ['get', 'selected'], true], 6, 3],
+				'line-dasharray': [1, 1]
+			}
+		});
 	if (!map.getLayer('tracks-points-drawing'))
 		map.addLayer({
 			id: 'tracks-points-drawing',
@@ -947,6 +960,7 @@ export function buildEditorFeatureCollection({
 	sectors = [],
 	savedAccessFeatures = [],
 	routes = [],
+	routePaths = [],
 	selectedObject = null,
 	editingRoutePath = null,
 	drawingPoints = [],
@@ -956,7 +970,7 @@ export function buildEditorFeatureCollection({
 	draggingTrackPointIndex = null,
 	selectedSectorVertex = null,
 	draggingSectorVertex = null,
-	editingTrackIndex = null,
+	activeTrackTarget = null,
 	flightPlan = null
 }) {
 	const features = [];
@@ -1021,7 +1035,7 @@ export function buildEditorFeatureCollection({
 	savedAccessFeatures
 		.filter((feature) => feature.properties?.kind === 'approach')
 		.forEach((track) => {
-			if (editingTrackIndex === track.id || !(track.geometry?.coordinates?.length > 1)) return;
+			if (activeTrackTarget?.kind === 'access' && activeTrackTarget.featureId === track.id || !(track.geometry?.coordinates?.length > 1)) return;
 			features.push({
 				type: 'Feature',
 				geometry: track.geometry,
@@ -1033,24 +1047,21 @@ export function buildEditorFeatureCollection({
 				}
 			});
 		});
-	routes.forEach(({ key, route }) => {
-		for (const [pathIndex, path] of (route?.assets?.paths || []).entries()) {
-			if (editingRoutePath?.key === key && editingRoutePath?.pathIndex === pathIndex) continue;
-			if (path?.path?.type !== 'LineString' || path.path.coordinates?.length < 2) continue;
+	routePaths.forEach(({ documentPath, feature, assignedRouteIds = [] }) => {
+		if (editingRoutePath?.documentPath === documentPath && editingRoutePath?.pathId === String(feature.id)) return;
+		if (!feature?.geometry || feature.geometry.type !== 'LineString' || feature.geometry.coordinates?.length < 2) return;
 			features.push({
 				type: 'Feature',
-				geometry: path.path,
+				geometry: feature.geometry,
 				properties: {
-					feature: 'route',
-					key,
-					documentPath: key.slice(0, key.lastIndexOf(':')),
-					routeId: route.id,
-					pathIndex,
-					name: route.name || 'Unnamed route',
-					selected: selectedObject?.type === 'route' && key === selectedObject.key
+					feature: 'route-path',
+					documentPath,
+					pathId: String(feature.id),
+					assignedRouteIds,
+					name: feature.properties?.name || 'Route path',
+					selected: selectedObject?.type === 'route-path' && selectedObject.documentPath === documentPath && String(selectedObject.pathId) === String(feature.id)
 				}
 			});
-		}
 	});
 	const drawingSegments =
 		draggingTrackPointIndex === null

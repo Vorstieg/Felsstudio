@@ -3,7 +3,7 @@
 	import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
 
 	let {
-		detectedAssets = [], editingTrackIndex = null, onSetHoverHighlight = () => {
+		detectedAssets = [], activeTrackTarget = null, routeDocuments = [], onAddRoutePath = () => {}, onEditRoutePath = () => {}, onDeleteRoutePath = () => {}, onSetHoverHighlight = () => {
 		}, onClearDetectedAssets = () => {
 		}, onAddDetectedAsset = () => {
 		}, onRemoveAccessFeature = () => {
@@ -18,6 +18,13 @@
 	let parkingFeatures = $derived(accessFeatures.filter((feature) => feature.properties?.kind === 'parking'));
 	let hutFeatures = $derived(accessFeatures.filter((feature) => feature.properties?.kind === 'hut'));
 	let approachFeatures = $derived(accessFeatures.filter((feature) => feature.properties?.kind === 'approach'));
+	function assignedRoutes(document, pathId) {
+		return (document.data?.routes || []).filter((route) => (route.pathRefs || []).some((ref) => String(ref.pathId) === String(pathId)));
+	}
+	function editPath(document, feature) {
+		const route = assignedRoutes(document, feature.id)[0];
+		if (route) onEditRoutePath(document.path, route.id, feature.id);
+	}
 </script>
 
 <div class="flex flex-col gap-2">
@@ -116,7 +123,7 @@
 				</div>
 			</div>
 			<input type="text" bind:value={track.properties.name} class="input-studio w-full" placeholder="Track Name" />
-			{#if editingTrackIndex === track.id}
+			{#if activeTrackTarget?.kind === 'access' && activeTrackTarget.featureId === track.id}
 				<div class="flex items-center gap-1.5">
 					<button onclick={onFinalizeTrack}
 					        class="flex-1 bg-creator-blue text-white rounded-sm py-1 text-micro-data font-bold uppercase tracking-widest">
@@ -128,6 +135,31 @@
 			{/if}
 		</div>
 	{/each}
+	<div class="mt-3 space-y-2 border-t border-black/10 pt-3">
+		<div class="flex items-center justify-between"><span class="text-ui-label">Topo paths</span><span class="text-micro-data text-warm-gray-500">{routeDocuments.reduce((count, document) => count + (document.data?.paths?.features?.length || 0), 0)}</span></div>
+		{#each routeDocuments as document}
+			<div class="space-y-1 rounded-sm border border-black/10 bg-white p-2">
+				<div class="flex items-center justify-between gap-1"><div class="text-micro-data font-bold text-warm-gray-500">{document.path.split('/').at(-1)}</div>{#if document.data?.routes?.[0]}<button type="button" class="text-micro-data text-creator-blue" onclick={() => onAddRoutePath(document.path, document.data.routes[0].id)}>Draw path</button>{/if}</div>
+				{#each document.data?.paths?.features || [] as feature}
+					{@const routes = assignedRoutes(document, feature.id)}
+					<div class="space-y-1 rounded-sm border border-black/10 p-1">
+						<div class="flex items-center justify-between gap-1">
+							<input class="input-studio min-w-0 flex-1" value={feature.properties?.name || ''} placeholder="Path name" onchange={(event) => { feature.properties = { ...(feature.properties || {}), name: event.currentTarget.value }; document.dirty = true; }} />
+							<span class="text-micro-data text-warm-gray-500">{routes.length} route{routes.length === 1 ? '' : 's'}</span>
+						</div>
+						<div class="text-micro-data text-warm-gray-500">{#if routes.length > 0}Used by: {routes.map((route) => route.name || route.id).join(', ')}{:else}Unassigned{/if}</div>
+						<div class="flex items-center justify-between gap-1 text-micro-data {feature.geometry?.type === 'LineString' && feature.geometry.coordinates?.length > 1 ? 'text-emerald-700' : 'text-rose-600'}">
+							<span>{feature.geometry?.type === 'LineString' && feature.geometry.coordinates?.length > 1 ? 'Valid geometry' : 'Invalid geometry'}</span>
+							<div class="flex gap-1">
+								<button type="button" class="text-creator-blue" title="Edit path" onclick={() => editPath(document, feature)}>Edit</button>
+								<button type="button" class="text-rose-600" title="Delete path" onclick={() => onDeleteRoutePath(document.path, feature.id)}>Delete</button>
+							</div>
+						</div>
+					</div>
+				{/each}
+			</div>
+		{/each}
+	</div>
 </div>
 
 <style>

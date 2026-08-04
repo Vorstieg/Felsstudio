@@ -7,7 +7,7 @@
 	let {
 		activeTab = $bindable('info'),
 		detectedAssets = [],
-		editingTrackIndex = null,
+		activeTrackTarget = null,
 		cragTypes = [],
 		availableTags = [],
 		securityOptions = [],
@@ -15,6 +15,8 @@
 		commonEquipment = [],
 		selectedObject = $bindable(null),
 		routeDocuments = [],
+		onEditRoutePath = () => {},
+		onDeleteRoutePath = () => {},
 		saveStatus = 'idle',
 		onAddEquipmentItem = () => {},
 		onRemoveEquipmentItem = () => {},
@@ -40,7 +42,6 @@
 		onUpdateRouteName = () => {},
 		onUpdateRoute = () => {},
 		onAddRoutePath = () => {},
-		onEditRoutePath = () => {},
 		onUpdateRoutePath = () => {},
 		onRemoveRoutePath = () => {},
 		onDeleteRoute = () => {}
@@ -68,8 +69,10 @@
 				bind:activeTab
 				bind:selectedObject
 				{routeDocuments}
+				{onEditRoutePath}
+				{onDeleteRoutePath}
 				{detectedAssets}
-				{editingTrackIndex}
+				{activeTrackTarget}
 				{cragTypes}
 				{availableTags}
 				{securityOptions}
@@ -100,7 +103,6 @@
 				{onUpdateRouteName}
 				{onUpdateRoute}
 				{onAddRoutePath}
-				{onEditRoutePath}
 				{onUpdateRoutePath}
 				{onRemoveRoutePath}
 				{onDeleteRoute}

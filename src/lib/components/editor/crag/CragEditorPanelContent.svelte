@@ -9,7 +9,7 @@
 		map = null,
 		activeTab = $bindable('info'),
 		detectedAssets = [],
-		editingTrackIndex = null,
+		activeTrackTarget = null,
 		cragTypes = [],
 		availableTags = [],
 		securityOptions = [],
@@ -17,6 +17,9 @@
 		commonEquipment = [],
 		selectedObject = $bindable(null),
 		routeDocuments = [],
+		onEditRoutePath = () => {},
+		onDeleteRoutePath = () => {},
+		onAddRoutePath = () => {},
 		saveStatus = 'idle',
 		onAddEquipmentItem = () => {},
 		onRemoveEquipmentItem = () => {},
@@ -62,7 +65,7 @@
 	{#if activeTab === 'info'}
 		<CragEditorInfoTab {cragTypes} {availableTags} {securityOptions} {rockTypes} {commonEquipment} {saveStatus} {onAddEquipmentItem} {onRemoveEquipmentItem} {onAddCragImages} {onRemoveCragImage} />
 	{:else if activeTab === 'registry'}
-		<CragEditorRegistryTab {detectedAssets} {editingTrackIndex} {onSetHoverHighlight} {onClearDetectedAssets} {onAddDetectedAsset} {onRemoveAccessFeature} {onEditTrack} {onRemoveTrack} {onFinalizeTrack} {onCancelTrackEdit} />
+		<CragEditorRegistryTab {detectedAssets} {activeTrackTarget} {routeDocuments} {onAddRoutePath} {onEditRoutePath} {onDeleteRoutePath} {onSetHoverHighlight} {onClearDetectedAssets} {onAddDetectedAsset} {onRemoveAccessFeature} {onEditTrack} {onRemoveTrack} {onFinalizeTrack} {onCancelTrackEdit} />
 	{:else}
 		<CragEditorSectorsTab {map} bind:selectedObject {cragTypes} {availableTags} {securityOptions} {rockTypes} {routeDocuments} {onAddSector} {onDuplicateSector} {onRemoveSector} {onMoveSector} {onFocusSector} {onSetSectorGeometryType} {onAddParentRoute} {onAddSectorRoute} {onSelectRoute} {onDeleteRoute} {onPlanGenerated} />
 	{/if}

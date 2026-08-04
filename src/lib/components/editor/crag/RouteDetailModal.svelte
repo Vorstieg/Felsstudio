@@ -8,11 +8,14 @@
 		onClose = () => {},
 		onChange = () => {},
 		onAddRoutePath = () => {},
+		onAssignRoutePath = () => {},
+		onCreateRoutePathFromAccess = () => {},
 		onEditRoutePath = () => {},
 		onUpdateRoutePath = () => {},
 		onRemoveRoutePath = () => {},
-		onMoveRoutePath = () => {},
-		routeDocuments = []
+		onDeleteRoutePath = () => {},
+		routeDocuments = [],
+		accessFeatures = []
 	} = $props();
 
 	let route = $derived(routeEntry?.route ?? null);
@@ -22,17 +25,12 @@
 		if (document && route) onChange(document.path, route.id);
 	}
 
-	function paths() {
-		const routePaths = route?.assets?.paths;
-		return Array.isArray(routePaths) ? routePaths : routePaths ? [routePaths] : [];
+	function paths() { return (route?.pathRefs || []).map((ref) => ({ ...ref, feature: document?.data?.paths?.features?.find((item) => String(item.id) === String(ref.pathId)) })); }
+	function availablePaths() {
+		const assigned = new Set((route?.pathRefs || []).map((ref) => String(ref.pathId)));
+		return (document?.data?.paths?.features || []).filter((feature) => !assigned.has(String(feature.id)));
 	}
-
-	function movePath(event, pathIndex) {
-		const [targetPath, targetRouteId] = event.currentTarget.value.split('\u0000');
-		if (!targetPath || !targetRouteId) return;
-		onMoveRoutePath(document.path, route.id, pathIndex, targetPath, targetRouteId);
-		event.currentTarget.value = '';
-	}
+	function availableAccessPaths() { return accessFeatures.filter((feature) => feature.properties?.kind === 'approach' && feature.geometry?.coordinates?.length > 1); }
 
 	function addPitch() {
 		route.pitches = [
@@ -144,32 +142,40 @@
 							<i class="fa-solid fa-plus mr-1"></i>Add path
 						</button>
 					</div>
+					{#if availablePaths().length > 0}
+						<div class="flex items-center gap-1">
+							<select class="input-studio min-w-0 flex-1" aria-label="Assign existing path" onchange={(event) => { const pathId = event.currentTarget.value; if (pathId) onAssignRoutePath(document.path, route.id, pathId); event.currentTarget.value = ''; }}>
+								<option value="" disabled selected>Assign existing path…</option>
+								{#each availablePaths() as feature}
+									<option value={feature.id}>{feature.properties?.name || feature.id}</option>
+								{/each}
+							</select>
+						</div>
+					{/if}
+					{#if availableAccessPaths().length > 0}
+						<select class="input-studio min-w-0" aria-label="Create route path from access path" onchange={(event) => { const accessId = event.currentTarget.value; if (accessId) onCreateRoutePathFromAccess(document.path, route.id, accessId); event.currentTarget.value = ''; }}>
+							<option value="" disabled selected>Copy access path…</option>
+							{#each availableAccessPaths() as feature}
+								<option value={feature.id}>{feature.properties?.name || feature.id}</option>
+							{/each}
+						</select>
+					{/if}
 					{#if paths().length === 0}
 						<p class="text-micro-data text-warm-gray-500">No paths attached.</p>
 					{:else}
-						{#each paths() as pathAsset, pathIndex}
+						{#each paths() as pathAsset}
 							<div class="grid grid-cols-[7rem_1fr_7rem_1.5rem_1.5rem] gap-1 rounded-sm border border-black/10 bg-white p-1">
-								<select class="input-studio min-w-0" value={pathAsset.role || 'main'} onchange={(event) => onUpdateRoutePath(document.path, route.id, pathIndex, 'role', event.currentTarget.value)}>
+								<select class="input-studio min-w-0" value={pathAsset.role || 'main'} onchange={(event) => onUpdateRoutePath(document.path, route.id, pathAsset.pathId, 'role', event.currentTarget.value)}>
 									<option value="approach">Approach</option>
 									<option value="main">Main</option>
 									<option value="descent">Descent</option>
 									<option value="variant">Variant</option>
 								</select>
-								<input class="input-studio min-w-0" value={pathAsset.label || ''} placeholder="Label" onchange={(event) => onUpdateRoutePath(document.path, route.id, pathIndex, 'label', event.currentTarget.value)} />
-								<select class="input-studio min-w-0" value="" aria-label="Move path to another route" onchange={(event) => movePath(event, pathIndex)}>
-									<option value="" disabled>Move to…</option>
-									{#each routeDocuments as targetDocument}
-										{#each targetDocument.data?.routes || [] as targetRoute}
-											{#if targetDocument.path !== document.path || targetRoute.id !== route.id}
-												<option value={`${targetDocument.path}\u0000${targetRoute.id}`}>
-													{targetRoute.name || 'Unnamed route'} ({targetDocument.sectorId || 'crag'})
-												</option>
-											{/if}
-										{/each}
-									{/each}
-								</select>
-								<button type="button" class="text-warm-gray-400 hover:text-creator-blue" title="Edit path" onclick={() => onEditRoutePath(document.path, route.id, pathIndex)}><i class="fa-solid fa-pencil text-[10px]"></i></button>
-								<button type="button" class="text-warm-gray-300 hover:text-rose-600" title="Remove path" onclick={() => onRemoveRoutePath(document.path, route.id, pathIndex)}><i class="fa-solid fa-xmark text-[10px]"></i></button>
+								<input class="input-studio min-w-0" value={pathAsset.label || ''} placeholder="Label" onchange={(event) => onUpdateRoutePath(document.path, route.id, pathAsset.pathId, 'label', event.currentTarget.value)} />
+								<span class="px-1 text-micro-data text-warm-gray-500">{pathAsset.feature?.properties?.name || pathAsset.pathId}</span>
+								<button type="button" class="text-warm-gray-400 hover:text-creator-blue" title="Edit path" onclick={() => onEditRoutePath(document.path, route.id, pathAsset.pathId)}><i class="fa-solid fa-pencil text-[10px]"></i></button>
+								<button type="button" class="text-warm-gray-300 hover:text-rose-600" title="Unassign path" onclick={() => onRemoveRoutePath(document.path, route.id, pathAsset.pathId)}><i class="fa-solid fa-xmark text-[10px]"></i></button>
+								<button type="button" class="text-warm-gray-300 hover:text-rose-600" title="Delete shared path" onclick={() => onDeleteRoutePath(document.path, pathAsset.pathId)}><i class="fa-solid fa-trash text-[10px]"></i></button>
 							</div>
 						{/each}
 					{/if}

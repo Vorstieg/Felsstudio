@@ -27,6 +27,7 @@
 		},
 		"altitude": { "type": "number" },
 		"routes": { "type": "array", "items": { "$ref": "#/$defs/route" } },
+		"paths": { "$ref": "#/$defs/pathCollection" },
 		"fixPoints": { "type": "array", "items": { "$ref": "#/$defs/fixPoint" } },
 		"outlines": { "type": "array", "items": { "$ref": "#/$defs/outline" } },
 		"textLabels": { "type": "array", "items": { "$ref": "#/$defs/textLabel" } }
@@ -40,6 +41,37 @@
 			"maxItems": 2
 		},
 		"path2D": { "type": "array", "items": { "$ref": "#/$defs/point2D" }, "minItems": 2 },
+		"pathCollection": {
+			"type": "object", "required": ["type", "features"],
+			"properties": {
+				"type": { "const": "FeatureCollection" },
+				"features": { "type": "array", "items": { "$ref": "#/$defs/pathFeature" } }
+			},
+			"additionalProperties": true
+		},
+		"pathFeature": {
+			"type": "object", "required": ["type", "geometry"],
+			"properties": {
+				"type": { "const": "Feature" },
+				"id": { "type": ["string", "number"] },
+				"properties": { "type": "object" },
+				"geometry": {
+					"type": "object", "required": ["type", "coordinates"],
+					"properties": { "type": { "const": "LineString" }, "coordinates": { "type": "array", "minItems": 2, "items": { "type": "array", "minItems": 2, "items": { "type": "number" } } } },
+					"additionalProperties": true
+				}
+			},
+			"additionalProperties": true
+		},
+		"pathRef": {
+			"type": "object", "required": ["pathId"],
+			"properties": {
+				"pathId": { "type": ["string", "number"] },
+				"role": { "type": "string" },
+				"label": { "type": "string" }
+			},
+			"additionalProperties": true
+		},
 		"route": {
 			"type": "object",
 			"required": ["id"],
@@ -68,7 +100,8 @@
 				"pitches": { "type": "array", "items": { "$ref": "#/$defs/pitch" } },
 				"variants": { "type": "array", "items": { "$ref": "#/$defs/variant" } },
 				"fixPoints": { "type": "array", "items": { "type": ["string", "number"] } },
-				"assets": { "type": "object" }
+				"assets": { "type": "object" },
+				"pathRefs": { "type": "array", "items": { "$ref": "#/$defs/pathRef" } }
 			},
 			"additionalProperties": true
 		},

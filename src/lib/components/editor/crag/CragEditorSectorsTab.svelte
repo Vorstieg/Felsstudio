@@ -53,6 +53,11 @@
 		return `${document.path}:${route.id}`;
 	}
 
+	function routePathCount(document, route) {
+		const features = new Set((document.data?.paths?.features || []).filter((feature) => feature.geometry?.type === 'LineString' && feature.geometry.coordinates?.length > 1).map((feature) => String(feature.id)));
+		return (route.pathRefs || []).filter((ref) => features.has(String(ref.pathId))).length;
+	}
+
 	function routePanelIsCollapsed(panelId) {
 		return collapsedRoutePanels[panelId] !== false;
 	}
@@ -124,7 +129,7 @@
 							        onclick={() => onSelectRoute(document.path, route.id)}>{route.name || 'Unnamed route'}</button>
 						</td>
 						<td>{route.type || 'route'}</td>
-						<td>{route.assets?.paths?.filter((path) => path.path?.coordinates?.length > 1).length || 0}</td>
+						<td>{routePathCount(document, route)}</td>
 						<td>
 							<button class="text-warm-gray-300 hover:text-rose-600" title="Delete route"
 							        onclick={() => onDeleteRoute(document.path, route.id)}><i class="fa-solid fa-trash-can"></i>
@@ -198,7 +203,7 @@
 									        onclick={(e) => { e.stopPropagation(); onSelectRoute(document.path, route.id); }}>{route.name || 'Unnamed route'}</button>
 								</td>
 								<td>{route.type || 'route'}</td>
-								<td>{route.assets?.paths?.filter((path) => path.path?.coordinates?.length > 1).length || 0}</td>
+								<td>{routePathCount(document, route)}</td>
 								<td>
 									<button class="text-warm-gray-300 hover:text-rose-600" title="Delete route"
 									        onclick={(e) => { e.stopPropagation(); onDeleteRoute(document.path, route.id); }}><i

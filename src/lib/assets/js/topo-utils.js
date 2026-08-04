@@ -48,8 +48,7 @@ export function convertRouteType(route, newType) {
 	}
 
 	route.topo = { ...(route.topo || {}) };
-	if (!route.assets) route.assets = { paths: [] };
-	if (!route.assets.paths) route.assets.paths = [];
+	if (!Array.isArray(route.pathRefs)) route.pathRefs = [];
 	if (Array.isArray(route.type)) {
 		if (willBeMultiPitch && !route.type.includes('multi-pitch')) route.type.push('multi-pitch');
 		else if (!willBeMultiPitch && route.type.includes('multi-pitch')) {

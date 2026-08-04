@@ -2,6 +2,24 @@ export type Position = [longitude: number, latitude: number, elevation?: number]
 export type Point2D = [x: number, y: number];
 export type Path2D = Point2D[];
 
+export interface TopoPathFeature {
+	type: 'Feature';
+	id: string | number;
+	properties?: Record<string, unknown>;
+	geometry: { type: 'LineString'; coordinates: Position[] };
+}
+
+export interface TopoPathReference {
+	pathId: string | number;
+	role?: string;
+	label?: string;
+}
+
+export interface TopoPathCollection {
+	type: 'FeatureCollection';
+	features: TopoPathFeature[];
+}
+
 export interface GeoJSONGeometry {
 	type: 'Point' | 'Polygon' | 'MultiPolygon';
 	coordinates: unknown;
@@ -97,6 +115,7 @@ export interface Route {
 	pitches?: Pitch[];
 	variants?: Record<string, unknown>[];
 	fixPoints?: (string | number)[];
+	pathRefs?: TopoPathReference[];
 	[key: string]: unknown;
 }
 
@@ -134,6 +153,7 @@ export interface TopoDocument {
 	coordinates?: [longitude: number, latitude: number, elevation?: number];
 	altitude?: number;
 	routes: Route[];
+	paths?: TopoPathCollection;
 	fixPoints?: FixPoint[];
 	outlines?: Outline[];
 	textLabels?: TextLabel[];

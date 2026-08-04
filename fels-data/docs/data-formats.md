@@ -91,10 +91,15 @@ the first coordinate as the final coordinate.
 
 ## `<crag>-topo.json`
 
-This is a custom JSON document. It contains a `routes` array and may contain 2D drawing layers,
+This is a custom JSON document. It contains a `routes` array and an optional document-local GeoJSON
+`paths` FeatureCollection. It may contain 2D drawing layers,
 3D route geometry, or both.
 
 - `routes`: route metadata and route lines.
+- `paths`: shared LineString features owned by this topo document. A path is stored once even when
+  several routes use it.
+- `routes[].pathRefs`: references to paths in the same document. Each reference stores the
+  route-specific `role` and optional `label`; paths cannot be assigned across topo documents.
 - `pitches`: multi-pitch route segments, ordered from bottom to top.
 - `fixPoints`: bolts, belays, trees, and other topo symbols.
 - `outlines`: rock, approach, descent, variant, or fixed-rope linework.
@@ -118,10 +123,22 @@ This is a custom JSON document. It contains a `routes` array and may contain 2D 
 
 ```json
 {
+	"paths": {
+		"type": "FeatureCollection",
+		"features": [
+			{
+				"type": "Feature",
+				"id": "path-approach",
+				"properties": { "name": "Common approach" },
+				"geometry": { "type": "LineString", "coordinates": [[16.27, 48.08], [16.271, 48.081]] }
+			}
+		]
+	},
 	"routes": [
 		{
 			"id": "route-1",
 			"name": "First Route",
+			"pathRefs": [{ "pathId": "path-approach", "role": "approach", "label": "Common approach" }],
 			"type": "sports-climbing",
 			"grade": "5+",
 			"_gradeScale": "uiaa",
@@ -130,6 +147,12 @@ This is a custom JSON document. It contains a `routes` array and may contain 2D 
 				[0.28, 0.55],
 				[0.32, 0.2]
 			]
+		}
+		,
+		{
+			"id": "route-2",
+			"name": "Second Route",
+			"pathRefs": [{ "pathId": "path-approach", "role": "approach" }]
 		}
 	],
 	"fixPoints": [
