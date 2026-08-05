@@ -117,7 +117,7 @@ import { fixpointSymbols } from '@vorstieg/topo-renderer';
 					cluster.anchor[1] + offset[1],
 					cluster.anchor[2] + offset[2]
 				];
-				userState.ui.targetControlsTarget = new Vector3(...anchor);
+				userState.transient.targetControlsTarget = new Vector3(...anchor);
 
 				// Calculate "Front-Facing" Camera Position
 				const hts = cluster.members;
@@ -131,14 +131,14 @@ import { fixpointSymbols } from '@vorstieg/topo-renderer';
 				const viewDir = new Vector3().subVectors(avgCamPos, anchorVec).normalize();
 
 				// Target Position (1.5m away for better overview)
-				userState.ui.targetCameraPosition = anchorVec.clone().add(viewDir.multiplyScalar(1.5));
+				userState.transient.targetCameraPosition = anchorVec.clone().add(viewDir.multiplyScalar(1.5));
 
 				// Trigger tween
 				targetPosStore.set(anchor);
 				cameraPosStore.set([
-					userState.ui.targetCameraPosition.x,
-					userState.ui.targetCameraPosition.y,
-					userState.ui.targetCameraPosition.z
+					userState.transient.targetCameraPosition.x,
+					userState.transient.targetCameraPosition.y,
+					userState.transient.targetCameraPosition.z
 				]);
 			}
 		} else if (!clusterId) {
@@ -166,8 +166,8 @@ import { fixpointSymbols } from '@vorstieg/topo-renderer';
 		// Force model offset from state
 		modelPositionOffset = userState.topo.modelOffset;
 
-		if (userState.ui.modelUrl) {
-			loadGlbFromUrl(userState.ui.modelUrl);
+		if (userState.transient.modelUrl) {
+			loadGlbFromUrl(userState.transient.modelUrl);
 		}
 
 		const handleKeyDown = (e) => {
@@ -206,7 +206,7 @@ import { fixpointSymbols } from '@vorstieg/topo-renderer';
 			isBlankTopoSession({
 				topo: userState.topo,
 				clustering: userState.clustering,
-				glbBlob: userState.ui.glbBlob
+				glbBlob: userState.transient.glbBlob
 			}),
 		restoreSession: (session, id) => {
 			restoreSession(session, id);
@@ -227,12 +227,12 @@ import { fixpointSymbols } from '@vorstieg/topo-renderer';
 				crag_id: userState.topo.crag_id,
 				sector_id: userState.topo.sector_id,
 				clustering: userState.clustering,
-				glbBlob: userState.ui.glbBlob,
-				modelRevision: userState.ui.modelRevision
+				glbBlob: userState.transient.glbBlob,
+				modelRevision: userState.transient.modelRevision
 			}),
 		getExtra: () => ({
 			clustering: $state.snapshot(userState.clustering),
-			glbBlob: userState.ui.glbBlob
+			glbBlob: userState.transient.glbBlob
 		})
 	});
 
@@ -411,10 +411,10 @@ import { fixpointSymbols } from '@vorstieg/topo-renderer';
 			await writeJson(userState.topo._topoFileName, topoToSave);
 
 			// Upload GLB model if available (3D mode)
-			if (userState.ui.glbBlob) {
+			if (userState.transient.glbBlob) {
 				await writeFile(
 					userState.topo._topoFileName.replace(/-topo\.json$/, '.glb'),
-					userState.ui.glbBlob,
+					userState.transient.glbBlob,
 					'model/gltf-binary'
 				);
 			}

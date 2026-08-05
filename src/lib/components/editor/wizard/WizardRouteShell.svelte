@@ -64,7 +64,7 @@
 		draftsState.load();
 		userState.ui.activeDraftId = await draftsState.save(userState.topo, userState.ui.activeDraftId, {
 			clustering: $state.snapshot(userState.clustering),
-			glbBlob: userState.ui.glbBlob
+			glbBlob: userState.transient.glbBlob
 		});
 		userState.ui.lastSaved = new Date().toISOString();
 	}

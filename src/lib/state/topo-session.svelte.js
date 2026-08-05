@@ -101,17 +101,6 @@ function createTransientState() {
 	};
 }
 
-function attachTransientAliases(ui, transient) {
-	for (const key of ['modelUrl', 'glbBlob', 'modelRevision', 'targetCameraPosition', 'targetControlsTarget']) {
-		Object.defineProperty(ui, key, {
-			configurable: true,
-			enumerable: false,
-			get: () => transient[key],
-			set: (value) => (transient[key] = value)
-		});
-	}
-}
-
 /**
  * Creates an editor session. A session owns one editing surface and must not
  * be shared between routes or browser tabs.
@@ -175,13 +164,6 @@ export function createTopoEditorSession() {
 			};
 		}
 	});
-	attachTransientAliases(session.ui, session.transient);
-
-	const reset = session.reset;
-	session.reset = function resetSession() {
-		reset.call(this);
-		attachTransientAliases(this.ui, this.transient);
-	};
 
 	return session;
 }
