@@ -3,20 +3,20 @@
 	import { createVariant } from '$lib/components/editor/topo-properties/topo-properties-utils.js';
 	import { generateId } from '$lib/assets/js/id-utils.js';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
-	import { getCragEditorController } from '$lib/state/crag-controller-context.svelte.js';
+	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
 
 	const cragEditorState = getCragEditorSession();
-	const { routes } = getCragEditorController();
+	const { routeTool } = getCragEditorTools();
 	const {
-		onUpdateRoute,
-		onAddRoutePath,
-		onAssignExistingRoutePath,
-		onCreateRoutePathFromAccess,
-		onEditRoutePath,
-		onUpdateRoutePath,
-		onRemoveRoutePath,
-		onDeleteRoutePath
-	} = routes;
+		updateRoute: onUpdateRoute,
+		addRoutePath: onAddRoutePath,
+		assignExistingRoutePath: onAssignExistingRoutePath,
+		createRoutePathFromAccess: onCreateRoutePathFromAccess,
+		editRoutePath: onEditRoutePath,
+		updateRoutePath: onUpdateRoutePath,
+		removeRoutePath: onRemoveRoutePath,
+		deleteRoutePath: onDeleteRoutePath
+	} = routeTool;
 	let accessFeatures = $derived(cragEditorState.access.features);
 
 	let {

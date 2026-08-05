@@ -6,18 +6,31 @@
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
 	import { _ } from 'svelte-i18n';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
-	import { getCragEditorController } from '$lib/state/crag-controller-context.svelte.js';
+	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
 	const cragEditorState = getCragEditorSession();
+	const { trackEditor, actions } = getCragEditorTools();
 	const {
-		toolbar,
-		history
-	} = getCragEditorController();
+		startRoutingDraft: onStartRoutingDraft,
+		setTrackDraftMode: onSetTrackDraftMode,
+		handleTrackConfirm: onHandleTrackConfirm,
+		cancelTrackEdit: onCancelTrackEdit,
+		undoTrackPoint: onUndoTrackPoint,
+		reverseTrack: onReverseTrack,
+		trimTrackStart: onTrimTrackStart,
+		trimTrackEnd: onTrimTrackEnd,
+		simplifyTrack: onSimplifyTrack,
+		handleGpxUpload: onGpxUpload
+	} = trackEditor;
 	const {
-		onBack, onStartRoutingDraft, onSetTrackDraftMode, onHandleTrackConfirm, onCancelTrackEdit,
-		onUndoTrackPoint, onStartTrackCut, onConfirmTrackCut, onCancelTrackCut, onReverseTrack,
-		onTrimTrackStart, onTrimTrackEnd, onSimplifyTrack, onGpxUpload, onExport, onCenterMapOnUser
-	} = toolbar;
-	const { onUndo, onRedo } = history;
+		back: onBack,
+		startTrackCut: onStartTrackCut,
+		confirmTrackCut: onConfirmTrackCut,
+		cancelTrackCut: onCancelTrackCut,
+		export: onExport,
+		centerMapOnUser: onCenterMapOnUser,
+		undo: onUndo,
+		redo: onRedo
+	} = actions;
 	let {
 		inspectorShadow = true,
 		map,

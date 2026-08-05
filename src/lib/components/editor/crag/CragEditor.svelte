@@ -4,8 +4,7 @@
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import * as turf from '@turf/turf';
 import { createCragEditorSession, normalizeCragSector, provideCragEditorSession } from '$lib/state/crag-session.svelte.js';
-	import { provideCragEditorController } from '$lib/state/crag-controller-context.svelte.js';
-	import { createCragEditorController } from '$lib/state/crag-editor-controller.js';
+	import { provideCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
 	import { viewport } from '$lib/state/viewport.svelte.js';
 	import { base } from '$app/paths';
 	import { goto } from '$app/navigation';
@@ -928,57 +927,27 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 		return cragEditorState.canUndo ? cragEditorState.undo() : routeTool.undoDeleteRoutePath();
 	}
 
-	provideCragEditorController(createCragEditorController({
-		onBack: () => goto(base + '/'),
-		onStartRoutingDraft: startRoutingDraft,
-		onSetTrackDraftMode: setTrackDraftMode,
-		onHandleTrackConfirm: handleTrackConfirm,
-		onCancelTrackEdit: cancelTrackEdit,
-		onUndoTrackPoint: undoTrackPoint,
-		onStartTrackCut: startTrackCut,
-		onConfirmTrackCut: confirmTrackCut,
-		onCancelTrackCut: resetTrackCut,
-		onReverseTrack: reverseTrack,
-		onTrimTrackStart: trimTrackStart,
-		onTrimTrackEnd: trimTrackEnd,
-		onSimplifyTrack: simplifyTrack,
-		onGpxUpload: handleGpxUpload,
-		onExport: saveToServer,
-		onCenterMapOnUser: centerMapOnUser,
-		onUndo: undoCragEdit,
-		onRedo: cragEditorState.redo,
-		onAddCragImages: addCragImages,
-		onRemoveCragImage: removeCragImage,
-		onAddEquipmentItem: addEquipmentItem,
-		onRemoveEquipmentItem: removeEquipmentItem,
-		onSetHoverHighlight: setHoverHighlight,
-		onClearDetectedAssets: () => accessEditor.clearDetectedAssets(),
-		onAddDetectedAsset: addDetectedAsset,
-		onRemoveAccessFeature: removeAccessFeature,
-		onEditTrack: editTrack,
-		onRemoveTrack: removeTrack,
-		onFinalizeTrack: finalizeTrack,
-		onAddSector: createSector,
-		onDuplicateSector: duplicateSector,
-		onRemoveSector: removeSector,
-		onMoveSector: moveSector,
-		onSetSectorGeometryType: setSectorGeometryType,
-		onFocusSector: focusSector,
-		onUndoSectorVertexDelete: undoSectorVertexDelete,
-		onPlanGenerated: handleFlightPlanGenerated,
-		onAddParentRoute: () => addRoute(),
-		onAddSectorRoute: addRoute,
-		onSelectRoute: selectRoute,
-		onUpdateRoute: updateRoute,
-		onAddRoutePath: addRoutePath,
-		onAssignExistingRoutePath: assignExistingRoutePath,
-		onCreateRoutePathFromAccess: createRoutePathFromAccess,
-		onEditRoutePath: editRoutePath,
-		onUpdateRoutePath: updateRoutePath,
-		onRemoveRoutePath: removeRoutePath,
-		onDeleteRoutePath: deleteRoutePath,
-		onDeleteRoute: deleteRoute
-	}));
+	provideCragEditorTools({
+		trackEditor,
+		sectorTool,
+		routeTool,
+		accessEditor,
+		actions: {
+			back: () => goto(base + '/'),
+			startTrackCut,
+			confirmTrackCut,
+			cancelTrackCut: resetTrackCut,
+			undo: undoCragEdit,
+			redo: cragEditorState.redo,
+			export: saveToServer,
+			centerMapOnUser,
+			addCragImages,
+			removeCragImage,
+			addEquipmentItem,
+			removeEquipmentItem,
+			handleFlightPlanGenerated
+		}
+	});
 
 </script>
 

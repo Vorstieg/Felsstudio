@@ -1,14 +1,14 @@
 import { getContext, setContext } from 'svelte';
 
-export const CRAG_EDITOR_CONTROLLER = Symbol('crag-editor-controller');
+export const CRAG_EDITOR_TOOLS = Symbol('crag-editor-tools');
 
-export function provideCragEditorController(controller) {
-	setContext(CRAG_EDITOR_CONTROLLER, controller);
-	return controller;
+export function provideCragEditorTools(tools) {
+	setContext(CRAG_EDITOR_TOOLS, tools);
+	return tools;
 }
 
-export function getCragEditorController() {
-	const controller = getContext(CRAG_EDITOR_CONTROLLER);
-	if (!controller) throw new Error('Crag editor controller is not available in this component tree');
-	return controller;
+export function getCragEditorTools() {
+	const tools = getContext(CRAG_EDITOR_TOOLS);
+	if (!tools) throw new Error('Crag editor tools are not available in this component tree');
+	return tools;
 }

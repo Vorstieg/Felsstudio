@@ -1,14 +1,14 @@
 <script>
 	import { _ } from 'svelte-i18n';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
-	import { getCragEditorController } from '$lib/state/crag-controller-context.svelte.js';
+	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
 	const cragEditorState = getCragEditorSession();
-	const { access, tracks, routes } = getCragEditorController();
+	const { accessEditor, trackEditor, routeTool } = getCragEditorTools();
 	const {
-		onAddRoutePath, onEditRoutePath, onDeleteRoutePath
-	} = routes;
-	const { onSetHoverHighlight, onClearDetectedAssets, onAddDetectedAsset, onRemoveAccessFeature } = access;
-	const { onEditTrack, onRemoveTrack, onFinalizeTrack, onCancelTrackEdit } = tracks;
+		addRoutePath: onAddRoutePath, editRoutePath: onEditRoutePath, deleteRoutePath: onDeleteRoutePath
+	} = routeTool;
+	const { setHoverHighlight: onSetHoverHighlight, clearDetectedAssets: onClearDetectedAssets, addDetectedAsset: onAddDetectedAsset, removeAccessFeature: onRemoveAccessFeature } = accessEditor;
+	const { editTrack: onEditTrack, removeTrack: onRemoveTrack, finalizeTrack: onFinalizeTrack, cancelTrackEdit: onCancelTrackEdit } = trackEditor;
 	let routeDocuments = $derived(cragEditorState.routeDocuments);
 
 	let {

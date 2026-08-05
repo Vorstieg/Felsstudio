@@ -1,15 +1,18 @@
 <script>
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
-	import { getCragEditorController } from '$lib/state/crag-controller-context.svelte.js';
+	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
 	import { availableTags, cragTypes, securityOptions } from './crag-editor-options.js';
 	import { rockTypes } from '$lib/config.js';
 	const cragEditorState = getCragEditorSession();
-	const { sectors, routes } = getCragEditorController();
+	const { sectorTool, routeTool, actions } = getCragEditorTools();
 	const {
-		onAddSector, onDuplicateSector, onRemoveSector, onMoveSector, onFocusSector,
-		onSetSectorGeometryType, onPlanGenerated
-	} = sectors;
-	const { onAddParentRoute, onAddSectorRoute, onSelectRoute, onDeleteRoute } = routes;
+		createSector: onAddSector, duplicateSector: onDuplicateSector, removeSector: onRemoveSector,
+		moveSector: onMoveSector, focusSector: onFocusSector,
+		setSectorGeometryType: onSetSectorGeometryType
+	} = sectorTool;
+	const { addRoute: onAddSectorRoute, selectRoute: onSelectRoute, deleteRoute: onDeleteRoute } = routeTool;
+	const onAddParentRoute = () => routeTool.addRoute();
+	const onPlanGenerated = actions.handleFlightPlanGenerated;
 	let routeDocuments = $derived(cragEditorState.routeDocuments);
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
 	import { getGeometryCenter } from '$lib/assets/js/sector-utils.js';
