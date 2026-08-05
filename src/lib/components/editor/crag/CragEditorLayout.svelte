@@ -68,7 +68,7 @@
 	}
 
 	function trimEnd() {
-		if (onTrimTrackEnd(trimPointIndex)) trimPointIndex = Math.max(0, currentTrackPoints.length - 1);
+		if (onTrimTrackEnd(trimPointIndex)) trimPointIndex = 0;
 	}
 
 	function simplify() {
@@ -171,7 +171,7 @@
 			<div class="flex items-center justify-between gap-2">
 				<div>
 					<div class="text-ui-label font-bold uppercase tracking-wide text-warm-gray-500">Track tools</div>
-					<div class="text-[10px] text-warm-gray-400">Enter a track point index to trim it.</div>
+					<div class="text-[10px] text-warm-gray-400">Enter points to trim from the selected end.</div>
 				</div>
 				<button
 					class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
@@ -186,7 +186,7 @@
 					min="0"
 					max={Math.max(0, currentTrackPoints.length - 1)}
 					class="input-studio w-full"
-					placeholder="Point index"
+					placeholder="Points"
 					disabled={!canEditTrack}
 				/>
 				<button

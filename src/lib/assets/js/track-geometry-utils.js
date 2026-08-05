@@ -18,8 +18,8 @@ export function trimCoordinatesStart(coordinates = [], index = 0) {
 	return coordinates.slice(Math.max(0, index));
 }
 
-export function trimCoordinatesEnd(coordinates = [], index = coordinates.length - 1) {
-	return coordinates.slice(0, Math.min(coordinates.length, index + 1));
+export function trimCoordinatesEnd(coordinates = [], count = 0) {
+	return coordinates.slice(0, Math.max(0, coordinates.length - count));
 }
 
 export function splitCoordinatesAt(coordinates = [], index = 0) {

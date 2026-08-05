@@ -3,8 +3,9 @@
 	import RouteLength from '$lib/components/editor/topo-properties/RouteLength.svelte';
 	import BoltCount from '$lib/components/editor/topo-properties/BoltCount.svelte';
 	import { routeLineStyles } from '$lib/components/editor/topo-properties/topo-properties-utils.js';
-	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
-	const userState = getTopoEditorSession();
+	import { getContext } from 'svelte';
+	import { TOPO_EDITOR_SESSION } from '$lib/state/topo-session.svelte.js';
+	const userState = getContext(TOPO_EDITOR_SESSION);
 	import { _ } from 'svelte-i18n';
 
 	let {
@@ -15,6 +16,8 @@
 		showBoltCount = true,
 		inheritLineStyle = false,
 		defaultLineStyle = 'red',
+		topoScale = null,
+		fixPoints = null,
 		onDraw = null,
 		onRemove = null,
 		onChange = null,
@@ -84,12 +87,12 @@
 				<RouteLength
 					length={pitch.length}
 					route={pitch}
-					topoScale={userState.topo.scale}
+					topoScale={topoScale ?? userState?.topo?.scale ?? 1}
 					onFieldChange={updateField}
 					onCalculate={() => onChange?.(pitch)}
 				/>
 			{:else}
-				<RouteLength bind:length={pitch.length} route={pitch} topoScale={userState.topo.scale} onCalculate={() => onChange?.(pitch)} />
+				<RouteLength bind:length={pitch.length} route={pitch} topoScale={topoScale ?? userState?.topo?.scale ?? 1} onCalculate={() => onChange?.(pitch)} />
 			{/if}
 		</div>
 		{#if showBoltCount}
@@ -98,12 +101,12 @@
 					<BoltCount
 						boltCount={pitch.boltAmount}
 						route={pitch}
-						fixPoints={userState.topo.fixPoints}
+						fixPoints={fixPoints ?? userState?.topo?.fixPoints ?? []}
 						onFieldChange={updateField}
 						onCalculate={() => onChange?.(pitch)}
 					/>
 				{:else}
-					<BoltCount bind:boltCount={pitch.boltAmount} route={pitch} fixPoints={userState.topo.fixPoints} onCalculate={() => onChange?.(pitch)} />
+					<BoltCount bind:boltCount={pitch.boltAmount} route={pitch} fixPoints={fixPoints ?? userState?.topo?.fixPoints ?? []} onCalculate={() => onChange?.(pitch)} />
 				{/if}
 			</div>
 		{/if}

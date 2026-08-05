@@ -102,7 +102,7 @@
 				</button>
 			</header>
 
-			<div class="space-y-4 overflow-y-auto p-4" onchange={touch}>
+			<div class="space-y-4 overflow-y-auto p-4">
 				<div class="grid grid-cols-[1fr_7rem] gap-2">
 					<div>
 						<label class="text-ui-label block" for="route-name">Route name</label>
@@ -128,7 +128,7 @@
 							<button type="button" class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-creator-blue" onclick={addPitch}>+ Add</button>
 						</div>
 						{#each route.pitches || [] as pitch, index}
-							<PitchComponent {pitch} kind="pitch" {index} inheritLineStyle={true} onRemove={(_, index) => removePitch(index)} onFieldChange={(field, value) => updatePitch(index, field, value)} />
+							<PitchComponent {pitch} kind="pitch" {index} inheritLineStyle={true} topoScale={1} fixPoints={[]} onRemove={(_, index) => removePitch(index)} onFieldChange={(field, value) => updatePitch(index, field, value)} />
 						{/each}
 						<div class="space-y-2 border-t border-black/10 pt-2">
 							<div class="flex items-center justify-between">
@@ -136,12 +136,12 @@
 								<button type="button" class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-creator-blue" onclick={addVariant}>+ Add</button>
 							</div>
 							{#each route.variants || [] as variant, index}
-								<PitchComponent pitch={variant} kind="variant" {index} defaultLineStyle="variant" onRemove={(_, index) => removeVariant(index)} onFieldChange={(field, value) => updateVariant(index, field, value)} />
+								<PitchComponent pitch={variant} kind="variant" {index} defaultLineStyle="variant" topoScale={1} fixPoints={[]} onRemove={(_, index) => removeVariant(index)} onFieldChange={(field, value) => updateVariant(index, field, value)} />
 							{/each}
 						</div>
 					</div>
 				{:else}
-					<PitchComponent pitch={route} showBoltCount={route.type === 'sports-climbing'} onFieldChange={updateRouteField} />
+					<PitchComponent pitch={route} showBoltCount={route.type === 'sports-climbing'} topoScale={1} fixPoints={[]} onFieldChange={updateRouteField} />
 				{/if}
 
 				<div>
