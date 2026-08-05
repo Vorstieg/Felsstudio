@@ -161,7 +161,6 @@
 				} catch {
 					/* crag file may not exist */
 				}
-				cragEditorState.crag.path = topo.path;
 				await loadAccessCollection(topo, cragEditorState);
 
 			} else if (workSpaceWrapper.is2DEditor()) {

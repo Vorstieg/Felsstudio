@@ -27,10 +27,6 @@ const fetchCrags = async ({ offset = 0, limit = cragsPerPage, search = '' } = {}
 
 					data.properties = data.properties || {};
 					data.properties.id = file.name.slice(0, -'.json'.length);
-					data.properties.path = file.path.slice(
-						0,
-						-(data.properties.id.length + 1 + file.name.length)
-					);
 					return data;
 				} catch (err) {
 					console.warn('Failed to load crag entry:', file.path, err);

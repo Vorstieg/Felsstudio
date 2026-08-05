@@ -40,6 +40,18 @@ describe('createCragEditorSession', () => {
 		expect(session.routeDocuments[0].dirty).toBe(true);
 	});
 
+	it('supports redo when exposed as an action callback', () => {
+		const session = createCragEditorSession();
+		session.setCragField('name', 'First name');
+		session.setCragField('name', 'Second name');
+		session.undo();
+
+		const redo = session.redo;
+		redo();
+
+		expect(session.crag.name).toBe('Second name');
+	});
+
 	it('centralizes equipment and image collection updates', () => {
 		const session = createCragEditorSession();
 		session.setEquipment([{ name: 'quickdraw', amount: 12 }]);

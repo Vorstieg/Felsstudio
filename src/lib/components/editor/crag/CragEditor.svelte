@@ -495,7 +495,6 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 	}
 
 	onMount(() => {
-		if (isBlankCragSession()) restoreLatestCragSession();
 		canAutosaveSession = true;
 
 		const handleKeyDown = (e) => {
@@ -518,6 +517,10 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 			clearTimeout(autosaveSessionTimeout);
 		};
 	});
+
+	// Restore before child components initialize. Hierarchy placement reads the
+	// crag path during initialization and must not start with a blank path.
+	if (isBlankCragSession()) restoreLatestCragSession();
 
 	async function handleMapClick(e) {
 		if (suppressNextMapClick) {
@@ -938,7 +941,7 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 			confirmTrackCut,
 			cancelTrackCut: resetTrackCut,
 			undo: undoCragEdit,
-			redo: cragEditorState.redo,
+			redo: () => cragEditorState.redo(),
 			export: saveToServer,
 			centerMapOnUser,
 			addCragImages,

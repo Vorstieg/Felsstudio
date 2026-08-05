@@ -8,7 +8,8 @@
 
 	let knownFolders = $state(new Set());
 	let hierarchyError = $state('');
-	let parentPath = $state('');
+	let parentPath = $derived(normalizePath(cragEditorState.crag.path));
+	let draftParentPath = $state('');
 	let cragSlug = $state('');
 	let showModal = $state(false);
 
@@ -18,7 +19,6 @@
 	onMount(loadHierarchyOptions);
 
 	async function loadHierarchyOptions() {
-		parentPath = normalizePath(cragEditorState.crag.path)
 		try {
 			const files = await listDir('', { recursive: true });
 			const folders = new Set(['']);
@@ -48,9 +48,15 @@
 		cragSlug = slugifyName(cragEditorState.crag.name);
 	});
 
-	$effect(() => {
-		if (cragEditorState.crag.path !== parentPath) cragEditorState.crag.path = parentPath;
-	});
+	function openModal() {
+		draftParentPath = parentPath;
+		showModal = true;
+	}
+
+	function closeModal() {
+		cragEditorState.setCragField('path', normalizePath(draftParentPath));
+		showModal = false;
+	}
 </script>
 
 <div class="space-y-2 rounded-sm border border-black/10 bg-black/[0.03] p-2">
@@ -64,7 +70,7 @@
 
 	<button
 		type="button"
-		onclick={() => showModal = true}
+		onclick={openModal}
 		class="w-full text-left rounded-sm border border-black/15 bg-white p-2 shadow-sm hover:border-creator-blue/40 hover:bg-creator-blue/[0.02] transition-none group"
 	>
 		<div class="flex items-center justify-between gap-2">
@@ -93,13 +99,13 @@
 	{/if}
 </div>
 
-{#if showModal}
+	{#if showModal}
 	<CragHierarchyModal
-		bind:parentPath
 		bind:cragSlug
 		cragName={cragEditorState.crag.name}
 		{knownFolders}
 		{hierarchyError}
-		onClose={() => showModal = false}
+		bind:parentPath={draftParentPath}
+		onClose={closeModal}
 	/>
 {/if}

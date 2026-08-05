@@ -99,7 +99,10 @@
 			</div>
 
 			<!-- Parent folder selector -->
-			<TreeFolderSelector {knownFolders} bind:selectedPath={parentPath} />
+			<TreeFolderSelector
+				{knownFolders}
+				bind:selectedPath={parentPath}
+			/>
 
 			{#if hierarchyError}
 				<p class="text-[10px] text-amber-600 font-bold">{hierarchyError}</p>

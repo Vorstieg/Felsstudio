@@ -73,17 +73,17 @@ export function createCragEditorSession() {
 			this.routeDocuments = value.routeDocuments;
 		},
 		undo() {
-			if (this.history.index < 0) return false;
-			const entry = this.history.entries[this.history.index];
-			this.restoreSnapshot(entry.before);
-			this.history.index--;
+			if (session.history.index < 0) return false;
+			const entry = session.history.entries[session.history.index];
+			session.restoreSnapshot(entry.before);
+			session.history.index--;
 			return true;
 		},
 		redo() {
-			if (this.history.index >= this.history.entries.length - 1) return false;
-			const entry = this.history.entries[this.history.index + 1];
-			this.restoreSnapshot(entry.after);
-			this.history.index++;
+			if (session.history.index >= session.history.entries.length - 1) return false;
+			const entry = session.history.entries[session.history.index + 1];
+			session.restoreSnapshot(entry.after);
+			session.history.index++;
 			return true;
 		},
 		get canUndo() {
