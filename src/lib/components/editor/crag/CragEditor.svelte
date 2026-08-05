@@ -31,6 +31,7 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 	} from '$lib/components/editor/crag/crag-editor-sectors.js';
 	import { useCragTrackEditor } from '$lib/components/editor/crag/use-crag-track-editor.svelte.js';
 	import { createCragRouteTool } from '$lib/components/editor/crag/CragRouteTool.svelte.js';
+	import { createCragSelectTool } from '$lib/components/editor/crag/CragSelectTool.svelte.js';
 	import { createCragSectorTool } from '$lib/components/editor/crag/CragSectorTool.svelte.js';
 	import { useCragSectorMapEditor } from '$lib/components/editor/crag/use-crag-sector-map-editor.svelte.js';
 	import { useCragAccessEditor } from '$lib/components/editor/crag/use-crag-access-editor.svelte.js';
@@ -213,6 +214,15 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 		removeRoutePath,
 		deleteRoutePath
 	} = routeTool;
+
+	const selectTool = createCragSelectTool({
+		getMap: () => map,
+		selectObject,
+		setActiveTab: (value) => (activeTab = value),
+		getRouteDocuments: () => cragEditorState.routeDocuments,
+		onEditRoutePath: (path, routeId, pathId) => routeTool.editRoutePath(path, routeId, pathId),
+		onEditTrack: editTrack
+	});
 
 	function isBlankCragSession() {
 		return (
@@ -522,55 +532,7 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 		}
 
 		if (activeTool === 'select') {
-			const hitRadius = getMapHitRadius(24) / 2;
-			const layers = [
-				'routes-line',
-				'route-paths-line',
-				'tracks-line-saved',
-				'sector-polygons-fill',
-				'sector-polygons-outline'
-			].filter((layer) => map.getLayer(layer));
-			const features = layers.length
-				? map.queryRenderedFeatures(
-					[
-						[e.point.x - hitRadius, e.point.y - hitRadius],
-						[e.point.x + hitRadius, e.point.y + hitRadius]
-					],
-					{ layers }
-				  )
-				: [];
-			const properties = (
-				features.find(({ properties }) => properties?.feature === 'route-path') ||
-				features.find(({ properties }) => properties?.feature === 'route') ||
-				features.find(({ properties }) => properties?.kind === 'approach') ||
-				features.find(({ properties }) => properties?.feature === 'sector') ||
-				features[0]
-			)?.properties || {};
-			if (properties.feature === 'route-path' && properties.documentPath && properties.pathId) {
-				selectObject({ type: 'route-path', documentPath: properties.documentPath, pathId: properties.pathId });
-				const route = cragEditorState.routeDocuments.find((entry) => entry.path === properties.documentPath)?.data?.routes?.find((item) => (item.pathRefs || []).some((ref) => String(ref.pathId) === String(properties.pathId)));
-				routeTool.editRoutePath(properties.documentPath, route?.id, properties.pathId);
-				return;
-			}
-
-			if (properties.feature === 'route' && properties.documentPath && properties.routeId) {
-				selectObject({
-					type: 'route',
-					key: `${properties.documentPath}:${properties.routeId}`
-				});
-				return;
-			}
-			if (properties.feature === 'sector' && properties.id) {
-				selectObject({ type: 'sector', id: properties.id });
-				activeTab = 'sectors';
-				return;
-			}
-			if (properties.kind === 'approach' && properties.accessFeatureId) {
-				selectObject({ type: 'approach', id: properties.accessFeatureId });
-				editTrack(properties.accessFeatureId);
-				return;
-			}
-			selectObject(null);
+			selectTool.handleMapClick(e);
 			return;
 		}
 
@@ -753,6 +715,7 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 	function initMarkersAndLayers(loadedMap = map) {
 		if (!loadedMap) return;
 		map = loadedMap;
+		sectorTool.ensureMapLayers(loadedMap);
 		ensureCragEditorLayers(loadedMap);
 
 		const markerPos = $state.snapshot(cragEditorState.crag.geometry.coordinates);
@@ -795,9 +758,12 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 		if (!source) return;
 		const drawingPoints = $state.snapshot(currentTrackPoints) || [];
 		const editingRoutePath = routeEditDraft || null;
+		sectorTool.syncDrawing({
+			selectedSectorVertex,
+			draggingSectorVertex: untrack(() => sectorMapEditor.draggingSectorVertex)
+		});
 		source.setData(
 			buildEditorFeatureCollection({
-				sectors: $state.snapshot(cragEditorState.crag.sectors) || [],
 				savedAccessFeatures: $state.snapshot(cragEditorState.access?.features) || [],
 				routes: (cragEditorState.routeDocuments || []).flatMap((document) =>
 					(document.data?.routes || []).map((route) => ({
@@ -820,8 +786,6 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 				visibleDrawingPointIndexes: visibleDrawingPointIndexes(drawingPoints),
 				editingDrawingPath: trackDraftMode === 'editing',
 				selectedTrackPointIndex: trackEditor.selectedTrackPointIndex,
-				selectedSectorVertex,
-				draggingSectorVertex: untrack(() => sectorMapEditor.draggingSectorVertex),
 				activeTrackTarget,
 				draggingTrackPointIndex: untrack(() => activeTrackDragState?.pointIndex ?? null),
 				flightPlan: $state.snapshot(flightPlan)

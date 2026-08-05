@@ -1,5 +1,3 @@
-import { getGeometryPath } from '$lib/assets/js/geometry-path-adapters.js';
-import { getEditablePath, getPathMidpoints } from '$lib/assets/js/path-geometry.js';
 import { getMapHitRadius, getTouchTargetSize } from '$lib/assets/js/mobile-utils.js';
 import { PathLayer, ScatterplotLayer } from '@deck.gl/layers';
 import { MapboxOverlay } from '@deck.gl/mapbox';
@@ -740,68 +738,6 @@ export function ensureCragEditorLayers(map) {
 			type: 'geojson',
 			data: { type: 'FeatureCollection', features: [] }
 		});
-	if (!map.getSource('sector-drag-overlay'))
-		map.addSource('sector-drag-overlay', {
-			type: 'geojson',
-			data: { type: 'FeatureCollection', features: [] }
-		});
-	if (!map.getLayer('sector-drag-fill'))
-		map.addLayer({
-			id: 'sector-drag-fill',
-			type: 'fill',
-			source: 'sector-drag-overlay',
-			paint: { 'fill-color': '#0075de', 'fill-opacity': 0.22 }
-		});
-	if (!map.getLayer('sector-drag-line'))
-		map.addLayer({
-			id: 'sector-drag-line',
-			type: 'line',
-			source: 'sector-drag-overlay',
-			paint: { 'line-color': '#0075de', 'line-width': 3, 'line-opacity': 1 }
-		});
-	if (!map.getLayer('sector-drag-vertices'))
-		map.addLayer({
-			id: 'sector-drag-vertices',
-			type: 'circle',
-			source: 'sector-drag-overlay',
-			filter: ['==', ['get', 'feature'], 'sector-vertex'],
-			paint: {
-				'circle-radius': vertexRadius,
-				'circle-color': '#0075de',
-				'circle-stroke-width': 2,
-				'circle-stroke-color': '#ffffff'
-			}
-		});
-	if (!map.getLayer('sector-drag-midpoints'))
-		map.addLayer({
-			id: 'sector-drag-midpoints',
-			type: 'circle',
-			source: 'sector-drag-overlay',
-			filter: ['==', ['get', 'feature'], 'sector-midpoint'],
-			paint: {
-				'circle-radius': midpointRadius,
-				'circle-color': '#ffffff',
-				'circle-stroke-width': 2,
-				'circle-stroke-color': '#0075de',
-				'circle-opacity': 0.85
-			}
-		});
-	if (!map.getLayer('sector-drag-delete'))
-		map.addLayer({
-			id: 'sector-drag-delete',
-			type: 'symbol',
-			source: 'sector-drag-overlay',
-			filter: ['==', ['get', 'feature'], 'sector-vertex-delete'],
-			layout: {
-				'text-field': '×',
-				'text-font': ['Noto Sans Bold'],
-				'text-size': deleteTextSize,
-				'text-offset': [0.85, -0.85],
-				'text-allow-overlap': true,
-				'text-ignore-placement': true
-			},
-			paint: { 'text-color': '#ffffff', 'text-halo-color': '#dc2626', 'text-halo-width': 6 }
-		});
 	if (!map.getLayer('tracks-drag-lines'))
 		map.addLayer({
 			id: 'tracks-drag-lines',
@@ -878,86 +814,11 @@ export function ensureCragEditorLayers(map) {
 				'circle-stroke-color': '#ffffff'
 			}
 		});
-	if (!map.getLayer('sector-polygons-fill'))
-		map.addLayer(
-			{
-				id: 'sector-polygons-fill',
-				type: 'fill',
-				source: 'crag-editor-data',
-				filter: ['==', ['get', 'feature'], 'sector'],
-				paint: {
-					'fill-color': ['case', ['==', ['get', 'selected'], true], '#0075de', '#31302e'],
-					'fill-opacity': ['case', ['==', ['get', 'selected'], true], 0.22, 0.12]
-				}
-			},
-			'tracks-line-saved'
-		);
-	if (!map.getLayer('sector-polygons-outline'))
-		map.addLayer(
-			{
-				id: 'sector-polygons-outline',
-				type: 'line',
-				source: 'crag-editor-data',
-				filter: ['==', ['get', 'feature'], 'sector'],
-				layout: { 'line-join': 'round', 'line-cap': 'round' },
-				paint: {
-					'line-color': ['case', ['==', ['get', 'selected'], true], '#0075de', '#31302e'],
-					'line-width': ['case', ['==', ['get', 'selected'], true], 3, 2],
-					'line-opacity': 0.9
-				}
-			},
-			'tracks-line-saved'
-		);
-	if (!map.getLayer('sector-vertex-midpoints'))
-		map.addLayer({
-			id: 'sector-vertex-midpoints',
-			type: 'circle',
-			source: 'crag-editor-data',
-			filter: ['==', ['get', 'feature'], 'sector-midpoint'],
-			paint: {
-				'circle-radius': midpointRadius,
-				'circle-color': '#ffffff',
-				'circle-stroke-width': 2,
-				'circle-stroke-color': '#0075de',
-				'circle-opacity': 0.85
-			}
-		});
-	if (!map.getLayer('sector-vertices'))
-		map.addLayer({
-			id: 'sector-vertices',
-			type: 'circle',
-			source: 'crag-editor-data',
-			filter: ['==', ['get', 'feature'], 'sector-vertex'],
-			paint: {
-				'circle-radius': vertexRadius,
-				'circle-color': '#0075de',
-				'circle-stroke-width': 2,
-				'circle-stroke-color': '#ffffff'
-			}
-		});
-	if (!map.getLayer('sector-vertex-delete'))
-		map.addLayer({
-			id: 'sector-vertex-delete',
-			type: 'symbol',
-			source: 'crag-editor-data',
-			filter: ['==', ['get', 'feature'], 'sector-vertex-delete'],
-			layout: {
-				'text-field': '×',
-				'text-font': ['Noto Sans Bold'],
-				'text-size': deleteTextSize,
-				'text-offset': [0.85, -0.85],
-				'text-allow-overlap': true,
-				'text-ignore-placement': true
-			},
-			paint: { 'text-color': '#ffffff', 'text-halo-color': '#dc2626', 'text-halo-width': 6 }
-		});
-
 	addFlightPathLayers(map);
 	ensureFlightPathDeckOverlay(map);
 }
 
 export function buildEditorFeatureCollection({
-	sectors = [],
 	savedAccessFeatures = [],
 	routes = [],
 	routePaths = [],
@@ -968,74 +829,18 @@ export function buildEditorFeatureCollection({
 	editingDrawingPath = false,
 	selectedTrackPointIndex = null,
 	draggingTrackPointIndex = null,
-	selectedSectorVertex = null,
-	draggingSectorVertex = null,
 	activeTrackTarget = null,
 	flightPlan = null
 }) {
 	const features = [];
-	sectors.forEach((sector) => {
-		if (sector.geometry?.type !== 'Polygon') return;
-		const isSelected = selectedObject?.type === 'sector' && selectedObject.id === sector.id;
-		const isDragging = draggingSectorVertex?.sectorId === sector.id;
-		if (isDragging) return;
-		features.push({
-			type: 'Feature',
-			geometry: sector.geometry,
-			properties: {
-				feature: 'sector',
-				id: sector.id || '',
-				name: sector.name || '',
-				selected: isSelected
-			}
-		});
-		if (!isSelected) return;
-		const path = getGeometryPath(sector.geometry);
-		const editablePath = getEditablePath(path, { closed: true });
-		editablePath.forEach((point, vertexIndex) => {
-			if (
-				draggingSectorVertex?.sectorId === sector.id &&
-				draggingSectorVertex?.vertexIndex === vertexIndex
-			)
-				return;
-			const isSelectedVertex =
-				selectedSectorVertex?.sectorId === sector.id &&
-				selectedSectorVertex?.vertexIndex === vertexIndex;
-			features.push({
-				type: 'Feature',
-				geometry: { type: 'Point', coordinates: point },
-				properties: { feature: 'sector-vertex', sectorId: sector.id, vertexIndex }
-			});
-			if (isSelectedVertex && editablePath.length > 3)
-				features.push({
-					type: 'Feature',
-					geometry: { type: 'Point', coordinates: point },
-					properties: { feature: 'sector-vertex-delete', sectorId: sector.id, vertexIndex }
-				});
-		});
-		getPathMidpoints(path, { closed: true }).forEach((midpoint) => {
-			if (
-				draggingSectorVertex?.sectorId === sector.id &&
-				[draggingSectorVertex.vertexIndex, draggingSectorVertex.vertexIndex + 1].includes(
-					midpoint.insertIndex
-				)
-			)
-				return;
-			features.push({
-				type: 'Feature',
-				geometry: { type: 'Point', coordinates: midpoint.point },
-				properties: {
-					feature: 'sector-midpoint',
-					sectorId: sector.id,
-					insertIndex: midpoint.insertIndex
-				}
-			});
-		});
-	});
 	savedAccessFeatures
 		.filter((feature) => feature.properties?.kind === 'approach')
 		.forEach((track) => {
-			if (activeTrackTarget?.kind === 'access' && activeTrackTarget.featureId === track.id || !(track.geometry?.coordinates?.length > 1)) return;
+			if (
+				(activeTrackTarget?.kind === 'access' && activeTrackTarget.featureId === track.id) ||
+				!(track.geometry?.coordinates?.length > 1)
+			)
+				return;
 			features.push({
 				type: 'Feature',
 				geometry: track.geometry,
@@ -1048,20 +853,32 @@ export function buildEditorFeatureCollection({
 			});
 		});
 	routePaths.forEach(({ documentPath, feature, assignedRouteIds = [] }) => {
-		if (editingRoutePath?.documentPath === documentPath && editingRoutePath?.pathId === String(feature.id)) return;
-		if (!feature?.geometry || feature.geometry.type !== 'LineString' || feature.geometry.coordinates?.length < 2) return;
-			features.push({
-				type: 'Feature',
-				geometry: feature.geometry,
-				properties: {
-					feature: 'route-path',
-					documentPath,
-					pathId: String(feature.id),
-					assignedRouteIds,
-					name: feature.properties?.name || 'Route path',
-					selected: selectedObject?.type === 'route-path' && selectedObject.documentPath === documentPath && String(selectedObject.pathId) === String(feature.id)
-				}
-			});
+		if (
+			editingRoutePath?.documentPath === documentPath &&
+			editingRoutePath?.pathId === String(feature.id)
+		)
+			return;
+		if (
+			!feature?.geometry ||
+			feature.geometry.type !== 'LineString' ||
+			feature.geometry.coordinates?.length < 2
+		)
+			return;
+		features.push({
+			type: 'Feature',
+			geometry: feature.geometry,
+			properties: {
+				feature: 'route-path',
+				documentPath,
+				pathId: String(feature.id),
+				assignedRouteIds,
+				name: feature.properties?.name || 'Route path',
+				selected:
+					selectedObject?.type === 'route-path' &&
+					selectedObject.documentPath === documentPath &&
+					String(selectedObject.pathId) === String(feature.id)
+			}
+		});
 	});
 	const drawingSegments =
 		draggingTrackPointIndex === null
