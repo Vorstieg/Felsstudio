@@ -6,13 +6,17 @@
 	import { fileUrl, listDir, readJson } from '$lib/api/felslager.js';
 	import { loadAccessCollection } from '$lib/assets/js/fetchCrags.js';
 	import { draftsState } from '$lib/state/drafts.svelte.js';
-	import { userState } from '$lib/state/editor.svelte.js';
+	import { createTopoEditorSession, provideTopoEditorSession } from '$lib/state/topo-session.svelte.js';
 	import { Topo } from '$lib/assets/js/topo-paths.js';
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
 	import { loadGlbIntoEditorState } from '$lib/assets/js/gltf-loader.js';
 	import EntryPicker from '$lib/components/editor/wizard/EntryPicker.svelte';
+	import { normalizeTopoPaths } from '$lib/assets/js/topo-document-paths.js';
+	import { createCragEditorSession } from '$lib/state/crag-session.svelte.js';
 
 	let { workspace, titleKey, actionLabelKey, locations = [] } = $props();
+	const userState = provideTopoEditorSession(createTopoEditorSession());
+	const cragEditorState = createCragEditorSession();
 
 	let isLoading = $state(false);
 	let error = $state(null);
@@ -57,7 +61,7 @@
 
 
 	async function persistTopoSessionImmediately() {
-		draftsState.init();
+		draftsState.load();
 		userState.ui.activeDraftId = await draftsState.save(userState.topo, userState.ui.activeDraftId, {
 			clustering: $state.snapshot(userState.clustering),
 			glbBlob: userState.ui.glbBlob
@@ -67,8 +71,7 @@
 
 	async function startNewEntry() {
 		if (workSpaceWrapper.isCragEditor()) {
-			const [{ cragEditorState }, { storage }, { CRAG_SESSION_KEY }] = await Promise.all([
-				import('$lib/state/crag-editor.svelte.js'),
+			const [{ storage }, { CRAG_SESSION_KEY }] = await Promise.all([
 				import('$lib/assets/js/storage-utils.js'),
 				import('$lib/components/editor/crag/crag-editor-options.js')
 			]);
@@ -112,7 +115,6 @@
 			let loadedTopo = workSpaceWrapper.is3DEditor() && glbFiles.has(topo.getGlbPath());
 
 			if (workSpaceWrapper.isCragEditor()) {
-				const { cragEditorState } = await import('$lib/state/crag-editor.svelte.js');
 				cragEditorState.reset();
 				try {
 					const cragData = await readJson(topo.getCragPath());
@@ -148,7 +150,8 @@
 							topoDocuments.map(async ({ sectorId, sectorTopo }) => {
 								try {
 									const path = sectorTopo.getTopoPath();
-									return { path, sectorId, data: await readJson(path), dirty: false };
+									const normalized = normalizeTopoPaths(await readJson(path));
+									return { path, sectorId, data: normalized.data, dirty: normalized.migrated };
 								} catch {
 									return null;
 								}
@@ -163,14 +166,14 @@
 
 			} else if (workSpaceWrapper.is2DEditor()) {
 				try {
-					userState.topo = { ...userState.topo, ...(await readJson(topo.getTopoPath())) };
+					userState.topo = { ...userState.topo, ...normalizeTopoPaths(await readJson(topo.getTopoPath())).data };
 				} catch {
 					/* no topo yet */
 				}
 				userState.topo.editorMode = '2d';
 			} else {
 				try {
-					const topoData = await readJson(topo.getTopoPath());
+					const topoData = normalizeTopoPaths(await readJson(topo.getTopoPath())).data;
 					userState.topo = { ...userState.topo, ...topoData };
 					loadedTopo = workspace === 'topos/3d/editor' ? loadedTopo : true;
 					initializeIdCounters(userState.topo);
@@ -185,7 +188,7 @@
 						if (res.ok) {
 							loadedTopo = workspace === 'topos/3d/editor' ? true : loadedTopo;
 							const blob = await res.blob();
-							await loadGlbIntoEditorState(new File([blob], `${topo.getBaseName()}.glb`));
+							await loadGlbIntoEditorState(new File([blob], `${topo.getBaseName()}.glb`), userState);
 						}
 					} catch {
 						/* GLB may not exist */
@@ -218,7 +221,19 @@
 			}
 
 			await persistTopoSessionImmediately();
-			goto(resolve(workSpaceWrapper.path));
+			if (workSpaceWrapper.isCragEditor()) {
+				const [{ storage }, { CRAG_SESSION_KEY }] = await Promise.all([
+					import('$lib/assets/js/storage-utils.js'),
+					import('$lib/components/editor/crag/crag-editor-options.js')
+				]);
+				storage.set(CRAG_SESSION_KEY, {
+					crag: $state.snapshot(cragEditorState.crag),
+					access: $state.snapshot(cragEditorState.access),
+					routeDocuments: $state.snapshot(cragEditorState.routeDocuments),
+					updated: new Date().toISOString()
+				});
+			}
+			goto(`${resolve(workSpaceWrapper.path)}?draft=${encodeURIComponent(userState.ui.activeDraftId)}`);
 		} catch (err) {
 			console.error(err);
 			error = 'Failed to load entry: ' + err.message;

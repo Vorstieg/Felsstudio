@@ -1,0 +1,52 @@
+{
+	"id": "example-crag:main-wall",
+	"name": "Main Wall",
+	"editorMode": "2d",
+	"paths": {
+		"type": "FeatureCollection",
+		"features": [
+			{
+				"type": "Feature",
+				"id": "path-approach",
+				"properties": { "name": "Common approach" },
+				"geometry": { "type": "LineString", "coordinates": [[16.27, 48.08], [16.271, 48.081]] }
+			}
+		]
+	},
+	"routes": [
+		{
+			"id": "route-1",
+			"name": "First Route",
+			"pathRefs": [{ "pathId": "path-approach", "role": "approach", "label": "Common approach" }],
+			"type": "sports-climbing",
+			"_gradeScale": "uiaa",
+			"grade": "5+",
+			"lineStyle": "red",
+			"points2D": [
+				[0.25, 0.9],
+				[0.28, 0.55],
+				[0.32, 0.2]
+			]
+		},
+		{
+			"id": "route-2",
+			"name": "Second Route",
+			"type": "sports-climbing",
+			"pathRefs": [{ "pathId": "path-approach", "role": "approach" }],
+			"points2D": [[0.4, 0.9], [0.45, 0.55], [0.5, 0.2]]
+		}
+	],
+	"fixPoints": [{ "id": "symbol-1", "type": "bolt", "position2D": [0.32, 0.2] }],
+	"outlines": [
+		{
+			"id": "outline-1",
+			"lineStyle": "rock",
+			"points2D": [
+				[0.1, 0.95],
+				[0.5, 0.95],
+				[0.6, 0.1]
+			]
+		}
+	],
+	"textLabels": [{ "id": "text-1", "text": "Main Wall", "position2D": [0.1, 0.08] }]
+}

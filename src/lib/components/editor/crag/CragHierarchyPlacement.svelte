@@ -1,6 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
-	import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
+	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
+	const cragEditorState = getCragEditorSession();
 	import { listDir } from '$lib/api/felslager.js';
 	import CragHierarchyModal from './CragHierarchyModal.svelte';
 	import { slugifyName, normalizePath } from '$lib/components/editor/crag/crag-editor-paths.js';
@@ -9,7 +10,6 @@
 	let hierarchyError = $state('');
 	let parentPath = $state('');
 	let cragSlug = $state('');
-	let lastBuiltPath = '';
 	let showModal = $state(false);
 
 	const finalPath = $derived(normalizePath([parentPath, cragSlug].filter(Boolean).join('/')));
@@ -18,6 +18,7 @@
 	onMount(loadHierarchyOptions);
 
 	async function loadHierarchyOptions() {
+		parentPath = normalizePath(cragEditorState.crag.path)
 		try {
 			const files = await listDir('', { recursive: true });
 			const folders = new Set(['']);
@@ -42,8 +43,13 @@
 		if (!normalized) return [];
 		return normalized.split('/').filter(Boolean);
 	}
+
 	$effect(() => {
 		cragSlug = slugifyName(cragEditorState.crag.name);
+	});
+
+	$effect(() => {
+		if (cragEditorState.crag.path !== parentPath) cragEditorState.crag.path = parentPath;
 	});
 </script>
 

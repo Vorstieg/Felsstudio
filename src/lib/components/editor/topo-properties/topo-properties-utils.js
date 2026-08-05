@@ -15,58 +15,21 @@ export const outlineLineStyles = [
 	{ id: 'fixedRope', label: 'Fixed rope' }
 ];
 
-export function parseAssetList(value) {
-	return value
-		.split(',')
-		.map((item) => item.trim())
-		.filter(Boolean);
+export function addPathAsset(item, document = null) {
+	if (!document) throw new Error('A topo document is required to create a route path.');
+	document.paths = document.paths || { type: 'FeatureCollection', features: [] };
+	let pathId;
+	do { pathId = generateId('path'); } while (document.paths.features.some((feature) => String(feature.id) === pathId));
+	document.paths.features = [...document.paths.features, { type: 'Feature', id: pathId, properties: { name: 'Route path' }, geometry: { type: 'LineString', coordinates: [] } }];
+	item.pathRefs = [...(item.pathRefs || []), { pathId, role: 'main', label: '' }];
+	return pathId;
 }
 
-export function getPathAssets(item) {
-	const paths = item.assets?.paths;
-	if (!paths) return [];
-	const list = Array.isArray(paths) ? paths : [paths];
-	return list.map((asset) => {
-		return {
-			role: asset.role || 'main',
-			label: asset.label || '',
-			path: asset.path || null
-		};
-	});
-}
 
-export function setPathAssets(item, value) {
-	item.assets = {
-		...(item.assets || {}),
-		paths: parseAssetList(value).map(() => ({ role: 'main', label: '', path: null }))
-	};
-}
-
-export function ensurePathAssets(item) {
-	item.assets = item.assets || {};
-	const paths = item.assets.paths;
-	const list = paths ? (Array.isArray(paths) ? paths : [paths]) : [];
-	item.assets.paths = list.map((asset) => {
-		return {
-			...asset,
-			role: asset.role || 'main',
-			label: asset.label || '',
-			path: asset.path || null
-		};
-	});
-	return item.assets.paths;
-}
-
-export function addPathAsset(item) {
-	const paths = ensurePathAssets(item);
-	paths.push({ role: 'main', label: '', path: null });
-	item.assets.paths = [...paths];
-}
-
-export function removePathAsset(item, index) {
-	const paths = ensurePathAssets(item);
-	paths.splice(index, 1);
-	item.assets.paths = [...paths];
+export function removePathAsset(item, pathId, document = null) {
+	if (!document || !Array.isArray(item.pathRefs)) throw new Error('A topo document is required to remove a route path.');
+	item.pathRefs = item.pathRefs.filter((ref) => String(ref.pathId) !== String(pathId));
+	return pathId;
 }
 
 export function createVariant(route) {

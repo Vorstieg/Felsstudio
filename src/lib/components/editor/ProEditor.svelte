@@ -14,7 +14,7 @@
 	import MapModal from '$lib/components/ui/MapModal.svelte';
 	import TopoPropertiesPanel from '$lib/components/editor/TopoPropertiesPanel.svelte';
 	import HitInspector from '$lib/components/editor/HitInspector.svelte';
-	import { userState } from '$lib/state/editor.svelte.js';
+	import { createTopoEditorSession, provideTopoEditorSession } from '$lib/state/topo-session.svelte.js';
 	import { isBlankTopoSession } from '$lib/state/drafts.svelte.js';
 	import { useTopoDraftAutosave } from '$lib/components/editor/use-topo-draft-autosave.svelte.js';
 	import { isMobileViewport } from '$lib/assets/js/mobile-utils.js';
@@ -29,6 +29,7 @@
 import { fixpointSymbols } from '@vorstieg/topo-renderer';
 
 	let { workspace = '3d-create', children } = $props();
+	const userState = provideTopoEditorSession(createTopoEditorSession());
 	let isMobile = $state(false);
 	let saveStatus = $state('idle');
 	let saveError = $state('');
@@ -190,26 +191,14 @@ import { fixpointSymbols } from '@vorstieg/topo-renderer';
 	});
 
 	function restoreSession(session, id) {
-		userState.reset();
-
-		// Handle legacy drafts vs new session structure
 		const topo = session.topo || session;
-		userState.topo = topo;
-
-		if (session.clustering) {
-			userState.clustering = { ...userState.clustering, ...session.clustering };
-		}
-
-		if (session.glbBlob) {
-			userState.ui.glbBlob = session.glbBlob;
-			userState.ui.modelUrl = URL.createObjectURL(session.glbBlob);
-		}
-
-		userState.ui.activeDraftId = id;
+		userState.loadSession(session, id);
 		userState.ui.workspace = topo.editorMode === '2d' ? 'topos/2d/editor' : 'topos/3d/editor';
 	}
 
 	useTopoDraftAutosave({
+		session: userState,
+		draftId: browser ? new URL(window.location.href).searchParams.get('draft') : null,
 		editorMode: '3d',
 		getWorkspace: () => workspace,
 		shouldRestore: () =>

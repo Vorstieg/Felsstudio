@@ -1,5 +1,6 @@
 <script>
-	import { userState } from '$lib/state/editor.svelte.js';
+	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	const userState = getTopoEditorSession();
 	import { _ } from 'svelte-i18n';
 	import { snapToBiggestHeight } from '$lib/assets/js/resize.js';
 	import SelectedRoutePanel from '$lib/components/editor/topo-properties/SelectedRoutePanel.svelte';
@@ -16,13 +17,13 @@
 	function selectRoute(route) {
 		if (userState.ui.selectedRouteId === route.id) {
 			userState.ui.selectedRouteId = null;
-			userState.ui.selectedPathIndex = null;
+			userState.ui.selectedPathId = null;
 			drawingTarget = null;
 			return;
 		}
 
 		userState.ui.selectedRouteId = route.id;
-		userState.ui.selectedPathIndex = null;
+		userState.ui.selectedPathId = null;
 		userState.ui.selectedFixpointId = null;
 		drawingTarget = !hasRouteType(route, 'multi-pitch') && !isTrackOnlyRoute(route)
 			? { type: 'route', id: route.id }
@@ -37,7 +38,7 @@
 		userState.topo.routes.splice(index, 1);
 		if (userState.ui.selectedRouteId === route.id) {
 			userState.ui.selectedRouteId = null;
-			userState.ui.selectedPathIndex = null;
+		userState.ui.selectedPathId = null;
 			drawingTarget = null;
 		}
 	}

@@ -1,11 +1,11 @@
 import { getTouchTargetSize } from '$lib/assets/js/mobile-utils.js';
 import { generateId, generateRouteId } from '$lib/assets/js/id-utils.js';
-import { userState } from '$lib/state/editor.svelte.js';
 
 export class RouteTool {
 	draftPoints = $state([]);
 
 	constructor({
+		state,
 		mode = 'route',
 		id = 'route',
 		getDrawingTarget,
@@ -16,6 +16,7 @@ export class RouteTool {
 		snapPoint,
 		referenceFixpoint
 	} = {}) {
+		this.state = state;
 		this.mode = mode;
 		this.id = id;
 		this.getDrawingTarget = getDrawingTarget || (() => null);
@@ -67,7 +68,7 @@ export class RouteTool {
 	}
 
 	findRoute(id) {
-		return userState.topo.routes.find((route) => route.id === id);
+		return this.state.topo.routes.find((route) => route.id === id);
 	}
 
 	getTargetPath(route, target) {
@@ -80,7 +81,7 @@ export class RouteTool {
 	}
 
 	appendToSelectedRoute(point) {
-		const route = this.findRoute(userState.ui.selectedRouteId);
+		const route = this.findRoute(this.state.ui.selectedRouteId);
 		if (!route || route.type === 'multi-pitch') return null;
 		route.points2D = [...(route.points2D || []), [point.x, point.y]];
 		return route;
@@ -103,14 +104,14 @@ export class RouteTool {
 				this.createPitch(route.pitches?.length + 1, points2D)
 			];
 			fixPointIds.forEach((id) => this.referenceFixpoint(route, id));
-			userState.ui.selectedRouteId = route.id;
+			this.state.ui.selectedRouteId = route.id;
 			this.saveHistory();
 			return route;
 		}
 		const route = this.createRoute(mode, points2D);
 		fixPointIds.forEach((id) => this.referenceFixpoint(route, id));
-		userState.topo.routes.push(route);
-		userState.ui.selectedRouteId = route.id;
+		this.state.topo.routes.push(route);
+		this.state.ui.selectedRouteId = route.id;
 		this.saveHistory();
 		return route;
 	}
@@ -125,8 +126,8 @@ export class RouteTool {
 		const index = selectedIndex >= 0 ? selectedIndex : route.pitches.length - 1;
 		const pitch = route.pitches[index];
 		const nextPitch = (pitch.points2D?.length || 0) < 2 ? pitch : route.pitches[index + 1];
-		userState.ui.selectedRouteId = route.id;
-		userState.ui.selectedFixpointId = null;
+		this.state.ui.selectedRouteId = route.id;
+		this.state.ui.selectedFixpointId = null;
 		this.setDrawingTarget(
 			nextPitch
 				? { type: 'pitch', routeId: route.id, pitchId: nextPitch.id }
@@ -153,7 +154,7 @@ export class RouteTool {
 			points: [],
 			fixPoints: [],
 			tags: [],
-			name: `Route ${userState.topo.routes.length + 1}`,
+			name: `Route ${this.state.topo.routes.length + 1}`,
 			lineStyle: 'red'
 		};
 		if (mode === 'multipitch')

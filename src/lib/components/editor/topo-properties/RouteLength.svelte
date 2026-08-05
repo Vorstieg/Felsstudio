@@ -2,7 +2,7 @@
 	import { calculateRouteLength } from '$lib/assets/js/topo-utils.js';
 	import { _ } from 'svelte-i18n';
 
-	let { route, length = $bindable(), topoScale, onCalculate = null } = $props();
+	let { route, length = $bindable(), topoScale, onCalculate = null, onFieldChange = null } = $props();
 </script>
 
 <label class="text-ui-label block" for="route-length">{$_('ui.length')}</label>
@@ -10,7 +10,8 @@
 	<div class="relative min-w-0 flex-1">
 		<input
 			type="number"
-			bind:value={length}
+			value={length ?? ''}
+			oninput={(event) => { length = event.currentTarget.valueAsNumber; onFieldChange?.('length', length); }}
 			class="input-studio w-full pl-8 pr-8!"
 			id="route-length"
 		/>
@@ -18,6 +19,7 @@
 		<button
 			onclick={() => {
 				length = calculateRouteLength(route, topoScale);
+				onFieldChange?.('length', length);
 				onCalculate?.();
 			}}
 			title={$_('ui.length')}

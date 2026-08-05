@@ -1,5 +1,5 @@
 <script>
-	import { userState } from '$lib/state/editor.svelte.js';
+	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { select } from 'd3-selection';
@@ -32,6 +32,8 @@
 	import { createSelectionRegion, getRegionSelection } from './selection-geometry.js';
 	import { renderSelectionRegion } from './render-selection-region.js';
 
+	const userState = getTopoEditorSession();
+
 	let {
 		activeTool = $bindable('select'),
 		selectedSymbol = 'bolt',
@@ -46,6 +48,7 @@
 
 	// Pass editor callbacks to all remaining tools.
 	const toolConfig = {
+		state: userState,
 		saveHistory: () => history.save(),
 		beginTextEdit,
 		getCanvasSize: () => ({ baseWidth, baseHeight }),
@@ -212,10 +215,8 @@
 	const history = createTopoHistory({
 		getTopo: () => userState.topo,
 		restore: (state) => {
-			userState.topo.routes = JSON.parse(JSON.stringify(state.routes));
-			userState.topo.fixPoints = JSON.parse(JSON.stringify(state.fixPoints));
-			userState.topo.outlines = JSON.parse(JSON.stringify(state.outlines));
-			userState.topo.textLabels = JSON.parse(JSON.stringify(state.textLabels || []));
+			const restored = JSON.parse(JSON.stringify(state));
+			userState.topo = { ...userState.topo, ...restored };
 		}
 	});
 	const saveHistory = () => history.save();

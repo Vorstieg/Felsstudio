@@ -7,6 +7,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 
 	let {
 		activeTool = $bindable('route'),
+		toolOptionsOpen = $bindable(false),
 		selectedSymbol = $bindable('bolt'),
 		hasPendingChanges = false,
 		onFinishRoute = null,
@@ -21,32 +22,31 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 	const fixpoints = topoSymbols.filter((symbol) => symbol.type === 'fixpoint');
 	const features = topoSymbols.filter((symbol) => symbol.type === 'feature');
 
-	function toggleSymbolTool(id, symbols) {
-		if (activeTool === id) {
-			activeTool = 'select';
-			return;
-		}
-		activeTool = id;
+	function selectSymbolTool(id, symbols, { isActive } = {}) {
+		if (isActive) return;
 		if (!symbols.some((symbol) => symbol.id === selectedSymbol)) {
 			selectedSymbol = symbols[0].id;
 		}
 	}
 
 	let tools = $derived([
-		{ id: 'route', icon: 'fa-route', label: $_('ui.route') },
-		{ id: 'multipitch', icon: 'fa-timeline', label: $_('ui.multipitch') },
-		{ id: 'outline', icon: 'fa-draw-polygon', label: $_('ui.outline') },
+		{ id: 'select', icon: 'fa-arrow-pointer', label: $_('ui.select') },
+		{ id: 'route', icon: 'fa-route', label: $_('ui.route'), hasOptions: true },
+		{ id: 'multipitch', icon: 'fa-timeline', label: $_('ui.multipitch'), hasOptions: true },
+		{ id: 'outline', icon: 'fa-draw-polygon', label: $_('ui.outline'), hasOptions: true },
 		{
 			id: 'fixpoint',
 			icon: 'fa-circle-dot',
 			label: $_('ui.fixpoints'),
-			onSelect: () => toggleSymbolTool('fixpoint', fixpoints)
+			hasOptions: true,
+			onSelect: (context) => selectSymbolTool('fixpoint', fixpoints, context)
 		},
 		{
 			id: 'symbol',
 			icon: 'fa-icons',
 			label: $_('ui.symbol'),
-			onSelect: () => toggleSymbolTool('symbol', features)
+			hasOptions: true,
+			onSelect: (context) => selectSymbolTool('symbol', features, context)
 		},
 		{ id: 'text', icon: 'fa-font', label: 'Text' },
 		{ id: 'eraser', icon: 'fa-eraser', label: $_('ui.delete') }
@@ -54,11 +54,10 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 </script>
 
 <ToolBar
-	title={$_('ui.2d_studio')}
 	bind:activeTool
-	deselectedTool="select"
+	neutralTool="select"
 	{tools}
-	onBack={() => goto(base + '/')}
+	bind:toolOptionsOpen
 	undo={onUndo ? { label: `${$_('ui.undo_desc')} (Ctrl+Z)`, run: onUndo } : null}
 	redo={onRedo ? { label: `${$_('ui.redo_desc')} (Ctrl+Y)`, run: onRedo } : null}
 	finish={hasPendingChanges && onFinishRoute

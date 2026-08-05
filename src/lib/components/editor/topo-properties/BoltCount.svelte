@@ -2,7 +2,7 @@
 	import { calculateBoltAmount } from '$lib/assets/js/topo-utils.js';
 	import { _ } from 'svelte-i18n';
 
-	let { route, boltCount = $bindable(), fixPoints, onCalculate = null } = $props();
+	let { route, boltCount = $bindable(), fixPoints, onCalculate = null, onFieldChange = null } = $props();
 </script>
 
 <label class="text-ui-label block" for="route-length">{$_('topo.protection')}</label>
@@ -10,7 +10,8 @@
 	<div class="relative min-w-0 flex-1">
 		<input
 			type="number"
-			bind:value={boltCount}
+			value={boltCount ?? ''}
+			oninput={(event) => { boltCount = event.currentTarget.valueAsNumber; onFieldChange?.('boltAmount', boltCount); }}
 			class="input-studio w-full pl-8 pr-8!"
 			id="route-length"
 		/>
@@ -18,6 +19,7 @@
 		<button
 			onclick={() => {
 				boltCount = calculateBoltAmount(route, fixPoints);
+				onFieldChange?.('boltAmount', boltCount);
 				onCalculate?.();
 			}}
 			title={$_('ui.length')}

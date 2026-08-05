@@ -2,7 +2,7 @@
 	import { onDestroy } from 'svelte';
 	import { maptilerApiKey } from '$lib/config';
 
-	let { map = null, onUsePosition = () => {} } = $props();
+	let { map = null, embedded = false } = $props();
 
 	let searchQuery = $state('');
 	let results = $state([]);
@@ -10,6 +10,9 @@
 	let searchError = $state('');
 	let selectedFeature = $state(null);
 	let abortController = null;
+	let resultPanelClass = $derived(
+		embedded ? 'fixed top-14 left-2 right-2 z-[60] panel shadow-panel bg-white' : ''
+	);
 
 	$effect(() => {
 		const query = searchQuery.trim();
@@ -88,6 +91,8 @@
 		} else {
 			map.easeTo({ center, zoom: Math.max(map.getZoom(), 14), duration: 600 });
 		}
+
+		clearSearch();
 	}
 
 	function clearSearch() {
@@ -130,7 +135,7 @@
 	}
 </script>
 
-<div class="panel shadow-panel bg-white w-full overflow-hidden">
+<div class={`${embedded ? '' : 'panel shadow-panel'} bg-white w-full overflow-hidden`}>
 	<div class="flex items-center gap-2 p-1.5">
 		<div class="w-7 h-7 flex items-center justify-center text-warm-gray-400 flex-shrink-0">
 			<i class="fa-solid fa-magnifying-glass text-[11px]"></i>
@@ -152,9 +157,9 @@
 	</div>
 
 	{#if searchError}
-		<div class="px-3 pb-2 text-micro-data text-rose-600 font-bold">{searchError}</div>
+		<div class={`${resultPanelClass} px-3 pb-2 text-micro-data text-rose-600 font-bold`}>{searchError}</div>
 	{:else if results.length > 0}
-		<div class="border-t border-black/10 p-1.5 max-h-72 overflow-y-auto custom-scrollbar">
+		<div class={`${resultPanelClass} border-t border-black/10 p-1.5 max-h-72 overflow-y-auto custom-scrollbar`}>
 			{#each results as feature}
 				<div
 					class={`group flex items-center gap-2 rounded-sm p-1.5 transition-none ${selectedFeature === feature ? 'bg-creator-blue/10' : 'hover:bg-black/5'}`}
@@ -166,21 +171,11 @@
 					<div class="text-[9px] font-bold uppercase text-warm-gray-300 w-14 truncate text-right">
 						{getFeatureType(feature)}
 					</div>
-					<button
-						class={`w-7 h-7 flex items-center justify-center rounded-sm transition-none ${selectedFeature === feature ? 'bg-near-black text-white' : 'bg-black/5 text-warm-gray-500 hover:bg-near-black hover:text-white'}`}
-						onclick={() => {
-							selectFeature(feature);
-							onUsePosition(getFeatureCenter(feature), feature);
-						}}
-						title="Use as crag position"
-					>
-						<i class="fa-solid fa-location-crosshairs text-[10px]"></i>
-					</button>
 				</div>
 			{/each}
 		</div>
 
 	{:else if searchQuery.trim().length >= 3 && !isSearching}
-		<div class="border-t border-black/10 px-3 py-2 text-micro-data text-warm-gray-400 font-bold">No results</div>
+		<div class={`${resultPanelClass} border-t border-black/10 px-3 py-2 text-micro-data text-warm-gray-400 font-bold`}>No results</div>
 	{/if}
 </div>

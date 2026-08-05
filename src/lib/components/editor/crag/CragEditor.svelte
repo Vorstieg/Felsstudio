@@ -3,14 +3,14 @@
 	import maplibregl from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import * as turf from '@turf/turf';
-	import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
+import { createCragEditorSession, normalizeCragSector, provideCragEditorSession } from '$lib/state/crag-session.svelte.js';
+	import { provideCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
 	import { viewport } from '$lib/state/viewport.svelte.js';
 	import { base } from '$app/paths';
 	import { goto } from '$app/navigation';
 
 	import CragEditorMap from '$lib/components/editor/crag/CragEditorMap.svelte';
 	import CragEditorLayout from '$lib/components/editor/crag/CragEditorLayout.svelte';
-	import CragEditorBottomSheet from '$lib/components/editor/crag/CragEditorBottomSheet.svelte';
 	import RouteDetailModal from '$lib/components/editor/crag/RouteDetailModal.svelte';
 	import {
 		availableTags,
@@ -21,20 +21,17 @@
 	} from '$lib/components/editor/crag/crag-editor-options.js';
 	import { writeFile, writeJson } from '$lib/api/felslager.js';
 	import { authState } from '$lib/api/auth.svelte.js';
-	import { createPolygonAround, getGeometryCenter, translateGeometryTo } from '$lib/assets/js/sector-utils.js';
 	import { storage } from '$lib/assets/js/storage-utils.js';
 	import { Topo } from '$lib/assets/js/topo-paths.js';
 	import { slugifyName } from '$lib/components/editor/crag/crag-editor-paths.js';
 	import {
 		addEquipment,
-		addSector,
-		createDefaultSector,
-		duplicateSectorById,
-		moveSectorById,
 		removeEquipment,
-		removeSectorById
 	} from '$lib/components/editor/crag/crag-editor-sectors.js';
 	import { useCragTrackEditor } from '$lib/components/editor/crag/use-crag-track-editor.svelte.js';
+	import { createCragRouteTool } from '$lib/components/editor/crag/CragRouteTool.svelte.js';
+	import { createCragSelectTool } from '$lib/components/editor/crag/CragSelectTool.svelte.js';
+	import { createCragSectorTool } from '$lib/components/editor/crag/CragSectorTool.svelte.js';
 	import { useCragSectorMapEditor } from '$lib/components/editor/crag/use-crag-sector-map-editor.svelte.js';
 	import { useCragAccessEditor } from '$lib/components/editor/crag/use-crag-access-editor.svelte.js';
 	import { initMapPointDragHandlers } from '$lib/components/editor/map-point-drag-handlers.js';
@@ -45,10 +42,11 @@
 		syncFlightPlanPreview
 	} from '$lib/components/editor/crag/crag-editor-map.js';
 	import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.js';
-	import { generateRouteId } from '$lib/assets/js/id-utils.js';
 	import { rockTypes } from '$lib/config.js';
+	import { createRouteEditController } from './route-editing.js';
 
 	let { inspectorShadow = true } = $props();
+	const cragEditorState = provideCragEditorSession(createCragEditorSession());
 
 	// Layout flags
 	let isCompact = $derived(viewport.isCompact);
@@ -64,22 +62,24 @@
 	let saveStatus = $state('idle');
 	let saveError = $state('');
 
-	let activeTool = $state('position'); // 'position' | 'transit' | 'parking' | 'track'
+	let activeTool = $state('select'); // 'select' | 'position' | 'transit' | 'parking' | 'hut' | 'track'
+	let toolOptionsOpen = $state(false);
 	let activeTab = $state('info'); // 'info' | 'registry'
-	let selectedSectorId = $state(null);
+	let selectedObject = $state(null);
 	// Preview state is replaced whenever the user generates another mission.
 	let flightPlan = $state(null);
-	let selectedRouteKey = $state(null);
+	let routeTool;
+
 	let selectedRouteEntry = $derived.by(() => {
-		if (!selectedRouteKey) return null;
+		if (selectedObject?.type !== 'route') return null;
 		return cragEditorState.routeDocuments
 			.flatMap((document) =>
 				(document.data?.routes || []).map((route) => ({ document, route }))
 			)
-			.find(({ document, route }) => `${document.path}:${route.id}` === selectedRouteKey);
+			.find(({ document, route }) => `${document.path}:${route.id}` === selectedObject.key);
 	});
-	let routePathDrawingTarget = $state(null);
-	let isRoutePathDrawing = $derived(routePathDrawingTarget !== null);
+	let routeEditDraft = $state(null);
+	let isRoutePathDrawing = $derived(routeEditDraft !== null);
 	let cutLineStart = $state(null);
 	let cutLineEnd = $state(null);
 	let pendingTrackCut = $state(null);
@@ -91,23 +91,37 @@
 	let autosaveSessionTimeout;
 
 	const trackEditor = useCragTrackEditor({
+		state: cragEditorState,
 		getMap: () => map,
 		getActiveTool: () => activeTool,
 		setActiveTool: (value) => (activeTool = value),
 		setActiveTab: (value) => (activeTab = value),
 		setSuppressNextMapClick: (value) => (suppressNextMapClick = value),
-		getRoutePathTarget: () => routePathDrawingTarget,
-		onSaveRoutePath: saveRoutePathCoordinates,
-		onRoutePathDrawingEnd: () => (routePathDrawingTarget = null),
+		getRoutePathTarget: () => routeEditDraft,
+		onSaveRoutePath: (...args) => routeTool?.saveRoutePathCoordinates(...args),
+		onRoutePathDrawingEnd: () => (routeEditDraft = null),
+		onPathFinished: () => selectObject(null),
+		onPathCancelled: () => selectObject(null),
 		onTrackPointDragStart: () => syncEditorData(),
-		onTrackPointDragEnd: () => syncEditorData()
+		onTrackPointDragEnd: () => syncEditorData(),
+		getTrackFeature: getCragTrackFeature,
+		 saveTrackGeometry: saveCragTrackGeometry
 	});
+	const routeEditController = createRouteEditController({
+		getSelection: () => selectedObject,
+		getDraft: () => routeEditDraft,
+		commitDraft: () => trackEditor.commitRoutePathEdit(),
+		setSelection: (value) => (selectedObject = value),
+		setDraft: (value) => (routeEditDraft = value)
+	});
+	const selectObject = routeEditController.selectObject;
+	const startRoutePathDraft = routeEditController.startDraft;
 	let currentTrackPoints = $derived(trackEditor.currentTrackPoints);
-	let editingTrackIndex = $derived(trackEditor.editingTrackIndex);
 	let trackDraftMode = $derived(trackEditor.trackDraftMode);
 	let isSnappingEnabled = $derived(trackEditor.isSnappingEnabled);
 	let isRoutingTrack = $derived(trackEditor.isRoutingTrack);
 	let activeTrackDragState = $derived(trackEditor.draggingTrackPoint);
+	let activeTrackTarget = $derived(trackEditor.activeTrackTarget);
 
 	const addTrackPoint = (...args) => trackEditor.addTrackPoint(...args);
 	const handleTrackConfirm = (...args) => trackEditor.handleTrackConfirm(...args);
@@ -121,12 +135,19 @@
 	const removeTrack = (...args) => trackEditor.removeTrack(...args);
 	const splitEditingTrack = (...args) => trackEditor.splitEditingTrack(...args);
 	const finalizeTrack = (...args) => trackEditor.finalizeTrack(...args);
-	const editTrack = (...args) => trackEditor.editTrack(...args);
-	const editRoutePathTrack = (...args) => trackEditor.editRoutePath(...args);
+	const editTrack = (...args) => {
+		toolOptionsOpen = true;
+		return trackEditor.editTrack(...args);
+	};
+	const editRoutePathTrack = (...args) => {
+		toolOptionsOpen = true;
+		return trackEditor.editRoutePath(...args);
+	};
 	const cancelTrackEdit = (...args) => trackEditor.cancelTrackEdit(...args);
 	const handleGpxUpload = (...args) => trackEditor.handleGpxUpload(...args);
 
 	const accessEditor = useCragAccessEditor({
+		state: cragEditorState,
 		getMap: () => map,
 		getIsMapLoaded: () => isMapLoaded,
 		getActiveTool: () => activeTool
@@ -137,23 +158,70 @@
 	const addDetectedAsset = (...args) => accessEditor.addDetectedAsset(...args);
 	const addTransitPoint = (...args) => accessEditor.addTransitPoint(...args);
 	const addParkingPoint = (...args) => accessEditor.addParkingPoint(...args);
+	const addHutPoint = (...args) => accessEditor.addHutPoint(...args);
 	const removeAccessFeature = (...args) => accessEditor.removeAccessFeature(...args);
 
+	const sectorTool = createCragSectorTool({
+		state: cragEditorState,
+		getMap: () => map,
+		getSelection: () => selectedObject,
+		selectObject,
+		setActiveTool: (value) => (activeTool = value),
+		setActiveTab: (value) => (activeTab = value)
+	});
+
 	const sectorMapEditor = useCragSectorMapEditor({
+		state: cragEditorState,
 		getMap: () => map,
 		getActiveTool: () => activeTool,
 		setActiveTool: (value) => (activeTool = value),
 		setActiveTab: (value) => (activeTab = value),
-		getSelectedSectorId: () => selectedSectorId,
-		setSelectedSectorId: (value) => (selectedSectorId = value),
+		getSelectedObject: () => selectedObject,
+		setSelectedObject: selectObject,
 		setSuppressNextMapClick: (value) => (suppressNextMapClick = value),
-		onUpdateSectorCoordinates: updateSectorCoordinates
+		onUpdateSectorCoordinates: sectorTool.updateSectorCoordinates,
+		onCommitSectorGeometry: (id, geometry) => sectorTool.updateSectorGeometry(id, () => geometry)
 	});
 	let selectedSectorVertex = $derived(sectorMapEditor.selectedSectorVertex);
 	let vertexDeleteUndo = $derived(sectorMapEditor.vertexDeleteUndo);
 	let draggingSectorMarkerId = $derived(sectorMapEditor.draggingSectorMarkerId);
 	const syncSectorMarkers = (...args) => sectorMapEditor.syncSectorMarkers(...args);
 	const undoSectorVertexDelete = (...args) => sectorMapEditor.undoSectorVertexDelete(...args);
+	const { createSector, duplicateSector, removeSector, moveSector, setSectorGeometryType, focusSector } = sectorTool;
+
+	routeTool = createCragRouteTool({
+		state: cragEditorState,
+		getSelection: () => selectedObject,
+		selectObject,
+		getRouteDraft: () => routeEditDraft,
+		cancelTrackEdit,
+		startRouteDraft: startRoutePathDraft,
+		startRoutingDraft,
+		editRoutePathTrack,
+		setActiveTool: (value) => (activeTool = value)
+	});
+	const {
+		addRoute,
+		deleteRoute,
+		selectRoute,
+		updateRoute,
+		addRoutePath,
+		assignExistingRoutePath,
+		createRoutePathFromAccess,
+		editRoutePath,
+		updateRoutePath,
+		removeRoutePath,
+		deleteRoutePath
+	} = routeTool;
+
+	const selectTool = createCragSelectTool({
+		getMap: () => map,
+		selectObject,
+		setActiveTab: (value) => (activeTab = value),
+		getRouteDocuments: () => cragEditorState.routeDocuments,
+		onEditRoutePath: (path, routeId, pathId) => routeTool.editRoutePath(path, routeId, pathId),
+		onEditTrack: editTrack
+	});
 
 	function isBlankCragSession() {
 		return (
@@ -172,23 +240,20 @@
 		const session = storage.get(CRAG_SESSION_KEY, null);
 		if (!session) return;
 
-		cragEditorState.crag = session.crag || cragEditorState.crag;
+		cragEditorState.crag = session.crag
+			? { ...session.crag, sectors: (session.crag.sectors || []).map(normalizeCragSector) }
+			: cragEditorState.crag;
 		cragEditorState.access = session.access || { type: 'FeatureCollection', version: 1, features: [] };
+		cragEditorState.routeDocuments = session.routeDocuments || [];
 	}
 
 	function saveLatestCragSession() {
 		storage.set(CRAG_SESSION_KEY, {
 			crag: $state.snapshot(cragEditorState.crag),
 			access: $state.snapshot(cragEditorState.access),
+			routeDocuments: $state.snapshot(cragEditorState.routeDocuments),
 			updated: new Date().toISOString()
 		});
-	}
-
-	function focusSector(sector) {
-		selectedSectorId = sector.id;
-		activeTool = 'position';
-		const center = getGeometryCenter(sector.geometry);
-		if (center && map) map.easeTo({ center, zoom: Math.max(map.getZoom(), 15), duration: 400 });
 	}
 
 	function coordinatesEqual(a, b) {
@@ -267,6 +332,8 @@
 		if (!activeTrackDragState) return { type: 'FeatureCollection', features: [] };
 		const { pointIndex, coordinate } = activeTrackDragState;
 		const features = [];
+		const dragPoints = [...currentTrackPoints];
+		dragPoints[pointIndex] = coordinate;
 		if (currentTrackPoints[pointIndex - 1]) {
 			features.push({
 				type: 'Feature',
@@ -290,6 +357,24 @@
 		features.push({
 			type: 'Feature',
 			properties: { feature: 'track-drag-point' },
+			geometry: { type: 'Point', coordinates: coordinate }
+		});
+		for (let index = 0; index < dragPoints.length - 1; index += 1) {
+			const first = dragPoints[index];
+			const second = dragPoints[index + 1];
+			if (!first || !second) continue;
+			features.push({
+				type: 'Feature',
+				properties: { feature: 'track-midpoint', pointIndex: index + 1 },
+				geometry: {
+					type: 'Point',
+					coordinates: [(first[0] + second[0]) / 2, (first[1] + second[1]) / 2]
+				}
+			});
+		}
+		features.push({
+			type: 'Feature',
+			properties: { feature: 'track-vertex-delete', pointIndex },
 			geometry: { type: 'Point', coordinates: coordinate }
 		});
 		return { type: 'FeatureCollection', features };
@@ -344,9 +429,9 @@
 	}
 
 	function startTrackCut() {
-		const isEditingRoutePath = routePathDrawingTarget && trackDraftMode === 'editing';
+		const isEditingRoutePath = routeEditDraft && trackDraftMode === 'editing';
 		if (
-			(editingTrackIndex === null && !isEditingRoutePath) ||
+			(activeTrackTarget === null && !isEditingRoutePath) ||
 			currentTrackPoints.length < 2
 		)
 			return;
@@ -368,11 +453,18 @@
 
 	function confirmTrackCut() {
 		if (!pendingTrackCut) return;
-		const wasSplit = routePathDrawingTarget
-			? splitRoutePath(
-					routePathDrawingTarget,
+		let splitMode = 'shared';
+		if (routeEditDraft && typeof window !== 'undefined') {
+			const choice = window.prompt('Split shared path for all routes or only this route? Enter "shared" or "route".', 'shared');
+			if (choice === null) return;
+			splitMode = choice.trim().toLowerCase().startsWith('route') ? 'route-specific' : 'shared';
+		}
+		const wasSplit = routeEditDraft
+			? routeTool.splitRoutePath(
+				routeEditDraft,
 					pendingTrackCut.startCoordinates,
-					pendingTrackCut.endCoordinates
+					pendingTrackCut.endCoordinates,
+					splitMode
 				)
 			: splitEditingTrack(pendingTrackCut.startCoordinates, pendingTrackCut.endCoordinates);
 		if (wasSplit) resetTrackCut();
@@ -438,18 +530,23 @@
 			return;
 		}
 
+		if (activeTool === 'select') {
+			selectTool.handleMapClick(e);
+			return;
+		}
+
 		if (
 			activeTool === 'track' &&
-			!routePathDrawingTarget &&
+			!routeEditDraft &&
 			currentTrackPoints.length === 0
 		) {
-			if (map.getLayer('routes-line')) {
-				const routeFeature = map.queryRenderedFeatures(e.point, { layers: ['routes-line'] })[0];
-				const path = routeFeature?.properties?.documentPath;
-				const routeId = routeFeature?.properties?.routeId;
-				const pathIndex = Number(routeFeature?.properties?.pathIndex);
-				if (path && routeId && Number.isInteger(pathIndex)) {
-					editRoutePath(path, routeId, pathIndex);
+			if (map.getLayer('route-paths-line')) {
+				const routePathFeature = map.queryRenderedFeatures(e.point, { layers: ['route-paths-line'] })[0];
+				const path = routePathFeature?.properties?.documentPath;
+				const pathId = routePathFeature?.properties?.pathId;
+				if (path && pathId) {
+					const route = cragEditorState.routeDocuments.find((entry) => entry.path === path)?.data?.routes?.find((item) => (item.pathRefs || []).some((ref) => String(ref.pathId) === String(pathId)));
+				routeTool.editRoutePath(path, route?.id, pathId);
 					return;
 				}
 			}
@@ -492,11 +589,13 @@
 		}
 
 		if (activeTool === 'position') {
-			if (!selectedSectorId) setCragPosition(lngLat);
+			if (selectedObject?.type !== 'sector') setCragPosition(lngLat);
 		} else if (activeTool === 'transit') {
 			addTransitPoint(lngLat);
 		} else if (activeTool === 'parking') {
 			addParkingPoint(lngLat);
+		} else if (activeTool === 'hut') {
+			addHutPoint(lngLat);
 		} else if (activeTool === 'track') {
 			await addTrackPoint(lngLat);
 		}
@@ -534,21 +633,20 @@
 		if (!isMapLoaded || !map) return;
 		JSON.stringify(cragEditorState.crag.sectors || []);
 		JSON.stringify(cragEditorState.routeDocuments || []);
-		selectedSectorId;
-		selectedRouteKey;
+		selectedObject;
 		selectedSectorVertex;
 		draggingSectorMarkerId;
 		untrack(() => {
-			if (!draggingSectorMarkerId) syncSectorMarkers();
+			if (!draggingSectorMarkerId && !sectorMapEditor.draggingSectorVertex) syncSectorMarkers();
 			syncEditorData();
 		});
 	});
 
 	$effect(() => {
 		const tool = activeTool;
-		if (tool === 'parking' || tool === 'transit') {
+		if (tool === 'parking' || tool === 'transit' || tool === 'hut') {
 			setTimeout(() => {
-				if (activeTool === tool) scanNearbyAssets(tool === 'parking' ? 'parking' : 'transit');
+				if (activeTool === tool) scanNearbyAssets(tool);
 			}, 300);
 		} else {
 			accessEditor.clearDetectedAssets();
@@ -595,26 +693,17 @@
 		return closestPoint || originalLngLat;
 	}
 
-	function setCragPositionFromSearch(coordinates) {
-		if (!coordinates) return;
-		setCragPosition(coordinates);
-		if (activeTool === 'parking' || activeTool === 'transit') {
-			scanNearbyAssets(activeTool === 'parking' ? 'parking' : 'transit');
-		}
-	}
-
 	function setCragPosition(coordinates) {
-		cragEditorState.crag.geometry.coordinates = coordinates;
+		cragEditorState.setCragGeometry({ ...cragEditorState.crag.geometry, coordinates });
 		if (cragMarker) cragMarker.setLngLat(coordinates);
 	}
 
-	function locateUser() {
+	function centerMapOnUser() {
 		if (!navigator.geolocation || !map) return;
 		navigator.geolocation.getCurrentPosition(
 			(position) => {
 				const coordinates = [position.coords.longitude, position.coords.latitude];
 				map.easeTo({ center: coordinates, zoom: Math.max(map.getZoom(), 15), duration: 500 });
-				if (activeTool === 'position' && !selectedSectorId) setCragPosition(coordinates);
 			},
 			() => {
 			},
@@ -622,37 +711,10 @@
 		);
 	}
 
-	function updateSectorCoordinates(id, coordinates) {
-		cragEditorState.crag.sectors = (cragEditorState.crag.sectors || []).map((sector) => {
-			if (sector.id !== id) return sector;
-			return {
-				...sector,
-				geometry: translateGeometryTo(
-					sector.geometry || { type: 'Point', coordinates },
-					coordinates
-				)
-			};
-		});
-	}
-
-	function setSectorGeometryType(id, type) {
-		cragEditorState.crag.sectors = (cragEditorState.crag.sectors || []).map((sector) => {
-			if (sector.id !== id || sector.geometry?.type === type) return sector;
-			const center = getGeometryCenter(sector.geometry) ||
-				cragEditorState.crag.geometry?.coordinates || [0, 0];
-			return {
-				...sector,
-				geometry:
-					type === 'Polygon'
-						? createPolygonAround(center)
-						: { type: 'Point', coordinates: [...center] }
-			};
-		});
-	}
-
 	function initMarkersAndLayers(loadedMap = map) {
 		if (!loadedMap) return;
 		map = loadedMap;
+		sectorTool.ensureMapLayers(loadedMap);
 		ensureCragEditorLayers(loadedMap);
 
 		const markerPos = $state.snapshot(cragEditorState.crag.geometry.coordinates);
@@ -672,9 +734,9 @@
 		});
 		cragMarker.on('dragend', () => {
 			const pos = cragMarker.getLngLat();
-			cragEditorState.crag.geometry.coordinates = [pos.lng, pos.lat];
-			if (activeTool === 'parking' || activeTool === 'transit')
-				scanNearbyAssets(activeTool === 'parking' ? 'parking' : 'transit');
+			setCragPosition([pos.lng, pos.lat]);
+			if (activeTool === 'parking' || activeTool === 'transit' || activeTool === 'hut')
+				scanNearbyAssets(activeTool);
 		});
 
 		syncSectorMarkers();
@@ -694,15 +756,13 @@
 		const source = map?.getSource('crag-editor-data');
 		if (!source) return;
 		const drawingPoints = $state.snapshot(currentTrackPoints) || [];
-		const editingRoutePath = routePathDrawingTarget
-			? {
-					key: `${routePathDrawingTarget.path}:${routePathDrawingTarget.routeId}`,
-					pathIndex: routePathDrawingTarget.pathIndex
-				}
-			: null;
+		const editingRoutePath = routeEditDraft || null;
+		sectorTool.syncDrawing({
+			selectedSectorVertex,
+			draggingSectorVertex: untrack(() => sectorMapEditor.draggingSectorVertex)
+		});
 		source.setData(
 			buildEditorFeatureCollection({
-				sectors: $state.snapshot(cragEditorState.crag.sectors) || [],
 				savedAccessFeatures: $state.snapshot(cragEditorState.access?.features) || [],
 				routes: (cragEditorState.routeDocuments || []).flatMap((document) =>
 					(document.data?.routes || []).map((route) => ({
@@ -710,13 +770,22 @@
 						route: $state.snapshot(route)
 					}))
 				),
-				selectedRouteKey,
+				routePaths: (cragEditorState.routeDocuments || []).flatMap((document) =>
+					(document.data?.paths?.features || []).map((feature) => ({
+						documentPath: document.path,
+						feature,
+						assignedRouteIds: (document.data?.routes || [])
+							.filter((route) => (route.pathRefs || []).some((ref) => String(ref.pathId) === String(feature.id)))
+							.map((route) => route.id)
+					}))
+				),
+				selectedObject,
 				editingRoutePath,
 				drawingPoints,
 				visibleDrawingPointIndexes: visibleDrawingPointIndexes(drawingPoints),
-				selectedSectorId,
-				selectedSectorVertex,
-				editingTrackIndex,
+				editingDrawingPath: trackDraftMode === 'editing',
+				selectedTrackPointIndex: trackEditor.selectedTrackPointIndex,
+				activeTrackTarget,
 				draggingTrackPointIndex: untrack(() => activeTrackDragState?.pointIndex ?? null),
 				flightPlan: $state.snapshot(flightPlan)
 			})
@@ -738,7 +807,7 @@
 		saveError = '';
 
 		try {
-			cragEditorState.crag.id = slugifyName(cragEditorState.crag.name);
+			cragEditorState.setCragField('id', slugifyName(cragEditorState.crag.name));
 			const topo = new Topo(savePath, cragEditorState.crag.id);
 			ensureCragAssets();
 			const sectors = $state.snapshot(cragEditorState.crag.sectors) || [];
@@ -759,7 +828,7 @@
 					});
 				}
 			}
-			cragEditorState.crag.assets.images = uploadedImages;
+			cragEditorState.setCragImages(uploadedImages);
 
 			await writeJson(topo.getCragPath(), {
 				type: 'Feature',
@@ -804,11 +873,11 @@
 	}
 
 	function addEquipmentItem() {
-		cragEditorState.crag.equipment = addEquipment(cragEditorState.crag.equipment);
+		cragEditorState.setEquipment(addEquipment(cragEditorState.crag.equipment));
 	}
 
 	function removeEquipmentItem(idx) {
-		cragEditorState.crag.equipment = removeEquipment(cragEditorState.crag.equipment, idx);
+		cragEditorState.setEquipment(removeEquipment(cragEditorState.crag.equipment, idx));
 	}
 
 	function ensureCragAssets() {
@@ -827,234 +896,59 @@
 				previewUrl: URL.createObjectURL(file),
 				_file: file
 			}));
-		cragEditorState.crag.assets.images = [...cragEditorState.crag.assets.images, ...images];
+		cragEditorState.setCragImages([...cragEditorState.crag.assets.images, ...images]);
 	}
 
 	function removeCragImage(index) {
 		ensureCragAssets();
 		const image = cragEditorState.crag.assets.images[index];
 		if (image?.previewUrl) URL.revokeObjectURL(image.previewUrl);
-		cragEditorState.crag.assets.images = cragEditorState.crag.assets.images.filter(
+		cragEditorState.setCragImages(cragEditorState.crag.assets.images.filter(
 			(_, i) => i !== index
+		));
+	}
+
+	function getCragTrackFeature(target) {
+		if (target?.kind === 'access') return cragEditorState.access.features.find((feature) => feature.id === target.featureId) || null;
+		if (target?.kind === 'route-path') return cragEditorState.routeDocuments.find((entry) => entry.path === target.documentPath)?.data?.paths?.features?.find((feature) => String(feature.id) === String(target.pathId)) || null;
+		return null;
+	}
+
+	function saveCragTrackGeometry(target, coordinates) {
+		if (target?.kind === 'route-path') return Boolean(routeTool.saveRoutePathCoordinates(target, coordinates));
+		if (target?.kind !== 'access') return false;
+		cragEditorState.replaceAccessFeatures(
+			cragEditorState.access.features.map((feature) => feature.id === target.featureId ? { ...feature, geometry: { type: 'LineString', coordinates } } : feature)
 		);
-	}
-
-	function createSector() {
-		const sectors = cragEditorState.crag.sectors || [];
-		const sector = createDefaultSector({
-			sectors,
-			cragCoordinates: cragEditorState.crag.geometry.coordinates
-		});
-		cragEditorState.crag.sectors = addSector(sectors, sector);
-		selectedSectorId = sector.id;
-		activeTab = 'sectors';
-		activeTool = 'position';
-	}
-
-	function duplicateSector(id) {
-		const result = duplicateSectorById(cragEditorState.crag.sectors || [], id);
-		if (!result.duplicatedId) return;
-		cragEditorState.crag.sectors = result.sectors;
-		selectedSectorId = result.duplicatedId;
-		activeTab = 'sectors';
-	}
-
-	function removeSector(id) {
-		cragEditorState.crag.sectors = removeSectorById(cragEditorState.crag.sectors || [], id);
-		if (selectedSectorId === id) selectedSectorId = null;
-	}
-
-	function moveSector(id, direction) {
-		cragEditorState.crag.sectors = moveSectorById(
-			cragEditorState.crag.sectors || [],
-			id,
-			direction
-		);
-	}
-
-	function getRouteDocument(sectorId) {
-		return cragEditorState.routeDocuments.find((document) => document.sectorId === sectorId);
-	}
-
-	function createRouteDocument(sectorId) {
-		const sectorTopo = new Topo(
-			cragEditorState.crag.path,
-			cragEditorState.crag.id,
-			sectorId || undefined
-		);
-		return {
-			path: sectorTopo.getTopoPath(),
-			sectorId,
-			data: {
-				id: sectorId ? `${cragEditorState.crag.id}:${sectorId}` : cragEditorState.crag.id,
-				crag_id: cragEditorState.crag.id,
-				sector_id: sectorId || '',
-				name: sectorId || cragEditorState.crag.name,
-				routes: []
-			},
-			dirty: true
-		};
-	}
-
-	function addRoute(sectorId = null) {
-		let document = getRouteDocument(sectorId);
-		if (!document) {
-			document = createRouteDocument(sectorId);
-			cragEditorState.routeDocuments = [...cragEditorState.routeDocuments, document];
-		}
-
-		let routeId;
-		do {
-			routeId = generateRouteId();
-		} while (
-			cragEditorState.routeDocuments.some((entry) =>
-				(entry.data.routes || []).some((route) => route.id === routeId)
-			)
-		);
-
-		const route = {
-			id: routeId,
-			name: '',
-			type: 'sports-climbing',
-			tags: [],
-			assets: { paths: [] }
-		};
-		document.data.routes = [...(document.data.routes || []), route];
-		document.dirty = true;
-		selectedRouteKey = `${document.path}:${route.id}`;
-	}
-
-	function deleteRoute(path, routeId) {
-		const document = cragEditorState.routeDocuments.find((entry) => entry.path === path);
-		if (!document) return;
-		document.data.routes = (document.data.routes || []).filter((route) => route.id !== routeId);
-		document.dirty = true;
-		if (selectedRouteKey === `${path}:${routeId}`) selectedRouteKey = null;
-	}
-
-	function selectRoute(path, routeId) {
-		selectedRouteKey = `${path}:${routeId}`;
-	}
-
-	function updateRoute(path, routeId, field, value) {
-		const document = cragEditorState.routeDocuments.find((entry) => entry.path === path);
-		const route = document?.data.routes?.find((entry) => entry.id === routeId);
-		if (!route) return;
-		route[field] = value;
-		document.dirty = true;
-	}
-
-	function touchRoute(path, routeId) {
-		const document = cragEditorState.routeDocuments.find((entry) => entry.path === path);
-		if (document?.data.routes?.some((route) => route.id === routeId)) document.dirty = true;
-	}
-
-	function updateRoutePaths(path, routeId, update) {
-		const document = cragEditorState.routeDocuments.find((entry) => entry.path === path);
-		const route = document?.data.routes?.find((entry) => entry.id === routeId);
-		if (!route) return;
-
-		const existingPaths = route.assets?.paths;
-		const paths = Array.isArray(existingPaths) ? existingPaths : existingPaths ? [existingPaths] : [];
-		route.assets = { ...(route.assets || {}), paths: update(paths) };
-		document.dirty = true;
-	}
-
-	function addRoutePath(path, routeId) {
-		updateRoutePaths(path, routeId, (paths) => [
-			...paths,
-			{ role: 'main', label: '', path: null }
-		]);
-		const document = cragEditorState.routeDocuments.find((entry) => entry.path === path);
-		const route = document?.data.routes?.find((entry) => entry.id === routeId);
-		const pathIndex = (route?.assets?.paths || []).length - 1;
-		if (pathIndex < 0) return;
-
-		routePathDrawingTarget = { path, routeId, pathIndex };
-		startRoutingDraft();
-	}
-
-	function saveRoutePathCoordinates({ path, routeId, pathIndex }, coordinates) {
-		updateRoutePaths(path, routeId, (paths) =>
-			paths.map((pathAsset, index) =>
-				index === pathIndex
-					? { ...pathAsset, path: { type: 'LineString', coordinates } }
-					: pathAsset
-			)
-		);
-	}
-
-	function editRoutePath(path, routeId, pathIndex) {
-		const document = cragEditorState.routeDocuments.find((entry) => entry.path === path);
-		const route = document?.data.routes?.find((entry) => entry.id === routeId);
-		const paths = route?.assets?.paths;
-		const pathAssets = Array.isArray(paths) ? paths : paths ? [paths] : [];
-		const coordinates = pathAssets[pathIndex]?.path?.coordinates;
-		if (!Array.isArray(coordinates) || coordinates.length < 2) return;
-
-		routePathDrawingTarget = { path, routeId, pathIndex };
-		editRoutePathTrack(coordinates);
-	}
-
-	function splitRoutePath({ path, routeId, pathIndex }, startCoordinates, endCoordinates) {
-		if (startCoordinates.length < 2 || endCoordinates.length < 2) return false;
-		const document = cragEditorState.routeDocuments.find((entry) => entry.path === path);
-		const route = document?.data.routes?.find((entry) => entry.id === routeId);
-		const paths = route?.assets?.paths;
-		const pathAssets = Array.isArray(paths) ? paths : paths ? [paths] : [];
-		const pathAsset = pathAssets[pathIndex];
-		if (!pathAsset) return false;
-
-		updateRoutePaths(path, routeId, (assets) => [
-			...assets.slice(0, pathIndex),
-			{ ...pathAsset, path: { type: 'LineString', coordinates: startCoordinates } },
-			{ ...pathAsset, path: { type: 'LineString', coordinates: endCoordinates } },
-			...assets.slice(pathIndex + 1)
-		]);
-		cancelTrackEdit();
-		activeTab = 'sectors';
-		activeTool = 'position';
 		return true;
 	}
 
-	function updateRoutePath(path, routeId, pathIndex, field, value) {
-		updateRoutePaths(path, routeId, (paths) =>
-			paths.map((pathAsset, index) =>
-				index === pathIndex ? { ...pathAsset, [field]: value } : pathAsset
-			)
-		);
+	function undoCragEdit() {
+		return cragEditorState.canUndo ? cragEditorState.undo() : routeTool.undoDeleteRoutePath();
 	}
 
-	function removeRoutePath(path, routeId, pathIndex) {
-		updateRoutePaths(path, routeId, (paths) => paths.filter((_, index) => index !== pathIndex));
-	}
+	provideCragEditorTools({
+		trackEditor,
+		sectorTool,
+		routeTool,
+		accessEditor,
+		actions: {
+			back: () => goto(base + '/'),
+			startTrackCut,
+			confirmTrackCut,
+			cancelTrackCut: resetTrackCut,
+			undo: undoCragEdit,
+			redo: cragEditorState.redo,
+			export: saveToServer,
+			centerMapOnUser,
+			addCragImages,
+			removeCragImage,
+			addEquipmentItem,
+			removeEquipmentItem,
+			handleFlightPlanGenerated
+		}
+	});
 
-	function moveRoutePath(sourcePath, sourceRouteId, pathIndex, targetPath, targetRouteId) {
-		const sourceDocument = cragEditorState.routeDocuments.find((entry) => entry.path === sourcePath);
-		const targetDocument = cragEditorState.routeDocuments.find((entry) => entry.path === targetPath);
-		const sourceRoute = sourceDocument?.data.routes?.find((route) => route.id === sourceRouteId);
-		const targetRoute = targetDocument?.data.routes?.find((route) => route.id === targetRouteId);
-		const sourcePaths = sourceRoute?.assets?.paths;
-		const pathAssets = Array.isArray(sourcePaths) ? sourcePaths : sourcePaths ? [sourcePaths] : [];
-		const pathAsset = pathAssets[pathIndex];
-
-		if (!sourceDocument || !targetDocument || !sourceRoute || !targetRoute || !pathAsset) return;
-
-		if (sourceRoute === targetRoute) return;
-
-		sourceRoute.assets = {
-			...(sourceRoute.assets || {}),
-			paths: pathAssets.filter((_, index) => index !== pathIndex)
-		};
-		const targetPaths = targetRoute.assets?.paths;
-		targetRoute.assets = {
-			...(targetRoute.assets || {}),
-			paths: [...(Array.isArray(targetPaths) ? targetPaths : targetPaths ? [targetPaths] : []), pathAsset]
-		};
-		sourceDocument.dirty = true;
-		targetDocument.dirty = true;
-		selectedRouteKey = `${targetPath}:${targetRouteId}`;
-	}
 </script>
 
 <CragEditorMap
@@ -1073,86 +967,26 @@
 	{isCompact}
 	{isMedium}
 	{isLandscape}
-	{CragEditorBottomSheet}
 	bind:activeTool
+	bind:toolOptionsOpen
 	bind:mapStyle
 	bind:activeTab
 	{detectedAssets}
-	bind:selectedSectorId
+	bind:selectedObject
 	{currentTrackPoints}
-	{editingTrackIndex}
+	{activeTrackTarget}
 	{trackDraftMode}
 	{isRoutingTrack}
 	{hasPendingTrackCut}
 	{isRoutePathDrawing}
-	{cragTypes}
-	{availableTags}
-	{securityOptions}
-	{rockTypes}
-	{commonEquipment}
 	{saveStatus}
 	{saveError}
-	onPlanGenerated={handleFlightPlanGenerated}
-	routeDocuments={cragEditorState.routeDocuments}
-	{selectedRouteKey}
-	onBack={() => goto(base + '/')}
-	onStartRoutingDraft={startRoutingDraft}
-	onSetTrackDraftMode={setTrackDraftMode}
-	onHandleTrackConfirm={handleTrackConfirm}
-	onCancelTrackEdit={cancelTrackEdit}
-	onUndoTrackPoint={undoTrackPoint}
-	onStartTrackCut={startTrackCut}
-	onConfirmTrackCut={confirmTrackCut}
-	onCancelTrackCut={resetTrackCut}
-	onReverseTrack={reverseTrack}
-	onTrimTrackStart={trimTrackStart}
-	onTrimTrackEnd={trimTrackEnd}
-	onSimplifyTrack={simplifyTrack}
-	onGpxUpload={handleGpxUpload}
-	onExport={saveToServer}
-	onUseSearchPosition={setCragPositionFromSearch}
-	onLocateUser={locateUser}
-	onAddEquipmentItem={addEquipmentItem}
-	onRemoveEquipmentItem={removeEquipmentItem}
-	onAddCragImages={addCragImages}
-	onRemoveCragImage={removeCragImage}
-	onAddSector={createSector}
-	onDuplicateSector={duplicateSector}
-	onRemoveSector={removeSector}
-	onMoveSector={moveSector}
-	onSetSectorGeometryType={setSectorGeometryType}
-	onFocusSector={focusSector}
-	onSetHoverHighlight={setHoverHighlight}
-	onClearDetectedAssets={accessEditor.clearDetectedAssets}
-	onAddDetectedAsset={addDetectedAsset}
-	onRemoveAccessFeature={removeAccessFeature}
-	onEditTrack={editTrack}
-	onRemoveTrack={removeTrack}
-	onFinalizeTrack={finalizeTrack}
-	onAddParentRoute={() => addRoute()}
-	onAddSectorRoute={addRoute}
-	onSelectRoute={selectRoute}
-	onUpdateRouteName={(path, routeId, name) => updateRoute(path, routeId, 'name', name)}
-	onUpdateRoute={updateRoute}
-	onAddRoutePath={addRoutePath}
-	onEditRoutePath={editRoutePath}
-	onUpdateRoutePath={updateRoutePath}
-	onRemoveRoutePath={removeRoutePath}
-	onDeleteRoute={deleteRoute}
 	{vertexDeleteUndo}
-	onUndoSectorVertexDelete={undoSectorVertexDelete}
 />
 
 <RouteDetailModal
 	routeEntry={selectedRouteEntry}
-	onClose={() => (selectedRouteKey = null)}
-	onChange={touchRoute}
-	onAddRoutePath={addRoutePath}
-	onEditRoutePath={editRoutePath}
-	onUpdateRoutePath={updateRoutePath}
-	onRemoveRoutePath={removeRoutePath}
-	onMoveRoutePath={moveRoutePath}
-	routeDocuments={cragEditorState.routeDocuments}
+	onClose={() => selectObject(null)}
 />
 
 {#if activeTool === 'cut'}

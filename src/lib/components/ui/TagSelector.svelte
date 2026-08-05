@@ -2,7 +2,7 @@
 	import { slide } from 'svelte/transition';
 	import { _ } from 'svelte-i18n';
 
-	let { selectedTags = $bindable(), availableTags = [], small = false } = $props();
+	let { selectedTags = $bindable(), availableTags = [], small = false, onChange = null } = $props();
 
 	let isOpen = $state(false);
 	let container;
@@ -12,12 +12,14 @@
 
 		if (!selectedTags.includes(tag)) {
 			selectedTags = [...selectedTags, tag];
+			onChange?.(selectedTags);
 		}
 	}
 
 	function removeTag(tag) {
 		if (!selectedTags) return;
 		selectedTags = selectedTags.filter((t) => t !== tag);
+		onChange?.(selectedTags);
 	}
 
 	function handleClickOutside(event) {

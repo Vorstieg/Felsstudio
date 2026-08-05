@@ -1,12 +1,5 @@
 function snapshot(topo) {
-	return JSON.parse(
-		JSON.stringify({
-			routes: topo.routes,
-			fixPoints: topo.fixPoints,
-			outlines: topo.outlines,
-			textLabels: topo.textLabels || []
-		})
-	);
+	return JSON.parse(JSON.stringify(topo));
 }
 
 /** Owns topo-edit history independently of input and rendering. */
@@ -28,6 +21,11 @@ export function createTopoHistory({ getTopo, restore }) {
 		return true;
 	}
 
+	function clear() {
+		entries = [];
+		index = -1;
+	}
+
 	function redo() {
 		if (index >= entries.length - 1) return false;
 		index++;
@@ -35,5 +33,5 @@ export function createTopoHistory({ getTopo, restore }) {
 		return true;
 	}
 
-	return { save, undo, redo };
+	return { save, undo, redo, clear };
 }

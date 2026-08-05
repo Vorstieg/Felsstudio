@@ -1,6 +1,5 @@
 import { onMount } from 'svelte';
 import { draftsState, isBlankTopoSession } from '$lib/state/drafts.svelte.js';
-import { userState } from '$lib/state/editor.svelte.js';
 
 /**
  * Adds the common local-draft lifecycle used by topo editors. Saving a draft is
@@ -13,17 +12,17 @@ export function useTopoDraftAutosave({
 	restoreSession,
 	getExtra = () => ({}),
 	shouldRestore = null,
-	delay = 2000
+	delay = 2000,
+	session,
+	draftId = null
 }) {
+	if (!session) throw new Error('A topo editor session is required for draft autosave');
+	const userState = session;
 	let canAutosave = $state(false);
 	let saveTimeout = null;
 	let isPersisting = false;
 	let saveAgain = false;
-	const currentSession = () => ({
-		topo: userState.topo,
-		clustering: userState.clustering,
-		glbBlob: userState.ui.glbBlob
-	});
+	const currentSession = () => userState.getSaveSession();
 
 	async function persistDraftImmediately() {
 		if (isBlankTopoSession(currentSession())) return;
@@ -55,8 +54,11 @@ export function useTopoDraftAutosave({
 		};
 
 		void (async () => {
-			draftsState.init();
-			if (
+			draftsState.load();
+			if (!userState.ui.activeDraftId && draftId) {
+				const requested = await draftsState.getById(draftId);
+				if (!disposed && requested) restoreSession(requested, draftId);
+			} else if (
 				!userState.ui.activeDraftId &&
 				(shouldRestore ? shouldRestore() : isBlankTopoSession(currentSession()))
 			) {

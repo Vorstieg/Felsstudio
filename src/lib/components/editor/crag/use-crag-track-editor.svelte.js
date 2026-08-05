@@ -1,4 +1,3 @@
-import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
 import { parseGpx } from '$lib/assets/js/route-path-utils.js';
 import { initMapPointDragHandlers } from '$lib/components/editor/map-point-drag-handlers.js';
 import {
@@ -15,6 +14,7 @@ import {
 import { createAccessFeature, createAccessId } from '$lib/assets/js/access-geojson.js';
 
 export function useCragTrackEditor({
+	state,
 	getMap,
 	getActiveTool,
 	setActiveTool,
@@ -23,30 +23,44 @@ export function useCragTrackEditor({
 	getRoutePathTarget = () => null,
 	onSaveRoutePath = () => {},
 	onRoutePathDrawingEnd = () => {},
+	onPathFinished = () => {},
+	onPathCancelled = () => {},
 	onTrackPointDragStart = () => {},
-	onTrackPointDragEnd = () => {}
+	onTrackPointDragEnd = () => {},
+	getTrackFeature = (target) => {
+		if (target?.kind !== 'access') return null;
+		return state.access.features.find((feature) => feature.id === target.featureId) || null;
+	},
+	saveTrackGeometry = (target, coordinates) => {
+		if (target?.kind !== 'access') return false;
+		state.replaceAccessFeatures(state.access.features.map((feature) => feature.id === target.featureId ? { ...feature, geometry: { type: 'LineString', coordinates } } : feature));
+		return true;
+	},
+	removeTrackTarget = (target) => {
+		if (target?.kind !== 'access') return false;
+		state.replaceAccessFeatures(state.access.features.filter((feature) => feature.id !== target.featureId));
+		return true;
+	}
 }) {
 	let currentTrackPoints = $state([]);
 	let routeDraftWaypoints = $state([]);
-	let editingTrackIndex = $state(null);
+	let activeTrackTarget = $state(null);
 	let trackDraftMode = $state('routing');
 	let isSnappingEnabled = $state(true);
 	let isRoutingTrack = $state(false);
 	let draggingTrackPoint = $state(null);
+	let selectedTrackPointIndex = $state(null);
 	let areTrackPointDragHandlersReady = false;
 	let trackEditHistory = [];
 	const approachFeatures = () =>
-		cragEditorState.access.features.filter((feature) => feature.properties?.kind === 'approach');
+		state.access.features.filter((feature) => feature.properties?.kind === 'approach');
 	const replaceApproaches = (features) => {
-		cragEditorState.access = {
-			...cragEditorState.access,
-			features: [
-				...cragEditorState.access.features.filter(
+		state.replaceAccessFeatures([
+				...state.access.features.filter(
 					(feature) => feature.properties?.kind !== 'approach'
 				),
 				...features
-			]
-		};
+		]);
 	};
 
 	function createDraftSnapshot() {
@@ -98,8 +112,9 @@ export function useCragTrackEditor({
 	function startRoutingDraft() {
 		currentTrackPoints = [];
 		routeDraftWaypoints = [];
-		editingTrackIndex = null;
+		activeTrackTarget = getRoutePathTarget() ? { kind: 'route-path', ...getRoutePathTarget() } : null;
 		clearDraftHistory();
+		selectedTrackPointIndex = null;
 		setActiveTool('track');
 	}
 
@@ -136,6 +151,26 @@ export function useCragTrackEditor({
 			return;
 		}
 		if (currentTrackPoints.length > 0) currentTrackPoints = currentTrackPoints.slice(0, -1);
+	}
+
+	function insertTrackPoint(index, coordinate) {
+		if (!Array.isArray(coordinate) || currentTrackPoints.length < 2) return false;
+		saveDraftHistory();
+		const points = $state.snapshot(currentTrackPoints);
+		points.splice(index, 0, [...coordinate]);
+		currentTrackPoints = points;
+		selectedTrackPointIndex = index;
+		return true;
+	}
+
+	function removeTrackPoint(index) {
+		if (currentTrackPoints.length <= 2 || !currentTrackPoints[index]) return false;
+		saveDraftHistory();
+		currentTrackPoints = $state
+			.snapshot(currentTrackPoints)
+			.filter((_, pointIndex) => pointIndex !== index);
+		selectedTrackPointIndex = null;
+		return true;
 	}
 
 	function useEditedTrackPoints(points) {
@@ -196,22 +231,21 @@ export function useCragTrackEditor({
 	}
 
 	function removeTrack(id) {
-		const next = approachFeatures().filter((feature) => feature.id !== id);
-		replaceApproaches(next);
-		if (editingTrackIndex === id) cancelTrackEdit();
+		removeTrackTarget({ kind: 'access', featureId: id });
+		if (activeTrackTarget?.kind === 'access' && activeTrackTarget.featureId === id) cancelTrackEdit();
 	}
 
 	function splitEditingTrack(startCoordinates, endCoordinates) {
-		if (editingTrackIndex === null || startCoordinates.length < 2 || endCoordinates.length < 2)
+		if (activeTrackTarget?.kind !== 'access' || startCoordinates.length < 2 || endCoordinates.length < 2)
 			return false;
 
-		const track = approachFeatures().find((feature) => feature.id === editingTrackIndex);
+		const track = getTrackFeature(activeTrackTarget);
 		if (!track) return false;
 
 		const segmentName = `${track.properties?.name || 'Approach Track'} segment 2`;
 		replaceApproaches([
 			...approachFeatures().flatMap((feature) =>
-				feature.id === editingTrackIndex
+				feature.id === activeTrackTarget.featureId
 					? [
 							{ ...feature, geometry: { type: 'LineString', coordinates: startCoordinates } },
 							{
@@ -237,28 +271,23 @@ export function useCragTrackEditor({
 		const routePathTarget = getRoutePathTarget();
 		if (routePathTarget) {
 			onSaveRoutePath(routePathTarget, coordinates);
-			setActiveTab('sectors');
 			setActiveTool('position');
 			resetDraft();
 			onRoutePathDrawingEnd();
+			onPathFinished();
 			return;
 		}
 
-		if (editingTrackIndex !== null) {
-			replaceApproaches(
-				approachFeatures().map((feature) =>
-					feature.id === editingTrackIndex
-						? { ...feature, geometry: { type: 'LineString', coordinates } }
-						: feature
-				)
-			);
+		if (activeTrackTarget?.kind === 'access') {
+			saveTrackGeometry(activeTrackTarget, coordinates);
 			setActiveTab('registry');
 			setActiveTool('track');
 			fitTrackBounds(coordinates);
-			editingTrackIndex = null;
+			activeTrackTarget = null;
 			currentTrackPoints = [];
 			routeDraftWaypoints = [];
 			clearDraftHistory();
+			onPathFinished();
 			return;
 		}
 
@@ -275,41 +304,57 @@ export function useCragTrackEditor({
 	}
 
 	function editTrack(id) {
-		const track = approachFeatures().find((feature) => feature.id === id);
+		const target = { kind: 'access', featureId: id };
+		const track = getTrackFeature(target);
 		if (!track?.geometry?.coordinates?.length) return;
-		editingTrackIndex = id;
+		activeTrackTarget = target;
 		currentTrackPoints = track.geometry.coordinates.map((point) => [...point]);
 		routeDraftWaypoints = [];
 		trackDraftMode = 'editing';
 		clearDraftHistory();
+		selectedTrackPointIndex = null;
 		setActiveTool('track');
 		setActiveTab('registry');
 		fitTrackBounds(track.geometry.coordinates);
 	}
 
 	function editRoutePath(coordinates) {
-		if (coordinates.length < 2) return;
-		editingTrackIndex = null;
+		if (!Array.isArray(coordinates)) return;
+		activeTrackTarget = getRoutePathTarget() ? { kind: 'route-path', ...getRoutePathTarget() } : null;
 		currentTrackPoints = coordinates.map((point) => [...point]);
 		routeDraftWaypoints = [];
 		trackDraftMode = 'editing';
 		clearDraftHistory();
+		selectedTrackPointIndex = null;
 		setActiveTool('track');
-		setActiveTab('sectors');
-		fitTrackBounds(coordinates);
+		if (coordinates.length > 1) fitTrackBounds(coordinates);
 	}
 
 	function cancelTrackEdit() {
 		const routePathTarget = getRoutePathTarget();
 		resetDraft();
 		if (routePathTarget) onRoutePathDrawingEnd();
+		onPathCancelled();
+	}
+
+	function commitRoutePathEdit() {
+		const routePathTarget = getRoutePathTarget();
+		if (!routePathTarget) return false;
+		if (currentTrackPoints.length > 1) {
+			onSaveRoutePath(routePathTarget, $state.snapshot(currentTrackPoints));
+		}
+		setActiveTool('position');
+		resetDraft();
+		onRoutePathDrawingEnd();
+		return true;
 	}
 
 	function resetDraft() {
 		currentTrackPoints = [];
 		routeDraftWaypoints = [];
-		editingTrackIndex = null;
+		activeTrackTarget = null;
 		clearDraftHistory();
+		selectedTrackPointIndex = null;
 	}
 
 	function fitTrackBounds(points) {
@@ -324,10 +369,10 @@ export function useCragTrackEditor({
 			const routePathTarget = getRoutePathTarget();
 			if (routePathTarget) {
 				onSaveRoutePath(routePathTarget, points);
-				setActiveTab('sectors');
 				setActiveTool('position');
 				resetDraft();
 				onRoutePathDrawingEnd();
+				onPathFinished();
 				return;
 			}
 			const feature = createAccessFeature({
@@ -348,17 +393,29 @@ export function useCragTrackEditor({
 
 		initMapPointDragHandlers({
 			map,
-			layers: ['tracks-points-drawing'],
+			layers: ['tracks-points-drawing', 'tracks-point-midpoints'],
 			canDrag: () => getActiveTool() === 'track' && trackDraftMode === 'editing',
-			getDragState: (event) => {
+			getDragState: (event, layerId) => {
 				const pointIndex = Number(event.features?.[0]?.properties?.pointIndex);
-				return Number.isInteger(pointIndex) ? { pointIndex } : null;
+				return Number.isInteger(pointIndex)
+					? { pointIndex, isMidpoint: layerId === 'tracks-point-midpoints' }
+					: null;
 			},
-			onDragStart: ({ pointIndex }) => {
+			onDragStart: (drag, event) => {
+				if (drag.isMidpoint) {
+					if (
+						!event.lngLat ||
+						!insertTrackPoint(drag.pointIndex, [event.lngLat.lng, event.lngLat.lat])
+					)
+						return false;
+				} else {
+					saveTrackPointMoveHistory(drag.pointIndex, currentTrackPoints[drag.pointIndex]);
+				}
+				const pointIndex = drag.pointIndex;
 				const coordinate = $state.snapshot(currentTrackPoints)[pointIndex];
 				if (!coordinate) return;
-				saveTrackPointMoveHistory(pointIndex, coordinate);
 				draggingTrackPoint = { pointIndex, coordinate: [...coordinate] };
+				selectedTrackPointIndex = pointIndex;
 				onTrackPointDragStart();
 			},
 			onDragMove: ({ pointIndex }, event) => {
@@ -376,14 +433,25 @@ export function useCragTrackEditor({
 				setSuppressNextMapClick(true);
 			}
 		});
+
+		const deleteTrackPoint = (event) => {
+			if (getActiveTool() !== 'track') return;
+			const pointIndex = Number(event.features?.[0]?.properties?.pointIndex);
+			if (!Number.isInteger(pointIndex) || !removeTrackPoint(pointIndex)) return;
+			event.originalEvent?.stopPropagation?.();
+			setSuppressNextMapClick(true);
+			onTrackPointDragEnd();
+		};
+		map.on('click', 'tracks-point-delete', deleteTrackPoint);
+		map.on('touchstart', 'tracks-point-delete', deleteTrackPoint);
 	}
 
 	return {
 		get currentTrackPoints() {
 			return currentTrackPoints;
 		},
-		get editingTrackIndex() {
-			return editingTrackIndex;
+		get activeTrackTarget() {
+			return activeTrackTarget;
 		},
 		get trackDraftMode() {
 			return trackDraftMode;
@@ -397,11 +465,16 @@ export function useCragTrackEditor({
 		get draggingTrackPoint() {
 			return draggingTrackPoint;
 		},
+		get selectedTrackPointIndex() {
+			return selectedTrackPointIndex;
+		},
 		addTrackPoint,
 		handleTrackConfirm,
 		startRoutingDraft,
 		setTrackDraftMode,
 		undoTrackPoint,
+		insertTrackPoint,
+		removeTrackPoint,
 		reverseTrack,
 		trimTrackStart,
 		trimTrackEnd,
@@ -412,6 +485,7 @@ export function useCragTrackEditor({
 		editTrack,
 		editRoutePath,
 		cancelTrackEdit,
+		commitRoutePathEdit,
 		handleGpxUpload,
 		initTrackPointDragHandlers
 	};

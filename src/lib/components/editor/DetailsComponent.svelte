@@ -9,12 +9,15 @@
 		onTabChange = (tab) => (activeTab = tab),
 		width = '20rem',
 		shadow = true,
+		visualSuperseded = false,
 		footer,
 		headerActions,
 		children
 	} = $props();
 
-	let isDesktop = $state(false);
+	// Resolve the initial layout from the browser width so desktop does not
+	// briefly render the mobile bottom-sheet variant during hydration.
+	let isDesktop = $state(typeof window !== 'undefined' && window.innerWidth > 1024);
 
 	onMount(() => {
 		const updateLayout = () => (isDesktop = window.innerWidth > 1024);
@@ -60,10 +63,10 @@
 		{#if footer}<div class="mt-2 panel p-2 bg-white shadow-sm border-black/15">{@render footer()}</div>{/if}
 	</div>
 {:else}
-	<div class="fixed inset-0 z-40 pointer-events-none">
+	<div class="details-mobile fixed inset-0 z-40 pointer-events-none">
 		<div
 			use:resize
-			class="fixed left-0 right-0 z-50 flex flex-col bg-white shadow-panel rounded-t-4xl border-t border-black/10 overflow-hidden pointer-events-auto"
+			class="fixed left-0 right-0 z-50 flex flex-col bg-white shadow-panel rounded-t-4xl border-t border-black/10 overflow-hidden pointer-events-auto {visualSuperseded ? 'invisible' : ''}"
 			role="dialog"
 			aria-label={title}
 		>
@@ -76,3 +79,13 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	/* SSR cannot know the viewport, so prevent its mobile fallback from
+	   covering the desktop editor before hydration completes. */
+	@media (min-width: 1025px) {
+		.details-mobile {
+			display: none;
+		}
+	}
+</style>

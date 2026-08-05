@@ -1,10 +1,12 @@
 <script>
 	import { _ } from 'svelte-i18n';
 	import ToolBar from '$lib/components/editor/tools/ToolBar.svelte';
+	import MapSearch from '$lib/components/editor/MapSearch.svelte';
 
 	let {
-		activeTool = $bindable('position'),
-		mapStyle = $bindable('transport'),
+		map = null,
+		activeTool = $bindable('select'),
+		toolOptionsOpen = $bindable(false),
 		currentTrackPoints = [],
 		trackDraftMode = 'routing',
 		isRoutingTrack = false,
@@ -14,37 +16,46 @@
 		onHandleTrackConfirm = () => {},
 		onCancelTrackEdit = () => {},
 		onUndoTrackPoint = () => {},
+		onUndo = () => {},
+		onRedo = () => {},
+		canUndo = false,
+		canRedo = false,
 		onConfirmTrackCut = () => {},
 		onCancelTrackCut = () => {},
-		onLocateUser = () => {},
 		onExport = () => {},
 		status = 'idle',
 		errorMessage = ''
 	} = $props();
 
 	let tools = $derived([
+		{ id: 'select', icon: 'fa-arrow-pointer', label: 'Select' },
 		{ id: 'position', icon: 'fa-location-crosshairs', label: 'Crag Position' },
 		{ id: 'parking', icon: 'fa-square-parking', label: 'Parking Spot' },
+		{ id: 'hut', icon: 'fa-house', label: 'Mountain Hut' },
 		{ id: 'transit', icon: 'fa-bus', label: 'Transit Station' },
-		{ id: 'track', icon: 'fa-route', label: 'Approach Track', onSelect: onStartRoutingDraft },
 		{
-			id: 'locate',
-			icon: 'fa-location-crosshairs',
-			label: 'Use current location',
-			onSelect: onLocateUser
-		}
+			id: 'track',
+			icon: 'fa-route',
+			label: 'Approach Track',
+			hasOptions: true,
+			onSelect: ({ isActive }) => {
+				if (!isActive) onStartRoutingDraft();
+			}
+		},
 	]);
 	let canFinishTrack = $derived(activeTool === 'track' && currentTrackPoints.length > 1);
 </script>
 
 <ToolBar
-	title={$_('ui.crag_studio')}
 	bind:activeTool
+	bind:toolOptionsOpen
+	neutralTool="select"
 	{tools}
 	{onBack}
 	undo={activeTool === 'track'
 		? { label: 'Undo', run: onUndoTrackPoint, disabled: currentTrackPoints.length === 0 }
-		: null}
+		: canUndo ? { label: 'Undo', run: onUndo } : null}
+	redo={activeTool === 'track' ? null : canRedo ? { label: 'Redo', run: onRedo } : null}
 	finish={canFinishTrack
 		? { label: $_('ui.finish'), run: onHandleTrackConfirm, disabled: isRoutingTrack }
 		: activeTool === 'cut' && hasPendingTrackCut
@@ -57,18 +68,7 @@
 			: null}
 	save={{ status, errorMessage, run: onExport }}
 >
-	{#snippet controls()}
-		<div
-			class="hidden items-center gap-1 rounded-sm border border-black/10 bg-black/5 p-0.5 xl:flex"
-		>
-			{#each ['transport', 'satellite', 'terrain'] as style}
-				<button
-					type="button"
-					onclick={() => (mapStyle = style)}
-					class={`rounded-sm px-2 py-1 text-[9px] font-bold uppercase tracking-wider transition-none ${mapStyle === style ? 'bg-white text-near-black shadow-sm' : 'text-warm-gray-400 hover:bg-black/5'}`}
-					>{style}</button
-				>
-			{/each}
-		</div>
+	{#snippet mobileSearch()}
+		<MapSearch {map} embedded />
 	{/snippet}
 </ToolBar>

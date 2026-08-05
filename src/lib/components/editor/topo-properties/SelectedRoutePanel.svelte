@@ -1,5 +1,6 @@
 <script>
-	import { userState } from '$lib/state/editor.svelte.js';
+	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	const userState = getTopoEditorSession();
 	import { cragTypes } from '$lib/components/editor/crag/crag-editor-options.js';
 	import { availableRouteTags, convertRouteType } from '$lib/assets/js/topo-utils.js';
 	import { snapToSmallestHeight } from '$lib/assets/js/resize.js';
@@ -8,7 +9,6 @@
 	import {
 		addPathAsset,
 		createVariant,
-		getPathAssets,
 		removePathAsset,
 		routeLineStyles
 	} from './topo-properties-utils.js';
@@ -29,11 +29,13 @@
 
 	function selectPathAsset(route, index) {
 		userState.ui.selectedRouteId = route.id;
-		userState.ui.selectedPathIndex = index;
+		userState.ui.selectedPathId = index;
 		userState.ui.selectedFixpointId = null;
 		drawingTarget = null;
 		onPathSelect?.(route, index);
 	}
+
+	function pathRefs() { return route?.pathRefs || []; }
 
 	function addPitch(route) {
 		if (!route.pitches) route.pitches = [];
@@ -152,22 +154,22 @@
 				<button
 					class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-warm-gray-500 hover:bg-creator-blue hover:text-white transition-none"
 					onclick={() => {
-									addPathAsset(route);
-									selectPathAsset(route, (route.assets?.paths || []).length - 1);
+									const pathId = addPathAsset(route, userState.topo);
+									selectPathAsset(route, pathId);
 								}}
 				>
 					+ Add
 				</button>
 			</div>
 		</div>
-		{#if getPathAssets(route).length === 0}
+		{#if pathRefs().length === 0}
 			<p class="text-micro-data text-warm-gray-400">No paths attached.</p>
 		{/if}
 		<div class="space-y-1">
-			{#each route.assets?.paths || [] as pathAsset, pathIndex}
+			{#each pathRefs() as pathAsset}
 				<div
-					class={`grid grid-cols-12 gap-1 rounded-sm border p-1 cursor-pointer ${userState.ui.selectedRouteId === route.id && userState.ui.selectedPathIndex === pathIndex ? 'border-creator-blue bg-creator-blue/5' : 'border-black/10 bg-white'}`}
-					onclick={() => selectPathAsset(route, pathIndex)}
+					class={`grid grid-cols-12 gap-1 rounded-sm border p-1 cursor-pointer ${userState.ui.selectedRouteId === route.id && userState.ui.selectedPathId === pathAsset.pathId ? 'border-creator-blue bg-creator-blue/5' : 'border-black/10 bg-white'}`}
+					onclick={() => selectPathAsset(route, pathAsset.pathId)}
 				>
 					<select bind:value={pathAsset.role}
 					        class="col-span-4 rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none">
@@ -180,7 +182,7 @@
 					       class="col-span-7 rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none"
 					       placeholder="Label" />
 					<button
-						onclick={(event) => { event.stopPropagation(); removePathAsset(route, pathIndex); if (userState.ui.selectedRouteId === route.id && userState.ui.selectedPathIndex === pathIndex) userState.ui.selectedPathIndex = null; }}
+						onclick={(event) => { event.stopPropagation(); removePathAsset(route, pathAsset.pathId, userState.topo); if (userState.ui.selectedRouteId === route.id && userState.ui.selectedPathId === pathAsset.pathId) userState.ui.selectedPathId = null; }}
 						class="col-span-1 text-warm-gray-300 hover:text-rose-600 transition-none">
 						<i class="fa-solid fa-xmark text-[10px]"></i>
 					</button>

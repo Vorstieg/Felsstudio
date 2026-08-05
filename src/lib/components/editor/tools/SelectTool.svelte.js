@@ -1,8 +1,7 @@
-import { userState } from '$lib/state/editor.svelte.js';
-
 export class SelectTool {
 	id = 'select';
-	constructor({ saveHistory } = {}) {
+	constructor({ state, saveHistory } = {}) {
+		this.state = state;
 		this.saveHistory = saveHistory || (() => {});
 	}
 
@@ -21,13 +20,13 @@ export class SelectTool {
 	onMouseUp(event, point) {}
 	onKeyDown(event) {
 		if (event.key === 'Delete' || event.key === 'Backspace') {
-			if (userState.ui.selectedFixpointId) {
-				const idToDelete = userState.ui.selectedFixpointId;
+			if (this.state.ui.selectedFixpointId) {
+				const idToDelete = this.state.ui.selectedFixpointId;
 				// Remove from global fixpoints
-				userState.topo.fixPoints = userState.topo.fixPoints.filter((p) => p.id !== idToDelete);
+				this.state.topo.fixPoints = this.state.topo.fixPoints.filter((p) => p.id !== idToDelete);
 
 				// Remove references from routes
-				userState.topo.routes.forEach((route) => {
+				this.state.topo.routes.forEach((route) => {
 					if (route.fixPoints) {
 						route.fixPoints = route.fixPoints.filter((id) => id !== idToDelete);
 					}
@@ -39,7 +38,7 @@ export class SelectTool {
 					}
 				});
 
-				userState.ui.selectedFixpointId = null;
+				this.state.ui.selectedFixpointId = null;
 				this.saveHistory();
 			}
 		}

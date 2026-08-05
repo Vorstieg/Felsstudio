@@ -2,7 +2,8 @@
 	import { onMount, onDestroy } from 'svelte';
 	import maplibregl from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
-	import { userState } from '$lib/state/editor.svelte.js';
+	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	const userState = getTopoEditorSession();
 
 	let mapContainer = $state();
 	let map;

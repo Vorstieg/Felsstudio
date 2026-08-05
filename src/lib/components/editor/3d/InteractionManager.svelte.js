@@ -1,4 +1,3 @@
-import { userState } from '$lib/state/editor.svelte.js';
 import * as THREE from 'three';
 import { Vector3, Raycaster } from 'three';
 import { generateRouteId, generateSymbolId, generateId } from '$lib/assets/js/id-utils.js';
@@ -31,7 +30,9 @@ export class Topo3DInteractionManager {
 	OFFSET_DISTANCE = 0.05;
 	SNAP_THRESHOLD = 0.15;
 
-	constructor() {}
+	constructor(state) {
+		this.state = state;
+	}
 
 	getSnappedVertex(point) {
 		let finalPoint = point.clone();
@@ -100,8 +101,8 @@ export class Topo3DInteractionManager {
 	handleMeshClick() {
 		if (this.currentClickData.length === 0) {
 			// Deselect logic
-			userState.ui.selectedRouteId = null;
-			userState.ui.selectedFixpointId = null;
+			this.state.ui.selectedRouteId = null;
+			this.state.ui.selectedFixpointId = null;
 		}
 	}
 
@@ -121,8 +122,8 @@ export class Topo3DInteractionManager {
 
 		if (activeTool === 'fixpoint') {
 			const localPoint = this.gltfScene.worldToLocal(event.point.clone());
-			const symbolType = userState.ui.selectedSymbol || 'bolt';
-			userState.topo.fixPoints.push({
+			const symbolType = this.state.ui.selectedSymbol || 'bolt';
+			this.state.topo.fixPoints.push({
 				id: generateSymbolId(),
 				position: localPoint.toArray().map((c) => Number(c.toFixed(4))),
 				type: symbolType
@@ -267,8 +268,8 @@ export class Topo3DInteractionManager {
 
 	handleFixPointClick(e, pointId) {
 		e.stopPropagation();
-		if (userState.ui.selectedRouteId) {
-			const route = userState.topo.routes.find((r) => r.id === userState.ui.selectedRouteId);
+		if (this.state.ui.selectedRouteId) {
+			const route = this.state.topo.routes.find((r) => r.id === this.state.ui.selectedRouteId);
 			if (route) {
 				if (!route.fixPoints) route.fixPoints = [];
 				if (route.fixPoints.includes(pointId)) {
@@ -278,8 +279,8 @@ export class Topo3DInteractionManager {
 				}
 			}
 		} else {
-			userState.ui.selectedFixpointId =
-				userState.ui.selectedFixpointId === pointId ? null : pointId;
+			this.state.ui.selectedFixpointId =
+				this.state.ui.selectedFixpointId === pointId ? null : pointId;
 		}
 	}
 
@@ -291,7 +292,7 @@ export class Topo3DInteractionManager {
 			this.currentClickData.length > 0
 		) {
 			// Finish route/pitch logic
-			const startPoint = userState.topo.fixPoints.find((p) => p.id === pointId);
+			const startPoint = this.state.topo.fixPoints.find((p) => p.id === pointId);
 			if (!startPoint) return;
 
 			const modelOffset = new Vector3(...this.modelPosition);
@@ -321,8 +322,8 @@ export class Topo3DInteractionManager {
 			});
 
 			if (activeTool === 'multipitch') {
-				let route = userState.topo.routes.find(
-					(r) => r.id === (this.localDrawingState?.routeId || userState.ui.selectedRouteId)
+				let route = this.state.topo.routes.find(
+					(r) => r.id === (this.localDrawingState?.routeId || this.state.ui.selectedRouteId)
 				);
 				if (route) {
 					let pitch = this.localDrawingState
@@ -347,8 +348,8 @@ export class Topo3DInteractionManager {
 					tags: [],
 					fixPoints: []
 				};
-				userState.topo.routes = [...userState.topo.routes, newRoute];
-				userState.ui.selectedRouteId = newRoute.id;
+				this.state.topo.routes = [...this.state.topo.routes, newRoute];
+				this.state.ui.selectedRouteId = newRoute.id;
 			}
 
 			this.resetDrawingState();
@@ -357,9 +358,9 @@ export class Topo3DInteractionManager {
 
 		if (activeTool === 'multipitch') {
 			// START multipitch
-			const route = userState.topo.routes.find((r) => r.id === userState.ui.selectedRouteId);
+			const route = this.state.topo.routes.find((r) => r.id === this.state.ui.selectedRouteId);
 			if (route && route.type === 'multi-pitch') {
-				const startPoint = userState.topo.fixPoints.find((p) => p.id === pointId);
+				const startPoint = this.state.topo.fixPoints.find((p) => p.id === pointId);
 				if (startPoint) {
 					const startClick = {
 						point: new Vector3(...startPoint.position).add(new Vector3(...this.modelPosition)),
@@ -387,13 +388,13 @@ export class Topo3DInteractionManager {
 	handleKeyDown(event, activeTool) {
 		// Global key handlers (Delete)
 		if (event.key === 'Delete' || event.key === 'Backspace') {
-			if (userState.ui.selectedFixpointId) {
-				const idToDelete = userState.ui.selectedFixpointId;
+			if (this.state.ui.selectedFixpointId) {
+				const idToDelete = this.state.ui.selectedFixpointId;
 				// Remove from global fixpoints
-				userState.topo.fixPoints = userState.topo.fixPoints.filter((p) => p.id !== idToDelete);
+				this.state.topo.fixPoints = this.state.topo.fixPoints.filter((p) => p.id !== idToDelete);
 
 				// Remove references from routes
-				userState.topo.routes.forEach((route) => {
+				this.state.topo.routes.forEach((route) => {
 					if (route.fixPoints) {
 						route.fixPoints = route.fixPoints.filter((id) => id !== idToDelete);
 					}
@@ -405,7 +406,7 @@ export class Topo3DInteractionManager {
 					}
 				});
 
-				userState.ui.selectedFixpointId = null;
+				this.state.ui.selectedFixpointId = null;
 				return;
 			}
 		}
@@ -440,19 +441,19 @@ export class Topo3DInteractionManager {
 			return localPoint.toArray().map((c) => Number(c.toFixed(4)));
 		});
 
-		let route = userState.topo.routes.find(
-			(r) => r.id === (this.localDrawingState?.routeId || userState.ui.selectedRouteId)
+		let route = this.state.topo.routes.find(
+			(r) => r.id === (this.localDrawingState?.routeId || this.state.ui.selectedRouteId)
 		);
 		if (!route) {
 			route = { id: generateRouteId(), type: 'multi-pitch', pitches: [], tags: [], fixPoints: [] };
-			userState.topo.routes.push(route);
+			this.state.topo.routes.push(route);
 		}
 
 		const anchorId = generateId('anchor');
 		const lastPoint = allPointsWithNormals[allPointsWithNormals.length - 1];
 		const localAnchor = this.gltfScene.worldToLocal(lastPoint.point.clone());
 		
-		userState.topo.fixPoints.push({
+		this.state.topo.fixPoints.push({
 			id: anchorId,
 			position: localAnchor.toArray().map((c) => Number(c.toFixed(4))),
 			type: 'belay'
@@ -504,8 +505,8 @@ export class Topo3DInteractionManager {
 				averageNormal.normalize();
 
 				if (activeTool === 'multipitch') {
-					let route = userState.topo.routes.find(
-						(r) => r.id === (this.localDrawingState?.routeId || userState.ui.selectedRouteId)
+					let route = this.state.topo.routes.find(
+						(r) => r.id === (this.localDrawingState?.routeId || this.state.ui.selectedRouteId)
 					);
 					if (!route) {
 						route = {
@@ -517,11 +518,11 @@ export class Topo3DInteractionManager {
 							tags: [],
 							fixPoints: []
 						};
-						userState.topo.routes = [...userState.topo.routes, route];
-						userState.ui.selectedRouteId = route.id;
+					this.state.topo.routes = [...this.state.topo.routes, route];
+					this.state.ui.selectedRouteId = route.id;
 					}
 					const endId = generateId('anchor');
-					userState.topo.fixPoints.push({
+				this.state.topo.fixPoints.push({
 						id: endId,
 						position: finalPoints[finalPoints.length - 1],
 						type: 'bolt'
@@ -542,8 +543,8 @@ export class Topo3DInteractionManager {
 						tags: [],
 						fixPoints: []
 					};
-					userState.topo.routes = [...userState.topo.routes, newRoute];
-					userState.ui.selectedRouteId = newRoute.id;
+				this.state.topo.routes = [...this.state.topo.routes, newRoute];
+				this.state.ui.selectedRouteId = newRoute.id;
 				}
 			}
 			this.resetDrawingState();

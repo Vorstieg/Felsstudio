@@ -1,46 +1,12 @@
 <script>
-	import { cragEditorState } from '$lib/state/crag-editor.svelte.js';
+	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
+	const cragEditorState = getCragEditorSession();
 	import DetailsComponent from '../DetailsComponent.svelte';
 	import CragEditorPanelContent from './CragEditorPanelContent.svelte';
 
 	let {
-		inspectorShadow = true, map = null, activeTab = $bindable('info'), detectedAssets = [], editingTrackIndex = null,
-		cragTypes = [], availableTags = [], securityOptions = [], rockTypes = [], commonEquipment = [],
-		selectedSectorId = $bindable(null), saveStatus = 'idle', onAddEquipmentItem = () => {
-		},
-		onRemoveEquipmentItem = () => {
-		}, onAddCragImages = () => {
-		}, onRemoveCragImage = () => {
-		},
-		onAddSector = () => {
-		}, onDuplicateSector = () => {
-		}, onRemoveSector = () => {
-		}, onMoveSector = () => {
-		},
-		onFocusSector = () => {
-		}, onSetSectorGeometryType = () => {
-		}, onSetHoverHighlight = () => {
-		},
-		onClearDetectedAssets = () => {
-		}, onAddDetectedAsset = () => {
-		}, onRemoveAccessFeature = () => {
-		}, onEditTrack = () => {
-		}, onRemoveTrack = () => {
-		},
-		onFinalizeTrack = () => {
-		}, onCancelTrackEdit = () => {
-		}, routeDocuments = [], selectedRouteKey = null, onAddParentRoute = () => {
-		}, onAddSectorRoute = () => {
-		}, onSelectRoute = () => {
-		}, onUpdateRouteName = () => {
-		}, onUpdateRoute = () => {
-		}, onAddRoutePath = () => {
-		}, onEditRoutePath = () => {
-		}, onUpdateRoutePath = () => {
-		}, onRemoveRoutePath = () => {
-		}, onDeleteRoute = () => {
-		}, onPlanGenerated = () => {
-		}
+		inspectorShadow = true, map = null, activeTab = $bindable('info'), detectedAssets = [], activeTrackTarget = null,
+		selectedObject = $bindable(null), saveStatus = 'idle'
 	} = $props();
 
 	let tabs = $derived([
@@ -59,23 +25,7 @@
                   width="20rem">
 	{#snippet children()}
 		<CragEditorPanelContent
-			bind:activeTab bind:selectedSectorId showTabs={false} {map} {detectedAssets} {editingTrackIndex} {cragTypes}
-				{routeDocuments} {selectedRouteKey} {onAddParentRoute} {onAddSectorRoute} {onSelectRoute} {onUpdateRouteName} {onUpdateRoute} {onAddRoutePath} {onEditRoutePath} {onUpdateRoutePath} {onRemoveRoutePath} {onDeleteRoute} {onPlanGenerated}
-			{availableTags}
-			{securityOptions} {rockTypes} {commonEquipment} {saveStatus} {onAddEquipmentItem}
-			{onRemoveEquipmentItem} {onAddCragImages} {onRemoveCragImage} {onAddSector} {onDuplicateSector}
-			{onRemoveSector} {onMoveSector} {onFocusSector} {onSetSectorGeometryType} {onSetHoverHighlight}
-			{onClearDetectedAssets} {onAddDetectedAsset} {onRemoveAccessFeature} {onEditTrack}
-			{onRemoveTrack} {onFinalizeTrack} {onCancelTrackEdit}
+			bind:activeTab bind:selectedObject showTabs={false} {map} {detectedAssets} {activeTrackTarget} {saveStatus}
 		/>
-	{/snippet}
-	{#snippet footer()}
-		<div class="flex justify-between items-center">
-			<span class="text-ui-label text-warm-gray-500 m-0!">GPS</span>
-			<div class="font-mono text-micro-data text-creator-blue font-bold">
-				{cragEditorState.crag.geometry.coordinates[1].toFixed(5)}
-				, {cragEditorState.crag.geometry.coordinates[0].toFixed(5)}
-			</div>
-		</div>
 	{/snippet}
 </DetailsComponent>

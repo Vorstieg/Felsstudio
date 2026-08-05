@@ -3,7 +3,8 @@
 	import RouteLength from '$lib/components/editor/topo-properties/RouteLength.svelte';
 	import BoltCount from '$lib/components/editor/topo-properties/BoltCount.svelte';
 	import { routeLineStyles } from '$lib/components/editor/topo-properties/topo-properties-utils.js';
-	import { userState } from '$lib/state/editor.svelte.js';
+	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	const userState = getTopoEditorSession();
 	import { _ } from 'svelte-i18n';
 
 	let {
@@ -16,8 +17,14 @@
 		defaultLineStyle = 'red',
 		onDraw = null,
 		onRemove = null,
-		onChange = null
+		onChange = null,
+		onFieldChange = null
 	} = $props();
+
+	function updateField(field, value) {
+		if (onFieldChange) onFieldChange(field, value);
+		else pitch[field] = value;
+	}
 </script>
 
 <div class="gap-1 rounded-sm border border-black/10 bg-white p-1" onchange={() => onChange?.(pitch)}>
@@ -25,7 +32,8 @@
 		<div class="flex items-center justify-between w-full">
 			{#if kind === 'variant'}
 				<input
-					bind:value={pitch.name}
+					value={pitch.name || ''}
+					oninput={(event) => updateField('name', event.currentTarget.value)}
 					placeholder={$_('ui.variant_name_placeholder')}
 					class="min-w-0 flex-1 rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none"
 				/>
@@ -60,30 +68,49 @@
 		</div>
 	{/if}
 
-	<GradeSelector route={pitch} bind:grade={pitch.grade} bind:scale={pitch._gradeScale} />
+	{#if onFieldChange}
+		<GradeSelector
+			route={pitch}
+			grade={pitch.grade}
+			scale={pitch._gradeScale}
+			onFieldChange={updateField}
+		/>
+	{:else}
+		<GradeSelector route={pitch} bind:grade={pitch.grade} bind:scale={pitch._gradeScale} />
+	{/if}
 	<div class={showBoltCount ? 'grid grid-cols-2 gap-2' : ''}>
 		<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
-			<RouteLength
-				bind:length={pitch.length}
-				route={pitch}
-				topoScale={userState.topo.scale}
-				onCalculate={() => onChange?.(pitch)}
-			/>
+			{#if onFieldChange}
+				<RouteLength
+					length={pitch.length}
+					route={pitch}
+					topoScale={userState.topo.scale}
+					onFieldChange={updateField}
+					onCalculate={() => onChange?.(pitch)}
+				/>
+			{:else}
+				<RouteLength bind:length={pitch.length} route={pitch} topoScale={userState.topo.scale} onCalculate={() => onChange?.(pitch)} />
+			{/if}
 		</div>
 		{#if showBoltCount}
 			<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
-				<BoltCount
-					bind:boltCount={pitch.boltAmount}
-					route={pitch}
-					fixPoints={userState.topo.fixPoints}
-					onCalculate={() => onChange?.(pitch)}
-				/>
+				{#if onFieldChange}
+					<BoltCount
+						boltCount={pitch.boltAmount}
+						route={pitch}
+						fixPoints={userState.topo.fixPoints}
+						onFieldChange={updateField}
+						onCalculate={() => onChange?.(pitch)}
+					/>
+				{:else}
+					<BoltCount bind:boltCount={pitch.boltAmount} route={pitch} fixPoints={userState.topo.fixPoints} onCalculate={() => onChange?.(pitch)} />
+				{/if}
 			</div>
 		{/if}
 	</div>
 	<select
 		value={pitch.lineStyle || (inheritLineStyle ? '' : defaultLineStyle)}
-		onchange={(event) => (pitch.lineStyle = event.currentTarget.value)}
+		onchange={(event) => updateField('lineStyle', event.currentTarget.value)}
 		class="w-full rounded-sm border border-black/15 bg-white px-1 py-1 text-micro-data outline-none"
 	>
 		{#if inheritLineStyle}

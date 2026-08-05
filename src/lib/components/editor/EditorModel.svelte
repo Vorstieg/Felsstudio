@@ -7,7 +7,8 @@
 	import { onMount } from 'svelte';
 	import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh';
 	import CssObject from '../CssObject.svelte';
-	import { userState } from '$lib/state/editor.svelte.js';
+	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	const userState = getTopoEditorSession();
 	import { Topo3DInteractionManager } from './3d/InteractionManager.svelte.js';
 import { topoSymbols } from '@vorstieg/topo-renderer';
 
@@ -30,7 +31,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 	} = $props();
 
 	// --- Interaction Manager ---
-	const interaction = new Topo3DInteractionManager();
+	const interaction = new Topo3DInteractionManager(userState);
 	const topo3DFixpointTypes = new Set(
 		topoSymbols.filter((symbol) => symbol.type === 'fixpoint').map((symbol) => symbol.id)
 	);
@@ -200,8 +201,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 				exportClone,
 				(glb) => {
 					const blob = new Blob([glb], { type: 'application/octet-stream' });
-					userState.ui.glbBlob = blob;
-					userState.ui.modelRevision++;
+					userState.setModelFile(blob);
 					resolve(true);
 				},
 				(err) => {
@@ -321,8 +321,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 			exportClone,
 			(glb) => {
 				const blob = new Blob([glb], { type: 'application/octet-stream' });
-				userState.ui.glbBlob = blob;
-				userState.ui.modelRevision++;
+				userState.setModelFile(blob);
 			},
 			(err) => console.error(err),
 			{ binary: true }

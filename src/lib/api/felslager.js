@@ -111,7 +111,8 @@ export async function readFile(path) {
 /**
  * Read a JSON file and return the parsed object.
  * @param {string} path
- * @returns {Promise<any>}
+ * @template T
+ * @returns {Promise<T>}
  */
 export async function readJson(path) {
 	const res = await readFile(path);
@@ -149,7 +150,7 @@ export async function writeFile(path, body, contentType) {
 /**
  * Write a JSON object to a file. Requires authentication.
  * @param {string} path
- * @param {any} data
+ * @param {unknown} data
  * @returns {Promise<Response>}
  */
 export async function writeJson(path, data) {
@@ -182,7 +183,7 @@ export async function renameFile(oldPath, newPath) {
 	const url = `${BASE_URL}/${normalizePath(oldPath)}`;
 	const headers = {
 		...authHeaders(),
-		'Destination': encodeURIComponent(normalizePath(newPath))
+		Destination: encodeURIComponent(normalizePath(newPath))
 	};
 	const res = await fetch(url, { method: 'MOVE', headers });
 	if (!res.ok) {

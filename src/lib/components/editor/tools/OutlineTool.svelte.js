@@ -1,4 +1,3 @@
-import { userState } from '$lib/state/editor.svelte.js';
 import { generateOutlineId } from '$lib/assets/js/id-utils.js';
 import { createBrushOutline } from '$lib/assets/js/brush-outline-geometry.js';
 import { findBrushImageEdge } from '$lib/assets/js/brush-edge-assist.js';
@@ -83,7 +82,8 @@ export class OutlineTool {
 	brushOutlinePoints = $state([]);
 	brushGeneration = 0;
 
-	constructor({ saveHistory, getCanvasSize, getImageSrc, getImageFit } = {}) {
+	constructor({ state, saveHistory, getCanvasSize, getImageSrc, getImageFit } = {}) {
+		this.state = state;
 		this.saveHistory = saveHistory || (() => {});
 		this.getCanvasSize = getCanvasSize || (() => ({ baseWidth: 1, baseHeight: 1 }));
 		this.getImageSrc = getImageSrc || (() => null);
@@ -94,8 +94,8 @@ export class OutlineTool {
 		event.stopPropagation?.();
 		const nextPoint = this.normalizePoint(point);
 
-		if (userState.ui.selectedOutlineId && this.mode === 'polyline') {
-			const outline = userState.topo.outlines.find((o) => o.id === userState.ui.selectedOutlineId);
+		if (this.state.ui.selectedOutlineId && this.mode === 'polyline') {
+			const outline = this.state.topo.outlines.find((o) => o.id === this.state.ui.selectedOutlineId);
 			if (outline) {
 				outline.points2D = [...(outline.points2D || []), toPair(nextPoint)];
 				outline.shape = {
@@ -362,7 +362,7 @@ export class OutlineTool {
 					}
 				: null);
 
-		userState.topo.outlines.push(
+		this.state.topo.outlines.push(
 			createOutlineRecord({
 				id: outlineId,
 				lineStyle: this.selectedStyle || 'rock',

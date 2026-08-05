@@ -5,10 +5,11 @@
 	import JSZip from 'jszip';
 	import { loadGlbIntoEditorState } from '$lib/assets/js/gltf-loader.js';
 	import { draftsState } from '$lib/state/drafts.svelte.js';
-	import { userState } from '$lib/state/editor.svelte.js';
+	import { createTopoEditorSession, provideTopoEditorSession } from '$lib/state/topo-session.svelte.js';
 	import Topo3DUploadForm from '$lib/components/editor/wizard/Topo3DUploadForm.svelte';
 
 	let isLoading = $state(false);
+	const userState = provideTopoEditorSession(createTopoEditorSession());
 	let zipFile = $state(null);
 	let glbFile = $state(null);
 	let projectFile = $state(null);
@@ -54,7 +55,7 @@
 			}
 
 			if (!glbFile) throw new Error('GLB Model is required');
-			await loadGlbIntoEditorState(glbFile);
+			await loadGlbIntoEditorState(glbFile, userState);
 
 			if (projectFile) {
 				const project = JSON.parse(await projectFile.text());
@@ -109,13 +110,13 @@
 				}
 			}
 
-			draftsState.init();
+			draftsState.load();
 			userState.ui.activeDraftId = await draftsState.save(userState.topo, userState.ui.activeDraftId, {
 				clustering: $state.snapshot(userState.clustering),
 				glbBlob: userState.ui.glbBlob
 			});
 			userState.ui.lastSaved = new Date().toISOString();
-			goto(resolve('/topos/3d/editor'));
+			goto(`${resolve('/topos/3d/editor')}?draft=${encodeURIComponent(userState.ui.activeDraftId)}`);
 		} catch (error) {
 			console.error(error);
 			alert(error.message);
