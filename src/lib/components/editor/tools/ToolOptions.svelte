@@ -12,16 +12,6 @@
 	let panel = $state();
 	let trigger = $state();
 
-	onMount(() => {
-		const handleKeyDown = (event) => {
-			if (event.key === 'Escape' && open) {
-				close(event);
-			}
-		};
-		window.addEventListener('keydown', handleKeyDown);
-		return () => window.removeEventListener('keydown', handleKeyDown);
-	});
-
 	function close(event) {
 		event?.preventDefault?.();
 		event?.stopPropagation?.();

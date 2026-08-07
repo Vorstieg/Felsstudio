@@ -157,8 +157,6 @@
 	let brushPreview = $derived(currentTool === tools.outline ? currentTool.getBrushPreview() : null);
 	$effect(() => {
 		editor.setDraftPending(
-			currentRoutePoints.length >= 2 ||
-				currentOutlinePoints.length >= 2 ||
 				Boolean(brushPreview?.points?.length) ||
 				(editor.ui.activeTool === 'multipitch' && editor.ui.drawingTarget?.type === 'newPitch')
 		);
