@@ -80,6 +80,7 @@ export function renderOutlinesLayer({
 			(exit) => exit.remove()
 		)
 		.attr('d', getOutlinePath)
+		.attr('data-testid', (outline) => `topo-object-outline-${outline.id}`)
 		.attr('stroke-width', getHitAreaSize(8))
 		.style('pointer-events', canInteract ? 'auto' : 'none');
 
@@ -96,6 +97,7 @@ export function renderOutlinesLayer({
 			(exit) => exit.remove()
 		)
 		.attr('d', getOutlinePath)
+		.attr('data-testid', (outline) => `topo-object-outline-${outline.id}`)
 		.attr('stroke', (d) =>
 			isSelected('outline', d.id) ? '#3b82f6' : getOutlineLineStyle(d.lineStyle).stroke
 		)

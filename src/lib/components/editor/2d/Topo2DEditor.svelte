@@ -1005,6 +1005,7 @@
 </script>
 
 <div
+	data-testid="topo-2d-editor"
 	class="relative w-full h-full bg-gray-100 rounded-lg overflow-hidden"
 	style="touch-action: none;"
 >
@@ -1019,6 +1020,7 @@
 		{mobileSelectionMode ? 'Done selecting' : 'Select multiple'}
 	</button>
 	<svg
+		data-testid="topo-2d-canvas"
 		bind:this={svgElement}
 		viewBox="0 0 {baseWidth} {baseHeight}"
 		preserveAspectRatio="xMidYMid meet"

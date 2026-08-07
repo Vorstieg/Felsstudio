@@ -49,6 +49,11 @@ export function renderRoutesLayer({
 			(route) =>
 				`route-container ${route.isPitch ? 'pitch-group' : route.isVariant ? 'variant-group' : 'route-group'}`
 		)
+		.attr(
+			'data-testid',
+			(route) =>
+				`topo-object-route-${route.id}-${route.pitchId || route.variantId || 'main'}`
+		)
 		.style('touch-action', 'none');
 
 	routeGroups

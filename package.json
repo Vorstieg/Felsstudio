@@ -13,6 +13,7 @@
 		"test:symbol-distortion": "vitest run tests/test-symbol-distortion.mjs",
 		"test:flight-plan": "vitest run tests/test-flight-plan-generator.mjs",
 		"test:flight-plan-kml": "vitest run tests/test-flight-plan-kml.mjs",
+		"test:2d": "vitest run src/lib/components/editor/2d tests/test-2d-editor-fixtures.mjs",
 		"test:topo-paths": "vitest run tests/test-topo-document-paths.mjs",
 		"test:topo-properties-paths": "vitest run tests/test-topo-properties-paths.mjs",
 		"lint": "prettier --ignore-path .gitignore --check . && eslint --ignore-path .gitignore .",

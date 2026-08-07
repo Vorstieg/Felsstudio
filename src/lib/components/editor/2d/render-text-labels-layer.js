@@ -46,6 +46,7 @@ const textGroups = textSelection
 		(update) => update,
 		(exit) => exit.remove()
 	)
+	.attr('data-testid', (label) => `topo-object-text-${label.id}`)
 	.attr(
 		'transform',
 		(d) =>

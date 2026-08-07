@@ -1,0 +1,114 @@
+{
+	"name": "Mixed 2D fixture",
+	"routes": [
+		{
+			"id": "route-1",
+			"name": "Main route",
+			"type": "sports-climbing",
+			"grade": "5a",
+			"points2D": [
+				[0.12, 0.88],
+				[0.22, 0.64],
+				[0.31, 0.42]
+			],
+			"fixPoints": ["fix-1"],
+			"pitches": [],
+			"variants": []
+		},
+		{
+			"id": "route-multi",
+			"name": "Multi route",
+			"type": "multi-pitch",
+			"grade": "6a",
+			"points2D": null,
+			"fixPoints": [],
+			"pitches": [
+				{
+					"id": "pitch-1",
+					"pitchNumber": 1,
+					"grade": "5c",
+					"points2D": [
+						[0.42, 0.82],
+						[0.5, 0.58]
+					]
+				}
+			],
+			"variants": [
+				{
+					"id": "variant-1",
+					"name": "Start variant",
+					"points2D": [
+						[0.42, 0.82],
+						[0.37, 0.6]
+					]
+				}
+			]
+		}
+	],
+	"fixPoints": [
+		{
+			"id": "fix-1",
+			"type": "bolt",
+			"position2D": [0.22, 0.64],
+			"rotation2D": 0,
+			"scale2D": 1
+		},
+		{
+			"id": "symbol-1",
+			"type": "tree",
+			"position2D": [0.72, 0.25],
+			"rotation2D": 0,
+			"scale2D": 1
+		}
+	],
+	"outlines": [
+		{
+			"id": "outline-polyline",
+			"shape": {
+				"type": "polyline",
+				"points2D": [
+					[0.08, 0.2],
+					[0.18, 0.12],
+					[0.3, 0.2]
+				]
+			},
+			"points2D": [
+				[0.08, 0.2],
+				[0.18, 0.12],
+				[0.3, 0.2]
+			],
+			"closed": true,
+			"lineStyle": "rock"
+		},
+		{
+			"id": "outline-preset",
+			"shape": {
+				"type": "polyline",
+				"preset": "slab",
+				"points2D": [
+					[0.55, 0.35],
+					[0.685, 0.35],
+					[0.82, 0.435],
+					[0.685, 0.52],
+					[0.55, 0.52]
+				]
+			},
+			"closed": true,
+			"lineStyle": "rock"
+		}
+	],
+	"textLabels": [
+		{
+			"id": "text-1",
+			"text": "Belay",
+			"position2D": [0.58, 0.2],
+			"fontSize2D": 0.025,
+			"color": "#23201d",
+			"fontWeight": 700
+		}
+	],
+	"image2D": "/fixtures/topo.jpg",
+	"imageAspectRatio": 2,
+	"canvasAspectRatio": 1.5,
+	"backgroundFit": "contain"
+}

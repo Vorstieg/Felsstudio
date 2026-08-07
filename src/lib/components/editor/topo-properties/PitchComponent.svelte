@@ -30,7 +30,10 @@
 	}
 </script>
 
-<div class="gap-1 rounded-sm border border-black/10 bg-white p-1" onchange={() => onChange?.(pitch)}>
+<div
+	class="gap-1 rounded-sm border border-black/10 bg-white p-1"
+	onchange={() => onChange?.(pitch)}
+>
 	{#if kind !== 'single' || onDraw || onRemove}
 		<div class="flex items-center justify-between w-full">
 			{#if kind === 'variant'}
@@ -71,43 +74,31 @@
 		</div>
 	{/if}
 
-	{#if onFieldChange}
-		<GradeSelector
-			route={pitch}
-			grade={pitch.grade}
-			scale={pitch._gradeScale}
-			onFieldChange={updateField}
-		/>
-	{:else}
-		<GradeSelector route={pitch} bind:grade={pitch.grade} bind:scale={pitch._gradeScale} />
-	{/if}
+	<GradeSelector
+		route={pitch}
+		grade={pitch.grade}
+		scale={pitch._gradeScale}
+		onFieldChange={updateField}
+	/>
 	<div class={showBoltCount ? 'grid grid-cols-2 gap-2' : ''}>
 		<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
-			{#if onFieldChange}
-				<RouteLength
-					length={pitch.length}
-					route={pitch}
-					topoScale={topoScale ?? userState?.topo?.scale ?? 1}
-					onFieldChange={updateField}
-					onCalculate={() => onChange?.(pitch)}
-				/>
-			{:else}
-				<RouteLength bind:length={pitch.length} route={pitch} topoScale={topoScale ?? userState?.topo?.scale ?? 1} onCalculate={() => onChange?.(pitch)} />
-			{/if}
+			<RouteLength
+				length={pitch.length}
+				route={pitch}
+				topoScale={topoScale ?? userState?.topo?.scale ?? 1}
+				onFieldChange={updateField}
+				onCalculate={() => onChange?.(pitch)}
+			/>
 		</div>
 		{#if showBoltCount}
 			<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
-				{#if onFieldChange}
-					<BoltCount
-						boltCount={pitch.boltAmount}
-						route={pitch}
-						fixPoints={fixPoints ?? userState?.topo?.fixPoints ?? []}
-						onFieldChange={updateField}
-						onCalculate={() => onChange?.(pitch)}
-					/>
-				{:else}
-					<BoltCount bind:boltCount={pitch.boltAmount} route={pitch} fixPoints={fixPoints ?? userState?.topo?.fixPoints ?? []} onCalculate={() => onChange?.(pitch)} />
-				{/if}
+				<BoltCount
+					boltCount={pitch.boltAmount}
+					route={pitch}
+					fixPoints={fixPoints ?? userState?.topo?.fixPoints ?? []}
+					onFieldChange={updateField}
+					onCalculate={() => onChange?.(pitch)}
+				/>
 			</div>
 		{/if}
 	</div>

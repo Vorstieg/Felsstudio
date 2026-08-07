@@ -50,8 +50,9 @@ export function renderSymbolsLayer({
 					}),
 			(update) => update,
 			(exit) => exit.remove()
-		)
-		.attr(
+	)
+	.attr('data-testid', (symbol) => `topo-object-symbol-${symbol.id}`)
+	.attr(
 			'transform',
 			(d) =>
 				`translate(${(d.position2D?.[0] || 0) * baseWidth}, ${(d.position2D?.[1] || 0) * baseHeight}) rotate(${d.rotation2D || 0})`
