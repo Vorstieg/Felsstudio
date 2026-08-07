@@ -29,7 +29,7 @@ export function createToolInteraction({ getActiveTool, setActiveTool, setOptions
 		if (!action || action.disabled) return;
 		vibrateOnAction(vibration);
 		action.run?.();
-		if (action === finish || action === cancel) {
+		if ((action === finish || action === cancel) && !action.keepActive) {
 			setActiveTool(neutralTool);
 		}
 	}

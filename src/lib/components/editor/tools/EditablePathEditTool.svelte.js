@@ -5,6 +5,7 @@ export class EditablePathEditTool {
 		id,
 		getActiveTool,
 		getEditablePath,
+		mutateDocument,
 		startInteraction,
 		saveHistory,
 		targetFromPoint,
@@ -13,8 +14,10 @@ export class EditablePathEditTool {
 		this.id = id;
 		this.getActiveTool = getActiveTool || (() => null);
 		this.getEditablePath = getEditablePath || (() => null);
+		this.mutateDocument =
+			context?.commands?.mutateDocument || mutateDocument || ((mutator) => mutator());
 		this.startInteraction = startInteraction || (() => {});
-		this.saveHistory = context?.commands?.commit || saveHistory || (() => {});
+		this.saveHistory = context?.history?.save || saveHistory || (() => {});
 		this.targetFromPoint = targetFromPoint || (() => null);
 		this.targetFromMidpoint = targetFromMidpoint || (() => null);
 	}
@@ -32,7 +35,7 @@ export class EditablePathEditTool {
 
 		if (event.altKey || this.getActiveTool() === 'eraser') {
 			if (!path.canRemovePoint()) return false;
-			path.removePoint(point.index);
+			this.mutateDocument(() => path.removePoint(point.index));
 			this.saveHistory();
 			return true;
 		}
@@ -47,7 +50,9 @@ export class EditablePathEditTool {
 		const path = target && this.getEditablePath(target);
 		if (!path) return false;
 		event.stopPropagation?.();
-		path.insertPoint(midpoint.insertIndex, [midpoint.midX, midpoint.midY]);
+		this.mutateDocument(() =>
+			path.insertPoint(midpoint.insertIndex, [midpoint.midX, midpoint.midY])
+		);
 		this.startInteraction('move-point', { ...target, pointIndex: midpoint.insertIndex });
 		return true;
 	}

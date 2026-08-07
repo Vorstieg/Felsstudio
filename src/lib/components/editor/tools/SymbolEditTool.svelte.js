@@ -21,6 +21,7 @@ export class SymbolEditTool {
 		saveHistory
 	} = {}) {
 		this.getTopo = getTopo || (() => ({ fixPoints: [], routes: [] }));
+		this.mutateDocument = context?.commands?.mutateDocument || ((mutator) => mutator());
 		this.getCanvasSize =
 			context?.viewport?.getCanvasSize ||
 			getCanvasSize ||
@@ -34,8 +35,7 @@ export class SymbolEditTool {
 		this.getMobileSelectionMode = getMobileSelectionMode || (() => false);
 		this.beginSelectionMove = beginSelectionMove || (() => null);
 		this.getSelectedSymbolId = getSelectedSymbolId || (() => null);
-		this.saveHistory =
-			context?.commands?.commit || context?.history?.save || saveHistory || (() => {});
+		this.saveHistory = context?.history?.save || saveHistory || (() => {});
 		this.deleteSymbols = context?.commands?.deleteSymbols || null;
 	}
 
@@ -155,16 +155,20 @@ export class SymbolEditTool {
 		const symbol = this.getSymbol(interaction.id);
 		if (!symbol?.position2D) return false;
 		if (interaction.kind === 'move-symbol') {
-			symbol.position2D = [
-				interaction.startPosition[0] + mouse.x - interaction.startMouse.x,
-				interaction.startPosition[1] + mouse.y - interaction.startMouse.y
-			];
+			this.mutateDocument(() => {
+				symbol.position2D = [
+					interaction.startPosition[0] + mouse.x - interaction.startMouse.x,
+					interaction.startPosition[1] + mouse.y - interaction.startMouse.y
+				];
+			});
 			return true;
 		}
 
 		if (interaction.kind === 'rotate-symbol') {
 			const { x: dx, y: dy } = this.getPointerDelta(symbol, mouse);
-			symbol.rotation2D = (Math.atan2(dy, dx) * (180 / Math.PI) + 90) % 360;
+			this.mutateDocument(() => {
+				symbol.rotation2D = (Math.atan2(dy, dx) * (180 / Math.PI) + 90) % 360;
+			});
 			return true;
 		}
 		const { x: dx, y: dy } = this.getLocalPointerDelta(symbol, mouse);
@@ -179,9 +183,11 @@ export class SymbolEditTool {
 				0.2,
 				Math.min(5, interaction.startScale * (distance / interaction.startDist))
 			);
-			if (interaction.axis === 'x') symbol.scaleX2D = value;
-			else if (interaction.axis === 'y') symbol.scaleY2D = value;
-			else symbol.scale2D = value;
+			this.mutateDocument(() => {
+				if (interaction.axis === 'x') symbol.scaleX2D = value;
+				else if (interaction.axis === 'y') symbol.scaleY2D = value;
+				else symbol.scale2D = value;
+			});
 			return true;
 		}
 		return false;
@@ -208,7 +214,9 @@ export class SymbolEditTool {
 	scale(id, delta) {
 		const symbol = this.getSymbol(id);
 		if (!symbol) return false;
-		symbol.scale2D = Math.max(0.2, Math.min(5, (symbol.scale2D || 1) + delta));
+		this.mutateDocument(() => {
+			symbol.scale2D = Math.max(0.2, Math.min(5, (symbol.scale2D || 1) + delta));
+		});
 		return true;
 	}
 

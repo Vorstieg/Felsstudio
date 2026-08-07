@@ -1,5 +1,3 @@
-import { generateSymbolId } from '$lib/assets/js/id-utils.js';
-
 export class SymbolTool {
 	id = 'symbol';
 	// No state needed for symbol tool currently as it places on click
@@ -7,7 +5,7 @@ export class SymbolTool {
 	constructor({ context, state, saveHistory } = {}) {
 		this.state = state;
 		this.saveHistory =
-			context?.commands?.commit || context?.history?.save || saveHistory || (() => {});
+			context?.history?.save || context?.commands?.commit || saveHistory || (() => {});
 		this.createSymbol = context?.commands?.createSymbol || null;
 	}
 
@@ -18,19 +16,7 @@ export class SymbolTool {
 			this.createSymbol(point, this.selectedType);
 			return;
 		}
-		const symbolId = generateSymbolId();
-		this.state.topo.fixPoints.push({
-			id: symbolId,
-			type: this.selectedType,
-			position2D: [point.x, point.y],
-			rotation2D: 0,
-			scale2D: 1,
-			// Independent multipliers allow a symbol to be stretched without
-			// changing the meaning of the legacy, proportional scale2D value.
-			scaleX2D: 1,
-			scaleY2D: 1
-		});
-		this.saveHistory();
+		this.state.createSymbol(point, this.selectedType);
 	}
 
 	onMouseMove(event, point) {}

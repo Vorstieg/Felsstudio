@@ -84,8 +84,51 @@ export class OutlineTool {
 
 	constructor({ context, state, saveHistory, getCanvasSize, getImageSrc, getImageFit } = {}) {
 		this.state = state;
+		if (state?.drafts?.outline) {
+			const draft = state.drafts.outline;
+			Object.defineProperties(this, {
+				currentPoints: {
+					configurable: true,
+					get: () => draft.points,
+					set: (value) => {
+						draft.points = value;
+						state.refreshPendingChanges?.();
+					}
+				},
+				previewShape: {
+					configurable: true,
+					get: () => draft.preview,
+					set: (value) => {
+						draft.preview = value;
+					}
+				},
+				brushPoints: {
+					configurable: true,
+					get: () => draft.brushPoints,
+					set: (value) => {
+						draft.brushPoints = value;
+						state.refreshPendingChanges?.();
+					}
+				},
+				brushOutlinePoints: {
+					configurable: true,
+					get: () => draft.brushOutlinePoints,
+					set: (value) => {
+						draft.brushOutlinePoints = value;
+						state.refreshPendingChanges?.();
+					}
+				},
+				mode: {
+					configurable: true,
+					get: () => draft.mode || 'polyline',
+					set: (value) => {
+						draft.mode = value;
+					}
+				}
+			});
+		}
 		this.saveHistory =
-			context?.commands?.commit || context?.history?.save || saveHistory || (() => {});
+			context?.history?.save || context?.commands?.commit || saveHistory || (() => {});
 		this.getCanvasSize =
 			context?.viewport?.getCanvasSize ||
 			getCanvasSize ||
@@ -107,10 +150,7 @@ export class OutlineTool {
 			if (outline) {
 				if (this.appendOutlinePoint)
 					this.appendOutlinePoint(outline.id, nextPoint, { recordHistory: false });
-				else {
-					outline.points2D = [...(outline.points2D || []), toPair(nextPoint)];
-					outline.shape = { type: OUTLINE_SHAPE_TYPES.POLYLINE, points2D: outline.points2D };
-				}
+				else this.state.appendOutlinePoint(outline.id, nextPoint, { recordHistory: false });
 				this.saveHistory();
 				return;
 			}
@@ -314,6 +354,7 @@ export class OutlineTool {
 		this.dragShape = { type: this.mode, start2D: point };
 		this.isDrawing = true;
 		this.temporaryPoints = [point];
+		this.state.refreshPendingChanges?.();
 	}
 
 	commitTemporaryShape() {
@@ -385,10 +426,9 @@ export class OutlineTool {
 			canvasSize: this.canvasSize
 		});
 		if (this.addOutline) this.addOutline(outline);
-		else this.state.topo.outlines.push(outline);
+		else this.state.addOutline(outline);
 
 		this.resetDrawingState();
-		if (!this.addOutline) this.saveHistory();
 	}
 
 	isClosedShape(points) {

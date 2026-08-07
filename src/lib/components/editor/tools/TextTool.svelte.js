@@ -1,5 +1,3 @@
-import { generateId } from '$lib/assets/js/id-utils.js';
-
 export class TextTool {
 	id = 'text';
 	editingId = $state(null);
@@ -16,8 +14,34 @@ export class TextTool {
 		deleteTextLabel
 	} = {}) {
 		this.state = state;
+		if (state?.drafts?.text) {
+			const draft = state.drafts.text;
+			Object.defineProperties(this, {
+				editingId: {
+					configurable: true,
+					get: () => draft.id,
+					set: (value) => {
+						draft.id = value;
+					}
+				},
+				editingValue: {
+					configurable: true,
+					get: () => draft.value,
+					set: (value) => {
+						draft.value = value;
+					}
+				},
+				editingOriginalValue: {
+					configurable: true,
+					get: () => draft.originalValue,
+					set: (value) => {
+						draft.originalValue = value;
+					}
+				}
+			});
+		}
 		this.saveHistory =
-			context?.commands?.commit || context?.history?.save || saveHistory || (() => {});
+			context?.history?.save || context?.commands?.commit || saveHistory || (() => {});
 		this.selectObject = context?.selection?.selectObject || selectObject || (() => {});
 		this.removeItems = context?.selection?.removeItems || removeItems || (() => {});
 		this.createTextLabel = context?.commands?.createTextLabel || createTextLabel || null;
@@ -108,18 +132,8 @@ export class TextTool {
 	}
 
 	createLegacyTextLabel(point) {
-		const id = generateId('text');
-		if (!this.state.topo.textLabels) this.state.topo.textLabels = [];
-		this.state.topo.textLabels.push({
-			id,
-			text: 'Text',
-			position2D: [point.x, point.y],
-			fontSize2D: 0.025,
-			color: '#23201d',
-			fontWeight: 700
-		});
+		const id = this.state.createTextLabel(point);
 		this.selectObject('text', id);
-		this.saveHistory();
 		return id;
 	}
 

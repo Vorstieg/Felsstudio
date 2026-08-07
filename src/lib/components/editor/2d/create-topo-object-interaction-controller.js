@@ -24,6 +24,8 @@ export function createTopoObjectInteractionController({
 			selection.selectObject(target.type, target.id, getIsShiftPressed());
 		}
 		if (target.type === 'route') {
+			if (target.pitchId && selection.selectPath) selection.selectPath('pitch', target.id, target.pitchId);
+			else if (target.variantId && selection.selectPath) selection.selectPath('variant', target.id, target.variantId);
 			setDrawingTarget(
 				target.pitchId
 					? { type: 'pitch', routeId: target.id, pitchId: target.pitchId }

@@ -29,7 +29,7 @@ export class OutlineEditTool extends EditablePathEditTool {
 			getActiveTool,
 			getEditablePath,
 			startInteraction: context?.selection?.startInteraction || startInteraction,
-			saveHistory: context?.commands?.commit || context?.history?.save || saveHistory,
+			saveHistory: context?.history?.save || saveHistory,
 			targetFromPoint: ({ outlineId }) => ({ outlineId }),
 			targetFromMidpoint: ({ outlineId }) => ({ outlineId })
 		});

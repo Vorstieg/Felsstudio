@@ -22,13 +22,14 @@ export class RouteEditTool extends EditablePathEditTool {
 			getActiveTool,
 			getEditablePath,
 			startInteraction: context?.selection?.startInteraction || startInteraction,
-			saveHistory: context?.commands?.commit || context?.history?.save || saveHistory,
+			saveHistory: context?.history?.save || saveHistory,
 			targetFromPoint: ({ routeId, pitchId, variantId }) => ({ routeId, pitchId, variantId }),
 			targetFromMidpoint: ({ routeId, pitchId, variantId }) => ({ routeId, pitchId, variantId })
 		});
 		this.getTopo = getTopo || (() => ({ routes: [] }));
 		this.isSelected = context?.selection?.isSelected || isSelected || (() => false);
 		this.selectObject = context?.selection?.selectObject || selectObject || (() => {});
+		this.selectPath = context?.selection?.selectPath || null;
 		this.getIsShiftPressed = getIsShiftPressed || (() => false);
 		this.getMobileSelectionMode = getMobileSelectionMode || (() => false);
 		this.beginSelectionMove = beginSelectionMove || (() => null);
@@ -51,7 +52,11 @@ export class RouteEditTool extends EditablePathEditTool {
 			this.selectObject('route', id, true);
 			return true;
 		}
-		if (!this.isSelected('route', id)) this.selectObject('route', id, this.getIsShiftPressed());
+		if (this.selectPath && (pitchId || variantId)) {
+			this.selectPath(pitchId ? 'pitch' : 'variant', id, pitchId || variantId);
+		} else if (!this.isSelected('route', id)) {
+			this.selectObject('route', id, this.getIsShiftPressed());
+		}
 		this.setDrawingTarget(
 			pitchId
 				? { type: 'pitch', routeId: id, pitchId }

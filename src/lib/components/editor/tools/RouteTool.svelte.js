@@ -22,6 +22,27 @@ export class RouteTool {
 		this.state = state;
 		this.mode = mode;
 		this.id = id;
+		this.getTopo = context?.document?.getTopo || (() => this.state.topo);
+		if (state?.drafts) {
+			const draft = state.drafts[mode === 'multipitch' ? 'multipitch' : 'route'];
+			Object.defineProperties(this, {
+				draftPoints: {
+					configurable: true,
+					get: () => draft.points,
+					set: (value) => {
+						draft.points = value;
+						state.refreshPendingChanges?.();
+					}
+				},
+				draftFixPointIds: {
+					configurable: true,
+					get: () => draft.fixPointIds,
+					set: (value) => {
+						draft.fixPointIds = value;
+					}
+				}
+			});
+		}
 		this.getDrawingTarget = context?.drawing?.getTarget || getDrawingTarget || (() => null);
 		this.setDrawingTarget = context?.drawing?.setTarget || setDrawingTarget || (() => {});
 		this.clearSelection = context?.selection?.clear || clearSelection || (() => {});
@@ -36,9 +57,10 @@ export class RouteTool {
 			context?.selection?.selectedId || getSelectedId || (() => this.state.ui.selectedRouteId);
 		this.deactivate = deactivate || (() => {});
 		this.saveHistory =
-			context?.commands?.commit || context?.history?.save || saveHistory || (() => {});
+			context?.history?.save || context?.commands?.commit || saveHistory || (() => {});
 		this.snapPoint = snapPoint || ((point) => ({ point, fixPointId: null }));
 		this.referenceFixpoint = referenceFixpoint || (() => {});
+		this.selectPath = context?.selection?.selectPath || null;
 		this.addRoute = context?.commands?.addRoute || null;
 		this.appendRoutePoint = context?.commands?.appendRoutePoint || null;
 		this.addPitch = context?.commands?.addPitch || null;
@@ -52,7 +74,10 @@ export class RouteTool {
 		const route = target?.routeId && this.findRoute(target.routeId);
 		const path = this.getTargetPath(route, target);
 		if (path) {
-			if (this.appendRoutePoint) this.appendRoutePoint(target.routeId, target, point, { recordHistory: false });
+			if (this.appendRoutePoint)
+				this.appendRoutePoint(target.routeId, target, point, { recordHistory: false });
+			else if (this.state.appendRoutePoint)
+				this.state.appendRoutePoint(target.routeId, target, point, { recordHistory: false });
 			else path.points2D = [...(path.points2D || []), [point.x, point.y]];
 			this.referenceFixpoint(route, snapped.fixPointId);
 		} else {
@@ -69,6 +94,7 @@ export class RouteTool {
 	finish(mode) {
 		const target = this.getDrawingTarget();
 		const draftPointCount = this.draftPoints.length;
+		if (draftPointCount > 0 && draftPointCount < 2) return;
 		if (mode === 'multipitch' && target?.type === 'newPitch' && draftPointCount === 0) {
 			this.setDrawingTarget(null);
 			this.clearSelection();
@@ -85,7 +111,7 @@ export class RouteTool {
 	}
 
 	findRoute(id) {
-		return this.state.topo.routes.find((route) => route.id === id);
+		return this.getTopo().routes.find((route) => route.id === id);
 	}
 
 	getTargetPath(route, target) {
@@ -101,6 +127,8 @@ export class RouteTool {
 		const route = this.findRoute(this.getSelectedId('route'));
 		if (!route || route.type === 'multi-pitch') return null;
 		if (this.appendRoutePoint) this.appendRoutePoint(route.id, {}, point, { recordHistory: false });
+		else if (this.state.appendRoutePoint)
+			this.state.appendRoutePoint(route.id, {}, point, { recordHistory: false });
 		else route.points2D = [...(route.points2D || []), [point.x, point.y]];
 		return route;
 	}
@@ -110,15 +138,19 @@ export class RouteTool {
 			if (this.draftPoints.length) console.warn('Route needs at least 2 points');
 			return null;
 		}
+		if (mode === 'multipitch' && target?.type === 'newPitch') {
+			const route = this.findRoute(target.routeId);
+			if (!route || route.type !== 'multi-pitch') return null;
+		}
 		const points2D = $state.snapshot(this.draftPoints);
 		const fixPointIds = $state.snapshot(this.draftFixPointIds);
 		this.draftPoints = [];
 		this.draftFixPointIds = [];
 		if (mode === 'multipitch' && target?.type === 'newPitch') {
 			const route = this.findRoute(target.routeId);
-			if (!route || route.type !== 'multi-pitch') return null;
 			const pitch = this.createPitch(route.pitches?.length + 1, points2D);
 			if (this.addPitch) this.addPitch(route.id, pitch, { recordHistory: false });
+			else if (this.state.addPitch) this.state.addPitch(route.id, pitch, { recordHistory: false });
 			else route.pitches = [...(route.pitches || []), pitch];
 			fixPointIds.forEach((id) => this.referenceFixpoint(route, id));
 			this.selectObject('route', route.id);
@@ -128,10 +160,8 @@ export class RouteTool {
 		const route = this.createRoute(mode, points2D);
 		fixPointIds.forEach((id) => this.referenceFixpoint(route, id));
 		if (this.addRoute) this.addRoute(route);
-		else {
-			this.state.topo.routes.push(route);
-			this.saveHistory();
-		}
+		else if (this.state.addRoute) this.state.addRoute(route);
+		else this.state.topo.routes.push(route);
 		this.selectObject('route', route.id);
 		return route;
 	}

@@ -13,8 +13,10 @@ export function useTopoDraftAutosave({
 	getExtra = () => ({}),
 	shouldRestore = null,
 	delay = 2000,
-	session,
-	draftId = null
+		session,
+		draftId = null,
+		getSaveSession = null,
+		onPersisted = null
 }) {
 	if (!session) throw new Error('A topo editor session is required for draft autosave');
 	const userState = session;
@@ -22,7 +24,7 @@ export function useTopoDraftAutosave({
 	let saveTimeout = null;
 	let isPersisting = false;
 	let saveAgain = false;
-	const currentSession = () => userState.getSaveSession();
+	const currentSession = () => getSaveSession?.() || userState.getSaveSession();
 
 	async function persistDraftImmediately() {
 		if (isBlankTopoSession(currentSession())) return;
@@ -40,7 +42,8 @@ export function useTopoDraftAutosave({
 					userState.ui.activeDraftId,
 					getExtra()
 				);
-				userState.ui.lastSaved = new Date().toISOString();
+					userState.ui.lastSaved = new Date().toISOString();
+					onPersisted?.();
 			} while (saveAgain);
 		} finally {
 			isPersisting = false;

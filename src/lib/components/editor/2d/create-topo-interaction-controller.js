@@ -5,6 +5,7 @@
  */
 export function createTopoInteractionController({
 	getTopo,
+	mutateDocument,
 	getInteraction,
 	getCurrentTool,
 	getEditablePath,
@@ -30,16 +31,18 @@ export function createTopoInteractionController({
 		if (interaction.kind === 'move-selection') {
 			const deltaX = mouse.x - interaction.startMouse.x;
 			const deltaY = mouse.y - interaction.startMouse.y;
-			interaction.items.paths.forEach(({ target, snapshot }) => {
-				getEditablePath?.(target)?.translateFrom(snapshot, [deltaX, deltaY]);
-			});
-			interaction.items.symbols.forEach(({ symbolId, startPos }) => {
-				const symbol = getTopo().fixPoints.find((item) => item.id === symbolId);
-				if (symbol) symbol.position2D = [startPos[0] + deltaX, startPos[1] + deltaY];
-			});
-			interaction.items.texts.forEach(({ textId, startPos }) => {
-				const label = (getTopo().textLabels || []).find((item) => item.id === textId);
-				if (label) label.position2D = [startPos[0] + deltaX, startPos[1] + deltaY];
+			(mutateDocument || ((mutator) => mutator()))(() => {
+				interaction.items.paths.forEach(({ target, snapshot }) => {
+					getEditablePath?.(target)?.translateFrom(snapshot, [deltaX, deltaY]);
+				});
+				interaction.items.symbols.forEach(({ symbolId, startPos }) => {
+					const symbol = getTopo().fixPoints.find((item) => item.id === symbolId);
+					if (symbol) symbol.position2D = [startPos[0] + deltaX, startPos[1] + deltaY];
+				});
+				interaction.items.texts.forEach(({ textId, startPos }) => {
+					const label = (getTopo().textLabels || []).find((item) => item.id === textId);
+					if (label) label.position2D = [startPos[0] + deltaX, startPos[1] + deltaY];
+				});
 			});
 			return;
 		}
@@ -49,11 +52,13 @@ export function createTopoInteractionController({
 			const route = interaction.routeId
 				? getTopo().routes.find((candidate) => candidate.id === interaction.routeId)
 				: null;
-			if (route) referenceFixpoint(route, snapped.fixPointId);
-			getEditablePath?.(interaction)?.movePoint(interaction.pointIndex, [
-				snapped.point.x,
-				snapped.point.y
-			]);
+			(mutateDocument || ((mutator) => mutator()))(() => {
+				if (route) referenceFixpoint(route, snapped.fixPointId);
+				getEditablePath?.(interaction)?.movePoint(interaction.pointIndex, [
+					snapped.point.x,
+					snapped.point.y
+				]);
+			});
 			return;
 		}
 
@@ -78,12 +83,14 @@ export function createTopoInteractionController({
 
 		if (interaction.kind === 'move-text') {
 			const label = (getTopo().textLabels || []).find((item) => item.id === interaction.id);
-			if (label) {
-				label.position2D = [
-					interaction.startPos[0] + mouse.x - interaction.startMouse.x,
-					interaction.startPos[1] + mouse.y - interaction.startMouse.y
-				];
-			}
+			(mutateDocument || ((mutator) => mutator()))(() => {
+				if (label) {
+					label.position2D = [
+						interaction.startPos[0] + mouse.x - interaction.startMouse.x,
+						interaction.startPos[1] + mouse.y - interaction.startMouse.y
+					];
+				}
+			});
 		}
 	}
 

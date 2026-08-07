@@ -2,7 +2,9 @@
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
 	const userState = getTopoEditorSession();
+	const editorState = getTopo2DEditorState();
 	import DetailsComponent from './DetailsComponent.svelte';
 	import TopoInfoPanel from './topo-properties/TopoInfoPanel.svelte';
 	import TopoRoutesPanel from './topo-properties/TopoRoutesPanel.svelte';
@@ -109,8 +111,11 @@
 
 	function switchTab(tab) {
 		activeTab = tab;
-		userState.ui.selectedRouteId = null;
-		userState.ui.selectedFixpointId = null;
+		if (editorState) editorState.clearSelection();
+		else {
+			userState.ui.selectedRouteId = null;
+			userState.ui.selectedFixpointId = null;
+		}
 	}
 
 	function formatTopoJson() {
@@ -162,10 +167,13 @@
 			backgroundFit: parsed.backgroundFit === 'cover' ? 'cover' : 'contain',
 			editorMode: parsed.editorMode || currentMode
 		};
-		userState.ui.selectedRouteId = null;
-		userState.ui.selectedFixpointId = null;
-		userState.ui.selectedTextLabelId = null;
-		userState.ui.selectedOutlineId = null;
+		if (editorState) editorState.clearSelection();
+		else {
+			userState.ui.selectedRouteId = null;
+			userState.ui.selectedFixpointId = null;
+			userState.ui.selectedTextLabelId = null;
+			userState.ui.selectedOutlineId = null;
+		}
 		drawingTarget = null;
 		topoJsonError = '';
 		formatTopoJson();
@@ -183,22 +191,35 @@
 	]);
 </script>
 
-<DetailsComponent title={$_('ui.properties')} subtitle={$_('ui.topo_inspector')} {tabs} bind:activeTab onTabChange={switchTab} width="20rem" visualSuperseded={toolOptionsOpen}>
+<DetailsComponent
+	title={$_('ui.properties')}
+	subtitle={$_('ui.topo_inspector')}
+	{tabs}
+	bind:activeTab
+	onTabChange={switchTab}
+	width="20rem"
+	visualSuperseded={toolOptionsOpen}
+>
 	{#snippet headerActions()}
-		<button class="h-6 w-6 rounded-sm text-warm-gray-300 hover:bg-black/5 hover:text-near-black" onclick={toggleJsonEditor} title="Edit topo JSON" aria-label="Edit topo JSON"><i class="fa-solid fa-code text-[10px]"></i></button>
+		<button
+			class="h-6 w-6 rounded-sm text-warm-gray-300 hover:bg-black/5 hover:text-near-black"
+			onclick={toggleJsonEditor}
+			title="Edit topo JSON"
+			aria-label="Edit topo JSON"><i class="fa-solid fa-code text-[10px]"></i></button
+		>
 	{/snippet}
 	{#snippet children({ mobile })}
 		<div class="flex flex-col gap-2.5 pb-2">
 			{#if activeTab === 'info'}
-					<TopoInfoPanel
-						bind:showMapModal
-						showJsonEditor={showJsonEditor}
-						bind:topoJsonText
-						topoJsonError={topoJsonError}
-						onformatjson={formatTopoJson}
-						onapplyjson={applyTopoJson}
-						{mobile}
-					/>
+				<TopoInfoPanel
+					bind:showMapModal
+					{showJsonEditor}
+					bind:topoJsonText
+					{topoJsonError}
+					onformatjson={formatTopoJson}
+					onapplyjson={applyTopoJson}
+					{mobile}
+				/>
 			{:else if activeTab === 'routes'}
 				<TopoRoutesPanel {routes} bind:drawingTarget bind:activeTool {mobile} />
 			{:else if activeTab === 'fixpoints'}

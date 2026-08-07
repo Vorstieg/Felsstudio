@@ -1,6 +1,8 @@
 <script>
 	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
 	const userState = getTopoEditorSession();
+	const editorState = getTopo2DEditorState();
 	import { _ } from 'svelte-i18n';
 	import { snapToBiggestHeight } from '$lib/assets/js/resize.js';
 	import SelectedRoutePanel from '$lib/components/editor/topo-properties/SelectedRoutePanel.svelte';
@@ -16,29 +18,37 @@
 
 	function selectRoute(route) {
 		if (userState.ui.selectedRouteId === route.id) {
+			editorState?.clearSelection();
 			userState.ui.selectedRouteId = null;
 			userState.ui.selectedPathId = null;
 			drawingTarget = null;
 			return;
 		}
 
-		userState.ui.selectedRouteId = route.id;
+		if (editorState) editorState.selectObject('route', route.id);
+		else userState.ui.selectedRouteId = route.id;
 		userState.ui.selectedPathId = null;
 		userState.ui.selectedFixpointId = null;
-		drawingTarget = !hasRouteType(route, 'multi-pitch') && !isTrackOnlyRoute(route)
-			? { type: 'route', id: route.id }
-			: null;
+		drawingTarget =
+			!hasRouteType(route, 'multi-pitch') && !isTrackOnlyRoute(route)
+				? { type: 'route', id: route.id }
+				: null;
 		if (mobile) snapToBiggestHeight();
 	}
 
 	function deleteRoute(route) {
+		if (editorState) {
+			editorState.removeRoute(route.id);
+			if (userState.ui.selectedRouteId === route.id) drawingTarget = null;
+			return;
+		}
 		const index = userState.topo.routes.indexOf(route);
 		if (index === -1) return;
 
 		userState.topo.routes.splice(index, 1);
 		if (userState.ui.selectedRouteId === route.id) {
 			userState.ui.selectedRouteId = null;
-		userState.ui.selectedPathId = null;
+			userState.ui.selectedPathId = null;
 			drawingTarget = null;
 		}
 	}
@@ -121,7 +131,8 @@
 				title={$_('ui.delete_route')}
 				aria-label={$_('ui.delete_route')}
 			>
-				<i class={mobile ? 'fa-solid fa-trash-can text-sm' : 'fa-solid fa-trash-can text-[10px]'}></i>
+				<i class={mobile ? 'fa-solid fa-trash-can text-sm' : 'fa-solid fa-trash-can text-[10px]'}
+				></i>
 			</button>
 		</div>
 

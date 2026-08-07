@@ -1,6 +1,13 @@
 <script>
 	import ToolPalette2D from '$lib/components/editor/2d/ToolPalette2D.svelte';
-	import { createTopoEditorSession, provideTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	import {
+		createTopoEditorSession,
+		provideTopoEditorSession
+	} from '$lib/state/topo-session.svelte.js';
+	import {
+		createTopo2DEditorState,
+		provideTopo2DEditorState
+	} from '$lib/state/topo-2d-editor-state.svelte.js';
 	import { useTopoDraftAutosave } from '$lib/components/editor/use-topo-draft-autosave.svelte.js';
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
 	import Topo2DEditor from '$lib/components/editor/2d/Topo2DEditor.svelte';
@@ -13,13 +20,14 @@
 	import { _ } from 'svelte-i18n';
 	import { browser } from '$app/environment';
 
-	let activeTool = $state('select');
 	const userState = provideTopoEditorSession(createTopoEditorSession());
+	const editorState = createTopo2DEditorState({
+		getTopo: () => userState.topo,
+		setTopo: (topo) => (userState.topo = topo),
+		ui: userState.ui
+	});
+	provideTopo2DEditorState(editorState);
 	let toolOptionsOpen = $state(false);
-	let selectedOutlineStyle = $state('rock');
-	let drawingTarget = $state(null);
-	let hasPendingChanges = $state(false);
-	let snapRoutesToFixpoints = $state(false);
 	let showMapModal = $state(false);
 	let editor2D = $state();
 	let saveStatus = $state();
@@ -28,21 +36,23 @@
 	let outlineSimplifySummary = $state('');
 	let activeSymbols = $derived(
 		topoSymbols.filter(
-			(symbol) => symbol.type === (activeTool === 'fixpoint' ? 'fixpoint' : 'feature')
+			(symbol) =>
+				symbol.type === (editorState.ui.activeTool === 'fixpoint' ? 'fixpoint' : 'feature')
 		)
 	);
-
 
 	useTopoDraftAutosave({
 		session: userState,
 		draftId: browser ? new URL(window.location.href).searchParams.get('draft') : null,
 		editorMode: '2d',
 		getWorkspace: () => 'topos/2d/editor',
+		getSaveSession: () => ({ ...userState.getSaveSession(), topo: editorState.getSaveSnapshot() }),
+		onPersisted: () => editorState.markSaved(),
 		restoreSession: (session, id) => {
 			userState.loadSession(session, id);
 			initializeIdCounters(userState.topo);
 		},
-		getSaveSignature: () => JSON.stringify(userState.topo)
+		getSaveSignature: () => JSON.stringify(editorState.getSaveSnapshot())
 	});
 
 	async function saveTopo() {
@@ -53,13 +63,14 @@
 			userState.topo.date = userState.topo.date || new Date().toISOString().split('T')[0];
 			userState.topo.updated = new Date().toISOString().split('T')[0];
 
-			let topoToSave = JSON.parse(JSON.stringify(userState.topo));
+			let topoToSave = editorState.getSaveSnapshot();
 
 			// Remove internal UI fields before saving
 			delete topoToSave._entryPath;
 			delete topoToSave._topoFileName;
 
 			await writeJson(userState.topo._topoFileName, topoToSave);
+			editorState.markSaved();
 
 			saveStatus = 'success';
 			setTimeout(() => {
@@ -81,22 +92,14 @@
 	}
 </script>
 
-<Topo2DEditor
-	bind:this={editor2D}
-	bind:activeTool
-	bind:drawingTarget
-	selectedSymbol={userState.ui.selectedSymbol}
-	{selectedOutlineStyle}
-	bind:snapRoutesToFixpoints
-	bind:hasPendingChanges
-/>
+<Topo2DEditor {editorState} bind:this={editor2D} />
 
 <ToolPalette2D
-	bind:activeTool
+	bind:activeTool={editorState.ui.activeTool}
 	bind:toolOptionsOpen
-	bind:selectedSymbol={userState.ui.selectedSymbol}
-	bind:selectedOutlineStyle
-	{hasPendingChanges}
+	bind:selectedSymbol={editorState.ui.selectedSymbol}
+	bind:selectedOutlineStyle={editorState.ui.selectedOutlineStyle}
+	hasPendingChanges={editorState.hasPendingChanges}
 	onFinishRoute={() => editor2D.finalize()}
 	onCancelAction={() => editor2D.cancel()}
 	onUndo={() => editor2D?.undo()}
@@ -106,30 +109,37 @@
 	errorMessage={saveError}
 />
 {#if toolOptionsOpen}
-	{#if activeTool === 'outline'}
+	{#if editorState.ui.activeTool === 'outline'}
 		<OutlineToolOptions
 			outlineTool={editor2D?.getCurrentTool?.()}
-			{activeTool}
-			bind:selectedOutlineStyle
+			activeTool={editorState.ui.activeTool}
+			bind:selectedOutlineStyle={editorState.ui.selectedOutlineStyle}
 			onClose={() => (toolOptionsOpen = false)}
 		/>
-	{:else if ['route', 'multipitch'].includes(activeTool)}
-		<ToolOptions title={$_(`ui.${activeTool === 'multipitch' ? 'multipitch' : 'route'}`)} open={toolOptionsOpen}
-		             onClose={() => (toolOptionsOpen = false)}>
+	{:else if ['route', 'multipitch'].includes(editorState.ui.activeTool)}
+		<ToolOptions
+			title={$_(`ui.${editorState.ui.activeTool === 'multipitch' ? 'multipitch' : 'route'}`)}
+			open={toolOptionsOpen}
+			onClose={() => (toolOptionsOpen = false)}
+		>
 			<label class="flex cursor-pointer items-center justify-between gap-3 text-sm text-near-black">
 				<span>{$_('ui.snap_routes_to_fixpoints')}</span>
-				<input type="checkbox" bind:checked={snapRoutesToFixpoints} />
+				<input type="checkbox" bind:checked={editorState.ui.snapRoutesToFixpoints} />
 			</label>
 			<p class="text-[10px] text-warm-gray-500">{$_('ui.snap_routes_to_fixpoints_hint')}</p>
 		</ToolOptions>
-	{:else if ['symbol', 'fixpoint'].includes(activeTool)}
-		<ToolOptions title={$_(`ui.${activeTool}`)} open={toolOptionsOpen} onClose={() => (toolOptionsOpen = false)}>
+	{:else if ['symbol', 'fixpoint'].includes(editorState.ui.activeTool)}
+		<ToolOptions
+			title={$_(`ui.${editorState.ui.activeTool}`)}
+			open={toolOptionsOpen}
+			onClose={() => (toolOptionsOpen = false)}
+		>
 			<div class="grid grid-cols-5 gap-1.5">
 				{#each activeSymbols as symbol}
 					<button
 						type="button"
-						class={`flex min-h-11 flex-col items-center justify-center rounded-sm p-1.5 transition-none ${userState.ui.selectedSymbol === symbol.id ? 'bg-creator-blue text-white ring-1 ring-creator-blue' : 'bg-black/5 hover:bg-black/10'}`}
-						onclick={() => (userState.ui.selectedSymbol = symbol.id)}
+						class={`flex min-h-11 flex-col items-center justify-center rounded-sm p-1.5 transition-none ${editorState.ui.selectedSymbol === symbol.id ? 'bg-creator-blue text-white ring-1 ring-creator-blue' : 'bg-black/5 hover:bg-black/10'}`}
+						onclick={() => (editorState.ui.selectedSymbol = symbol.id)}
 						title={$_(`topo.fixpoints.${symbol.id}`)}
 						aria-label={$_(`topo.fixpoints.${symbol.id}`)}
 					>
@@ -138,8 +148,12 @@
 				{/each}
 			</div>
 		</ToolOptions>
-	{:else if activeTool === 'outlineEdit' && userState.ui.selectedOutlineId}
-		<ToolOptions title="Outline tools" open={toolOptionsOpen} onClose={() => (toolOptionsOpen = false)}>
+	{:else if editorState.ui.activeTool === 'outlineEdit' && userState.ui.selectedOutlineId}
+		<ToolOptions
+			title="Outline tools"
+			open={toolOptionsOpen}
+			onClose={() => (toolOptionsOpen = false)}
+		>
 			<div class="flex flex-col gap-2">
 				<label class="text-xs font-medium text-warm-gray-600" for="outline-simplify-tolerance">
 					Simplify selected outline
@@ -157,9 +171,9 @@
 					<button
 						type="button"
 						class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
-						onclick={simplifySelectedOutline}>Simplify
-					</button
-					>
+						onclick={simplifySelectedOutline}
+						>Simplify
+					</button>
 				</div>
 				<p class="text-[10px] text-warm-gray-400">
 					Removes redundant vertices using a pixel tolerance. Undo restores the original.
@@ -172,4 +186,9 @@
 	{/if}
 {/if}
 
-<TopoPropertiesPanel bind:showMapModal bind:drawingTarget bind:activeTool {toolOptionsOpen} />
+<TopoPropertiesPanel
+	bind:showMapModal
+	bind:drawingTarget={editorState.ui.drawingTarget}
+	bind:activeTool={editorState.ui.activeTool}
+	{toolOptionsOpen}
+/>

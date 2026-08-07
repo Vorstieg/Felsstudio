@@ -1,8 +1,10 @@
 <script>
 	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
 	const userState = getTopoEditorSession();
+	const editorState = getTopo2DEditorState();
 	import { _ } from 'svelte-i18n';
-import { topoSymbols } from '@vorstieg/topo-renderer';
+	import { topoSymbols } from '@vorstieg/topo-renderer';
 	import { createAiFixpoint } from './topo-properties-utils.js';
 
 	let { aiSuggestions = [], mobile = false } = $props();
@@ -17,12 +19,17 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 	}
 
 	function addAiBolt(cluster) {
-		userState.topo.fixPoints.push(createAiFixpoint(cluster));
+		if (editorState) editorState.addFixpoint(createAiFixpoint(cluster));
+		else userState.topo.fixPoints.push(createAiFixpoint(cluster));
 		userState.clustering.selectedClusterId = null;
 	}
 
 	function removeFixpoint(point, index) {
 		const pointId = point?.id;
+		if (editorState) {
+			editorState.removeFixpoint(pointId);
+			return;
+		}
 		userState.topo.fixPoints.splice(index, 1);
 		if (userState.ui.selectedFixpointId === pointId) userState.ui.selectedFixpointId = null;
 		userState.topo.routes.forEach((route) => {
@@ -73,7 +80,11 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 							}`}
 					onclick={() => toggleCluster(cluster)}
 				>
-					<div class={mobile ? 'w-8 h-8 rounded-sm bg-creator-blue/10 flex items-center justify-center text-creator-blue text-xs font-black shadow-sm' : 'flex items-center gap-2'}>
+					<div
+						class={mobile
+							? 'w-8 h-8 rounded-sm bg-creator-blue/10 flex items-center justify-center text-creator-blue text-xs font-black shadow-sm'
+							: 'flex items-center gap-2'}
+					>
 						{#if mobile}
 							<i class="fa-solid fa-wand-magic-sparkles"></i>
 						{:else}
@@ -114,8 +125,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 						onclick={(e) => {
 							e.stopPropagation();
 							addAiBolt(cluster);
-						}}
-						>Add</button
+						}}>Add</button
 					>
 				</div>
 			{/each}
@@ -139,9 +149,14 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 			<button
 				class="w-9 h-9 rounded-sm transition-none bg-warm-gray-100 flex items-center justify-center text-warm-gray-500 text-xs font-black shadow-sm"
 				onclick={() => {
-					userState.ui.selectedFixpointId =
-						userState.ui.selectedFixpointId === point.id ? null : point.id;
-					userState.ui.selectedRouteId = null;
+					if (editorState) {
+						if (userState.ui.selectedFixpointId === point.id) editorState.clearSelection();
+						else editorState.selectObject('symbol', point.id);
+					} else {
+						userState.ui.selectedFixpointId =
+							userState.ui.selectedFixpointId === point.id ? null : point.id;
+						userState.ui.selectedRouteId = null;
+					}
 				}}
 				aria-label={`${$_('ui.fixpoints')} ${i + 1}`}
 			>

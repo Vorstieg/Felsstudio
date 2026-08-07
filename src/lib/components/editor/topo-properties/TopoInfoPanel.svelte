@@ -1,6 +1,8 @@
 <script>
 	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
 	const userState = getTopoEditorSession();
+	const editorState = getTopo2DEditorState();
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
 	import ImageUploader from '$lib/components/editor/ImageUploader.svelte';
 	import ClusteringMap from '$lib/components/editor/ClusteringMap.svelte';
@@ -32,6 +34,10 @@
 	);
 
 	function deleteSelectedText() {
+		if (editorState) {
+			editorState.removeTextLabel(selectedTextLabel.id);
+			return;
+		}
 		userState.topo.textLabels = (userState.topo.textLabels || []).filter(
 			(label) => label.id !== selectedTextLabel.id
 		);
@@ -39,6 +45,10 @@
 	}
 
 	function deleteSelectedOutline() {
+		if (editorState) {
+			editorState.removeOutline(selectedOutline.id);
+			return;
+		}
 		userState.topo.outlines = (userState.topo.outlines || []).filter(
 			(outline) => outline.id !== selectedOutline.id
 		);
@@ -50,17 +60,36 @@
 			selectedOutline.shape?.preset === 'pillar'
 				? PILLAR_OUTLINE_CURVE_TENSION
 				: DEFAULT_OUTLINE_CURVE_TENSION;
-		selectedOutline.curve = {
+		const curve = {
 			enabled,
 			tension: selectedOutline.curve?.tension ?? defaultTension
 		};
+		if (editorState) editorState.updateOutline(selectedOutline.id, { curve });
+		else selectedOutline.curve = curve;
 	}
 
 	function setSelectedOutlineCurveTension(tension) {
-		selectedOutline.curve = {
+		const curve = {
 			enabled: Boolean(selectedOutline.curve?.enabled),
 			tension: Number(tension)
 		};
+		if (editorState) editorState.updateOutline(selectedOutline.id, { curve });
+		else selectedOutline.curve = curve;
+	}
+
+	function updateSelectedText(changes) {
+		if (editorState) editorState.updateTextLabel(selectedTextLabel.id, changes);
+		else Object.assign(selectedTextLabel, changes);
+	}
+
+	function updateSelectedOutline(changes) {
+		if (editorState) editorState.updateOutline(selectedOutline.id, changes);
+		else Object.assign(selectedOutline, changes);
+	}
+
+	function updateTopoField(field, value) {
+		if (editorState) editorState.updateNestedPath(field, value);
+		else userState.topo[field] = value;
 	}
 </script>
 
@@ -81,7 +110,8 @@
 			<input
 				type="text"
 				id="name-mobile"
-				bind:value={userState.topo.name}
+				value={userState.topo.name || ''}
+				oninput={(event) => updateTopoField('name', event.currentTarget.value)}
 				class="input-studio w-full"
 				placeholder={$_('ui.name_placeholder')}
 			/>
@@ -107,7 +137,8 @@
 				<input
 					type="text"
 					id="name"
-					bind:value={userState.topo.name}
+					value={userState.topo.name || ''}
+					oninput={(event) => updateTopoField('name', event.currentTarget.value)}
 					class="input-studio w-full"
 					placeholder={$_('ui.name_placeholder')}
 				/>
@@ -118,7 +149,8 @@
 				<input
 					type="text"
 					id="author"
-					bind:value={userState.topo.author}
+					value={userState.topo.author || ''}
+					oninput={(event) => updateTopoField('author', event.currentTarget.value)}
 					class="input-studio w-full"
 					placeholder={$_('ui.author_placeholder')}
 				/>
@@ -128,12 +160,12 @@
 				<label for="rock" class="text-ui-label block">{$_('ui.rock_type')}</label>
 				<select
 					id="rock"
-					bind:value={userState.topo.rock}
+					value={userState.topo.rock || ''}
+					onchange={(event) => updateTopoField('rock', event.currentTarget.value)}
 					class="input-studio w-full appearance-none"
 				>
 					{#each rockTypes as rockType}
-						<option value="{rockType}">{$_(`rock_types.${rockType}`)}</option>
-
+						<option value={rockType}>{$_(`rock_types.${rockType}`)}</option>
 					{/each}
 				</select>
 			</div>
@@ -154,7 +186,9 @@
 						</button>
 						<div class="flex-1 min-w-0 pr-1">
 							{#if userState.topo.coordinates[0] !== 0}
-								<div class="text-micro-data font-mono truncate leading-none text-near-black font-bold">
+								<div
+									class="text-micro-data font-mono truncate leading-none text-near-black font-bold"
+								>
 									{userState.topo.coordinates[1].toFixed(5)}
 									, {userState.topo.coordinates[0].toFixed(5)}
 								</div>
@@ -178,7 +212,8 @@
 				<label for="description" class="text-ui-label block">{$_('ui.description')}</label>
 				<textarea
 					id="description"
-					bind:value={userState.topo.description}
+					value={userState.topo.description || ''}
+					oninput={(event) => updateTopoField('description', event.currentTarget.value)}
 					rows="2"
 					class="input-studio w-full resize-none"
 					placeholder={$_('ui.description_placeholder')}
@@ -187,7 +222,11 @@
 
 			<div class="space-y-0.5">
 				<label class="text-ui-label block">{$_('ui.tags')}</label>
-				<TagSelector bind:selectedTags={userState.topo.tags} availableTags={availableTopoTags} />
+				<TagSelector
+					selectedTags={userState.topo.tags || []}
+					onChange={(value) => updateTopoField('tags', value)}
+					availableTags={availableTopoTags}
+				/>
 			</div>
 
 			{#if selectedTextLabel}
@@ -202,7 +241,12 @@
 							<i class="fa-solid fa-trash-can text-[10px]"></i>
 						</button>
 					</div>
-					<input type="text" bind:value={selectedTextLabel.text} class="input-studio w-full" />
+					<input
+						type="text"
+						value={selectedTextLabel.text || ''}
+						oninput={(event) => updateSelectedText({ text: event.currentTarget.value })}
+						class="input-studio w-full"
+					/>
 					<div class="grid grid-cols-3 gap-1.5">
 						<div class="space-y-0.5">
 							<label class="text-ui-label block">Size</label>
@@ -211,7 +255,9 @@
 								min="0.01"
 								max="0.08"
 								step="0.005"
-								bind:value={selectedTextLabel.fontSize2D}
+								value={selectedTextLabel.fontSize2D}
+								oninput={(event) =>
+									updateSelectedText({ fontSize2D: Number(event.currentTarget.value) })}
 								class="input-studio w-full"
 							/>
 						</div>
@@ -219,14 +265,17 @@
 							<label class="text-ui-label block">Color</label>
 							<input
 								type="color"
-								bind:value={selectedTextLabel.color}
+								value={selectedTextLabel.color}
+								oninput={(event) => updateSelectedText({ color: event.currentTarget.value })}
 								class="input-studio w-full h-8 p-1"
 							/>
 						</div>
 						<div class="space-y-0.5">
 							<label class="text-ui-label block">Weight</label>
 							<select
-								bind:value={selectedTextLabel.fontWeight}
+								value={selectedTextLabel.fontWeight}
+								onchange={(event) =>
+									updateSelectedText({ fontWeight: Number(event.currentTarget.value) })}
 								class="input-studio w-full appearance-none"
 							>
 								<option value={400}>Regular</option>
@@ -252,7 +301,7 @@
 					</div>
 					<select
 						value={selectedOutline.lineStyle || 'rock'}
-						onchange={(e) => (selectedOutline.lineStyle = e.currentTarget.value)}
+						onchange={(e) => updateSelectedOutline({ lineStyle: e.currentTarget.value })}
 						class="input-studio w-full appearance-none"
 					>
 						{#each outlineLineStyles as style}

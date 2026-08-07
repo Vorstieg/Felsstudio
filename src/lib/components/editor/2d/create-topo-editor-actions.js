@@ -18,11 +18,11 @@ export function createTopoEditorActions({
 			tool.undoLastPoint();
 			return;
 		}
-		editor.history.undo();
+		(editor.undo || editor.history.undo)();
 	}
 
 	function redo() {
-		editor.history.redo();
+		(editor.redo || editor.history.redo)();
 	}
 
 	function finalize() {
