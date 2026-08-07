@@ -26,4 +26,18 @@ describe('createTopoKeyboardController', () => {
 
 		expect(undo).not.toHaveBeenCalled();
 	});
+
+	it('routes Enter and Escape through the shared editor actions', () => {
+		const finalize = vi.fn();
+		const cancel = vi.fn();
+		const preventDefault = vi.fn();
+		const controller = createTopoKeyboardController({ finalize, cancel });
+
+		controller.handleKeyDown({ key: 'Enter', target: {}, preventDefault });
+		controller.handleKeyDown({ key: 'Escape', target: {}, preventDefault });
+
+		expect(finalize).toHaveBeenCalledOnce();
+		expect(cancel).toHaveBeenCalledOnce();
+		expect(preventDefault).toHaveBeenCalledTimes(2);
+	});
 });

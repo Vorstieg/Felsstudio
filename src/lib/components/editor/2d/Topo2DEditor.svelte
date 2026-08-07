@@ -159,7 +159,8 @@
 		editor.setDraftPending(
 			currentRoutePoints.length >= 2 ||
 				currentOutlinePoints.length >= 2 ||
-				Boolean(brushPreview?.points?.length)
+				Boolean(brushPreview?.points?.length) ||
+				(editor.ui.activeTool === 'multipitch' && editor.ui.drawingTarget?.type === 'newPitch')
 		);
 	});
 
@@ -245,6 +246,8 @@
 		}),
 		getSelectedOutlineId: () => userState.ui.selectedOutlineId,
 		getOutlineEditTool: () => tools.outlineEdit,
+		getActiveTool: () => editor.ui.activeTool,
+		setActiveTool: (tool) => editor.setActiveTool(tool),
 		setDrawingTarget: (target) => editor.setDrawingTarget(target),
 		clearSelection
 	});
@@ -375,12 +378,9 @@
 
 	const keyboard = createTopoKeyboardController({
 		getEditingTextId: () => editingTextLabelId,
-		getActiveTool: () => editor.ui.activeTool,
 		getCurrentTool: () => currentTool,
-		getDraftState: () => ({
-			routePoints: currentRoutePoints.length,
-			outlinePoints: currentOutlinePoints.length
-		}),
+		finalize: actions.finalize,
+		cancel: actions.cancel,
 		getSelectedItems: () => editor.selectedItems,
 		getCanvasSize: () => ({ baseWidth, baseHeight }),
 		clipboard,

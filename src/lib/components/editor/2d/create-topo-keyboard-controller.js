@@ -4,9 +4,9 @@
  */
 export function createTopoKeyboardController({
 	getEditingTextId,
-	getActiveTool,
 	getCurrentTool,
-	getDraftState,
+	finalize,
+	cancel,
 	getSelectedItems,
 	getCanvasSize,
 	clipboard,
@@ -50,19 +50,15 @@ export function createTopoKeyboardController({
 		if (event.key === 'Shift') setShiftPressed?.(true);
 
 		if (event.key === 'Escape') {
-			const draft = getDraftState?.() || {};
-			if (draft.routePoints > 0 || draft.outlinePoints > 0) {
-				getCurrentTool()?.cancel?.();
-				return;
-			}
-			if (getActiveTool() !== 'select') {
-				getCurrentTool()?.cancel?.();
-				setDrawingTarget?.(null);
-				setActiveTool?.('select');
-				clearSelection?.();
-				return;
-			}
-			clearSelection?.();
+			event.preventDefault?.();
+			cancel?.();
+			return;
+		}
+
+		if (event.key === 'Enter') {
+			event.preventDefault?.();
+			finalize?.();
+			return;
 		}
 
 		if (event.key === 'Delete' || event.key === 'Backspace') {
