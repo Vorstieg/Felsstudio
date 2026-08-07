@@ -50,6 +50,9 @@
 	const toolConfig = {
 		state: userState,
 		saveHistory: () => history.save(),
+		selectObject: (...args) => editor.selectObject(...args),
+		getSelectedId: (type) => editor.selectedId(type),
+		removeItems: (items) => editor.removeItems(items),
 		beginTextEdit,
 		getCanvasSize: () => ({ baseWidth, baseHeight }),
 		getImageSrc: () => userState.topo.image2D,
@@ -162,10 +165,6 @@
 			currentTool instanceof SymbolTool ||
 			currentTool instanceof TextTool
 		) {
-			userState.ui.selectedFixpointId = null;
-			userState.ui.selectedRouteId = null;
-			userState.ui.selectedOutlineId = null;
-			userState.ui.selectedTextLabelId = null;
 			editor.clearSelection();
 		}
 
@@ -495,8 +494,7 @@
 				userState.topo.textLabels = (userState.topo.textLabels || []).filter(
 					(textLabel) => textLabel.id !== editingTextLabelId
 				);
-				userState.ui.selectedTextLabelId = null;
-				editor.selectedItems.delete(`text:${editingTextLabelId}`);
+				editor.removeItems([{ type: 'text', id: editingTextLabelId }]);
 			}
 		}
 
@@ -724,13 +722,11 @@
 				// Delete routes
 				if (idsByType.route.length > 0) {
 					tools.routeEdit.delete(idsByType.route);
-					userState.ui.selectedRouteId = null;
 				}
 
 				// Delete symbols
 				if (idsByType.symbol.length > 0) {
 					tools.symbolEdit.delete(idsByType.symbol);
-					userState.ui.selectedFixpointId = null;
 				}
 
 				// Delete outlines
@@ -738,28 +734,26 @@
 					userState.topo.outlines = userState.topo.outlines.filter(
 						(o) => !idsByType.outline.includes(o.id)
 					);
-					userState.ui.selectedOutlineId = null;
 				}
 
 				if (idsByType.text.length > 0) {
 					userState.topo.textLabels = (userState.topo.textLabels || []).filter(
 						(t) => !idsByType.text.includes(t.id)
 					);
-					userState.ui.selectedTextLabelId = null;
 				}
 
-				editor.selectedItems.clear();
+				editor.clearSelection();
 				saveHistory();
 				return;
 			}
 
 			// Single delete (existing logic)
-			if (userState.ui.selectedFixpointId) {
-				const idToDelete = userState.ui.selectedFixpointId;
+			const selectedFixpointId = editor.selectedId('symbol');
+			if (selectedFixpointId) {
+				const idToDelete = selectedFixpointId;
 				if (tools.symbolEdit.delete([idToDelete])) saveHistory();
 
-				userState.ui.selectedFixpointId = null;
-				editor.selectedSymbolInstance = null;
+				editor.removeItems([{ type: 'symbol', id: idToDelete }]);
 				return;
 			}
 		}

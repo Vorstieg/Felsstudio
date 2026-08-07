@@ -3,10 +3,11 @@ import { generateId } from '$lib/assets/js/id-utils.js';
 export class TextTool {
 	id = 'text';
 
-	constructor({ state, saveHistory, beginTextEdit } = {}) {
+	constructor({ state, saveHistory, beginTextEdit, selectObject } = {}) {
 		this.state = state;
 		this.saveHistory = saveHistory || (() => {});
 		this.beginTextEdit = beginTextEdit || (() => {});
+		this.selectObject = selectObject || (() => {});
 	}
 
 	onMouseDown(event, point) {
@@ -22,7 +23,7 @@ export class TextTool {
 			color: '#23201d',
 			fontWeight: 700
 		});
-		this.state.ui.selectedTextLabelId = id;
+		this.selectObject('text', id);
 		this.saveHistory();
 		this.beginTextEdit(id);
 	}

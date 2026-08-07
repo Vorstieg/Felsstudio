@@ -27,6 +27,55 @@ describe('createTopo2DEditorController', () => {
 		expect(ui.selectedFixpointId).toBe('fix-1');
 	});
 
+	it('projects the authoritative selection after removing selected data', () => {
+		const ui = {
+			selectedRouteId: null,
+			selectedFixpointId: null,
+			selectedOutlineId: null,
+			selectedTextLabelId: null
+		};
+		const topo = {
+			routes: [{ id: 'route-1' }],
+			fixPoints: [{ id: 'fix-1' }],
+			outlines: [],
+			textLabels: []
+		};
+		const controller = createTopo2DEditorController({ getTopo: () => topo, ui });
+
+		controller.selectItems([
+			{ type: 'route', id: 'route-1' },
+			{ type: 'symbol', id: 'fix-1' }
+		]);
+		topo.routes = [];
+		controller.reconcileSelection();
+
+		expect([...controller.selectedItems]).toEqual(['symbol:fix-1']);
+		expect(ui.selectedRouteId).toBeNull();
+		expect(ui.selectedFixpointId).toBe('fix-1');
+
+		controller.removeItems([{ type: 'symbol', id: 'fix-1' }]);
+		expect(controller.selectedItems.size).toBe(0);
+		expect(ui.selectedFixpointId).toBeNull();
+	});
+
+	it('does not leave a legacy field from a previous selection', () => {
+		const ui = {
+			selectedRouteId: 'stale-route',
+			selectedFixpointId: 'stale-fix',
+			selectedOutlineId: null,
+			selectedTextLabelId: null
+		};
+		const controller = createTopo2DEditorController({
+			getTopo: () => ({ fixPoints: [{ id: 'fix-2' }] }),
+			ui
+		});
+
+		controller.selectObject('symbol', 'fix-2');
+
+		expect(ui.selectedRouteId).toBeNull();
+		expect(ui.selectedFixpointId).toBe('fix-2');
+	});
+
 	it('records and completes pointer interactions', () => {
 		const controller = createTopo2DEditorController({
 			getTopo: () => ({ fixPoints: [] }),

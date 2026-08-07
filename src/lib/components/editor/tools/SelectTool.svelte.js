@@ -1,8 +1,18 @@
 export class SelectTool {
 	id = 'select';
-	constructor({ state, saveHistory } = {}) {
+	constructor({ state, saveHistory, getSelectedId, removeItems } = {}) {
 		this.state = state;
 		this.saveHistory = saveHistory || (() => {});
+		this.getSelectedId = getSelectedId || (() => this.state.ui.selectedFixpointId);
+		this.removeItems =
+			removeItems ||
+			((items) => {
+				if (
+					items.some(({ type, id }) => type === 'symbol' && id === this.state.ui.selectedFixpointId)
+				) {
+					this.state.ui.selectedFixpointId = null;
+				}
+			});
 	}
 
 	onMouseDown(event, point) {
@@ -20,8 +30,8 @@ export class SelectTool {
 	onMouseUp(event, point) {}
 	onKeyDown(event) {
 		if (event.key === 'Delete' || event.key === 'Backspace') {
-			if (this.state.ui.selectedFixpointId) {
-				const idToDelete = this.state.ui.selectedFixpointId;
+			const idToDelete = this.getSelectedId('symbol');
+			if (idToDelete) {
 				// Remove from global fixpoints
 				this.state.topo.fixPoints = this.state.topo.fixPoints.filter((p) => p.id !== idToDelete);
 
@@ -38,7 +48,7 @@ export class SelectTool {
 					}
 				});
 
-				this.state.ui.selectedFixpointId = null;
+				this.removeItems([{ type: 'symbol', id: idToDelete }]);
 				this.saveHistory();
 			}
 		}

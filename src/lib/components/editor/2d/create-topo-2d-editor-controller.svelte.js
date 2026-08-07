@@ -17,9 +17,8 @@ export function createTopo2DEditorController({ getTopo, ui }) {
 	}
 
 	function clearSelection() {
-		clearUiSelection();
-		selectedSymbolInstance = null;
 		selectedItems.clear();
+		syncUiSelection();
 	}
 
 	function syncUiSelection() {
@@ -37,6 +36,15 @@ export function createTopo2DEditorController({ getTopo, ui }) {
 		}
 	}
 
+	function selectedId(type) {
+		let id = null;
+		for (const itemKey of selectedItems) {
+			const [itemType, itemId] = itemKey.split(':');
+			if (itemType === type) id = itemId;
+		}
+		return id;
+	}
+
 	function isSelected(type, id) {
 		return selectedItems.has(`${type}:${id}`);
 	}
@@ -52,13 +60,7 @@ export function createTopo2DEditorController({ getTopo, ui }) {
 		}
 
 		selectedItems.add(itemKey);
-		if (type === 'route') ui.selectedRouteId = id;
-		if (type === 'outline') ui.selectedOutlineId = id;
-		if (type === 'text') ui.selectedTextLabelId = id;
-		if (type === 'symbol') {
-			ui.selectedFixpointId = id;
-			selectedSymbolInstance = getTopo().fixPoints.find((symbol) => symbol.id === id) || null;
-		}
+		syncUiSelection();
 	}
 
 	function selectItems(items, mode = 'replace') {
@@ -68,6 +70,26 @@ export function createTopo2DEditorController({ getTopo, ui }) {
 			if (mode === 'subtract') selectedItems.delete(key);
 			else selectedItems.add(key);
 		});
+		syncUiSelection();
+	}
+
+	function removeItems(items) {
+		for (const { type, id } of items) selectedItems.delete(`${type}:${id}`);
+		syncUiSelection();
+	}
+
+	function reconcileSelection() {
+		const topo = getTopo();
+		const existing = {
+			route: new Set((topo.routes || []).map((item) => item.id)),
+			symbol: new Set((topo.fixPoints || []).map((item) => item.id)),
+			outline: new Set((topo.outlines || []).map((item) => item.id)),
+			text: new Set((topo.textLabels || []).map((item) => item.id))
+		};
+		for (const itemKey of selectedItems) {
+			const [type, id] = itemKey.split(':');
+			if (!existing[type]?.has(id)) selectedItems.delete(itemKey);
+		}
 		syncUiSelection();
 	}
 
@@ -83,21 +105,23 @@ export function createTopo2DEditorController({ getTopo, ui }) {
 
 	return {
 		get selectedItems() {
-			return selectedItems;
+			// Selection changes must go through the controller so the compatibility
+			// fields and selected symbol instance are always projected together.
+			return new Set(selectedItems);
 		},
 		get selectedSymbolInstance() {
 			return selectedSymbolInstance;
-		},
-		set selectedSymbolInstance(value) {
-			selectedSymbolInstance = value;
 		},
 		get interaction() {
 			return interaction;
 		},
 		clearSelection,
+		selectedId,
 		isSelected,
 		selectObject,
 		selectItems,
+		removeItems,
+		reconcileSelection,
 		startInteraction,
 		endInteraction
 	};

@@ -11,6 +11,8 @@ export class RouteTool {
 		getDrawingTarget,
 		setDrawingTarget,
 		clearSelection,
+		selectObject,
+		getSelectedId,
 		deactivate,
 		saveHistory,
 		snapPoint,
@@ -22,6 +24,13 @@ export class RouteTool {
 		this.getDrawingTarget = getDrawingTarget || (() => null);
 		this.setDrawingTarget = setDrawingTarget || (() => {});
 		this.clearSelection = clearSelection || (() => {});
+		this.selectObject =
+			selectObject ||
+			((type, id) => {
+				this.state.ui.selectedRouteId = type === 'route' ? id : null;
+				this.state.ui.selectedFixpointId = null;
+			});
+		this.getSelectedId = getSelectedId || (() => this.state.ui.selectedRouteId);
 		this.deactivate = deactivate || (() => {});
 		this.saveHistory = saveHistory || (() => {});
 		this.snapPoint = snapPoint || ((point) => ({ point, fixPointId: null }));
@@ -81,7 +90,7 @@ export class RouteTool {
 	}
 
 	appendToSelectedRoute(point) {
-		const route = this.findRoute(this.state.ui.selectedRouteId);
+		const route = this.findRoute(this.getSelectedId('route'));
 		if (!route || route.type === 'multi-pitch') return null;
 		route.points2D = [...(route.points2D || []), [point.x, point.y]];
 		return route;
@@ -104,14 +113,14 @@ export class RouteTool {
 				this.createPitch(route.pitches?.length + 1, points2D)
 			];
 			fixPointIds.forEach((id) => this.referenceFixpoint(route, id));
-			this.state.ui.selectedRouteId = route.id;
+			this.selectObject('route', route.id);
 			this.saveHistory();
 			return route;
 		}
 		const route = this.createRoute(mode, points2D);
 		fixPointIds.forEach((id) => this.referenceFixpoint(route, id));
 		this.state.topo.routes.push(route);
-		this.state.ui.selectedRouteId = route.id;
+		this.selectObject('route', route.id);
 		this.saveHistory();
 		return route;
 	}
@@ -126,8 +135,7 @@ export class RouteTool {
 		const index = selectedIndex >= 0 ? selectedIndex : route.pitches.length - 1;
 		const pitch = route.pitches[index];
 		const nextPitch = (pitch.points2D?.length || 0) < 2 ? pitch : route.pitches[index + 1];
-		this.state.ui.selectedRouteId = route.id;
-		this.state.ui.selectedFixpointId = null;
+		this.selectObject('route', route.id);
 		this.setDrawingTarget(
 			nextPitch
 				? { type: 'pitch', routeId: route.id, pitchId: nextPitch.id }
