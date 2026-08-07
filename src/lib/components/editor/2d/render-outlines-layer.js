@@ -16,11 +16,12 @@ export function renderOutlinesLayer({
 	baseWidth,
 	baseHeight,
 	canvasInput,
-	outlineEditTool,
+	editTools,
 	isSelected,
 	onObjectMouseDown: handleObjectMouseDown,
 	onObjectClick: handleObjectClick
 }) {
+	const outlineEditTool = editTools?.outline;
 	const outlinesLayer = layers.outlines;
 	const outlines = topo.outlines;
 	const canInteract =

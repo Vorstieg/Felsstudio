@@ -82,12 +82,18 @@ export class OutlineTool {
 	brushOutlinePoints = $state([]);
 	brushGeneration = 0;
 
-	constructor({ state, saveHistory, getCanvasSize, getImageSrc, getImageFit } = {}) {
+	constructor({ context, state, saveHistory, getCanvasSize, getImageSrc, getImageFit } = {}) {
 		this.state = state;
-		this.saveHistory = saveHistory || (() => {});
-		this.getCanvasSize = getCanvasSize || (() => ({ baseWidth: 1, baseHeight: 1 }));
-		this.getImageSrc = getImageSrc || (() => null);
-		this.getImageFit = getImageFit || (() => 'contain');
+		this.saveHistory =
+			context?.commands?.commit || context?.history?.save || saveHistory || (() => {});
+		this.getCanvasSize =
+			context?.viewport?.getCanvasSize ||
+			getCanvasSize ||
+			(() => ({ baseWidth: 1, baseHeight: 1 }));
+		this.getImageSrc = context?.image?.getSrc || getImageSrc || (() => null);
+		this.getImageFit = context?.image?.getFit || getImageFit || (() => 'contain');
+		this.addOutline = context?.commands?.addOutline || null;
+		this.appendOutlinePoint = context?.commands?.appendOutlinePoint || null;
 	}
 
 	onMouseDown(event, point) {
@@ -95,13 +101,16 @@ export class OutlineTool {
 		const nextPoint = this.normalizePoint(point);
 
 		if (this.state.ui.selectedOutlineId && this.mode === 'polyline') {
-			const outline = this.state.topo.outlines.find((o) => o.id === this.state.ui.selectedOutlineId);
+			const outline = this.state.topo.outlines.find(
+				(o) => o.id === this.state.ui.selectedOutlineId
+			);
 			if (outline) {
-				outline.points2D = [...(outline.points2D || []), toPair(nextPoint)];
-				outline.shape = {
-					type: OUTLINE_SHAPE_TYPES.POLYLINE,
-					points2D: outline.points2D
-				};
+				if (this.appendOutlinePoint)
+					this.appendOutlinePoint(outline.id, nextPoint, { recordHistory: false });
+				else {
+					outline.points2D = [...(outline.points2D || []), toPair(nextPoint)];
+					outline.shape = { type: OUTLINE_SHAPE_TYPES.POLYLINE, points2D: outline.points2D };
+				}
 				this.saveHistory();
 				return;
 			}
@@ -362,24 +371,24 @@ export class OutlineTool {
 					}
 				: null);
 
-		this.state.topo.outlines.push(
-			createOutlineRecord({
-				id: outlineId,
-				lineStyle: this.selectedStyle || 'rock',
-				type: this.mode,
-				points2D,
-				shape: shape ? $state.snapshot(shape) : null,
-				// A photo-tracked edge is an open line, so it must not inherit an
-				// area fill from the paint-mask fallback.
-				fillColor: shape?.edgeTracked ? null : this.fillColor,
-				fillOpacity: this.fillOpacity,
-				curve: { enabled: this.curveEnabled, tension: this.curveTension },
-				canvasSize: this.canvasSize
-			})
-		);
+		const outline = createOutlineRecord({
+			id: outlineId,
+			lineStyle: this.selectedStyle || 'rock',
+			type: this.mode,
+			points2D,
+			shape: shape ? $state.snapshot(shape) : null,
+			// A photo-tracked edge is an open line, so it must not inherit an
+			// area fill from the paint-mask fallback.
+			fillColor: shape?.edgeTracked ? null : this.fillColor,
+			fillOpacity: this.fillOpacity,
+			curve: { enabled: this.curveEnabled, tension: this.curveTension },
+			canvasSize: this.canvasSize
+		});
+		if (this.addOutline) this.addOutline(outline);
+		else this.state.topo.outlines.push(outline);
 
 		this.resetDrawingState();
-		this.saveHistory();
+		if (!this.addOutline) this.saveHistory();
 	}
 
 	isClosedShape(points) {

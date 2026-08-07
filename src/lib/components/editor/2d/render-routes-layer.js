@@ -9,10 +9,11 @@ export function renderRoutesLayer({
 	baseWidth,
 	baseHeight,
 	canvasInput,
-	routeEditTool,
+	editTools,
 	onObjectMouseDown: handleObjectMouseDown,
 	onObjectClick: handleObjectClick
 }) {
+	const routeEditTool = editTools?.route;
 	const routesLayer = layers.routes;
 	const canInteract =
 		activeTool === 'select' || activeTool === 'eraser' || activeTool === routeEditTool?.id;
@@ -51,8 +52,7 @@ export function renderRoutesLayer({
 		)
 		.attr(
 			'data-testid',
-			(route) =>
-				`topo-object-route-${route.id}-${route.pitchId || route.variantId || 'main'}`
+			(route) => `topo-object-route-${route.id}-${route.pitchId || route.variantId || 'main'}`
 		)
 		.style('touch-action', 'none');
 

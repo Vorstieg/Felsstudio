@@ -12,11 +12,12 @@ export function renderSymbolsLayer({
 	selectedSymbolInstance,
 	isSelected,
 	canvasInput,
-	symbolEditTool,
+	editTools,
 	basePath: base,
 	onObjectMouseDown: handleObjectMouseDown,
 	onObjectClick: handleObjectClick
 }) {
+	const symbolEditTool = editTools?.symbol;
 	const symbolsLayer = layers.symbols;
 	const symbols = topo.fixPoints;
 	// 5. Symbols (FixPoints) Rendering
@@ -50,9 +51,9 @@ export function renderSymbolsLayer({
 					}),
 			(update) => update,
 			(exit) => exit.remove()
-	)
-	.attr('data-testid', (symbol) => `topo-object-symbol-${symbol.id}`)
-	.attr(
+		)
+		.attr('data-testid', (symbol) => `topo-object-symbol-${symbol.id}`)
+		.attr(
 			'transform',
 			(d) =>
 				`translate(${(d.position2D?.[0] || 0) * baseWidth}, ${(d.position2D?.[1] || 0) * baseHeight}) rotate(${d.rotation2D || 0})`

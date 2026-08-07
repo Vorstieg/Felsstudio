@@ -1,8 +1,8 @@
 export class SelectTool {
 	id = 'select';
-	constructor({ state, saveHistory, getSelectedId, removeItems } = {}) {
+	constructor({ context, state, saveHistory, getSelectedId, removeItems, deleteSymbols } = {}) {
 		this.state = state;
-		this.saveHistory = saveHistory || (() => {});
+		this.saveHistory = context?.commands?.commit || context?.history?.save || saveHistory || (() => {});
 		this.getSelectedId = getSelectedId || (() => this.state.ui.selectedFixpointId);
 		this.removeItems =
 			removeItems ||
@@ -13,6 +13,10 @@ export class SelectTool {
 					this.state.ui.selectedFixpointId = null;
 				}
 			});
+		this.getSelectedId =
+			context?.selection?.selectedId || getSelectedId || (() => this.state.ui.selectedFixpointId);
+		this.removeItems = context?.selection?.removeItems || this.removeItems;
+		this.deleteSymbols = context?.commands?.deleteSymbols || deleteSymbols || null;
 	}
 
 	onMouseDown(event, point) {
@@ -32,24 +36,19 @@ export class SelectTool {
 		if (event.key === 'Delete' || event.key === 'Backspace') {
 			const idToDelete = this.getSelectedId('symbol');
 			if (idToDelete) {
-				// Remove from global fixpoints
-				this.state.topo.fixPoints = this.state.topo.fixPoints.filter((p) => p.id !== idToDelete);
-
-				// Remove references from routes
-				this.state.topo.routes.forEach((route) => {
-					if (route.fixPoints) {
-						route.fixPoints = route.fixPoints.filter((id) => id !== idToDelete);
-					}
-					if (route.pitches) {
-						route.pitches.forEach((pitch) => {
-							if (pitch.startNodeId === idToDelete) pitch.startNodeId = null; // Potential validity issue
+				if (this.deleteSymbols) this.deleteSymbols([idToDelete]);
+				else {
+					this.state.topo.fixPoints = this.state.topo.fixPoints.filter((p) => p.id !== idToDelete);
+					this.state.topo.routes.forEach((route) => {
+						route.fixPoints = (route.fixPoints || []).filter((id) => id !== idToDelete);
+						(route.pitches || []).forEach((pitch) => {
+							if (pitch.startNodeId === idToDelete) pitch.startNodeId = null;
 							if (pitch.endNodeId === idToDelete) pitch.endNodeId = null;
 						});
-					}
-				});
-
-				this.removeItems([{ type: 'symbol', id: idToDelete }]);
-				this.saveHistory();
+					});
+				}
+				if (!this.deleteSymbols) this.removeItems([{ type: 'symbol', id: idToDelete }]);
+				if (!this.deleteSymbols) this.saveHistory();
 			}
 		}
 	}

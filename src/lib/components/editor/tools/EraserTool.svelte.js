@@ -1,13 +1,20 @@
 export class EraserTool {
 	id = 'eraser';
 
-	constructor({ state, saveHistory } = {}) {
+	constructor({ context, state, saveHistory, deleteSymbolAt } = {}) {
 		this.state = state;
-		this.saveHistory = saveHistory || (() => {});
+		this.saveHistory = context?.commands?.commit || context?.history?.save || saveHistory || (() => {});
+		this.deleteSymbolAt = context?.commands?.deleteSymbolAt || deleteSymbolAt || null;
 	}
 
 	onMouseDown(event, point) {
-		// Eraser logic
+		if (this.deleteSymbolAt) {
+			this.deleteSymbolAt(point);
+			return;
+		}
+
+		// Compatibility fallback for isolated consumers that construct the tool
+		// without the editor command context.
 		const clickedSymbol = this.state.topo.fixPoints.find((s) => {
 			if (!s.position2D) return false;
 			const dx = Math.abs(s.position2D[0] - point.x);
@@ -15,12 +22,11 @@ export class EraserTool {
 			return dx < 0.02 && dy < 0.02; // Tolerance
 		});
 		if (clickedSymbol) {
-			this.state.topo.fixPoints = this.state.topo.fixPoints.filter((s) => s.id !== clickedSymbol.id);
+			this.state.topo.fixPoints = this.state.topo.fixPoints.filter(
+				(s) => s.id !== clickedSymbol.id
+			);
 			this.saveHistory();
 		}
-		// Eraser also deletes points via handlePointMouseDown in Topo2DEditor (which I preserved).
-		// If I want to move that here, I'd need to handle point hit testing.
-		// For now, Topo2DEditor logic handles point deletion.
 	}
 
 	onMouseMove(event, point) {}

@@ -4,14 +4,20 @@ export class SymbolTool {
 	id = 'symbol';
 	// No state needed for symbol tool currently as it places on click
 
-	constructor({ state, saveHistory } = {}) {
+	constructor({ context, state, saveHistory } = {}) {
 		this.state = state;
-		this.saveHistory = saveHistory || (() => {});
+		this.saveHistory =
+			context?.commands?.commit || context?.history?.save || saveHistory || (() => {});
+		this.createSymbol = context?.commands?.createSymbol || null;
 	}
 
 	selectedType = 'bolt';
 
 	onMouseDown(event, point) {
+		if (this.createSymbol) {
+			this.createSymbol(point, this.selectedType);
+			return;
+		}
 		const symbolId = generateSymbolId();
 		this.state.topo.fixPoints.push({
 			id: symbolId,

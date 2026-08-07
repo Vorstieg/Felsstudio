@@ -2,37 +2,38 @@
 	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { select } from 'd3-selection';
-	import { RouteTool } from '../tools/RouteTool.svelte.js';
-	import { SymbolTool } from '../tools/SymbolTool.svelte.js';
-	import { OutlineTool } from '../tools/OutlineTool.svelte.js';
-	import { EraserTool } from '../tools/EraserTool.svelte.js';
-	import { SelectTool } from '../tools/SelectTool.svelte.js';
-	import { TextTool } from '../tools/TextTool.svelte.js';
-	import { SymbolEditTool } from '../tools/SymbolEditTool.svelte.js';
-	import { RouteEditTool } from '../tools/RouteEditTool.svelte.js';
-	import { OutlineEditTool } from '../tools/OutlineEditTool.svelte.js';
-	import { createTopo2DEditorController } from './create-topo-2d-editor-controller.svelte.js';
+	import { createTopo2DEditorFacade } from './create-topo-2d-editor-facade.svelte.js';
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
-	import { getOutlinePoints } from '$lib/assets/js/outline-geometry.js';
 	import { createEditablePathResolver } from './editable-path.js';
-	import { buildTopo2DRenderModel } from './topo-2d-render-model.js';
-	import { renderBackgroundLayer } from './render-background-layer.js';
-	import { renderCurrentLayer } from './render-current-layer.js';
-	import { renderOutlinesLayer } from './render-outlines-layer.js';
-	import { renderRoutesLayer } from './render-routes-layer.js';
-	import { renderTextLabelsLayer } from './render-text-labels-layer.js';
-	import { renderSymbolsLayer } from './render-symbols-layer.js';
-	import { createTopoLayerStack } from './create-topo-layer-stack.js';
-	import { createTopo2DRenderContext } from './create-topo-render-context.js';
-	import { createTopoHistory } from './create-topo-history.svelte.js';
 	import { createCanvasInput } from './create-canvas-input.svelte.js';
 	import { referenceFixpoint, snapRoutePointToFixpoint } from './route-fixpoint-snap.js';
-	import { createTopoClipboard } from './topo-clipboard.js';
-	import { createSelectionRegion, getRegionSelection } from './selection-geometry.js';
-	import { renderSelectionRegion } from './render-selection-region.js';
+	import { createTopoKeyboardController } from './create-topo-keyboard-controller.js';
+	import { createTopoInteractionController } from './create-topo-interaction-controller.js';
+	import { createTopoPointerController } from './create-topo-pointer-controller.js';
+	import { createTopoSelectionSnapshot } from './create-topo-selection-snapshot.js';
+	import { createTopoObjectInteractionController } from './create-topo-object-interaction-controller.js';
+	import { createTopoRenderEditServices } from './create-topo-render-edit-services.js';
+	import { trackTopoRenderDependencies } from './track-topo-render-dependencies.svelte.js';
+	import { createTopoToolRegistry } from './create-topo-tool-registry.js';
+	import { renderTopo2D } from './render-topo-2d.js';
+	import { createTopoEditorActions } from './create-topo-editor-actions.js';
+	import { syncTopoToolLifecycle } from './sync-topo-tool-lifecycle.js';
 
 	const userState = getTopoEditorSession();
+	const editor = createTopo2DEditorFacade({
+		getTopo: () => userState.topo,
+		ui: userState.ui,
+		getCanvasSize: () => ({ baseWidth, baseHeight }),
+		getDrawingTarget: () => drawingTarget,
+		setDrawingTarget: (target) => (drawingTarget = target),
+		getImageSrc: () => userState.topo.image2D,
+		getImageFit: () => userState.topo.backgroundFit ?? 'contain',
+		restore: (state) => {
+			const restored = JSON.parse(JSON.stringify(state));
+			userState.topo = { ...userState.topo, ...restored };
+		}
+	});
+	const { commands, clipboard } = editor;
 
 	let {
 		activeTool = $bindable('select'),
@@ -46,90 +47,32 @@
 	let svgElement = $state(null);
 	let gElement = $state(null);
 
-	// Pass editor callbacks to all remaining tools.
-	const toolConfig = {
-		state: userState,
-		saveHistory: () => history.save(),
-		selectObject: (...args) => editor.selectObject(...args),
-		getSelectedId: (type) => editor.selectedId(type),
-		removeItems: (items) => editor.removeItems(items),
-		beginTextEdit,
-		getCanvasSize: () => ({ baseWidth, baseHeight }),
-		getImageSrc: () => userState.topo.image2D,
-		getImageFit: () => userState.topo.backgroundFit ?? 'contain',
-		getDrawingTarget: () => drawingTarget,
-		setDrawingTarget: (target) => (drawingTarget = target),
-		clearSelection
-	};
 	function snapRoutePoint(point) {
 		return snapRoutePointToFixpoint(point, userState.topo.fixPoints, {
 			enabled: snapRoutesToFixpoints,
 			canvasSize: { baseWidth, baseHeight }
 		});
 	}
-	const tools = {
-		route: new RouteTool({
-			...toolConfig,
-			mode: 'route',
-			snapPoint: snapRoutePoint,
-			referenceFixpoint
-		}),
-		multipitch: new RouteTool({
-			...toolConfig,
-			mode: 'multipitch',
-			snapPoint: snapRoutePoint,
-			referenceFixpoint
-		}),
-		symbol: new SymbolTool(toolConfig),
-		fixpoint: new SymbolTool(toolConfig),
-		text: new TextTool(toolConfig),
-		eraser: new EraserTool(toolConfig),
-		outline: new OutlineTool(toolConfig),
-		select: new SelectTool(toolConfig),
-		routeEdit: new RouteEditTool({
-			getTopo: () => userState.topo,
-			getActiveTool: () => activeTool,
-			getEditablePath: (target) => editablePaths.resolve(target),
-			startInteraction: (kind, details) => editor.startInteraction(kind, details),
-			isSelected,
-			selectObject,
-			getIsShiftPressed: () => isShiftPressed,
-			getMobileSelectionMode: () => mobileSelectionMode,
-			beginSelectionMove: collectDraggingSelection,
-			setDrawingTarget: (target) => (drawingTarget = target),
-			saveHistory: () => history.save()
-		}),
-		outlineEdit: new OutlineEditTool({
-			getTopo: () => userState.topo,
-			getCanvasSize: () => ({ baseWidth, baseHeight }),
-			getActiveTool: () => activeTool,
-			getEditablePath: (target) => editablePaths.resolve(target),
-			startInteraction: (kind, details) => editor.startInteraction(kind, details),
-			isSelected,
-			selectObject,
-			getIsShiftPressed: () => isShiftPressed,
-			getMobileSelectionMode: () => mobileSelectionMode,
-			beginSelectionMove: collectDraggingSelection,
-			saveHistory: () => history.save()
-		}),
-		symbolEdit: new SymbolEditTool({
-			getTopo: () => userState.topo,
-			getCanvasSize: () => ({ baseWidth, baseHeight }),
-			getInteraction: () => editor.interaction,
-			startInteraction: (kind, details) => editor.startInteraction(kind, details),
-			isSelected,
-			selectObject,
-			getSelectionSize: () => editor.selectedItems.size,
-			getIsShiftPressed: () => isShiftPressed,
-			getMobileSelectionMode: () => mobileSelectionMode,
-			getSelectedSymbolId: () => userState.ui.selectedFixpointId,
-			saveHistory: () => history.save(),
-			beginSelectionMove: (mouse) => ({
-				kind: 'move-selection',
-				...collectDraggingSelection(mouse)
-			})
-		})
-	};
+	const tools = createTopoToolRegistry({
+		context: editor.toolContext,
+		state: userState,
+		getTopo: () => userState.topo,
+		getActiveTool: () => activeTool,
+		getEditablePath: (target) => editablePaths.resolve(target),
+		getIsShiftPressed: () => isShiftPressed,
+		getMobileSelectionMode: () => mobileSelectionMode,
+		beginSelectionMove: collectDraggingSelection,
+		setDrawingTarget: (target) => (drawingTarget = target),
+		getSelectionSize: () => editor.selectedItems.size,
+		getSelectedSymbolId: () => userState.ui.selectedFixpointId,
+		snapRoutePoint,
+		referenceFixpoint
+	});
+	const renderEditServices = createTopoRenderEditServices({
+		route: tools.routeEdit,
+		outline: tools.outlineEdit,
+		symbol: tools.symbolEdit
+	});
 
 	// Track previous tool for lifecycle
 	let previousTool = $state(null);
@@ -144,7 +87,7 @@
 
 	// Sync selected options to their configured tool.
 	$effect(() => {
-		if (currentTool instanceof SymbolTool) {
+		if (currentTool === tools.symbol || currentTool === tools.fixpoint) {
 			currentTool.selectedType = selectedSymbol;
 		}
 		if (tools.outline) {
@@ -154,33 +97,30 @@
 
 	// Tool lifecycle management
 	$effect(() => {
-		if (previousTool && previousTool !== currentTool) {
-			previousTool.onDeactivate?.();
-		}
-
-		// If we are activating a drawing tool, clear any existing selection
-		if (
-			currentTool instanceof RouteTool ||
-			currentTool instanceof OutlineTool ||
-			currentTool instanceof SymbolTool ||
-			currentTool instanceof TextTool
-		) {
-			editor.clearSelection();
-		}
-
-		currentTool.onActivate?.();
-		previousTool = currentTool;
+		previousTool = syncTopoToolLifecycle({
+			previousTool,
+			currentTool,
+			drawingTools: [
+				 tools.route,
+				 tools.multipitch,
+				 tools.outline,
+				 tools.symbol,
+				 tools.fixpoint,
+				 tools.text
+			],
+			clearSelection: editor.clearSelection
+		});
 	});
 
 	// Derived state for rendering
 	let currentRoutePoints = $derived(
-		currentTool instanceof RouteTool ? currentTool.draftPoints : []
+		currentTool === tools.route || currentTool === tools.multipitch ? currentTool.draftPoints : []
 	);
 	let currentOutlinePoints = $derived(
-		currentTool instanceof OutlineTool ? currentTool.getPreviewPoints() : []
+		currentTool === tools.outline ? currentTool.getPreviewPoints() : []
 	);
 	let brushPreview = $derived(
-		currentTool instanceof OutlineTool ? currentTool.getBrushPreview() : null
+		currentTool === tools.outline ? currentTool.getBrushPreview() : null
 	);
 
 	$effect(() => {
@@ -195,30 +135,18 @@
 	// Symbol tool manages symbol creation directly into userState, so no "currentSymbolPoints" needed for preview distinct from cursor?
 	// RouteTool owns route draft points, target transitions, and previews.
 
-	const editor = createTopo2DEditorController({
-		getTopo: () => userState.topo,
-		ui: userState.ui
-	});
-	const clipboard = createTopoClipboard();
 	const editablePaths = createEditablePathResolver({
 		getTopo: () => userState.topo,
 		getCanvasSize: () => ({ baseWidth, baseHeight })
 	});
-	let editingTextLabelId = $state(null);
-	let editingTextValue = $state('');
-	let editingTextOriginalValue = $state('');
 	let editingTextNeedsFocus = false;
 	let isShiftPressed = $state(false);
 	let mobileSelectionMode = $state(false);
 
-	const history = createTopoHistory({
-		getTopo: () => userState.topo,
-		restore: (state) => {
-			const restored = JSON.parse(JSON.stringify(state));
-			userState.topo = { ...userState.topo, ...restored };
-		}
-	});
-	const saveHistory = () => history.save();
+	const saveHistory = () => editor.history.save();
+	let editingTextLabelId = $derived(tools.text.editingId);
+	let editingTextValue = $derived(tools.text.editingValue);
+	let editingTextOriginalValue = $derived(tools.text.editingOriginalValue);
 	const canvasInput = createCanvasInput({
 		getActiveTool: () => activeTool,
 		getAspectRatio: () =>
@@ -232,24 +160,61 @@
 	let baseWidth = $derived(canvasInput.baseWidth);
 	let baseHeight = $derived(canvasInput.baseHeight);
 	let transform = $derived(canvasInput.transform);
+	const interactionController = createTopoInteractionController({
+		getTopo: () => userState.topo,
+		getInteraction: () => editor.interaction,
+		getCurrentTool: () => currentTool,
+		getEditablePath: (target) => editablePaths.resolve(target),
+		snapRoutePoint,
+		referenceFixpoint,
+		outlineEditTool: tools.outlineEdit,
+		symbolEditTool: tools.symbolEdit,
+		onMoveRouteLabel: (interaction, mouse) =>
+			commands.moveRouteLabel(interaction.routeId, interaction, mouse)
+	});
+	const pointerController = createTopoPointerController({
+		getActiveTool: () => activeTool,
+		getCurrentTool: () => currentTool,
+		getEditingTextId: () => editingTextLabelId,
+		commitTextEdit,
+		getMobileSelectionMode: () => mobileSelectionMode,
+		getTopo: () => userState.topo,
+		getCanvasSize: () => ({ baseWidth, baseHeight }),
+		selection: editor,
+		clearSelection,
+		deselectEditTarget,
+		saveHistory,
+		onBeginSelectionRegion: (interaction) => editor.startInteraction('selection-region', interaction)
+	});
+	const objectInteractionController = createTopoObjectInteractionController({
+		getActiveTool: () => activeTool,
+		normalizeEvent: (event) => canvasInput.normalizeEvent(event),
+		getMobileSelectionMode: () => mobileSelectionMode,
+		getIsShiftPressed: () => isShiftPressed,
+		getDraftState: () => ({
+			routePoints: currentRoutePoints.length,
+			outlinePoints: currentOutlinePoints.length
+		}),
+		selection: editor,
+		createSelectionSnapshot: (mouse) => collectDraggingSelection(mouse),
+		setDrawingTarget: (target) => (drawingTarget = target)
+	});
 
-	export function undo() {
-		if (
-			(currentTool instanceof RouteTool || currentTool instanceof OutlineTool) &&
-			(currentTool instanceof RouteTool
-				? currentTool.draftPoints.length > 0
-				: currentTool.currentPoints.length > 0)
-		) {
-			currentTool.undoLastPoint();
-			return;
-		}
+	const actions = createTopoEditorActions({
+		editor,
+		getCurrentTool: () => currentTool,
+		getDraftState: () => ({
+			routePoints: currentRoutePoints.length,
+			outlinePoints: currentOutlinePoints.length
+		}),
+		getSelectedOutlineId: () => userState.ui.selectedOutlineId,
+		getOutlineEditTool: () => tools.outlineEdit,
+		setDrawingTarget: (target) => (drawingTarget = target),
+		clearSelection
+	});
 
-		history.undo();
-	}
-
-	export function redo() {
-		history.redo();
-	}
+	export const undo = actions.undo;
+	export const redo = actions.redo;
 
 	/* Canvas setup and input lifecycle live in createCanvasInput. */
 	onMount(() => {
@@ -278,147 +243,15 @@
 	});
 
 	function handleCanvasDown(input) {
-		if (!input || (input.button !== 0 && !input.isTouch)) return;
-		const { point, sourceEvent: event } = input;
-
-		if (editingTextLabelId) {
-			commitTextEdit();
-			event.stopPropagation?.();
-			return;
-		}
-		if (['symbolEdit', 'routeEdit', 'outlineEdit'].includes(activeTool)) {
-			deselectEditTarget();
-			return;
-		}
-
-		if (activeTool === 'select') {
-			editor.startInteraction('selection-region', {
-				start: point,
-				end: point,
-				mode:
-					input.isTouch && mobileSelectionMode
-						? 'add'
-						: event.altKey
-							? 'subtract'
-							: input.shiftKey
-								? 'add'
-								: 'replace'
-			});
-			return;
-		}
-
-		const textLabelIdsBefore =
-			activeTool === 'text'
-				? new Set((userState.topo.textLabels || []).map((label) => label.id))
-				: null;
-
-		// Delegate to tool - this handles placing points, etc.
-		currentTool.onMouseDown(event, point);
-
-		if (activeTool === 'text' && textLabelIdsBefore) {
-			const createdLabel = (userState.topo.textLabels || []).find(
-				(label) => !textLabelIdsBefore.has(label.id)
-			);
-			if (createdLabel) beginTextEdit(createdLabel.id);
-		}
+		pointerController.down(input);
 	}
 
 	function handleCanvasMove(input) {
-		if (!input) return;
-		const { point: mouse, sourceEvent: event } = input;
-
-		// Delegate to tool for generic mouse move (e.g. hover effects)
-		currentTool.onMouseMove(event, mouse);
-
-		const interaction = editor.interaction;
-		if (interaction?.kind === 'selection-region') {
-			interaction.end = mouse;
-		} else if (interaction?.kind === 'move-selection') {
-			const deltaX = mouse.x - interaction.startMouse.x;
-			const deltaY = mouse.y - interaction.startMouse.y;
-
-			// Move routes
-			interaction.items.paths.forEach(({ target, snapshot }) => {
-				editablePaths.resolve(target)?.translateFrom(snapshot, [deltaX, deltaY]);
-			});
-
-			// Move symbols
-			interaction.items.symbols.forEach(({ symbolId, startPos }) => {
-				const symbol = userState.topo.fixPoints.find((s) => s.id === symbolId);
-				if (symbol) {
-					symbol.position2D = [startPos[0] + deltaX, startPos[1] + deltaY];
-				}
-			});
-
-			// Move text labels
-			interaction.items.texts.forEach(({ textId, startPos }) => {
-				const label = userState.topo.textLabels?.find((t) => t.id === textId);
-				if (label) {
-					label.position2D = [startPos[0] + deltaX, startPos[1] + deltaY];
-				}
-			});
-		} else if (interaction?.kind === 'move-point') {
-			const snapped = snapRoutePoint(mouse);
-			const route = interaction.routeId
-				? userState.topo.routes.find((candidate) => candidate.id === interaction.routeId)
-				: null;
-			if (route) referenceFixpoint(route, snapped.fixPointId);
-			editablePaths
-				.resolve(interaction)
-				?.movePoint(interaction.pointIndex, [snapped.point.x, snapped.point.y]);
-		} else if (interaction?.kind === 'transform-preset-outline') {
-			tools.outlineEdit.applySemanticTransform(interaction, mouse);
-		} else if (
-			interaction?.kind === 'move-symbol' ||
-			interaction?.kind === 'rotate-symbol' ||
-			interaction?.kind === 'scale-symbol' ||
-			interaction?.kind === 'scale-symbol-x' ||
-			interaction?.kind === 'scale-symbol-y'
-		) {
-			tools.symbolEdit.onMouseMove(event, mouse);
-		} else if (interaction?.kind === 'move-route-label') {
-			const route = userState.topo.routes.find((r) => r.id === interaction.routeId);
-			if (route) {
-				const target = interaction.pitchId
-					? route.pitches.find((p) => p.id === interaction.pitchId)
-					: interaction.variantId
-						? route.variants?.find((v) => v.id === interaction.variantId)
-						: route;
-				if (target && target.points2D?.length > 0) {
-					const basePoint = target.points2D[0];
-					if (!target.labelOffset2D) target.labelOffset2D = [0, 0.05];
-					target.labelOffset2D = [mouse.x - basePoint[0], mouse.y - basePoint[1]];
-				}
-			}
-		} else if (interaction?.kind === 'move-text') {
-			const label = userState.topo.textLabels?.find((t) => t.id === interaction.id);
-			if (label) {
-				label.position2D = [
-					interaction.startPos[0] + mouse.x - interaction.startMouse.x,
-					interaction.startPos[1] + mouse.y - interaction.startMouse.y
-				];
-			}
-		}
+		interactionController.update(input);
 	}
 
 	function handleCanvasUp(input) {
-		if (!input) return;
-		const { point, sourceEvent: event } = input;
-		currentTool.onMouseUp(event, point);
-
-		const interaction = editor.endInteraction();
-		if (interaction?.kind === 'selection-region') {
-			const region = createSelectionRegion(interaction.start, interaction.end);
-			const moved = Math.hypot(region.right - region.left, region.bottom - region.top) > 0.005;
-			if (moved) {
-				editor.selectItems(
-					getRegionSelection(userState.topo, region, { baseWidth, baseHeight }),
-					interaction.mode
-				);
-			} else if (interaction.mode === 'replace') {
-				clearSelection();
-			}
-		} else if (interaction) saveHistory();
+		pointerController.up(input);
 	}
 
 	function isSelected(type, id) {
@@ -430,29 +263,7 @@
 	}
 
 	function handleObjectMouseDown(event, { type, id, pitchId = null, variantId = null }) {
-		if (activeTool !== 'select') return;
-		event?.stopPropagation?.();
-		const mouse = canvasInput.normalizeEvent(event)?.point;
-		if (!mouse) return;
-
-		const isTouch = event?.identifier != null;
-		if (isTouch && mobileSelectionMode) {
-			selectObject(type, id, true);
-			return;
-		}
-		if (!isSelected(type, id)) {
-			selectObject(type, id, isShiftPressed);
-		}
-		if (type === 'route') {
-			if (pitchId) {
-				drawingTarget = { type: 'pitch', routeId: id, pitchId };
-			} else if (variantId) {
-				drawingTarget = { type: 'variant', routeId: id, variantId };
-			} else {
-				drawingTarget = null;
-			}
-		}
-		editor.startInteraction('move-selection', collectDraggingSelection(mouse));
+		objectInteractionController.objectMouseDown(event, { type, id, pitchId, variantId });
 	}
 
 	function clearSelection() {
@@ -471,302 +282,80 @@
 	}
 
 	function beginTextEdit(id) {
-		const label = userState.topo.textLabels?.find((textLabel) => textLabel.id === id);
-		if (!label) return;
-		selectObject('text', id);
-		editingTextLabelId = id;
-		editingTextValue = label.text || '';
-		editingTextOriginalValue = label.text || '';
-		editingTextNeedsFocus = true;
+		if (tools.text.beginEdit(id)) editingTextNeedsFocus = true;
 	}
 
 	function commitTextEdit() {
-		if (!editingTextLabelId) return;
-		const label = userState.topo.textLabels?.find(
-			(textLabel) => textLabel.id === editingTextLabelId
-		);
-		const nextText = editingTextValue.trim();
-
-		if (label) {
-			if (nextText) {
-				label.text = nextText;
-			} else {
-				userState.topo.textLabels = (userState.topo.textLabels || []).filter(
-					(textLabel) => textLabel.id !== editingTextLabelId
-				);
-				editor.removeItems([{ type: 'text', id: editingTextLabelId }]);
-			}
-		}
-
-		if (nextText !== editingTextOriginalValue) saveHistory();
-		editingTextLabelId = null;
-		editingTextValue = '';
-		editingTextOriginalValue = '';
+		tools.text.commitEdit();
+		editingTextNeedsFocus = false;
 	}
 
 	function cancelTextEdit() {
-		const label = userState.topo.textLabels?.find(
-			(textLabel) => textLabel.id === editingTextLabelId
-		);
-		if (label) label.text = editingTextOriginalValue;
-		editingTextLabelId = null;
-		editingTextValue = '';
-		editingTextOriginalValue = '';
+		tools.text.cancelEdit();
+		editingTextNeedsFocus = false;
 	}
 
 	function handleTextEditKeyDown(event) {
-		event.stopPropagation();
-		if (event.key === 'Enter') {
-			event.preventDefault();
-			commitTextEdit();
-		} else if (event.key === 'Escape') {
-			event.preventDefault();
-			cancelTextEdit();
-		}
+		tools.text.handleEditKeyDown(event);
+		editingTextNeedsFocus = false;
 	}
 
 	function handleObjectClick(event, type, id) {
-		if (event?.stopPropagation) event.stopPropagation();
-		if (activeTool !== 'select') return;
-		if (currentRoutePoints.length > 0 || currentOutlinePoints.length > 0) return;
-		selectObject(type, id, isShiftPressed);
+		objectInteractionController.objectClick(event, type, id);
 	}
 
 	function collectDraggingSelection(mouse) {
-		const paths = [];
-		const symbols = [];
-		const texts = [];
-		// A route is selected as one object, even though it may render several
-		// pitch/variant paths. When moving multiple selected objects, move every
-		// path belonging to each route instead of narrowing the route under the
-		// pointer to its active pitch.
-		const isMultiSelection = editor.selectedItems.size > 1;
-		const addPath = (target) => {
-			const path = editablePaths.resolve(target);
-			if (path?.getPoints().length) paths.push({ target, snapshot: path.snapshot() });
-		};
-
-		editor.selectedItems.forEach((itemKey) => {
-			const [type, id] = itemKey.split(':');
-
-			if (type === 'route') {
-				const r = userState.topo.routes.find((rt) => rt.id === id);
-				if (r) {
-					const selectedPitchId =
-						!isMultiSelection &&
-						drawingTarget?.type === 'pitch' &&
-						drawingTarget.routeId === r.id
-							? drawingTarget.pitchId
-							: null;
-					const selectedVariantId =
-						!isMultiSelection &&
-						drawingTarget?.type === 'variant' &&
-						drawingTarget.routeId === r.id
-							? drawingTarget.variantId
-							: null;
-
-					if (r.points2D && !selectedPitchId && !selectedVariantId) {
-						addPath({ routeId: r.id });
-					}
-
-					if (r.pitches) {
-						r.pitches.forEach((p) => {
-							if (selectedPitchId && p.id !== selectedPitchId) return;
-							if (p.points2D) {
-								addPath({ routeId: r.id, pitchId: p.id });
-							}
-						});
-					}
-					if (r.variants) {
-						r.variants.forEach((v) => {
-							if (selectedVariantId && v.id !== selectedVariantId) return;
-							if (v.points2D) {
-								addPath({ routeId: r.id, variantId: v.id });
-							}
-						});
-					}
-				}
-			} else if (type === 'outline') {
-				addPath({ outlineId: id });
-			} else if (type === 'symbol') {
-				const s = userState.topo.fixPoints.find((fp) => fp.id === id);
-				if (s && s.position2D) {
-					symbols.push({
-						symbolId: s.id,
-						startPos: [...s.position2D]
-					});
-				}
-			} else if (type === 'text') {
-				const t = userState.topo.textLabels?.find((label) => label.id === id);
-				if (t && t.position2D) {
-					texts.push({
-						textId: t.id,
-						startPos: [...t.position2D]
-					});
-				}
-			}
-		});
-
-		return {
-			items: { paths, symbols, texts },
+		return createTopoSelectionSnapshot({
+			getTopo: () => userState.topo,
+			selectedItems: editor.selectedItems,
+			drawingTarget,
+			getEditablePath: (target) => editablePaths.resolve(target),
 			startMouse: mouse
-		};
+		});
 	}
 
 	function handleTextMouseDown(event, label) {
-		if (activeTool !== 'select') return;
-		event?.stopPropagation?.();
-		const mouse = canvasInput.normalizeEvent(event)?.point;
-		if (!mouse || !label.position2D) return;
-		if (event?.identifier != null && mobileSelectionMode) {
-			selectObject('text', label.id, true);
-			return;
-		}
-		if (!isSelected('text', label.id)) selectObject('text', label.id, isShiftPressed);
-		editor.startInteraction('move-selection', collectDraggingSelection(mouse));
+		objectInteractionController.textMouseDown(event, label);
 	}
 
 	function handleLabelMouseDown(event, { routeId, pitchId, variantId }) {
-		event?.stopPropagation?.();
-		editor.startInteraction('move-route-label', { routeId, pitchId, variantId });
+		objectInteractionController.routeLabelMouseDown(event, { routeId, pitchId, variantId });
 	}
 
-	export function finalize() {
-		if (currentTool && typeof currentTool.finalize === 'function') {
-			currentTool.finalize();
-		}
-	}
-
-	export function cancel() {
-		if (currentTool && typeof currentTool.cancel === 'function') {
-			currentTool.cancel();
-		} else {
-			currentTool.onKeyDown?.({ key: 'Escape' });
-		}
-		drawingTarget = null;
-		clearSelection();
-	}
+	export const finalize = actions.finalize;
+	export const cancel = actions.cancel;
 
 	export function getCurrentTool() {
 		return currentTool;
 	}
 
-	export function simplifySelectedOutline(tolerancePx) {
-		const outlineId = userState.ui.selectedOutlineId;
-		return outlineId ? tools.outlineEdit.simplifyOutline(outlineId, tolerancePx) : null;
-	}
+	export const simplifySelectedOutline = actions.simplifySelectedOutline;
+
+	const keyboard = createTopoKeyboardController({
+		getEditingTextId: () => editingTextLabelId,
+		getActiveTool: () => activeTool,
+		getCurrentTool: () => currentTool,
+		getDraftState: () => ({
+			routePoints: currentRoutePoints.length,
+			outlinePoints: currentOutlinePoints.length
+		}),
+		getSelectedItems: () => editor.selectedItems,
+		getCanvasSize: () => ({ baseWidth, baseHeight }),
+		clipboard,
+		getTopo: () => userState.topo,
+		selection: editor,
+		setActiveTool: (tool) => (activeTool = tool),
+		setDrawingTarget: (target) => (drawingTarget = target),
+		clearSelection,
+		deleteSelection: (selectedItems) => commands.deleteSelection(selectedItems),
+		recordHistory: saveHistory,
+		undo,
+		redo,
+		setShiftPressed: (pressed) => (isShiftPressed = pressed)
+	});
 
 	function handleKeyDown(event) {
-		if (editingTextLabelId) return;
-		const isShortcut = event.ctrlKey || event.metaKey;
-		const isTextInput = event.target?.closest?.(
-			'input, textarea, select, [contenteditable="true"]'
-		);
-
-		if (isShortcut && !isTextInput && event.key.toLowerCase() === 'c') {
-			if (clipboard.copy({ topo: userState.topo, selectedItems: editor.selectedItems })) {
-				event.preventDefault();
-			}
-			return;
-		}
-
-		if (isShortcut && !isTextInput && event.key.toLowerCase() === 'v') {
-			const pasted = clipboard.paste({
-				topo: userState.topo,
-				canvasSize: { baseWidth, baseHeight }
-			});
-			if (pasted.length) {
-				event.preventDefault();
-				editor.clearSelection();
-				pasted.forEach(({ type, id }) => editor.selectObject(type, id, true));
-				activeTool = 'select';
-				saveHistory();
-			}
-			return;
-		}
-
-		// Track shift key for multi-select
-		if (event.key === 'Shift') {
-			isShiftPressed = true;
-		}
-
-		// Global delete handler
-		if (event.key === 'Escape') {
-			// Priority 1: If drawing, cancel the drawing
-			if (currentRoutePoints.length > 0 || currentOutlinePoints.length > 0) {
-				currentTool.cancel?.();
-				return;
-			}
-
-			// Priority 2: If a tool is active, deselect it
-			if (activeTool !== 'select') {
-				currentTool.cancel?.();
-				drawingTarget = null;
-				activeTool = 'select';
-				clearSelection();
-				return;
-			}
-
-			// Priority 3: Clear all selections
-			clearSelection();
-		}
-
-		if (event.key === 'Delete' || event.key === 'Backspace') {
-			if (editor.selectedItems.size > 0) {
-				const idsByType = { route: [], symbol: [], outline: [], text: [] };
-				editor.selectedItems.forEach((itemKey) => {
-					const [type, id] = itemKey.split(':');
-					idsByType[type].push(id);
-				});
-
-				// Delete routes
-				if (idsByType.route.length > 0) {
-					tools.routeEdit.delete(idsByType.route);
-				}
-
-				// Delete symbols
-				if (idsByType.symbol.length > 0) {
-					tools.symbolEdit.delete(idsByType.symbol);
-				}
-
-				// Delete outlines
-				if (idsByType.outline.length > 0) {
-					userState.topo.outlines = userState.topo.outlines.filter(
-						(o) => !idsByType.outline.includes(o.id)
-					);
-				}
-
-				if (idsByType.text.length > 0) {
-					userState.topo.textLabels = (userState.topo.textLabels || []).filter(
-						(t) => !idsByType.text.includes(t.id)
-					);
-				}
-
-				editor.clearSelection();
-				saveHistory();
-				return;
-			}
-
-			// Single delete (existing logic)
-			const selectedFixpointId = editor.selectedId('symbol');
-			if (selectedFixpointId) {
-				const idToDelete = selectedFixpointId;
-				if (tools.symbolEdit.delete([idToDelete])) saveHistory();
-
-				editor.removeItems([{ type: 'symbol', id: idToDelete }]);
-				return;
-			}
-		}
-
-		currentTool.onKeyDown(event);
-
-		if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
-			event.preventDefault();
-			undo();
-		} else if ((event.ctrlKey || event.metaKey) && event.key === 'y') {
-			event.preventDefault();
-			redo();
-		}
+		keyboard.handleKeyDown(event);
 	}
 	onMount(() => {
 		const handleKeyUp = (event) => {
@@ -783,44 +372,13 @@
 	// D3 Render groups (Managed imperatively)
 
 	function updateD3Rendering() {
-		if (!svgElement || !gElement) return;
-
-		const svg = select(svgElement);
-
-		// Interaction state check for suppressing handles/gizmos
-		// We suppress handles when moving OBJECTS, but NOT when moving POINTS
-		const isAnyInteractionActive = editor.interaction && editor.interaction.kind !== 'move-point';
-
-		const layers = createTopoLayerStack(gElement);
-		const {
-			background: bgLayer,
-			outlines: outlinesLayer,
-			routes: routesLayer,
-			current: currentLayer,
-			handles: handlesLayer,
-			symbols: symbolsLayer,
-			text: textLayer
-		} = layers;
-		const renderModel = buildTopo2DRenderModel({
+		renderTopo2D({
+			svgElement,
+			gElement,
 			topo: userState.topo,
 			ui: userState.ui,
-			isSelected,
-			selectionSize: editor.selectedItems.size,
 			activeTool,
 			drawingTarget,
-			isInteractionActive: isAnyInteractionActive,
-			baseWidth,
-			baseHeight,
-			currentRoutePoints,
-			currentOutlinePoints
-		});
-
-		const renderContext = createTopo2DRenderContext({
-			svg,
-			layers,
-			topo: userState.topo,
-			renderModel,
-			activeTool,
 			baseWidth,
 			baseHeight,
 			currentRoutePoints,
@@ -829,16 +387,17 @@
 			outlinePreview: {
 				baseWidth,
 				baseHeight,
-				fillColor: currentTool instanceof OutlineTool ? currentTool.fillColor : null,
-				fillOpacity: currentTool instanceof OutlineTool ? currentTool.fillOpacity : null
+				fillColor: currentTool === tools.outline ? currentTool.fillColor : null,
+				fillOpacity: currentTool === tools.outline ? currentTool.fillOpacity : null
 			},
 			brushPreview,
 			canvasInput,
-			routeEditTool: tools.routeEdit,
-			outlineEditTool: tools.outlineEdit,
-			symbolEditTool: tools.symbolEdit,
+			editTools: renderEditServices,
+			draftTools: { route: tools.route, multipitch: tools.multipitch },
 			isSelected,
+			selectionSize: editor.selectedItems.size,
 			selectedSymbolInstance: editor.selectedSymbolInstance,
+			interaction: editor.interaction,
 			editingTextLabelId,
 			editingTextValue,
 			editingTextNeedsFocus,
@@ -849,136 +408,23 @@
 			onTextMouseDown: handleTextMouseDown,
 			onBeginTextEdit: beginTextEdit,
 			onTextEditKeyDown: handleTextEditKeyDown,
-			onTextValueChange: (value) => (editingTextValue = value),
+			onTextValueChange: (value) => tools.text.setValue(value),
 			onCommitTextEdit: commitTextEdit,
 			onTextFocusHandled: () => (editingTextNeedsFocus = false),
 			setActiveTouch: (identifier) => canvasInput.trackTouch({ identifier })
-		});
-
-		renderBackgroundLayer(renderContext);
-		renderOutlinesLayer(renderContext);
-		renderRoutesLayer(renderContext);
-		renderCurrentLayer(renderContext);
-		tools.route.render(renderContext);
-		tools.multipitch.render(renderContext);
-		renderSymbolsLayer(renderContext);
-		renderTextLabelsLayer(renderContext);
-		const selectionInteraction = editor.interaction;
-		renderSelectionRegion({
-			layers,
-			region:
-				selectionInteraction?.kind === 'selection-region'
-					? createSelectionRegion(selectionInteraction.start, selectionInteraction.end)
-					: null,
-			baseWidth,
-			baseHeight
 		});
 	}
 
 	// Trigger D3 render on state changes
 	$effect(() => {
-		// Explicitly track deep reactive dependencies for D3 rendering
-		// Svelte 5 needs to see these accessed synchronously to track them
-		for (const r of userState.topo.routes) {
-			r.lineStyle;
-			if (r.labelOffset2D) {
-				r.labelOffset2D[0];
-				r.labelOffset2D[1];
-			}
-			if (r.points2D) {
-				for (const p of r.points2D) {
-					p[0];
-					p[1];
-				}
-			}
-			if (r.pitches) {
-				for (const pitch of r.pitches) {
-					pitch.lineStyle;
-					pitch.grade;
-					pitch.length;
-					pitch.pitchNumber;
-					if (pitch.labelOffset2D) {
-						pitch.labelOffset2D[0];
-						pitch.labelOffset2D[1];
-					}
-					if (pitch.points2D) {
-						for (const p of pitch.points2D) {
-							p[0];
-							p[1];
-						}
-					}
-				}
-			}
-			if (r.variants) {
-				for (const variant of r.variants) {
-					variant.name;
-					variant.lineStyle;
-					variant.grade;
-					variant.length;
-					if (variant.labelOffset2D) {
-						variant.labelOffset2D[0];
-						variant.labelOffset2D[1];
-					}
-					if (variant.points2D) {
-						for (const p of variant.points2D) {
-							p[0];
-							p[1];
-						}
-					}
-				}
-			}
-		}
-		for (const o of userState.topo.outlines) {
-			o.lineStyle;
-			o.fillColor;
-			o.fillOpacity;
-			o.closed;
-			o.shape?.type;
-			o.shape?.radius2D;
-			o.shape?.fromCenter;
-			o.shape?.square;
-			const outlinePoints = getOutlinePoints(o, { baseWidth, baseHeight });
-			for (const p of outlinePoints) {
-				p[0];
-				p[1];
-			}
-		}
-		for (const s of userState.topo.fixPoints) {
-			if (s.position2D) {
-				s.position2D[0];
-				s.position2D[1];
-				s.rotation2D;
-				s.scale2D;
-				s.scaleX2D;
-				s.scaleY2D;
-			}
-		}
-		for (const t of userState.topo.textLabels || []) {
-			t.text;
-			t.fontSize2D;
-			t.color;
-			t.fontWeight;
-			if (t.position2D) {
-				t.position2D[0];
-				t.position2D[1];
-			}
-		}
-		for (const p of currentRoutePoints) {
-			p[0];
-			p[1];
-		}
-		for (const p of currentOutlinePoints) {
-			p[0];
-			p[1];
-		}
-		for (const p of brushPreview?.points || []) {
-			p[0];
-			p[1];
-		}
-		for (const p of brushPreview?.contourPoints || []) {
-			p[0];
-			p[1];
-		}
+		trackTopoRenderDependencies({
+			topo: userState.topo,
+			currentRoutePoints,
+			currentOutlinePoints,
+			brushPreview,
+			baseWidth,
+			baseHeight
+		});
 
 		// Map these as dependencies too
 		const _deps = {

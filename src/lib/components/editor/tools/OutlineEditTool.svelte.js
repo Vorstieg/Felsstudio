@@ -10,6 +10,7 @@ import {
 /** Editing interactions for persisted 2D rock outlines. */
 export class OutlineEditTool extends EditablePathEditTool {
 	constructor({
+		context,
 		getTopo,
 		getCanvasSize,
 		getActiveTool,
@@ -23,21 +24,26 @@ export class OutlineEditTool extends EditablePathEditTool {
 		beginSelectionMove
 	} = {}) {
 		super({
+			context,
 			id: 'outlineEdit',
 			getActiveTool,
 			getEditablePath,
-			startInteraction,
-			saveHistory,
+			startInteraction: context?.selection?.startInteraction || startInteraction,
+			saveHistory: context?.commands?.commit || context?.history?.save || saveHistory,
 			targetFromPoint: ({ outlineId }) => ({ outlineId }),
 			targetFromMidpoint: ({ outlineId }) => ({ outlineId })
 		});
 		this.getTopo = getTopo || (() => ({ outlines: [] }));
-		this.getCanvasSize = getCanvasSize || (() => ({ baseWidth: 1, baseHeight: 1 }));
-		this.isSelected = isSelected || (() => false);
-		this.selectObject = selectObject || (() => {});
+		this.getCanvasSize =
+			context?.viewport?.getCanvasSize ||
+			getCanvasSize ||
+			(() => ({ baseWidth: 1, baseHeight: 1 }));
+		this.isSelected = context?.selection?.isSelected || isSelected || (() => false);
+		this.selectObject = context?.selection?.selectObject || selectObject || (() => {});
 		this.getIsShiftPressed = getIsShiftPressed || (() => false);
 		this.getMobileSelectionMode = getMobileSelectionMode || (() => false);
 		this.beginSelectionMove = beginSelectionMove || (() => null);
+		this.updateOutline = context?.commands?.updateOutline || null;
 	}
 
 	getOutline(id) {
@@ -60,9 +66,13 @@ export class OutlineEditTool extends EditablePathEditTool {
 
 		// Keep freehand/brush metadata (including edge tracking), but make the
 		// simplified vertices authoritative for both rendering and export.
-		outline.shape = { ...(outline.shape || { type: 'polyline' }), points2D: simplified };
-		outline.points2D = simplified;
-		outline.closed = isClosedShape(simplified);
+		const changes = {
+			shape: { ...(outline.shape || { type: 'polyline' }), points2D: simplified },
+			points2D: simplified,
+			closed: isClosedShape(simplified)
+		};
+		if (this.updateOutline) this.updateOutline(outline.id, changes, { recordHistory: false });
+		else Object.assign(outline, changes);
 		this.saveHistory();
 		return {
 			changed: true,
@@ -105,15 +115,14 @@ export class OutlineEditTool extends EditablePathEditTool {
 	applySemanticTransform(interaction, mouse) {
 		const outline = this.getOutline(interaction.outlineId);
 		if (!outline) return false;
-		Object.assign(
+		const changes = applyPresetSemanticHandle(
 			outline,
-			applyPresetSemanticHandle(
-				outline,
-				interaction.handleId,
-				[mouse.x, mouse.y],
-				this.getCanvasSize()
-			)
+			interaction.handleId,
+			[mouse.x, mouse.y],
+			this.getCanvasSize()
 		);
+		if (this.updateOutline) this.updateOutline(outline.id, changes, { recordHistory: false });
+		else Object.assign(outline, changes);
 		return true;
 	}
 

@@ -3,6 +3,7 @@ import { EditablePathEditTool } from './EditablePathEditTool.svelte.js';
 /** Editing controls and mutations for persisted 2D routes, pitches, and variants. */
 export class RouteEditTool extends EditablePathEditTool {
 	constructor({
+		context,
 		getTopo,
 		getActiveTool,
 		getEditablePath,
@@ -16,21 +17,23 @@ export class RouteEditTool extends EditablePathEditTool {
 		saveHistory
 	} = {}) {
 		super({
+			context,
 			id: 'routeEdit',
 			getActiveTool,
 			getEditablePath,
-			startInteraction,
-			saveHistory,
+			startInteraction: context?.selection?.startInteraction || startInteraction,
+			saveHistory: context?.commands?.commit || context?.history?.save || saveHistory,
 			targetFromPoint: ({ routeId, pitchId, variantId }) => ({ routeId, pitchId, variantId }),
 			targetFromMidpoint: ({ routeId, pitchId, variantId }) => ({ routeId, pitchId, variantId })
 		});
 		this.getTopo = getTopo || (() => ({ routes: [] }));
-		this.isSelected = isSelected || (() => false);
-		this.selectObject = selectObject || (() => {});
+		this.isSelected = context?.selection?.isSelected || isSelected || (() => false);
+		this.selectObject = context?.selection?.selectObject || selectObject || (() => {});
 		this.getIsShiftPressed = getIsShiftPressed || (() => false);
 		this.getMobileSelectionMode = getMobileSelectionMode || (() => false);
 		this.beginSelectionMove = beginSelectionMove || (() => null);
 		this.setDrawingTarget = setDrawingTarget || (() => {});
+		this.deleteRoutes = context?.commands?.deleteRoutes || null;
 	}
 
 	handleRouteDown(event, routeTarget, canvasInput) {
@@ -80,6 +83,7 @@ export class RouteEditTool extends EditablePathEditTool {
 	}
 
 	delete(ids) {
+		if (this.deleteRoutes) return this.deleteRoutes(ids, { recordHistory: false });
 		const idsToDelete = new Set(ids);
 		if (!idsToDelete.size) return false;
 		const topo = this.getTopo();

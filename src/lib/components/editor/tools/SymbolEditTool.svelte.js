@@ -6,6 +6,7 @@ export class SymbolEditTool {
 	id = 'symbolEdit';
 
 	constructor({
+		context,
 		getTopo,
 		getCanvasSize,
 		getInteraction,
@@ -20,17 +21,22 @@ export class SymbolEditTool {
 		saveHistory
 	} = {}) {
 		this.getTopo = getTopo || (() => ({ fixPoints: [], routes: [] }));
-		this.getCanvasSize = getCanvasSize || (() => ({ baseWidth: 1, baseHeight: 1 }));
-		this.getInteraction = getInteraction || (() => null);
-		this.startInteraction = startInteraction || (() => {});
-		this.isSelected = isSelected || (() => false);
-		this.selectObject = selectObject || (() => {});
+		this.getCanvasSize =
+			context?.viewport?.getCanvasSize ||
+			getCanvasSize ||
+			(() => ({ baseWidth: 1, baseHeight: 1 }));
+		this.getInteraction = context?.selection?.getInteraction || getInteraction || (() => null);
+		this.startInteraction = context?.selection?.startInteraction || startInteraction || (() => {});
+		this.isSelected = context?.selection?.isSelected || isSelected || (() => false);
+		this.selectObject = context?.selection?.selectObject || selectObject || (() => {});
 		this.getSelectionSize = getSelectionSize || (() => 0);
 		this.getIsShiftPressed = getIsShiftPressed || (() => false);
 		this.getMobileSelectionMode = getMobileSelectionMode || (() => false);
 		this.beginSelectionMove = beginSelectionMove || (() => null);
 		this.getSelectedSymbolId = getSelectedSymbolId || (() => null);
-		this.saveHistory = saveHistory || (() => {});
+		this.saveHistory =
+			context?.commands?.commit || context?.history?.save || saveHistory || (() => {});
+		this.deleteSymbols = context?.commands?.deleteSymbols || null;
 	}
 
 	getSymbol(id) {
@@ -207,6 +213,7 @@ export class SymbolEditTool {
 	}
 
 	delete(ids) {
+		if (this.deleteSymbols) return this.deleteSymbols(ids, { recordHistory: false });
 		const idsToDelete = new Set(ids);
 		if (!idsToDelete.size) return false;
 		const topo = this.getTopo();

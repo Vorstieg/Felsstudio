@@ -1,6 +1,7 @@
 /** Shared point and midpoint editing behavior for persisted editable paths. */
 export class EditablePathEditTool {
 	constructor({
+		context,
 		id,
 		getActiveTool,
 		getEditablePath,
@@ -13,7 +14,7 @@ export class EditablePathEditTool {
 		this.getActiveTool = getActiveTool || (() => null);
 		this.getEditablePath = getEditablePath || (() => null);
 		this.startInteraction = startInteraction || (() => {});
-		this.saveHistory = saveHistory || (() => {});
+		this.saveHistory = context?.commands?.commit || saveHistory || (() => {});
 		this.targetFromPoint = targetFromPoint || (() => null);
 		this.targetFromMidpoint = targetFromMidpoint || (() => null);
 	}
@@ -116,7 +117,9 @@ export class EditablePathEditTool {
 			.attr('cy', (item) => item.midY * baseHeight)
 			.attr('r', (item) => item.midpointHitSize)
 			.attr('fill', 'transparent')
-			.on('mousedown', (event, item) => this.handleMidpointDown(event, midpointTarget(item), canvasInput))
+			.on('mousedown', (event, item) =>
+				this.handleMidpointDown(event, midpointTarget(item), canvasInput)
+			)
 			.on('touchstart', (event, item) =>
 				this.handleTouchControl(event, this.handleMidpointDown, midpointTarget(item), canvasInput)
 			);
