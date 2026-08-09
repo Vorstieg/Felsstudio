@@ -157,7 +157,7 @@
 	let brushPreview = $derived(currentTool === tools.outline ? currentTool.getBrushPreview() : null);
 	$effect(() => {
 		editor.setDraftPending(
-				Boolean(brushPreview?.points?.length) ||
+			Boolean(brushPreview?.points?.length) ||
 				(editor.ui.activeTool === 'multipitch' && editor.ui.drawingTarget?.type === 'newPitch')
 		);
 	});
@@ -169,12 +169,8 @@
 		getTopo: () => userState.topo,
 		getCanvasSize: () => ({ baseWidth, baseHeight })
 	});
-	let editingTextNeedsFocus = false;
 
 	const saveHistory = () => editor.saveHistory();
-	let editingTextLabelId = $derived(tools.text.editingId);
-	let editingTextValue = $derived(tools.text.editingValue);
-	let editingTextOriginalValue = $derived(tools.text.editingOriginalValue);
 	const canvasInput = createCanvasInput({
 		getActiveTool: () => editor.ui.activeTool,
 		getAspectRatio: () =>
@@ -209,8 +205,8 @@
 	const pointerController = createTopoPointerController({
 		getActiveTool: () => editor.ui.activeTool,
 		getCurrentTool: () => currentTool,
-		getEditingTextId: () => editingTextLabelId,
-		commitTextEdit,
+		getTextComposerOpen: () => Boolean(tools.text.editingPosition),
+		commitTextComposer: () => tools.text.commitEdit(),
 		getMobileSelectionMode: () => editor.ui.mobileSelectionMode,
 		getTopo: () => userState.topo,
 		getCanvasSize: () => ({ baseWidth, baseHeight }),
@@ -318,33 +314,12 @@
 		editor.setActiveTool('select');
 	}
 
-	function beginTextEdit(id) {
-		if (tools.text.beginEdit(id)) {
-			editingTextNeedsFocus = true;
-			editor.ui.editingTextNeedsFocus = true;
-		}
-	}
-
-	function commitTextEdit() {
-		tools.text.commitEdit();
-		editingTextNeedsFocus = false;
-		editor.ui.editingTextNeedsFocus = false;
-	}
-
-	function cancelTextEdit() {
-		tools.text.cancelEdit();
-		editingTextNeedsFocus = false;
-		editor.ui.editingTextNeedsFocus = false;
-	}
-
-	function handleTextEditKeyDown(event) {
-		tools.text.handleEditKeyDown(event);
-		editingTextNeedsFocus = false;
-		editor.ui.editingTextNeedsFocus = false;
-	}
-
 	function handleObjectClick(event, type, id) {
 		objectInteractionController.objectClick(event, type, id);
+	}
+
+	function handleTextMouseDown(event, label) {
+		objectInteractionController.textMouseDown(event, label);
 	}
 
 	function collectDraggingSelection(mouse) {
@@ -355,10 +330,6 @@
 			getEditablePath: (target) => editablePaths.resolve(target),
 			startMouse: mouse
 		});
-	}
-
-	function handleTextMouseDown(event, label) {
-		objectInteractionController.textMouseDown(event, label);
 	}
 
 	function handleLabelMouseDown(event, { routeId, pitchId, variantId }) {
@@ -375,7 +346,6 @@
 	export const simplifySelectedOutline = actions.simplifySelectedOutline;
 
 	const keyboard = createTopoKeyboardController({
-		getEditingTextId: () => editingTextLabelId,
 		getCurrentTool: () => currentTool,
 		finalize: actions.finalize,
 		cancel: actions.cancel,
@@ -391,7 +361,11 @@
 		recordHistory: saveHistory,
 		undo,
 		redo,
-		setShiftPressed: (pressed) => editor.setShiftPressed(pressed)
+		setShiftPressed: (pressed) => editor.setShiftPressed(pressed),
+		onEditSelectedText: () => {
+			const id = editor.selectedId('text');
+			return id ? tools.text.beginEdit(id) : false;
+		}
 	});
 
 	function handleKeyDown(event) {
@@ -437,23 +411,13 @@
 			isSelected,
 			selectionSize: editor.selectedItems.size,
 			selectedSymbolInstance: editor.selectedSymbolInstance,
+			textTool: tools.text,
 			interaction: editor.interaction,
-			editingTextLabelId,
-			editingTextValue,
-			editingTextNeedsFocus,
 			basePath: base,
 			onObjectMouseDown: handleObjectMouseDown,
 			onObjectClick: handleObjectClick,
 			onLabelMouseDown: handleLabelMouseDown,
 			onTextMouseDown: handleTextMouseDown,
-			onBeginTextEdit: beginTextEdit,
-			onTextEditKeyDown: handleTextEditKeyDown,
-			onTextValueChange: (value) => tools.text.setValue(value),
-			onCommitTextEdit: commitTextEdit,
-			onTextFocusHandled: () => {
-				editingTextNeedsFocus = false;
-				editor.ui.editingTextNeedsFocus = false;
-			},
 			setActiveTouch: (identifier) => canvasInput.trackTouch({ identifier })
 		});
 	}
@@ -475,8 +439,15 @@
 			selectedRoute: userState.ui.selectedRouteId,
 			selectedOutline: userState.ui.selectedOutlineId,
 			selectedFixpoint: userState.ui.selectedFixpointId,
-			editingText: editingTextLabelId,
-			editingTextValue,
+			selectedText: userState.ui.selectedTextLabelId,
+			textDraft: tools.text.editingValue,
+			textDraftPosition: tools.text.editingPosition,
+			textDraftStyle: [
+				tools.text.fontSize2D,
+				tools.text.color,
+				tools.text.fontWeight,
+				tools.text.textAlign2D
+			],
 			selectedItems: editor.selectedItems.size,
 			selectionInteraction: editor.interaction?.kind,
 			transform: transform,

@@ -4,8 +4,8 @@ import { renderBackgroundLayer } from './render-background-layer.js';
 import { renderCurrentLayer } from './render-current-layer.js';
 import { renderOutlinesLayer } from './render-outlines-layer.js';
 import { renderRoutesLayer } from './render-routes-layer.js';
-import { renderTextLabelsLayer } from './render-text-labels-layer.js';
 import { renderSymbolsLayer } from './render-symbols-layer.js';
+import { renderTextLabelsLayer } from './render-text-labels-layer.js';
 import { createTopoLayerStack } from './create-topo-layer-stack.js';
 import { createTopo2DRenderContext } from './create-topo-render-context.js';
 import { createSelectionRegion } from './selection-geometry.js';
@@ -31,20 +31,13 @@ export function renderTopo2D({
 	isSelected,
 	selectionSize,
 	selectedSymbolInstance,
+	textTool,
 	interaction,
-	editingTextLabelId,
-	editingTextValue,
-	editingTextNeedsFocus,
 	basePath,
 	onObjectMouseDown,
 	onObjectClick,
 	onLabelMouseDown,
 	onTextMouseDown,
-	onBeginTextEdit,
-	onTextEditKeyDown,
-	onTextValueChange,
-	onCommitTextEdit,
-	onTextFocusHandled,
 	setActiveTouch
 }) {
 	if (!svgElement || !gElement) return;
@@ -81,19 +74,12 @@ export function renderTopo2D({
 		editTools,
 		isSelected,
 		selectedSymbolInstance,
-		editingTextLabelId,
-		editingTextValue,
-		editingTextNeedsFocus,
+		textTool,
 		basePath,
 		onObjectMouseDown,
 		onObjectClick,
 		onLabelMouseDown,
 		onTextMouseDown,
-		onBeginTextEdit,
-		onTextEditKeyDown,
-		onTextValueChange,
-		onCommitTextEdit,
-		onTextFocusHandled,
 		setActiveTouch
 	});
 

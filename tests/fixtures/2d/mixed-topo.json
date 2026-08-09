@@ -100,11 +100,12 @@
 	"textLabels": [
 		{
 			"id": "text-1",
-			"text": "Belay",
-			"position2D": [0.58, 0.2],
-			"fontSize2D": 0.025,
-			"color": "#23201d",
-			"fontWeight": 700
+			"text": "Main Wall\nSouth Face",
+			"position2D": [0.5, 0.1],
+			"fontSize2D": 28,
+			"color": "#111827",
+			"fontWeight": 600,
+			"textAlign2D": "center"
 		}
 	],
 	"image2D": "/fixtures/topo.jpg",

@@ -37,7 +37,7 @@
 
 		// This remains metadata about the image itself; only canvasAspectRatio is stable.
 		topo.imageAspectRatio = imageAspectRatio;
-		topo.backgroundFit ??= 'contain';
+		if (!topo.backgroundFit) topo.backgroundFit = 'contain';
 		topo.image2D = imageData;
 		hasEstablishedCanvas = true;
 	}

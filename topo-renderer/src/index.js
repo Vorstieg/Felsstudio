@@ -2,6 +2,39 @@ import { select } from 'd3-selection';
 
 export { fixpointSymbols, topoSymbols } from './symbols.js';
 
+export const TEXT_LABEL_DEFAULTS = Object.freeze({
+	fontSize2D: 24,
+	color: '#111827',
+	fontWeight: 600,
+	textAlign2D: 'center'
+});
+
+export function getTextLabelStyle(label = {}) {
+	const textAlign2D = ['left', 'center', 'right'].includes(label.textAlign2D)
+		? label.textAlign2D
+		: TEXT_LABEL_DEFAULTS.textAlign2D;
+	return {
+		fontSize2D: Number.isFinite(Number(label.fontSize2D))
+			? Number(label.fontSize2D)
+			: TEXT_LABEL_DEFAULTS.fontSize2D,
+		color: label.color || TEXT_LABEL_DEFAULTS.color,
+		fontWeight: label.fontWeight ?? TEXT_LABEL_DEFAULTS.fontWeight,
+		textAlign2D,
+		textAnchor: { left: 'start', center: 'middle', right: 'end' }[textAlign2D]
+	};
+}
+
+export function renderTextLabelLines(textSelection, label) {
+	const lines = String(label?.text ?? '').split('\n');
+	textSelection
+		.selectAll('tspan')
+		.data(lines)
+		.join('tspan')
+		.attr('x', 0)
+		.attr('dy', (_, index) => (index === 0 ? 0 : '1.2em'))
+		.text((line) => line);
+}
+
 export const ROUTE_LINE_STYLES = {
 	red: { stroke: '#dc2626', width: 4, dash: null },
 	redDashed: { stroke: '#dc2626', width: 4, dash: '18 12' },
@@ -245,6 +278,7 @@ export function renderTopoSvg({
 	const outlinesLayer = layer('outlines-layer');
 	const routesLayer = layer('routes-layer');
 	const symbolsLayer = layer('symbols-layer');
+	const textLayer = layer('text-layer');
 
 	background
 		.selectAll('image.bg-image')
@@ -381,4 +415,36 @@ export function renderTopoSvg({
 				.attr('y', -(meta?.height || width) / 2)
 				.attr('href', meta?.icon || symbolHref(symbol.type));
 		});
+
+	const textGroups = textLayer
+		.selectAll('g.text-label-group')
+		.data(
+			(topo.textLabels || []).filter((label) => label.position2D),
+			(label) => label.id
+		)
+		.join('g')
+		.attr('class', 'text-label-group')
+		.attr(
+			'transform',
+			(label) =>
+				`translate(${label.position2D[0] * baseWidth}, ${label.position2D[1] * baseHeight})`
+		);
+
+	textGroups.each(function (label) {
+		const style = getTextLabelStyle(label);
+		const text = select(this)
+			.selectAll('text.text-label')
+			.data([label])
+			.join('text')
+			.attr('class', 'text-label')
+			.attr('font-size', style.fontSize2D)
+			.attr('font-weight', style.fontWeight)
+			.attr('text-anchor', style.textAnchor)
+			.attr('fill', style.color)
+			.attr('stroke', 'rgba(255,255,255,0.9)')
+			.attr('stroke-width', 3)
+			.attr('stroke-linejoin', 'round')
+			.attr('paint-order', 'stroke fill');
+		renderTextLabelLines(text, label);
+	});
 }

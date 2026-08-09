@@ -4,8 +4,8 @@ import { createSelectionRegion, getRegionSelection } from './selection-geometry.
 export function createTopoPointerController({
 	getActiveTool,
 	getCurrentTool,
-	getEditingTextId,
-	commitTextEdit,
+	getTextComposerOpen,
+	commitTextComposer,
 	getMobileSelectionMode,
 	getTopo,
 	getCanvasSize,
@@ -19,12 +19,12 @@ export function createTopoPointerController({
 	function down(input) {
 		if (!input || (input.button !== 0 && !input.isTouch)) return;
 		const { point, sourceEvent: event } = input;
-
-		if (getEditingTextId?.()) {
-			commitTextEdit?.();
+		if (getTextComposerOpen?.()) {
+			commitTextComposer?.();
 			event.stopPropagation?.();
 			return;
 		}
+
 		if (['symbolEdit', 'routeEdit', 'outlineEdit'].includes(getActiveTool())) {
 			deselectEditTarget?.();
 			return;

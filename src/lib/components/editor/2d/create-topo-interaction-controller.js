@@ -39,7 +39,7 @@ export function createTopoInteractionController({
 					const symbol = getTopo().fixPoints.find((item) => item.id === symbolId);
 					if (symbol) symbol.position2D = [startPos[0] + deltaX, startPos[1] + deltaY];
 				});
-				interaction.items.texts.forEach(({ textId, startPos }) => {
+				interaction.items.texts?.forEach(({ textId, startPos }) => {
 					const label = (getTopo().textLabels || []).find((item) => item.id === textId);
 					if (label) label.position2D = [startPos[0] + deltaX, startPos[1] + deltaY];
 				});
@@ -78,19 +78,6 @@ export function createTopoInteractionController({
 
 		if (interaction.kind === 'move-route-label') {
 			onMoveRouteLabel?.(interaction, mouse);
-			return;
-		}
-
-		if (interaction.kind === 'move-text') {
-			const label = (getTopo().textLabels || []).find((item) => item.id === interaction.id);
-			(mutateDocument || ((mutator) => mutator()))(() => {
-				if (label) {
-					label.position2D = [
-						interaction.startPos[0] + mouse.x - interaction.startMouse.x,
-						interaction.startPos[1] + mouse.y - interaction.startMouse.y
-					];
-				}
-			});
 		}
 	}
 

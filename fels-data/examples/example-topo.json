@@ -9,7 +9,13 @@
 				"type": "Feature",
 				"id": "path-approach",
 				"properties": { "name": "Common approach" },
-				"geometry": { "type": "LineString", "coordinates": [[16.27, 48.08], [16.271, 48.081]] }
+				"geometry": {
+					"type": "LineString",
+					"coordinates": [
+						[16.27, 48.08],
+						[16.271, 48.081]
+					]
+				}
 			}
 		]
 	},
@@ -33,7 +39,11 @@
 			"name": "Second Route",
 			"type": "sports-climbing",
 			"pathRefs": [{ "pathId": "path-approach", "role": "approach" }],
-			"points2D": [[0.4, 0.9], [0.45, 0.55], [0.5, 0.2]]
+			"points2D": [
+				[0.4, 0.9],
+				[0.45, 0.55],
+				[0.5, 0.2]
+			]
 		}
 	],
 	"fixPoints": [{ "id": "symbol-1", "type": "bolt", "position2D": [0.32, 0.2] }],
@@ -48,5 +58,15 @@
 			]
 		}
 	],
-	"textLabels": [{ "id": "text-1", "text": "Main Wall", "position2D": [0.1, 0.08] }]
+	"textLabels": [
+		{
+			"id": "text-1",
+			"text": "Main Wall\nSouth Face",
+			"position2D": [0.1, 0.08],
+			"fontSize2D": 28,
+			"color": "#111827",
+			"fontWeight": 600,
+			"textAlign2D": "left"
+		}
+	]
 }

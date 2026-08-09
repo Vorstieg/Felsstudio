@@ -33,7 +33,7 @@ test('selects geometry according to marquee direction', async () => {
 			}
 		],
 		fixPoints: [{ id: 'bolt', position2D: [0.35, 0.35] }],
-		textLabels: [{ id: 'label', position2D: [0.36, 0.36] }]
+		textLabels: [{ id: 'label', text: 'Inside', position2D: [0.45, 0.25] }]
 	};
 
 	const contained = createSelectionRegion({ x: 0.2, y: 0.2 }, { x: 0.5, y: 0.5 });

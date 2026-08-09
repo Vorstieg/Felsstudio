@@ -139,7 +139,8 @@ export function createTopoEditorSession() {
 			this.topo.fixPoints = [...(topo.fixPoints || [])];
 			this.topo.outlines = [...(topo.outlines || [])];
 			this.topo.textLabels = [...(topo.textLabels || [])];
-			if (session?.clustering) this.clustering = { ...createInitialClustering(), ...session.clustering };
+			if (session?.clustering)
+				this.clustering = { ...createInitialClustering(), ...session.clustering };
 			if (session?.glbBlob) this.setModelFile(session.glbBlob);
 			this.ui.activeDraftId = id;
 		},

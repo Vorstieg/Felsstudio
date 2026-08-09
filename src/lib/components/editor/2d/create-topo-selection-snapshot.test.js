@@ -6,7 +6,7 @@ describe('createTopoSelectionSnapshot', () => {
 		const topo = {
 			routes: [],
 			fixPoints: [{ id: 's1', position2D: [0.1, 0.2] }],
-			textLabels: [{ id: 't1', position2D: [0.3, 0.4] }]
+			textLabels: [{ id: 't1', text: 'Label', position2D: [0.3, 0.4] }]
 		};
 		const snapshot = createTopoSelectionSnapshot({
 			getTopo: () => topo,

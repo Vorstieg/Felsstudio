@@ -1,10 +1,25 @@
 import { createInitialTopo } from './topo-session.svelte.js';
 import { getContext, setContext } from 'svelte';
-import { generateId, generateOutlineId, generateSymbolId } from '$lib/assets/js/id-utils.js';
+import { generateOutlineId, generateSymbolId, generateTextId } from '$lib/assets/js/id-utils.js';
 import { translateOutline } from '$lib/assets/js/outline-geometry.js';
 
 const HISTORY_LIMIT = 50;
 const PASTE_OFFSET_PX = 16;
+const COLLECTION_BY_TYPE = Object.freeze({
+	route: 'routes',
+	outline: 'outlines',
+	symbol: 'fixPoints',
+	text: 'textLabels'
+});
+
+const collectionForType = (type) => COLLECTION_BY_TYPE[type] || `${type}s`;
+const sameId = (left, right) => String(left) === String(right);
+const nextTextId = (topo) => {
+	let id;
+	do id = generateTextId();
+	while ((topo.textLabels || []).some((label) => sameId(label.id, id)));
+	return id;
+};
 
 export const TOPO_2D_EDITOR_STATE = Symbol('topo-2d-editor-state');
 
@@ -24,7 +39,7 @@ function createDrafts() {
 		route: { points: [], fixPointIds: [], mode: 'route' },
 		multipitch: { points: [], fixPointIds: [], target: null },
 		outline: { points: [], preview: null, brushPoints: [], brushOutlinePoints: [], mode: null },
-		text: { id: null, value: '', originalValue: '' },
+		text: { id: null, value: '', originalValue: '', isNew: false },
 		pathEdit: { target: null, points: [], selectedPointIndex: null }
 	};
 }
@@ -38,7 +53,6 @@ function createUi() {
 		drawingTarget: null,
 		mobileSelectionMode: false,
 		isShiftPressed: false,
-		editingTextNeedsFocus: false,
 		selectedRouteId: null,
 		selectedPathId: null,
 		selectedPitchId: null,
@@ -54,7 +68,7 @@ function createInteraction() {
 }
 
 function itemsForType(topo, type) {
-	if (type === 'symbol') return topo.fixPoints || [];
+	if (COLLECTION_BY_TYPE[type]) return topo[collectionForType(type)] || [];
 	if (type === 'pitch' || type === 'variant') {
 		return (topo.routes || []).flatMap((route) => route[`${type}s`] || []);
 	}
@@ -120,7 +134,7 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 			if (type === 'symbol') {
 				ui.selectedFixpointId = id;
 				state.selectedSymbolInstance =
-					(readTopo().fixPoints || []).find((item) => item.id === id) || null;
+					(readTopo().fixPoints || []).find((item) => sameId(item.id, id)) || null;
 			}
 		}
 		if (!drawingTargetExists(readTopo(), ui.drawingTarget)) ui.drawingTarget = null;
@@ -157,7 +171,7 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 	function reconcileSelection() {
 		for (const key of [...(state.selection || [])]) {
 			const [type, id] = key.split(':');
-			if (!itemsForType(readTopo(), type).some((item) => item.id === id))
+			if (!itemsForType(readTopo(), type).some((item) => sameId(item.id, id)))
 				state.selection.delete(key);
 		}
 		projectSelection();
@@ -291,7 +305,7 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 
 	function updateItem(collection, id, changes, label, { recordHistory = true } = {}) {
 		const mutate = () => {
-			const item = (readTopo()[collection] || []).find((entry) => entry.id === id);
+			const item = (readTopo()[collection] || []).find((entry) => sameId(entry.id, id));
 			if (!item) return false;
 			Object.assign(item, clone(changes));
 			return item;
@@ -303,9 +317,13 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 		const mutate = () => {
 			const topo = readTopo();
 			const before = topo[collection] || [];
-			if (!before.some((item) => item.id === id)) return false;
-			topo[collection] = before.filter((item) => item.id !== id);
-			removeItems([{ type: collection === 'fixPoints' ? 'symbol' : collection.slice(0, -1), id }]);
+			if (!before.some((item) => sameId(item.id, id))) return false;
+			topo[collection] = before.filter((item) => !sameId(item.id, id));
+			const type =
+				Object.keys(COLLECTION_BY_TYPE).find(
+					(candidate) => COLLECTION_BY_TYPE[candidate] === collection
+				) || collection.slice(0, -1);
+			removeItems([{ type, id }]);
 			if (collection === 'fixPoints') {
 				for (const route of topo.routes || []) {
 					route.fixPoints = (route.fixPoints || []).filter((ref) => ref !== id);
@@ -324,11 +342,11 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 		const selected = [...(state.selection || [])];
 		return commit('Delete selection', () => {
 			for (const [type, id] of selected.map((key) => key.split(':'))) {
-				const collection = type === 'symbol' ? 'fixPoints' : `${type}s`;
+				const collection = collectionForType(type);
 				const topo = readTopo();
 				const before = topo[collection] || [];
-				if (!before.some((item) => item.id === id)) continue;
-				topo[collection] = before.filter((item) => item.id !== id);
+				if (!before.some((item) => sameId(item.id, id))) continue;
+				topo[collection] = before.filter((item) => !sameId(item.id, id));
 				if (type === 'symbol') {
 					for (const route of topo.routes || []) {
 						route.fixPoints = (route.fixPoints || []).filter((ref) => ref !== id);
@@ -353,10 +371,11 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 
 	function copySelection() {
 		state.clipboard = [...(state.selection || [])]
+			.filter((key) => ['outline', 'symbol', 'text'].includes(key.split(':')[0]))
 			.map((key) => {
 				const [type, id] = key.split(':');
-				const collection = type === 'symbol' ? 'fixPoints' : `${type}s`;
-				const item = (readTopo()[collection] || []).find((entry) => entry.id === id);
+				const collection = collectionForType(type);
+				const item = (readTopo()[collection] || []).find((entry) => sameId(entry.id, id));
 				return item ? { type, item: clone(item) } : null;
 			})
 			.filter(Boolean);
@@ -372,13 +391,21 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 			const pasted = [];
 			for (const { type, item } of state.clipboard) {
 				const copy = clone(item);
-				copy.id = type === 'symbol' ? generateSymbolId() : generateOutlineId();
+				copy.id =
+					type === 'symbol'
+						? generateSymbolId()
+						: type === 'outline'
+							? generateOutlineId()
+							: nextTextId(topo);
 				if (type === 'outline') {
 					translateOutline(copy, dx, dy, canvasSize);
 					topo.outlines.push(copy);
-				} else {
+				} else if (type === 'symbol') {
 					copy.position2D = [copy.position2D[0] + dx, copy.position2D[1] + dy];
 					topo.fixPoints.push(copy);
+				} else if (type === 'text') {
+					copy.position2D = [copy.position2D[0] + dx, copy.position2D[1] + dy];
+					topo.textLabels.push(copy);
 				}
 				pasted.push({ type, id: copy.id });
 			}
@@ -414,21 +441,6 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 		state.hasPendingChanges = Boolean(hasActiveDraft());
 	}
 
-	function createTextLabel(point, values = {}) {
-		const item = {
-			id: generateId('text'),
-			text: 'Text',
-			position2D: [point.x, point.y],
-			fontSize2D: 0.025,
-			color: '#23201d',
-			fontWeight: 700,
-			...values
-		};
-		collectionMethod('textLabels', item, 'Add text label');
-		selectObject('text', item.id);
-		return item.id;
-	}
-
 	function createSymbol(point, type, values = {}) {
 		const item = {
 			id: generateSymbolId(),
@@ -441,6 +453,22 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 			...values
 		};
 		collectionMethod('fixPoints', item, 'Add fixpoint');
+		return item.id;
+	}
+
+	function createTextLabel(point, values = {}) {
+		const item = {
+			id: nextTextId(readTopo()),
+			text: '',
+			position2D: [point.x, point.y],
+			fontSize2D: 24,
+			color: '#111827',
+			fontWeight: 600,
+			textAlign2D: 'center',
+			...values
+		};
+		collectionMethod('textLabels', item, 'Add text label');
+		selectObject('text', item.id);
 		return item.id;
 	}
 
@@ -571,25 +599,20 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 		updateOutline: (id, changes, options) =>
 			updateItem('outlines', id, changes, 'Update outline', options),
 		removeOutline: (id) => removeItem('outlines', id, 'Remove outline'),
-		addTextLabel: (item) => collectionMethod('textLabels', item, 'Add text label'),
+		addTextLabel: (item, options) =>
+			collectionMethod('textLabels', item, 'Add text label', options),
 		updateTextLabel: (id, changes, options) =>
-			updateItem(
-				'textLabels',
-				id,
-				typeof changes === 'string' ? { text: changes } : changes,
-				'Update text label',
-				options
-			),
-		removeTextLabel: (id) => removeItem('textLabels', id, 'Remove text label'),
+			updateItem('textLabels', id, changes, 'Update text label', options),
+		removeTextLabel: (id, options) => removeItem('textLabels', id, 'Remove text label', options),
 		createTextLabel,
 		createSymbol,
 		appendRoutePoint,
 		appendOutlinePoint,
 		moveRouteLabel,
-		deleteTextLabels: (ids, options) => deleteItems('textLabels', ids, 'text label', options),
 		deleteOutlines: (ids, options) => deleteItems('outlines', ids, 'outline', options),
 		deleteSymbols: (ids, options) => deleteItems('fixPoints', ids, 'fixpoint', options),
 		deleteRoutes: (ids, options) => deleteItems('routes', ids, 'route', options),
+		deleteTextLabels: (ids, options) => deleteItems('textLabels', ids, 'text label', options),
 		deleteSymbolAt: (point, tolerance = 0.02) => {
 			const item = readTopo().fixPoints.find(
 				(entry) =>
@@ -604,9 +627,7 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 			commit('Move selection', () => {
 				for (const key of state.selection) {
 					const [type, id] = key.split(':');
-					const item = (type === 'symbol' ? readTopo().fixPoints : readTopo()[`${type}s`])?.find(
-						(entry) => entry.id === id
-					);
+					const item = readTopo()[collectionForType(type)]?.find((entry) => sameId(entry.id, id));
 					if (item?.position2D)
 						item.position2D = [item.position2D[0] + move.x, item.position2D[1] + move.y];
 				}
@@ -683,11 +704,15 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 			state.drafts.pathEdit = createDrafts().pathEdit;
 			updatePendingChanges();
 		},
-		beginTextEdit: (id) => {
-			const item = readTopo().textLabels.find((label) => label.id === id);
+		beginTextEdit: (id, { isNew = false } = {}) => {
+			const item = (readTopo().textLabels || []).find((label) => sameId(label.id, id));
 			if (!item) return false;
-			state.drafts.text = { id, value: item.text || '', originalValue: item.text || '' };
-			state.ui.editingTextNeedsFocus = true;
+			state.drafts.text = {
+				id,
+				value: item.text || '',
+				originalValue: item.text || '',
+				isNew
+			};
 			updatePendingChanges();
 			return true;
 		},
@@ -695,18 +720,8 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 			state.drafts.text.value = value;
 			updatePendingChanges();
 		},
-		commitTextEdit: () => {
-			const draft = state.drafts.text;
-			if (!draft.id) return false;
-			const result = updateItem('textLabels', draft.id, { text: draft.value }, 'Edit text');
+		finishTextEdit: () => {
 			state.drafts.text = createDrafts().text;
-			state.ui.editingTextNeedsFocus = false;
-			updatePendingChanges();
-			return result;
-		},
-		cancelTextEdit: () => {
-			state.drafts.text = createDrafts().text;
-			state.ui.editingTextNeedsFocus = false;
 			updatePendingChanges();
 		},
 		load,

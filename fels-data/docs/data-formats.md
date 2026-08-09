@@ -103,7 +103,9 @@ This is a custom JSON document. It contains a `routes` array and an optional doc
 - `pitches`: multi-pitch route segments, ordered from bottom to top.
 - `fixPoints`: bolts, belays, trees, and other topo symbols.
 - `outlines`: rock, approach, descent, variant, or fixed-rope linework.
-- `textLabels`: movable labels.
+- `textLabels`: movable 2D annotations. `text` may contain newlines; optional `fontSize2D`,
+  `color`, `fontWeight`, and `textAlign2D` fields control presentation. Renderers default missing
+  values to 24 px, `#111827`, weight 600, and centered alignment.
 
 3D topographies may additionally include:
 
@@ -120,7 +122,6 @@ This is a custom JSON document. It contains a `routes` array and an optional doc
 `position2D` remain normalized to the unit square. `outlines.lineStyle` is optional because
 3D-derived topo documents may contain outlines without a style.
 
-
 ```json
 {
 	"paths": {
@@ -130,7 +131,13 @@ This is a custom JSON document. It contains a `routes` array and an optional doc
 				"type": "Feature",
 				"id": "path-approach",
 				"properties": { "name": "Common approach" },
-				"geometry": { "type": "LineString", "coordinates": [[16.27, 48.08], [16.271, 48.081]] }
+				"geometry": {
+					"type": "LineString",
+					"coordinates": [
+						[16.27, 48.08],
+						[16.271, 48.081]
+					]
+				}
 			}
 		]
 	},
@@ -147,8 +154,7 @@ This is a custom JSON document. It contains a `routes` array and an optional doc
 				[0.28, 0.55],
 				[0.32, 0.2]
 			]
-		}
-		,
+		},
 		{
 			"id": "route-2",
 			"name": "Second Route",

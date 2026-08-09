@@ -20,7 +20,6 @@
 	let activeTab = $state('info');
 	let lastSelectedId = $state(null);
 	let lastSelectedFpId = $state(null);
-	let lastSelectedTextId = $state(null);
 	let lastLockedClusterId = $state(null);
 	let showJsonEditor = $state(false);
 	let topoJsonText = $state('');
@@ -45,7 +44,6 @@
 	$effect(() => {
 		const selectedId = userState.ui.selectedRouteId;
 		const selectedFpId = userState.ui.selectedFixpointId;
-		const selectedTextId = userState.ui.selectedTextLabelId;
 		const lockedClusterId = userState.clustering.lockedClusterId;
 
 		if (selectedId && selectedId !== lastSelectedId) {
@@ -71,13 +69,6 @@
 			scrollIntoInspectorView('fixpoint-' + selectedFpId);
 		} else if (!selectedFpId) {
 			lastSelectedFpId = null;
-		}
-
-		if (selectedTextId && selectedTextId !== lastSelectedTextId) {
-			lastSelectedTextId = selectedTextId;
-			activeTab = 'info';
-		} else if (!selectedTextId) {
-			lastSelectedTextId = null;
 		}
 
 		if (lockedClusterId && lockedClusterId !== lastLockedClusterId) {

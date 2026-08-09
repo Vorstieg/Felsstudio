@@ -7,7 +7,7 @@ const document = () => ({
 	routes: [{ id: 'route-1', points2D: [[0, 0]], pitches: [] }],
 	fixPoints: [{ id: 'symbol-1', position2D: [0, 0] }],
 	outlines: [],
-	textLabels: []
+	textLabels: [{ id: 'text-1', text: 'Existing', position2D: [0.2, 0.3] }]
 });
 
 describe('createTopo2DEditorState', () => {
@@ -55,8 +55,7 @@ describe('createTopo2DEditorState', () => {
 			topo: {
 				routes: [{ id: 'route-1', pitches: [{ id: 'pitch-1' }], variants: [{ id: 'variant-1' }] }],
 				fixPoints: [],
-				outlines: [],
-				textLabels: []
+				outlines: []
 			}
 		});
 		editor.selectPath('pitch', 'route-1', 'pitch-1');
@@ -88,9 +87,9 @@ describe('createTopo2DEditorState', () => {
 		expect(editor.drafts.route.points).toHaveLength(0);
 	});
 
-	it('owns route, outline, and text draft lifecycles', () => {
+	it('owns route and outline draft lifecycles', () => {
 		const editor = createTopo2DEditorState({
-			topo: { routes: [], fixPoints: [], outlines: [], textLabels: [{ id: 'text-1', text: 'Old' }] }
+			topo: { routes: [], fixPoints: [], outlines: [] }
 		});
 		editor.beginRouteDraft();
 		editor.appendRouteDraftPoint({ x: 0, y: 0 });
@@ -113,10 +112,6 @@ describe('createTopo2DEditorState', () => {
 			[1, 1]
 		]);
 		expect(editor.commitOutlineDraft()).toMatchObject({ mode: 'polyline' });
-		editor.beginTextEdit('text-1');
-		editor.setTextEditValue('New');
-		editor.cancelTextEdit();
-		expect(editor.topo.textLabels[0].text).toBe('Old');
 	});
 
 	it('clears deleted nested selections and drawing targets', () => {
@@ -130,8 +125,7 @@ describe('createTopo2DEditorState', () => {
 					}
 				],
 				fixPoints: [],
-				outlines: [],
-				textLabels: []
+				outlines: []
 			}
 		});
 
@@ -172,5 +166,48 @@ describe('createTopo2DEditorState', () => {
 		editor.cancelRouteDraft();
 		editor.setDrawingTarget(null);
 		expect(editor.hasPendingChanges).toBe(false);
+	});
+
+	it('creates, updates, copies, moves, deletes, and restores text labels', () => {
+		const editor = createTopo2DEditorState({ topo: document() });
+		const firstId = editor.createTextLabel(
+			{ x: 0.4, y: 0.5 },
+			{ text: 'Main\nWall', fontSize2D: 32, textAlign2D: 'left' }
+		);
+		const secondId = editor.createTextLabel({ x: 0.6, y: 0.7 }, { text: 'Second' });
+		expect(firstId).not.toBe(secondId);
+		expect(editor.ui.selectedTextLabelId).toBe(secondId);
+
+		editor.updateTextLabel(firstId, { color: '#dc2626' });
+		editor.selectObject('text', firstId);
+		expect(editor.copySelection()).toBe(1);
+		const [pasted] = editor.pasteSelection({ baseWidth: 1000, baseHeight: 500 });
+		expect(pasted.type).toBe('text');
+		const duplicate = editor.topo.textLabels.find((label) => label.id === pasted.id);
+		expect(duplicate.position2D[0]).toBeCloseTo(0.416);
+		expect(duplicate.position2D[1]).toBeCloseTo(0.532);
+		expect(duplicate).toMatchObject({ text: 'Main\nWall', color: '#dc2626' });
+
+		editor.deleteSelection();
+		expect(editor.topo.textLabels.some((label) => label.id === pasted.id)).toBe(false);
+		expect(editor.undo()).toBe(true);
+		expect(editor.topo.textLabels.some((label) => label.id === pasted.id)).toBe(true);
+		expect(editor.getSaveSnapshot().textLabels).toHaveLength(4);
+	});
+
+	it('supports the public numeric ID form for text-label selection and deletion', () => {
+		const editor = createTopo2DEditorState({
+			topo: {
+				routes: [],
+				fixPoints: [],
+				outlines: [],
+				textLabels: [{ id: 7, text: 'Seven', position2D: [0.1, 0.2] }]
+			}
+		});
+		editor.selectObject('text', 7);
+		editor.reconcileSelection();
+		expect([...editor.selectedItems]).toEqual(['text:7']);
+		editor.deleteSelection();
+		expect(editor.topo.textLabels).toEqual([]);
 	});
 });

@@ -6,6 +6,7 @@
 let routeIdCounter = 1;
 let outlineIdCounter = 1;
 let symbolIdCounter = 1;
+let textIdCounter = 1;
 let genericIdCounter = 1;
 
 export function generateRouteId() {
@@ -18,6 +19,10 @@ export function generateOutlineId() {
 
 export function generateSymbolId() {
 	return `symbol-${symbolIdCounter++}`;
+}
+
+export function generateTextId() {
+	return `text-${textIdCounter++}`;
 }
 
 export function generateId(prefix = 'id') {
@@ -47,6 +52,7 @@ export function initializeIdCounters(topo) {
 	routeIdCounter = findMaxId(topo.routes, 'route-') + 1;
 	outlineIdCounter = findMaxId(topo.outlines, 'outline-') + 1;
 	symbolIdCounter = findMaxId(topo.fixPoints, 'symbol-') + 1;
+	textIdCounter = findMaxId(topo.textLabels, 'text-') + 1;
 
 	// Also check pitches within routes for ID conflicts if we used them there
 	topo.routes?.forEach((r) => {
@@ -62,5 +68,6 @@ export function resetIdCounters() {
 	routeIdCounter = 1;
 	outlineIdCounter = 1;
 	symbolIdCounter = 1;
+	textIdCounter = 1;
 	genericIdCounter = 1;
 }

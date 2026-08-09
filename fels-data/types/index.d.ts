@@ -136,8 +136,18 @@ export interface Outline {
 
 export interface TextLabel {
 	id: string | number;
+	/** Newlines render as separate SVG rows. */
 	text: string;
+	/** Normalized anchor of the first row. */
 	position2D: Point2D;
+	/** Logical SVG pixels. Defaults to 24. */
+	fontSize2D?: number;
+	/** CSS color. Defaults to #111827. */
+	color?: string;
+	/** CSS font weight. The editor writes 400, 600, or 700. */
+	fontWeight?: string | number;
+	/** Horizontal alignment relative to position2D. Defaults to center. */
+	textAlign2D?: 'left' | 'center' | 'right';
 	[key: string]: unknown;
 }
 

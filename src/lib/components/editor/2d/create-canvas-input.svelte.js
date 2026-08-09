@@ -107,7 +107,7 @@ export function createCanvasInput({
 		const captureOptions = { passive: false, capture: true };
 		const startedOnEditControl = (event) =>
 			event.target?.closest?.(
-				'.symbol-group, .route-container, .route-label, .route-point-hit-area, .route-point-handle, .route-midpoint-hit-area, .route-midpoint, .outline-hit-area, .gizmo'
+				'.symbol-group, .text-label-group, .text-composer, .route-container, .route-label, .route-point-hit-area, .route-point-handle, .route-midpoint-hit-area, .route-midpoint, .outline-hit-area, .gizmo'
 			);
 		const handleMouseDown = (event) => onDown?.(normalizeEvent(event));
 		const handleMouseMove = (event) => onMove?.(normalizeEvent(event));

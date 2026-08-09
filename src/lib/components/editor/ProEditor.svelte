@@ -14,7 +14,10 @@
 	import MapModal from '$lib/components/ui/MapModal.svelte';
 	import TopoPropertiesPanel from '$lib/components/editor/TopoPropertiesPanel.svelte';
 	import HitInspector from '$lib/components/editor/HitInspector.svelte';
-	import { createTopoEditorSession, provideTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	import {
+		createTopoEditorSession,
+		provideTopoEditorSession
+	} from '$lib/state/topo-session.svelte.js';
 	import { isBlankTopoSession } from '$lib/state/drafts.svelte.js';
 	import { useTopoDraftAutosave } from '$lib/components/editor/use-topo-draft-autosave.svelte.js';
 	import { isMobileViewport } from '$lib/assets/js/mobile-utils.js';
@@ -26,7 +29,7 @@
 	import { authState } from '$lib/api/auth.svelte.js';
 	import ToolPalette3D from '$lib/components/editor/3d/ToolPalette3D.svelte';
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
-import { fixpointSymbols } from '@vorstieg/topo-renderer';
+	import { fixpointSymbols } from '@vorstieg/topo-renderer';
 
 	let { workspace = '3d-create', children } = $props();
 	const userState = provideTopoEditorSession(createTopoEditorSession());
@@ -131,7 +134,9 @@ import { fixpointSymbols } from '@vorstieg/topo-renderer';
 				const viewDir = new Vector3().subVectors(avgCamPos, anchorVec).normalize();
 
 				// Target Position (1.5m away for better overview)
-				userState.transient.targetCameraPosition = anchorVec.clone().add(viewDir.multiplyScalar(1.5));
+				userState.transient.targetCameraPosition = anchorVec
+					.clone()
+					.add(viewDir.multiplyScalar(1.5));
 
 				// Trigger tween
 				targetPosStore.set(anchor);
@@ -452,21 +457,21 @@ import { fixpointSymbols } from '@vorstieg/topo-renderer';
 					<span>{$_('ui.set_vertex')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Dbl Click</kbd
+						>Dbl Click</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.undo_vertex')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Backspace</kbd
+						>Backspace</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.finalize')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Enter</kbd
+						>Enter</kbd
 					>
 				</div>
 			{:else if activeTool === 'multipitch'}
@@ -474,28 +479,28 @@ import { fixpointSymbols } from '@vorstieg/topo-renderer';
 					<span>{$_('ui.vertex')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Dbl Click</kbd
+						>Dbl Click</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.undo_vertex')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Backspace</kbd
+						>Backspace</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.place_belay')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>B</kbd
+						>B</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>{$_('ui.finalize')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Enter</kbd
+						>Enter</kbd
 					>
 				</div>
 			{:else if activeTool === 'fixpoint'}
@@ -503,7 +508,7 @@ import { fixpointSymbols } from '@vorstieg/topo-renderer';
 					<span>{$_('ui.place_point')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Dbl Click</kbd
+						>Dbl Click</kbd
 					>
 				</div>
 				<div class="w-px h-4 bg-black/10 mx-1"></div>
@@ -525,7 +530,7 @@ import { fixpointSymbols } from '@vorstieg/topo-renderer';
 									: 'opacity-70'}"
 							/>
 							<span class="text-[9px] font-bold uppercase tracking-tighter"
-							>{$_(`topo.fixpoints.${symbol.id}`)}</span
+								>{$_(`topo.fixpoints.${symbol.id}`)}</span
 							>
 						</button>
 					{/each}
@@ -535,28 +540,28 @@ import { fixpointSymbols } from '@vorstieg/topo-renderer';
 					<span>Select Area</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Shift + Drag</kbd
+						>Shift + Drag</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>Select Islands</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>C</kbd
+						>C</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>Apply Cut</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Delete</kbd
+						>Delete</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
 					<span>Reset</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-					>Esc</kbd
+						>Esc</kbd
 					>
 				</div>
 			{/if}

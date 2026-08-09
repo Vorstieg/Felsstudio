@@ -1,4 +1,4 @@
-import { generateOutlineId, generateSymbolId } from '$lib/assets/js/id-utils.js';
+import { generateOutlineId, generateSymbolId, generateTextId } from '$lib/assets/js/id-utils.js';
 import { translateOutline } from '$lib/assets/js/outline-geometry.js';
 
 const PASTE_OFFSET_PX = 16;
@@ -24,7 +24,10 @@ export function createTopoClipboard() {
 				.map((item) => ({ type: 'outline', item: clone(item) })),
 			...topo.fixPoints
 				.filter((symbol) => selected.has(`symbol:${symbol.id}`))
-				.map((item) => ({ type: 'symbol', item: clone(item) }))
+				.map((item) => ({ type: 'symbol', item: clone(item) })),
+			...(topo.textLabels || [])
+				.filter((label) => selected.has(`text:${label.id}`))
+				.map((item) => ({ type: 'text', item: clone(item) }))
 		];
 		pasteCount = 0;
 		return contents.length;
@@ -43,7 +46,7 @@ export function createTopoClipboard() {
 				duplicate.id = generateOutlineId();
 				translateOutline(duplicate, deltaX, deltaY, canvasSize);
 				topo.outlines.push(duplicate);
-			} else {
+			} else if (type === 'symbol') {
 				duplicate.id = generateSymbolId();
 				if (Array.isArray(duplicate.position2D)) {
 					duplicate.position2D = [
@@ -52,6 +55,12 @@ export function createTopoClipboard() {
 					];
 				}
 				topo.fixPoints.push(duplicate);
+			} else {
+				do duplicate.id = generateTextId();
+				while ((topo.textLabels || []).some((label) => label.id === duplicate.id));
+				duplicate.position2D = [duplicate.position2D[0] + deltaX, duplicate.position2D[1] + deltaY];
+				if (!topo.textLabels) topo.textLabels = [];
+				topo.textLabels.push(duplicate);
 			}
 			pasted.push({ type, id: duplicate.id });
 		});

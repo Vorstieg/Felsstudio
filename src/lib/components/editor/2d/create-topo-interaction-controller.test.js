@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { createTopoInteractionController } from './create-topo-interaction-controller.js';
 
 describe('createTopoInteractionController', () => {
-	it('moves selected symbols from their interaction snapshot', () => {
+	it('moves selected symbols and text labels from their interaction snapshot', () => {
 		const topo = {
 			fixPoints: [{ id: 'symbol-1', position2D: [0.1, 0.2] }],
-			textLabels: [],
+			textLabels: [{ id: 'text-1', text: 'Label', position2D: [0.2, 0.1] }],
 			routes: []
 		};
 		const controller = createTopoInteractionController({
@@ -13,7 +13,11 @@ describe('createTopoInteractionController', () => {
 			getInteraction: () => ({
 				kind: 'move-selection',
 				startMouse: { x: 0.2, y: 0.2 },
-				items: { paths: [], symbols: [{ symbolId: 'symbol-1', startPos: [0.1, 0.2] }], texts: [] }
+				items: {
+					paths: [],
+					symbols: [{ symbolId: 'symbol-1', startPos: [0.1, 0.2] }],
+					texts: [{ textId: 'text-1', startPos: [0.2, 0.1] }]
+				}
 			}),
 			getCurrentTool: () => ({ onMouseMove: vi.fn() })
 		});
@@ -22,5 +26,7 @@ describe('createTopoInteractionController', () => {
 
 		expect(topo.fixPoints[0].position2D[0]).toBeCloseTo(0.2);
 		expect(topo.fixPoints[0].position2D[1]).toBeCloseTo(0.5);
+		expect(topo.textLabels[0].position2D[0]).toBeCloseTo(0.3);
+		expect(topo.textLabels[0].position2D[1]).toBeCloseTo(0.4);
 	});
 });

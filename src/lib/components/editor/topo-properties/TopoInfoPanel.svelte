@@ -26,23 +26,9 @@
 		mobile = false
 	} = $props();
 
-	let selectedTextLabel = $derived(
-		(userState.topo.textLabels || []).find((label) => label.id === userState.ui.selectedTextLabelId)
-	);
 	let selectedOutline = $derived(
 		(userState.topo.outlines || []).find((outline) => outline.id === userState.ui.selectedOutlineId)
 	);
-
-	function deleteSelectedText() {
-		if (editorState) {
-			editorState.removeTextLabel(selectedTextLabel.id);
-			return;
-		}
-		userState.topo.textLabels = (userState.topo.textLabels || []).filter(
-			(label) => label.id !== selectedTextLabel.id
-		);
-		userState.ui.selectedTextLabelId = null;
-	}
 
 	function deleteSelectedOutline() {
 		if (editorState) {
@@ -75,11 +61,6 @@
 		};
 		if (editorState) editorState.updateOutline(selectedOutline.id, { curve });
 		else selectedOutline.curve = curve;
-	}
-
-	function updateSelectedText(changes) {
-		if (editorState) editorState.updateTextLabel(selectedTextLabel.id, changes);
-		else Object.assign(selectedTextLabel, changes);
 	}
 
 	function updateSelectedOutline(changes) {
@@ -228,64 +209,6 @@
 					availableTags={availableTopoTags}
 				/>
 			</div>
-
-			{#if selectedTextLabel}
-				<div class="space-y-2 p-2 rounded-sm bg-warm-white border border-black/10">
-					<div class="flex items-center justify-between">
-						<label class="text-ui-label block">Selected text</label>
-						<button
-							class="text-warm-gray-300 hover:text-rose-600 transition-none w-6 h-6 flex items-center justify-center rounded-sm hover:bg-rose-50"
-							title="Delete text"
-							onclick={deleteSelectedText}
-						>
-							<i class="fa-solid fa-trash-can text-[10px]"></i>
-						</button>
-					</div>
-					<input
-						type="text"
-						value={selectedTextLabel.text || ''}
-						oninput={(event) => updateSelectedText({ text: event.currentTarget.value })}
-						class="input-studio w-full"
-					/>
-					<div class="grid grid-cols-3 gap-1.5">
-						<div class="space-y-0.5">
-							<label class="text-ui-label block">Size</label>
-							<input
-								type="number"
-								min="0.01"
-								max="0.08"
-								step="0.005"
-								value={selectedTextLabel.fontSize2D}
-								oninput={(event) =>
-									updateSelectedText({ fontSize2D: Number(event.currentTarget.value) })}
-								class="input-studio w-full"
-							/>
-						</div>
-						<div class="space-y-0.5">
-							<label class="text-ui-label block">Color</label>
-							<input
-								type="color"
-								value={selectedTextLabel.color}
-								oninput={(event) => updateSelectedText({ color: event.currentTarget.value })}
-								class="input-studio w-full h-8 p-1"
-							/>
-						</div>
-						<div class="space-y-0.5">
-							<label class="text-ui-label block">Weight</label>
-							<select
-								value={selectedTextLabel.fontWeight}
-								onchange={(event) =>
-									updateSelectedText({ fontWeight: Number(event.currentTarget.value) })}
-								class="input-studio w-full appearance-none"
-							>
-								<option value={400}>Regular</option>
-								<option value={700}>Bold</option>
-								<option value={900}>Heavy</option>
-							</select>
-						</div>
-					</div>
-				</div>
-			{/if}
 
 			{#if selectedOutline}
 				<div class="space-y-2 p-2 rounded-sm bg-warm-white border border-black/10">

@@ -5,26 +5,33 @@ import { getOutlinePoints } from '$lib/assets/js/outline-geometry.js';
  * effect tracking then invalidates the render when an editor object is
  * mutated in place.
  */
-export function trackTopoRenderDependencies({ topo, currentRoutePoints, currentOutlinePoints, brushPreview, baseWidth, baseHeight }) {
+export function trackTopoRenderDependencies({
+	topo,
+	currentRoutePoints,
+	currentOutlinePoints,
+	brushPreview,
+	baseWidth,
+	baseHeight
+}) {
 	for (const route of topo.routes) {
 		route.lineStyle;
-		if (route.labelOffset2D) route.labelOffset2D[0], route.labelOffset2D[1];
-		for (const point of route.points2D || []) point[0], point[1];
+		if (route.labelOffset2D) (route.labelOffset2D[0], route.labelOffset2D[1]);
+		for (const point of route.points2D || []) (point[0], point[1]);
 		for (const pitch of route.pitches || []) {
 			pitch.lineStyle;
 			pitch.grade;
 			pitch.length;
 			pitch.pitchNumber;
-			if (pitch.labelOffset2D) pitch.labelOffset2D[0], pitch.labelOffset2D[1];
-			for (const point of pitch.points2D || []) point[0], point[1];
+			if (pitch.labelOffset2D) (pitch.labelOffset2D[0], pitch.labelOffset2D[1]);
+			for (const point of pitch.points2D || []) (point[0], point[1]);
 		}
 		for (const variant of route.variants || []) {
 			variant.name;
 			variant.lineStyle;
 			variant.grade;
 			variant.length;
-			if (variant.labelOffset2D) variant.labelOffset2D[0], variant.labelOffset2D[1];
-			for (const point of variant.points2D || []) point[0], point[1];
+			if (variant.labelOffset2D) (variant.labelOffset2D[0], variant.labelOffset2D[1]);
+			for (const point of variant.points2D || []) (point[0], point[1]);
 		}
 	}
 	for (const outline of topo.outlines) {
@@ -36,7 +43,7 @@ export function trackTopoRenderDependencies({ topo, currentRoutePoints, currentO
 		outline.shape?.radius2D;
 		outline.shape?.fromCenter;
 		outline.shape?.square;
-		for (const point of getOutlinePoints(outline, { baseWidth, baseHeight })) point[0], point[1];
+		for (const point of getOutlinePoints(outline, { baseWidth, baseHeight })) (point[0], point[1]);
 	}
 	for (const symbol of topo.fixPoints) {
 		if (symbol.position2D) {
@@ -53,10 +60,11 @@ export function trackTopoRenderDependencies({ topo, currentRoutePoints, currentO
 		label.fontSize2D;
 		label.color;
 		label.fontWeight;
-		if (label.position2D) label.position2D[0], label.position2D[1];
+		label.textAlign2D;
+		if (label.position2D) (label.position2D[0], label.position2D[1]);
 	}
-	for (const point of currentRoutePoints) point[0], point[1];
-	for (const point of currentOutlinePoints) point[0], point[1];
-	for (const point of brushPreview?.points || []) point[0], point[1];
-	for (const point of brushPreview?.contourPoints || []) point[0], point[1];
+	for (const point of currentRoutePoints) (point[0], point[1]);
+	for (const point of currentOutlinePoints) (point[0], point[1]);
+	for (const point of brushPreview?.points || []) (point[0], point[1]);
+	for (const point of brushPreview?.contourPoints || []) (point[0], point[1]);
 }

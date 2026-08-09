@@ -1,8 +1,6 @@
 <script>
 	import { _ } from 'svelte-i18n';
-	import { goto } from '$app/navigation';
-	import { base } from '$app/paths';
-import { topoSymbols } from '@vorstieg/topo-renderer';
+	import { topoSymbols } from '@vorstieg/topo-renderer';
 	import ToolBar from '$lib/components/editor/tools/ToolBar.svelte';
 
 	let {
@@ -48,7 +46,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 			hasOptions: true,
 			onSelect: (context) => selectSymbolTool('symbol', features, context)
 		},
-		{ id: 'text', icon: 'fa-font', label: 'Text' },
+		{ id: 'text', icon: 'fa-font', label: $_('ui.text'), hasOptions: true },
 		{ id: 'eraser', icon: 'fa-eraser', label: $_('ui.delete') }
 	]);
 </script>

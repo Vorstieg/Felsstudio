@@ -24,4 +24,27 @@ describe('createTopoPointerController', () => {
 			mode: 'add'
 		});
 	});
+
+	it('commits an open text composer before handling the click-away target', () => {
+		const commitTextComposer = vi.fn();
+		const onMouseDown = vi.fn();
+		const stopPropagation = vi.fn();
+		const controller = createTopoPointerController({
+			getActiveTool: () => 'text',
+			getCurrentTool: () => ({ onMouseDown }),
+			getTextComposerOpen: () => true,
+			commitTextComposer
+		});
+
+		controller.down({
+			point: { x: 0.4, y: 0.5 },
+			sourceEvent: { stopPropagation },
+			button: 0,
+			isTouch: false
+		});
+
+		expect(commitTextComposer).toHaveBeenCalledOnce();
+		expect(stopPropagation).toHaveBeenCalledOnce();
+		expect(onMouseDown).not.toHaveBeenCalled();
+	});
 });

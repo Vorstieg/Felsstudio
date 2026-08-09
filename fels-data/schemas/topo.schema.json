@@ -42,7 +42,8 @@
 		},
 		"path2D": { "type": "array", "items": { "$ref": "#/$defs/point2D" }, "minItems": 2 },
 		"pathCollection": {
-			"type": "object", "required": ["type", "features"],
+			"type": "object",
+			"required": ["type", "features"],
 			"properties": {
 				"type": { "const": "FeatureCollection" },
 				"features": { "type": "array", "items": { "$ref": "#/$defs/pathFeature" } }
@@ -50,21 +51,31 @@
 			"additionalProperties": true
 		},
 		"pathFeature": {
-			"type": "object", "required": ["type", "geometry"],
+			"type": "object",
+			"required": ["type", "geometry"],
 			"properties": {
 				"type": { "const": "Feature" },
 				"id": { "type": ["string", "number"] },
 				"properties": { "type": "object" },
 				"geometry": {
-					"type": "object", "required": ["type", "coordinates"],
-					"properties": { "type": { "const": "LineString" }, "coordinates": { "type": "array", "minItems": 2, "items": { "type": "array", "minItems": 2, "items": { "type": "number" } } } },
+					"type": "object",
+					"required": ["type", "coordinates"],
+					"properties": {
+						"type": { "const": "LineString" },
+						"coordinates": {
+							"type": "array",
+							"minItems": 2,
+							"items": { "type": "array", "minItems": 2, "items": { "type": "number" } }
+						}
+					},
 					"additionalProperties": true
 				}
 			},
 			"additionalProperties": true
 		},
 		"pathRef": {
-			"type": "object", "required": ["pathId"],
+			"type": "object",
+			"required": ["pathId"],
 			"properties": {
 				"pathId": { "type": ["string", "number"] },
 				"role": { "type": "string" },
@@ -160,7 +171,8 @@
 				"position2D": { "$ref": "#/$defs/point2D" },
 				"fontSize2D": { "type": "number" },
 				"color": { "type": "string" },
-				"fontWeight": { "type": ["string", "number"] }
+				"fontWeight": { "type": ["string", "number"] },
+				"textAlign2D": { "enum": ["left", "center", "right"] }
 			},
 			"additionalProperties": true
 		}

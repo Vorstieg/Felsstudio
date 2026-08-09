@@ -3,7 +3,6 @@
  * only after editor-level shortcuts and cancellation have been handled.
  */
 export function createTopoKeyboardController({
-	getEditingTextId,
 	getCurrentTool,
 	finalize,
 	cancel,
@@ -13,16 +12,15 @@ export function createTopoKeyboardController({
 	getTopo,
 	selection,
 	setActiveTool,
-	setDrawingTarget,
 	clearSelection,
 	deleteSelection,
 	recordHistory,
 	undo,
 	redo,
-	setShiftPressed
+	setShiftPressed,
+	onEditSelectedText
 } = {}) {
 	function handleKeyDown(event) {
-		if (getEditingTextId?.()) return;
 		const isShortcut = event.ctrlKey || event.metaKey;
 		const isTextInput = event.target?.closest?.(
 			'input, textarea, select, [contenteditable="true"]'
@@ -56,6 +54,11 @@ export function createTopoKeyboardController({
 		}
 
 		if (event.key === 'Enter') {
+			if (onEditSelectedText?.()) {
+				event.preventDefault?.();
+				return;
+			}
+			if (getCurrentTool?.()?.onKeyDown?.(event) === true) return;
 			event.preventDefault?.();
 			finalize?.();
 			return;

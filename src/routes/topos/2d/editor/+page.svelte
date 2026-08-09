@@ -12,6 +12,7 @@
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
 	import Topo2DEditor from '$lib/components/editor/2d/Topo2DEditor.svelte';
 	import OutlineToolOptions from '$lib/components/editor/tools/OutlineToolOptions.svelte';
+	import TextToolOptions from '$lib/components/editor/tools/TextToolOptions.svelte';
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
 	import TopoPropertiesPanel from '$lib/components/editor/TopoPropertiesPanel.svelte';
 	import { authState } from '$lib/api/auth.svelte.js';
@@ -114,6 +115,12 @@
 			outlineTool={editor2D?.getCurrentTool?.()}
 			activeTool={editorState.ui.activeTool}
 			bind:selectedOutlineStyle={editorState.ui.selectedOutlineStyle}
+			onClose={() => (toolOptionsOpen = false)}
+		/>
+	{:else if editorState.ui.activeTool === 'text'}
+		<TextToolOptions
+			textTool={editor2D?.getCurrentTool?.()}
+			open={toolOptionsOpen}
 			onClose={() => (toolOptionsOpen = false)}
 		/>
 	{:else if ['route', 'multipitch'].includes(editorState.ui.activeTool)}

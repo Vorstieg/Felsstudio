@@ -25,6 +25,7 @@ export function createTopoLayerStack(rootElement) {
 		current: getOrCreate('current-layer'),
 		handles: getOrCreate('handles-layer', { touchActionNone: true }),
 		symbols: getOrCreate('symbols-layer'),
+		// Text is intentionally last so annotations remain legible above symbols.
 		text: getOrCreate('text-layer', { touchActionNone: true })
 	};
 }

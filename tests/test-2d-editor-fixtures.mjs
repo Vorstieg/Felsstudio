@@ -7,7 +7,6 @@ function assertTopoCollections(topo) {
 	for (const key of ['routes', 'fixPoints', 'outlines']) {
 		expect(topo[key], key).toBeInstanceOf(Array);
 	}
-	if (topo.textLabels) expect(topo.textLabels).toBeInstanceOf(Array);
 }
 
 describe('2D editor fixtures', () => {
@@ -15,6 +14,7 @@ describe('2D editor fixtures', () => {
 		assertTopoCollections(emptyTopo);
 		expect(emptyTopo.canvasAspectRatio).toBeGreaterThan(0);
 		expect(emptyTopo.backgroundFit).toBe('contain');
+		expect(emptyTopo.textLabels).toEqual([]);
 	});
 
 	it('provides every object family and nested path in the mixed fixture', () => {
@@ -24,7 +24,7 @@ describe('2D editor fixtures', () => {
 		expect(mixedTopo.routes[1].variants[0].points2D).toHaveLength(2);
 		expect(mixedTopo.outlines.some((outline) => outline.shape?.preset)).toBe(true);
 		expect(mixedTopo.fixPoints).toHaveLength(2);
-		expect(mixedTopo.textLabels).toHaveLength(1);
+		expect(mixedTopo.textLabels[0].text).toContain('\n');
 	});
 
 	it('keeps a deliberately incomplete legacy document available for migration tests', () => {
