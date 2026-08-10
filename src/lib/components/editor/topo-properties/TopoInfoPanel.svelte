@@ -8,13 +8,8 @@
 	import ClusteringMap from '$lib/components/editor/ClusteringMap.svelte';
 	import { _ } from 'svelte-i18n';
 	import { availableTopoTags } from '$lib/assets/js/topo-utils.js';
-	import { outlineLineStyles } from './topo-properties-utils.js';
 	import TopoJsonEditor from './TopoJsonEditor.svelte';
 	import { rockTypes } from '$lib/config.js';
-	import {
-		DEFAULT_OUTLINE_CURVE_TENSION,
-		PILLAR_OUTLINE_CURVE_TENSION
-	} from '$lib/assets/js/outline-geometry.js';
 
 	let {
 		showMapModal = $bindable(false),
@@ -23,53 +18,8 @@
 		topoJsonError = '',
 		onformatjson,
 		onapplyjson,
-		oneditoutline = null,
 		mobile = false
 	} = $props();
-
-	let selectedOutline = $derived(
-		(userState.topo.outlines || []).find(
-			(outline) => String(outline.id) === String(userState.ui.selectedOutlineId)
-		)
-	);
-
-	function deleteSelectedOutline() {
-		if (editorState) {
-			editorState.removeOutline(selectedOutline.id);
-			return;
-		}
-		userState.topo.outlines = (userState.topo.outlines || []).filter(
-			(outline) => outline.id !== selectedOutline.id
-		);
-		userState.ui.selectedOutlineId = null;
-	}
-
-	function setSelectedOutlineCurved(enabled) {
-		const defaultTension =
-			selectedOutline.shape?.preset === 'pillar'
-				? PILLAR_OUTLINE_CURVE_TENSION
-				: DEFAULT_OUTLINE_CURVE_TENSION;
-		const curve = {
-			enabled,
-			tension: selectedOutline.curve?.tension ?? defaultTension
-		};
-		if (editorState) editorState.updateOutline(selectedOutline.id, { curve });
-		else selectedOutline.curve = curve;
-	}
-
-	function setSelectedOutlineCurveTension(tension) {
-		const curve = {
-			enabled: Boolean(selectedOutline.curve?.enabled),
-			tension: Number(tension)
-		};
-		if (editorState) editorState.updateOutline(selectedOutline.id, { curve });
-		else selectedOutline.curve = curve;
-	}
-
-	function updateSelectedOutline(changes) {
-		if (editorState) editorState.updateOutline(selectedOutline.id, changes);
-		else Object.assign(selectedOutline, changes);
-	}
 
 	function updateTopoField(field, value) {
 		if (editorState) editorState.updateNestedPath(field, value);
@@ -189,55 +139,6 @@
 					availableTags={availableTopoTags}
 				/>
 			</div>
-
-			{#if selectedOutline}
-				<div class="space-y-2 p-2 rounded-sm bg-warm-white border border-black/10">
-					<div class="flex items-center justify-between">
-						<label class="text-ui-label block">Selected outline</label>
-						<button
-							class="text-warm-gray-300 hover:text-rose-600 transition-none w-6 h-6 flex items-center justify-center rounded-sm hover:bg-rose-50"
-							title="Delete outline"
-							onclick={deleteSelectedOutline}
-						>
-							<i class="fa-solid fa-trash-can text-[10px]"></i>
-						</button>
-					</div>
-					<select
-						value={selectedOutline.lineStyle || 'rock'}
-						onchange={(e) => updateSelectedOutline({ lineStyle: e.currentTarget.value })}
-						class="input-studio w-full appearance-none"
-					>
-						{#each outlineLineStyles as style}
-							<option value={style.id}>{style.label}</option>
-						{/each}
-					</select>
-					<label class="flex items-center justify-between gap-2 text-ui-label">
-						<span>{$_('ui.curved_outline')}</span>
-						<input
-							type="checkbox"
-							checked={Boolean(selectedOutline.curve?.enabled)}
-							onchange={(event) => setSelectedOutlineCurved(event.currentTarget.checked)}
-						/>
-					</label>
-					{#if selectedOutline.curve?.enabled}
-						<div class="space-y-0.5">
-							<label for="outline-curve-tension" class="text-ui-label block">
-								{$_('ui.curve_amount')}
-							</label>
-							<input
-								id="outline-curve-tension"
-								type="range"
-								min="0"
-								max="1"
-								step="0.05"
-								value={selectedOutline.curve.tension ?? DEFAULT_OUTLINE_CURVE_TENSION}
-								oninput={(event) => setSelectedOutlineCurveTension(event.currentTarget.value)}
-								class="w-full"
-							/>
-						</div>
-					{/if}
-				</div>
-			{/if}
 
 			{#if userState.topo.editorMode === '2d'}
 				<div class="pt-2 border-t border-black/15">

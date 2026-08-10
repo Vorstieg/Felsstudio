@@ -7,14 +7,6 @@ export const routeLineStyles = [
 	{ id: 'variant', label: 'Variant' }
 ];
 
-export const outlineLineStyles = [
-	{ id: 'rock', label: 'Rock outline' },
-	{ id: 'approach', label: 'Approach' },
-	{ id: 'descent', label: 'Descent' },
-	{ id: 'variant', label: 'Variant' },
-	{ id: 'fixedRope', label: 'Fixed rope' }
-];
-
 export function addPathAsset(item, document = null) {
 	if (!document) throw new Error('A topo document is required to create a route path.');
 	document.paths = document.paths || { type: 'FeatureCollection', features: [] };

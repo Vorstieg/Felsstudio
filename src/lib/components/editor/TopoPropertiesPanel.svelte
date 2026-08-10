@@ -112,11 +112,6 @@
 		}
 	}
 
-	function editSelectedOutline() {
-		activeTool = 'outlineEdit';
-		toolOptionsOpen = true;
-	}
-
 	function formatTopoJson() {
 		topoJsonText = JSON.stringify($state.snapshot(userState.topo), null, 2);
 		topoJsonError = '';
@@ -217,7 +212,6 @@
 					{topoJsonError}
 					onformatjson={formatTopoJson}
 					onapplyjson={applyTopoJson}
-					oneditoutline={editSelectedOutline}
 					{mobile}
 				/>
 			{:else if activeTab === 'routes'}
