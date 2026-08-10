@@ -15,7 +15,6 @@ export function renderTopo2D({
 	svgElement,
 	gElement,
 	topo,
-	ui,
 	activeTool,
 	drawingTarget,
 	baseWidth,
@@ -47,7 +46,6 @@ export function renderTopo2D({
 	const layers = createTopoLayerStack(gElement);
 	const renderModel = buildTopo2DRenderModel({
 		topo,
-		ui,
 		isSelected,
 		isRoutePointSelected,
 		selectionSize,

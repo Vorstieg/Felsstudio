@@ -34,13 +34,82 @@ describe('buildTopo2DRenderModel', () => {
 		expect(model.routeLabels.length).toBeGreaterThanOrEqual(3);
 	});
 
-	it('only exposes selected edit handles when the canvas is idle', () => {
+	it('exposes every selected multi-pitch path handle when the canvas is idle', () => {
 		const idle = renderModel({ activeTool: 'routeEdit' });
 		const interacting = renderModel({ activeTool: 'routeEdit', isInteractionActive: true });
 
-		expect(idle.routePointHandles.length).toBe(0);
+		expect(idle.routePointHandles).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ routeId: 'route-multi', pitchId: 'pitch-1', index: 0 }),
+				expect.objectContaining({ routeId: 'route-multi', pitchId: 'pitch-1', index: 1 }),
+				expect.objectContaining({ routeId: 'route-multi', variantId: 'variant-1', index: 0 }),
+				expect.objectContaining({ routeId: 'route-multi', variantId: 'variant-1', index: 1 })
+			])
+		);
+		expect(interacting.routePointHandles).toEqual([]);
+		expect(idle.routeMidpoints).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ routeId: 'route-multi', pitchId: 'pitch-1' }),
+				expect.objectContaining({ routeId: 'route-multi', variantId: 'variant-1' })
+			])
+		);
+		expect(interacting.routeMidpoints).toEqual([]);
 		expect(idle.outlines.handles.length).toBeGreaterThan(0);
 		expect(interacting.outlines.handles).toEqual([]);
+	});
+
+	it('does not duplicate handles for the active multi-pitch path', () => {
+		const model = renderModel({
+			activeTool: 'routeEdit',
+			drawingTarget: { type: 'pitch', routeId: 'route-multi', pitchId: 'pitch-1' }
+		});
+
+		expect(model.routePointHandles).toHaveLength(2);
+		expect(model.routePointHandles).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ routeId: 'route-multi', pitchId: 'pitch-1', index: 0 }),
+				expect.objectContaining({ routeId: 'route-multi', pitchId: 'pitch-1', index: 1 })
+			])
+		);
+		expect(model.routeMidpoints).toHaveLength(1);
+	});
+
+	it('keeps single-pitch route handles scoped to the selected route', () => {
+		const model = renderModel({
+			ui: { selectedRouteId: 'route-1' },
+			isSelected: (type, id) => type === 'route' && id === 'route-1'
+		});
+
+		expect(model.routePointHandles).toHaveLength(3);
+		expect(model.routePointHandles).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ routeId: 'route-1', pitchId: null, variantId: null })
+			])
+		);
+		expect(model.routeMidpoints).toHaveLength(2);
+	});
+
+	it('renders selected route controls even when a nested path is also selected', () => {
+		const model = renderModel({
+			selectionSize: 2,
+			isSelected: (type, id) => type === 'route' && id === 'route-1'
+		});
+
+		expect(model.routePointHandles).toHaveLength(3);
+		expect(model.routeMidpoints).toHaveLength(2);
+	});
+
+	it('renders controls for the active single-pitch route target', () => {
+		const model = renderModel({
+			ui: { selectedRouteId: null },
+			selectionSize: 0,
+			isSelected: () => false,
+			activeTool: 'routeEdit',
+			drawingTarget: { type: 'route', id: 'route-1' }
+		});
+
+		expect(model.routePointHandles).toHaveLength(3);
+		expect(model.routeMidpoints).toHaveLength(2);
 	});
 
 	it('emits current drawing previews without changing persisted routes', () => {

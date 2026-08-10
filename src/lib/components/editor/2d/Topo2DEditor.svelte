@@ -396,7 +396,6 @@
 			svgElement,
 			gElement,
 			topo: userState.topo,
-			ui: userState.ui,
 			activeTool: editor.ui.activeTool,
 			drawingTarget: editor.ui.drawingTarget,
 			baseWidth,

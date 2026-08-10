@@ -10,6 +10,30 @@ function toSvgPoints(points, { baseWidth, baseHeight }) {
 	return points.map((point) => `${point[0] * baseWidth},${point[1] * baseHeight}`).join(' ');
 }
 
+function isMultiPitch(route) {
+	const type = Array.isArray(route.type) ? route.type : [route.type];
+	return type.includes('multi-pitch');
+}
+
+function getRoutePaths(route) {
+	if (!isMultiPitch(route))
+		return [{ routeId: route.id, pitchId: null, variantId: null, points: route.points2D }];
+	return [
+		...(route.pitches || []).map((pitch) => ({
+			routeId: route.id,
+			pitchId: pitch.id,
+			variantId: null,
+			points: pitch.points2D
+		})),
+		...(route.variants || []).map((variant) => ({
+			routeId: route.id,
+			pitchId: null,
+			variantId: variant.id,
+			points: variant.points2D
+		}))
+	];
+}
+
 /**
  * Converts persistent topo data and ephemeral editor state into flat SVG data.
  * It deliberately contains no D3 or DOM calls, so renderer layers can remain
@@ -17,7 +41,6 @@ function toSvgPoints(points, { baseWidth, baseHeight }) {
  */
 export function buildTopo2DRenderModel({
 	topo,
-	ui,
 	isSelected,
 	isRoutePointSelected = () => false,
 	selectionSize,
@@ -36,8 +59,6 @@ export function buildTopo2DRenderModel({
 			activeTool === 'routeEdit' ||
 			activeTool === 'outlineEdit' ||
 			activeTool === 'eraser');
-	const singleSelection = canEditHandles && selectionSize <= 1 && ui.selectedRouteId !== null;
-
 	const outlineHandles = [];
 	const outlineMidpoints = [];
 	const outlineSemanticHandles = [];
@@ -107,28 +128,9 @@ export function buildTopo2DRenderModel({
 			};
 			if (!labelOnly) routes.push(line);
 			if (label) routeLabels.push(line);
-
-			if (!labelOnly && canEditHandles && selectionSize <= 1 && selected && points.length > 1) {
-				const midpointSize = 2;
-				const midpointHitSize = getTouchTargetSize(2);
-				for (let pointIndex = 0; pointIndex < points.length - 1; pointIndex++) {
-					const start = points[pointIndex];
-					const end = points[pointIndex + 1];
-					routeMidpoints.push({
-						routeId: route.id,
-						pitchId,
-						variantId,
-						insertIndex: pointIndex + 1,
-						midX: (start[0] + end[0]) / 2,
-						midY: (start[1] + end[1]) / 2,
-						midpointSize,
-						midpointHitSize
-					});
-				}
-			}
 		};
 
-		if (route.type === 'multi-pitch' && route.pitches) {
+		if (isMultiPitch(route)) {
 			route.pitches.forEach((pitch, pitchIndex) =>
 				addRouteLine({
 					points: pitch.points2D,
@@ -162,7 +164,7 @@ export function buildTopo2DRenderModel({
 	});
 
 	const routePointHandles = [];
-	const addPointHandles = (routeId, pitchId, variantId, points) => {
+	const addPathControls = ({ routeId, pitchId, variantId, points }) => {
 		points?.forEach((point, index) => {
 			const target = { routeId, pitchId, variantId, index };
 			routePointHandles.push({
@@ -175,35 +177,46 @@ export function buildTopo2DRenderModel({
 				hitSize: getTouchTargetSize(activeTool === 'eraser' ? 5 : 3)
 			});
 		});
+		if (points?.length > 1) {
+			const midpointSize = 2;
+			const midpointHitSize = getTouchTargetSize(2);
+			for (let pointIndex = 0; pointIndex < points.length - 1; pointIndex++) {
+				const start = points[pointIndex];
+				const end = points[pointIndex + 1];
+				routeMidpoints.push({
+					routeId,
+					pitchId,
+					variantId,
+					insertIndex: pointIndex + 1,
+					midX: (start[0] + end[0]) / 2,
+					midY: (start[1] + end[1]) / 2,
+					midpointSize,
+					midpointHitSize
+				});
+			}
+		}
 	};
-	if (!isInteractionActive && singleSelection && ui.selectedRouteId) {
-		const route = topo.routes.find(
-			(item) => String(item.id) === String(ui.selectedRouteId)
+	const getDrawingTargetPath = () => {
+		if (!drawingTarget) return null;
+		const routeId = drawingTarget.routeId || drawingTarget.id;
+		const route = topo.routes.find((item) => String(item.id) === String(routeId));
+		return getRoutePaths(route || {}).find(
+			(path) =>
+				(drawingTarget.type === 'route' && !path.pitchId && !path.variantId) ||
+				(drawingTarget.type === 'pitch' &&
+					String(path.pitchId) === String(drawingTarget.pitchId)) ||
+				(drawingTarget.type === 'variant' &&
+					String(path.variantId) === String(drawingTarget.variantId))
 		);
-		if (route?.points2D) addPointHandles(route.id, null, null, route.points2D);
-	}
-	if (
-		(activeTool === 'select' ||
-			activeTool === 'routeEdit' ||
-			activeTool === 'eraser' ||
-			activeTool === 'multipitch') &&
-		drawingTarget
-	) {
-		const route = topo.routes.find(
-			(item) => String(item.id) === String(drawingTarget.routeId)
-		);
-		if (drawingTarget.type === 'pitch') {
-			const pitch = route?.pitches?.find(
-				(item) => String(item.id) === String(drawingTarget.pitchId)
-			);
-			if (pitch?.points2D) addPointHandles(route.id, pitch.id, null, pitch.points2D);
-		}
-		if (drawingTarget.type === 'variant') {
-			const variant = route?.variants?.find(
-				(item) => String(item.id) === String(drawingTarget.variantId)
-			);
-			if (variant?.points2D) addPointHandles(route.id, null, variant.id, variant.points2D);
-		}
+	};
+	if (canEditHandles) {
+		const activePath = getDrawingTargetPath();
+		const activeNestedPath = activePath && ['pitch', 'variant'].includes(drawingTarget?.type);
+		const selectedPaths = topo.routes
+			.filter((route) => isSelected('route', route.id))
+			.flatMap(getRoutePaths)
+			.filter((path) => !activeNestedPath || String(path.routeId) !== String(activePath.routeId));
+		for (const path of [...selectedPaths, activePath].filter(Boolean)) addPathControls(path);
 	}
 
 	return {
