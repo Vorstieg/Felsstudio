@@ -24,21 +24,21 @@ export class RouteTool {
 		this.id = id;
 		this.getTopo = context?.document?.getTopo || (() => this.state.topo);
 		if (state?.drafts) {
-			const draft = state.drafts[mode === 'multipitch' ? 'multipitch' : 'route'];
+			const draftKey = mode === 'multipitch' ? 'multipitch' : 'route';
 			Object.defineProperties(this, {
 				draftPoints: {
 					configurable: true,
-					get: () => draft.points,
+					get: () => state.drafts[draftKey].points,
 					set: (value) => {
-						draft.points = value;
+						state.drafts[draftKey].points = value;
 						state.refreshPendingChanges?.();
 					}
 				},
 				draftFixPointIds: {
 					configurable: true,
-					get: () => draft.fixPointIds,
+					get: () => state.drafts[draftKey].fixPointIds,
 					set: (value) => {
-						draft.fixPointIds = value;
+						state.drafts[draftKey].fixPointIds = value;
 					}
 				}
 			});

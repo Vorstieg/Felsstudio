@@ -56,7 +56,7 @@ describe('RouteTool', () => {
 		expect(state.ui.selectedRouteId).toBe(state.topo.routes[0].id);
 	});
 
-	it('marks a store-backed new route as pending while points are drawn', () => {
+	it('keeps a store-backed two-point route draft pending until it is finished', () => {
 		const editor = createTopo2DEditorState({
 			topo: { routes: [], fixPoints: [], outlines: [], textLabels: [] }
 		});
@@ -75,6 +75,37 @@ describe('RouteTool', () => {
 		});
 
 		tool.appendPoint('route', { x: 0.1, y: 0.2 });
+		tool.appendPoint('route', { x: 0.8, y: 0.9 });
+		expect(editor.hasPendingChanges).toBe(true);
+		expect(tool.draftPoints).toHaveLength(2);
+	});
+
+	it('uses the current draft after the editor reloads its session', () => {
+		const editor = createTopo2DEditorState({
+			topo: { routes: [], fixPoints: [], outlines: [], textLabels: [] }
+		});
+		const tool = new RouteTool({
+			state: editor,
+			context: {
+				document: { getTopo: () => editor.topo, ui: editor.ui },
+				selection: editor,
+				history: { save: editor.saveHistory },
+				commands: editor,
+				drawing: {
+					getTarget: () => editor.ui.drawingTarget,
+					setTarget: editor.setDrawingTarget
+				}
+			}
+		});
+
+		editor.load({ routes: [], fixPoints: [], outlines: [], textLabels: [] });
+		tool.appendPoint('route', { x: 0.1, y: 0.2 });
+		tool.appendPoint('route', { x: 0.8, y: 0.9 });
+
+		expect(editor.drafts.route.points).toEqual([
+			[0.1, 0.2],
+			[0.8, 0.9]
+		]);
 		expect(editor.hasPendingChanges).toBe(true);
 	});
 
