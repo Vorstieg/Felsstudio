@@ -2,10 +2,10 @@ let snapToBiggestHeight;
 let snapToSmallestHeight;
 
 export function resize(element) {
-	const top = document.createElement('div');
-	top.direction = 'north';
-	top.classList.add('grabber');
-	top.classList.add('top');
+	// The sheet owns its visible drag handle. Reusing it prevents an empty,
+	// dynamically appended node from becoming a second visual layer when the
+	// panel is resized or remounted.
+	const grabber = element.querySelector('.grabber');
 
 	let active = null,
 		initialRect = null,
@@ -22,15 +22,35 @@ export function resize(element) {
 		const screenHeight = window.innerHeight;
 		// Keep the inspector in a clearly collapsed or expanded state. The old
 		// 50% detent was easy to hit accidentally and obscured half the editor.
-		targetHeights = [screenHeight * 0.05, screenHeight * 0.9];
+		// The collapsed detent must also fit the handle. At 5% of a short
+		// landscape viewport it was only a few pixels tall, making the sheet look
+		// like it had disappeared after a resize or a drawing action.
+		const collapsedHeight = Math.max(30, screenHeight * 0.05);
+		targetHeights = [collapsedHeight, screenHeight * 0.9];
 
-		minHeight = screenHeight * 0.05;
+		minHeight = collapsedHeight;
 		maxTop = screenHeight - minHeight;
 
 		// If it hasn't been explicitly dragged yet, keep the CSS variable in sync with window.innerHeight
 		if (isMobile() && (!element.style.height || element.style.height === '')) {
 			setPanelHeight(targetHeights[0]);
 		}
+	}
+
+	function repositionForViewportResize() {
+		if (!isMobile()) return;
+
+		const currentHeight = parseFloat(element.style.height);
+		const wasExpanded =
+			Number.isFinite(currentHeight) &&
+			Math.abs(currentHeight - targetHeights[1]) < Math.abs(currentHeight - targetHeights[0]);
+
+		calculateTargetHeights();
+		const nextHeight = targetHeights[wasExpanded ? 1 : 0];
+		element.style.top = `${window.innerHeight - nextHeight}px`;
+		element.style.height = `${nextHeight}px`;
+		element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+		setPanelHeight(nextHeight);
 	}
 
 	function setPanelHeight(height) {
@@ -74,7 +94,6 @@ export function resize(element) {
 	function snapToClosestHeight() {
 		if (!isMobile()) return; // Guard for desktop
 
-		const currentTop = parseFloat(element.style.top);
 		const currentHeight = parseFloat(element.style.height);
 
 		let direction = 0;
@@ -244,7 +263,7 @@ export function resize(element) {
 		}
 	}
 
-	function onContentTouchEnd(event) {
+	function onContentTouchEnd(_) {
 		if (contentDragActive) {
 			onMouseup();
 			contentDragActive = false;
@@ -262,15 +281,14 @@ export function resize(element) {
 		element.style.borderRadius = `1.5rem 1.5rem 0 0`;
 	}
 
-	element.appendChild(top);
-	top.addEventListener('mousedown', onMousedown);
-	top.addEventListener('touchstart', onMousedown);
+	grabber?.addEventListener('mousedown', onMousedown);
+	grabber?.addEventListener('touchstart', onMousedown);
 
 	window.addEventListener('mousemove', onMove, { passive: false });
 	window.addEventListener('touchmove', onMove, { passive: false });
 	window.addEventListener('mouseup', onMouseup);
 	window.addEventListener('touchend', onMouseup);
-	window.addEventListener('resize', calculateTargetHeights);
+	window.addEventListener('resize', repositionForViewportResize);
 
 	element.addEventListener('touchstart', onContentTouchStart, { passive: true });
 	element.addEventListener('touchmove', onContentTouchMove, { passive: false });
@@ -320,15 +338,12 @@ export function resize(element) {
 			window.removeEventListener('mousedown', onMousedown);
 			window.removeEventListener('mouseup', onMouseup);
 			window.removeEventListener('touchend', onMouseup);
-			window.removeEventListener('resize', calculateTargetHeights);
+			window.removeEventListener('resize', repositionForViewportResize);
 
 			element.removeEventListener('touchstart', onContentTouchStart);
 			element.removeEventListener('touchmove', onContentTouchMove);
 			element.removeEventListener('touchend', onContentTouchEnd);
 
-			if (element.contains(top)) {
-				element.removeChild(top);
-			}
 			document.body.style.removeProperty('--info-panel-height');
 			document.body.style.removeProperty('--mobile-toolbar-visibility');
 		}

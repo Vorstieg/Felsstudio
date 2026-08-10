@@ -95,8 +95,8 @@
 </div>
 
 {#if isCompact}
-	<div class="fixed inset-x-0 z-50 flex justify-center pointer-events-none" style={`bottom: calc(${toolOptionsOpen ? '0px' : 'var(--info-panel-height, 0px)'} + max(0.75rem, env(safe-area-inset-bottom))); transition: var(--info-panel-transition, none); visibility: ${toolOptionsOpen ? 'visible' : 'var(--mobile-toolbar-visibility, visible)'};`}>
-		<div use:observeMobileDock class="flex w-full flex-col gap-0 pointer-events-auto">
+	<div class="mobile-toolbar fixed inset-x-0 z-50 flex justify-center pointer-events-none" style={`bottom: calc(${toolOptionsOpen ? '0px' : 'var(--info-panel-height, 0px)'} + var(--mobile-toolbar-gap, max(0.75rem, env(safe-area-inset-bottom)))); transition: var(--info-panel-transition, none); visibility: ${toolOptionsOpen ? 'visible' : 'var(--mobile-toolbar-visibility, visible)'};`}>
+		<div use:observeMobileDock class="mobile-tool-dock flex w-full flex-col gap-0 pointer-events-auto">
 			<div class={`panel flex w-full items-center justify-center overflow-x-auto rounded-none border-x-0 shadow-panel ${dense ? 'gap-0.5 p-1' : 'gap-1 p-1.5'}`}>
 				{#each tools.filter((tool) => !tool.hidden) as tool}
 					<ToolButton {tool} {dense} active={activeTool === tool.id} compact onclick={() => selectTool(tool)} />
@@ -113,3 +113,23 @@
 {/if}
 
 {@render children?.()}
+
+<style>
+	@media (max-width: 1024px) and (orientation: landscape) {
+		.mobile-toolbar {
+			--mobile-toolbar-gap: max(0.1rem, env(safe-area-inset-bottom));
+				width: fit-content;
+		}
+
+		.mobile-tool-dock :global(button) {
+			height: 2rem !important;
+			min-width: 2rem !important;
+			width: 2rem !important;
+			padding-inline: 0.375rem !important;
+		}
+
+		.mobile-tool-dock :global(.h-7) {
+			height: 1.25rem;
+		}
+	}
+</style>

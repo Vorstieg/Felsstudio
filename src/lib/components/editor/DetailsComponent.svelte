@@ -70,7 +70,7 @@
 			role="dialog"
 			aria-label={title}
 		>
-			<div class="w-full py-3 flex justify-center shrink-0">
+				<div class="grabber w-full py-3 flex justify-center shrink-0">
 				<span class="w-12 h-1.5 bg-warm-gray-300 rounded-full"></span>
 			</div>
 			{@render tabBar(true)}
