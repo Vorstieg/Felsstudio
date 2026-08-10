@@ -1,4 +1,4 @@
-<script context="module">
+<script module>
 	// Use WeakMap to associate cache with the specific Renderer instance.
 	// When the Renderer is destroyed (e.g. navigation away from Topo view), 
 	// the cache is automatically garbage collected, preventing memory leaks.
@@ -81,8 +81,7 @@
 	let {
 		position = [0, 0, 0],
 		modelUrl,
-		onload,
-		...props
+		onload
 	} = $props();
 
 	// Access the current Three.js WebGLRenderer from the Threlte context.
@@ -91,7 +90,7 @@
 
 	let scene = $state(); // Holds the loaded (and potentially cached) GLTF scene
 	let error = $state(); // Stores any error during model loading
-	let modelRef; // Reference to the mounted Three.js object in the scene
+	let modelRef = $state(); // Reference to the mounted Three.js object in the scene
 
 	/**
 	 * $effect hook to handle model loading based on `modelUrl` and `renderer`.
@@ -172,6 +171,6 @@
 	     shared geometry/materials held in the cache when this component unmounts.
 	     The cloned scene's Object3D structure will be garbage collected naturally. -->
 	{#key scene} 
-		<T {...props} is={scene.clone(true)} dispose={false} {position} bind:ref={modelRef} />
+		<T is={scene.clone(true)} dispose={false} {position} bind:ref={modelRef} />
 	{/key}
 {/if}

@@ -635,10 +635,6 @@
 				bind:this={modelComponent}
 				gltfScene={loadedGltfScene}
 				{activeTool}
-				{drawingTarget}
-				{element}
-				bind:cameraPosition
-				bind:controlsTarget
 				bind:selectedIndicesMap
 			>
 				<EditorInternal

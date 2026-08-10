@@ -26,8 +26,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 		gltfScene = null,
 		activeTool,
 		selectedIndicesMap = $bindable(new Map()),
-		children,
-		...props
+		children
 	} = $props();
 
 	// --- Interaction Manager ---
@@ -534,7 +533,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 
 	$effect(() => {
 		interaction.gltfScene = gltfScene;
-		interaction.modelPosition = props.position || [0, 0, 0];
+		interaction.modelPosition = userState.topo.modelOffset || [0, 0, 0];
 		interaction.visualRoutes = visualRoutes;
 		interaction.visualFixPoints = visualFixPoints;
 		interaction.visualClusters = visualClusters;
@@ -564,7 +563,6 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 	position={userState.topo.modelOffset || [0, 0, 0]}
 	rotation={userState.topo.modelRotation || [0, 0, 0]}
 	scale={userState.topo.modelScale || [1, 1, 1]}
-	{...props}
 >
 	{#if gltfScene}
 		<T

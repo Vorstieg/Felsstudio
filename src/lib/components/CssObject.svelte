@@ -4,7 +4,7 @@
 	import { Vector3 } from 'three';
 
 	// Use $props() to get pointerEvents and restProps (like position)
-	let { position, pointerEvents = false, scaleWithZoom = false, referenceDistance = 15, children, ...props } = $props();
+	let { position, pointerEvents = false, scaleWithZoom = false, referenceDistance = 15, children } = $props();
 
 	let element = $state(); // Bind to the wrapper div element
 	let innerElement = $state();
@@ -45,7 +45,6 @@
 
 	{#if element !== undefined}
 	<T
-		{...props}
 		is={CSS2DObject}
 		args={[element]}
 		bind:ref={cssObject}

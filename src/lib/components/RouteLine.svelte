@@ -114,7 +114,7 @@
 
 	{#if (name || grade) && (isVisible || isHovered || isSelected)}
 		<CssObject position={labelPosition} pointerEvents={true}>
-			<div class={labelClass}
+			<button type="button" class={labelClass}
 					 style:border-left="5px solid {color}"
 					 onpointerenter={onPointerEnter}
 					 onpointerleave={onPointerLeave}
@@ -127,7 +127,7 @@
 				{:else}
 					{grade}
 				{/if}
-			</div>
+			</button>
 		</CssObject>
 	{/if}
 {/if}
