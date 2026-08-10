@@ -147,9 +147,7 @@ export function useCragSectorMapEditor({
 			onDragStart: (drag, event) => {
 				const lngLat = getMapEventLngLat(event);
 				if (drag.isMidpoint && !lngLat) return false;
-				const sector = (state.crag.sectors || []).find(
-					(item) => item.id === drag.sectorId
-				);
+				const sector = (state.crag.sectors || []).find((item) => item.id === drag.sectorId);
 				if (!sector?.geometry) return false;
 				selectSector(drag.sectorId);
 				selectedSectorVertex = { sectorId: drag.sectorId, vertexIndex: drag.vertexIndex };

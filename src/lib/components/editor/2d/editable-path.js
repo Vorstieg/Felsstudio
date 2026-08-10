@@ -64,9 +64,7 @@ export function createEditablePathResolver({ getTopo, getCanvasSize }) {
 	function resolve(target) {
 		if (target.outlineId != null) {
 			const getOutline = () =>
-				getTopo().outlines.find(
-					(outline) => String(outline.id) === String(target.outlineId)
-				);
+				getTopo().outlines.find((outline) => String(outline.id) === String(target.outlineId));
 			if (!getOutline()) return null;
 
 			return {

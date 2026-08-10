@@ -67,11 +67,19 @@ describe('createCragSectorTool', () => {
 		tool.createSector();
 
 		tool.duplicateSector('sector-1');
-		expect(state.crag.sectors.map((sector) => sector.id)).toEqual(['sector-1', 'sector-2', 'sector-1-copy']);
+		expect(state.crag.sectors.map((sector) => sector.id)).toEqual([
+			'sector-1',
+			'sector-2',
+			'sector-1-copy'
+		]);
 		expect(selection()).toEqual({ type: 'sector', id: 'sector-1-copy' });
 
 		tool.moveSector('sector-1-copy', -1);
-		expect(state.crag.sectors.map((sector) => sector.id)).toEqual(['sector-1', 'sector-1-copy', 'sector-2']);
+		expect(state.crag.sectors.map((sector) => sector.id)).toEqual([
+			'sector-1',
+			'sector-1-copy',
+			'sector-2'
+		]);
 
 		tool.removeSector('sector-1-copy');
 		expect(state.crag.sectors.map((sector) => sector.id)).toEqual(['sector-1', 'sector-2']);

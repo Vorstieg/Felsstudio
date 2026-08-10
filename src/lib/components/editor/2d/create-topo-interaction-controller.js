@@ -52,9 +52,7 @@ export function createTopoInteractionController({
 				? { point: outlineEditTool?.snapPoint(mouse) || mouse, fixPointId: null }
 				: snapRoutePoint(mouse);
 			const route = interaction.routeId
-				? getTopo().routes.find(
-						(candidate) => String(candidate.id) === String(interaction.routeId)
-					)
+				? getTopo().routes.find((candidate) => String(candidate.id) === String(interaction.routeId))
 				: null;
 			(mutateDocument || ((mutator) => mutator()))(() => {
 				if (route) referenceFixpoint(route, snapped.fixPointId);

@@ -4,15 +4,44 @@ import { generateId } from './id-utils.js';
 export { fixpointSymbols, topoSymbols } from '@vorstieg/topo-renderer';
 
 export const availableTopoTags = [
-	'Kinderfreundlich', 'Regensicher', 'Kurzer Zustieg', 'Alpin', 'Brüchig', 'Beliebt',
-	'Morgensonne', 'Abendsonne', 'Schattig', 'Gletscher', 'Firn', 'Grat', 'Ausgesetzt',
-	'Steinschlag', 'Spaltengefahr', 'Klettersteig'
+	'Kinderfreundlich',
+	'Regensicher',
+	'Kurzer Zustieg',
+	'Alpin',
+	'Brüchig',
+	'Beliebt',
+	'Morgensonne',
+	'Abendsonne',
+	'Schattig',
+	'Gletscher',
+	'Firn',
+	'Grat',
+	'Ausgesetzt',
+	'Steinschlag',
+	'Spaltengefahr',
+	'Klettersteig'
 ];
 
 export const availableRouteTags = [
-	'Technisch', 'Kraft', 'Ausdauer', 'Leisten', 'Löcher', 'Riss', 'Platte', 'Überhang',
-	'Weite Haken', 'Abgespeckt', 'Klassiker', 'Boulder-Start', 'Gletscher', 'Firn', 'Grat',
-	'Ausgesetzt', 'Steinschlag', 'Spaltengefahr', 'Klettersteig'
+	'Technisch',
+	'Kraft',
+	'Ausdauer',
+	'Leisten',
+	'Löcher',
+	'Riss',
+	'Platte',
+	'Überhang',
+	'Weite Haken',
+	'Abgespeckt',
+	'Klassiker',
+	'Boulder-Start',
+	'Gletscher',
+	'Firn',
+	'Grat',
+	'Ausgesetzt',
+	'Steinschlag',
+	'Spaltengefahr',
+	'Klettersteig'
 ];
 
 export function getDefaultGeometryMode(type) {
@@ -28,11 +57,18 @@ export function convertRouteType(route, newType) {
 	const willBeMultiPitch = newType === 'multi-pitch';
 
 	if (willBeMultiPitch && !wasMultiPitch) {
-		route.pitches = [{
-			id: generateId('pitch'), pitchNumber: 1, grade: route.grade,
-			_gradeScale: route._gradeScale || 'french', length: route.length,
-			description: route.description, points: route.points || [], type: 'pitch'
-		}];
+		route.pitches = [
+			{
+				id: generateId('pitch'),
+				pitchNumber: 1,
+				grade: route.grade,
+				_gradeScale: route._gradeScale || 'french',
+				length: route.length,
+				description: route.description,
+				points: route.points || [],
+				type: 'pitch'
+			}
+		];
 		route.length = 0;
 		route.points = [];
 	} else if (!willBeMultiPitch && wasMultiPitch) {
@@ -62,12 +98,15 @@ export function calculateRouteLength(route, scale = 1) {
 	if (!route.points || route.points.length < 2) return 0;
 	let length = 0;
 	for (let index = 0; index < route.points.length - 1; index++) {
-		length += new Vector3(...route.points[index]).distanceTo(new Vector3(...route.points[index + 1]));
+		length += new Vector3(...route.points[index]).distanceTo(
+			new Vector3(...route.points[index + 1])
+		);
 	}
 	return parseFloat((length * scale).toFixed(1));
 }
 
 export function calculateBoltAmount(route, fixPoints = []) {
 	if (!route.fixPoints || !fixPoints) return 0;
-	return route.fixPoints.filter((id) => fixPoints.find((point) => point.id === id)?.type === 'bolt').length;
+	return route.fixPoints.filter((id) => fixPoints.find((point) => point.id === id)?.type === 'bolt')
+		.length;
 }

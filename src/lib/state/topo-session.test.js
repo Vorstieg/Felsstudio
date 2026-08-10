@@ -19,10 +19,13 @@ describe('createTopoEditorSession', () => {
 		const session = createTopoEditorSession();
 		session.ui.selectedRouteId = 'stale';
 
-		session.loadSession({
-			topo: { name: 'Loaded', routes: [{ id: 'route-2' }] },
-			clustering: { rawHits: [{ id: 1 }] }
-		}, 'draft-1');
+		session.loadSession(
+			{
+				topo: { name: 'Loaded', routes: [{ id: 'route-2' }] },
+				clustering: { rawHits: [{ id: 1 }] }
+			},
+			'draft-1'
+		);
 
 		expect(session.topo.name).toBe('Loaded');
 		expect(session.topo.routes).toEqual([{ id: 'route-2' }]);

@@ -507,11 +507,7 @@
 					]
 				}
 			},
-			"filter": [
-				"all",
-				["==", "$type", "LineString"],
-				["==", "class", "cliff"]
-			]
+			"filter": ["all", ["==", "$type", "LineString"], ["==", "class", "cliff"]]
 		},
 		{
 			"id": "Cliff-arrows",
@@ -540,11 +536,7 @@
 			"paint": {
 				"text-color": "hsl(0, 0%, 60%)"
 			},
-			"filter": [
-				"all",
-				["==", "$type", "LineString"],
-				["==", "class", "cliff"]
-			]
+			"filter": ["all", ["==", "$type", "LineString"], ["==", "class", "cliff"]]
 		},
 		{
 			"id": "River tunnel",

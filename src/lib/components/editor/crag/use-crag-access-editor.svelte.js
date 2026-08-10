@@ -199,9 +199,11 @@ export function useCragAccessEditor({ state, getMap, getIsMapLoaded, getActiveTo
 			const pos = marker.getLngLat();
 			const coordinates = [pos.lng, pos.lat];
 			if (accessFeatures().some((candidate) => candidate.id === feature.id)) {
-				replaceFeatures(accessFeatures().map((item) => item.id === feature.id
-					? { ...item, geometry: { ...item.geometry, coordinates } }
-					: item));
+				replaceFeatures(
+					accessFeatures().map((item) =>
+						item.id === feature.id ? { ...item, geometry: { ...item.geometry, coordinates } } : item
+					)
+				);
 			}
 		});
 		pointMarkers.push({ id: feature.id, marker });

@@ -16,7 +16,9 @@ export function renderCurrentLayer({
 	const brushContourPoints = brushPreview?.contourPoints || [];
 	const toSvgPoints = (points) =>
 		points
-			.map((point) => `${point[0] * outlinePreview.baseWidth},${point[1] * outlinePreview.baseHeight}`)
+			.map(
+				(point) => `${point[0] * outlinePreview.baseWidth},${point[1] * outlinePreview.baseHeight}`
+			)
 			.join(' ');
 
 	// A brush preview intentionally lives in the current layer rather than the
@@ -95,7 +97,8 @@ export function renderCurrentLayer({
 		.selectAll('circle.current-outline-point')
 		.data(currentOutlinePoints)
 		.join(
-			(enter) => enter.append('circle').attr('class', 'current-outline-point').attr('fill', '#f59e0b'),
+			(enter) =>
+				enter.append('circle').attr('class', 'current-outline-point').attr('fill', '#f59e0b'),
 			(update) => update,
 			(exit) => exit.remove()
 		)

@@ -452,7 +452,7 @@ export class Topo3DInteractionManager {
 		const anchorId = generateId('anchor');
 		const lastPoint = allPointsWithNormals[allPointsWithNormals.length - 1];
 		const localAnchor = this.gltfScene.worldToLocal(lastPoint.point.clone());
-		
+
 		this.state.topo.fixPoints.push({
 			id: anchorId,
 			position: localAnchor.toArray().map((c) => Number(c.toFixed(4))),
@@ -518,11 +518,11 @@ export class Topo3DInteractionManager {
 							tags: [],
 							fixPoints: []
 						};
-					this.state.topo.routes = [...this.state.topo.routes, route];
-					this.state.ui.selectedRouteId = route.id;
+						this.state.topo.routes = [...this.state.topo.routes, route];
+						this.state.ui.selectedRouteId = route.id;
 					}
 					const endId = generateId('anchor');
-				this.state.topo.fixPoints.push({
+					this.state.topo.fixPoints.push({
 						id: endId,
 						position: finalPoints[finalPoints.length - 1],
 						type: 'bolt'
@@ -543,8 +543,8 @@ export class Topo3DInteractionManager {
 						tags: [],
 						fixPoints: []
 					};
-				this.state.topo.routes = [...this.state.topo.routes, newRoute];
-				this.state.ui.selectedRouteId = newRoute.id;
+					this.state.topo.routes = [...this.state.topo.routes, newRoute];
+					this.state.ui.selectedRouteId = newRoute.id;
 				}
 			}
 			this.resetDrawingState();

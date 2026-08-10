@@ -2,7 +2,8 @@ export class SelectTool {
 	id = 'select';
 	constructor({ context, state, saveHistory, getSelectedId, removeItems, deleteSymbols } = {}) {
 		this.state = state;
-		this.saveHistory = context?.commands?.commit || context?.history?.save || saveHistory || (() => {});
+		this.saveHistory =
+			context?.commands?.commit || context?.history?.save || saveHistory || (() => {});
 		this.getSelectedId = getSelectedId || (() => this.state.ui.selectedFixpointId);
 		this.removeItems =
 			removeItems ||

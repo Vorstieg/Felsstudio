@@ -74,6 +74,10 @@ describe('createCragEditorSession', () => {
 			assets: { images: ['wall.jpg'], topos: [], models: [], approaches: [] }
 		});
 		expect(session.crag.sectors[0]).toEqual(normalized);
-		expect(sector).toEqual({ id: 'sector-1', topo: { site: 'guide' }, assets: { images: ['wall.jpg'] } });
+		expect(sector).toEqual({
+			id: 'sector-1',
+			topo: { site: 'guide' },
+			assets: { images: ['wall.jpg'] }
+		});
 	});
 });

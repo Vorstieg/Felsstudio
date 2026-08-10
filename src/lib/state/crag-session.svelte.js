@@ -16,9 +16,22 @@ export function getCragEditorSession() {
 export function createInitialCrag() {
 	const date = new Date().toISOString().split('T')[0];
 	return {
-		id: '', name: '', path: '', type: ['sports-climbing'], tags: [], security: '', rock_type: '',
-		description_de: '', description_en: '', equipment: [], assets: { images: [] }, sectors: [],
-		topo: { site: '', link: '' }, geometry: { type: 'Point', coordinates: [16.37, 48.21] }, date, updated: date
+		id: '',
+		name: '',
+		path: '',
+		type: ['sports-climbing'],
+		tags: [],
+		security: '',
+		rock_type: '',
+		description_de: '',
+		description_en: '',
+		equipment: [],
+		assets: { images: [] },
+		sectors: [],
+		topo: { site: '', link: '' },
+		geometry: { type: 'Point', coordinates: [16.37, 48.21] },
+		date,
+		updated: date
 	};
 }
 
@@ -43,11 +56,14 @@ export function normalizeCragSector(sector = {}) {
 }
 
 export function createCragEditorSession() {
-	const snapshot = (session) => JSON.parse(JSON.stringify({
-		crag: session.crag,
-		access: session.access,
-		routeDocuments: session.routeDocuments
-	}));
+	const snapshot = (session) =>
+		JSON.parse(
+			JSON.stringify({
+				crag: session.crag,
+				access: session.access,
+				routeDocuments: session.routeDocuments
+			})
+		);
 	const session = $state({
 		crag: createInitialCrag(),
 		access: createInitialAccess(),
@@ -68,7 +84,7 @@ export function createCragEditorSession() {
 			return true;
 		},
 		restoreSnapshot(value) {
-		this.crag = value.crag;
+			this.crag = value.crag;
 			this.access = value.access;
 			this.routeDocuments = value.routeDocuments;
 		},
@@ -105,16 +121,24 @@ export function createCragEditorSession() {
 			return document;
 		},
 		setCragGeometry(geometry) {
-			this.commit('Move crag', () => { this.crag.geometry = geometry; });
+			this.commit('Move crag', () => {
+				this.crag.geometry = geometry;
+			});
 		},
 		setCragField(field, value) {
-			this.commit(`Update crag ${field}`, () => { this.crag[field] = value; });
+			this.commit(`Update crag ${field}`, () => {
+				this.crag[field] = value;
+			});
 		},
 		setEquipment(equipment) {
-			this.commit('Update equipment', () => { this.crag.equipment = equipment; });
+			this.commit('Update equipment', () => {
+				this.crag.equipment = equipment;
+			});
 		},
 		setCragImages(images) {
-			this.commit('Update crag images', () => { this.crag.assets = { ...(this.crag.assets || {}), images }; });
+			this.commit('Update crag images', () => {
+				this.crag.assets = { ...(this.crag.assets || {}), images };
+			});
 		},
 		setSectors(sectors) {
 			this.commit('Update sectors', () => {
@@ -134,10 +158,14 @@ export function createCragEditorSession() {
 			});
 		},
 		replaceAccessFeatures(features) {
-			this.commit('Update access features', () => { this.access = { ...this.access, features }; });
+			this.commit('Update access features', () => {
+				this.access = { ...this.access, features };
+			});
 		},
 		addRouteDocument(document) {
-			this.commit('Add route document', () => { this.routeDocuments = [...this.routeDocuments, document]; });
+			this.commit('Add route document', () => {
+				this.routeDocuments = [...this.routeDocuments, document];
+			});
 			return document;
 		},
 		updateRouteDocument(path, updater) {

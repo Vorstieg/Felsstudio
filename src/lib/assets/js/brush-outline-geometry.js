@@ -48,8 +48,10 @@ function pointLineDistance(point, start, end) {
 	const dx = end[0] - start[0];
 	const dy = end[1] - start[1];
 	if (dx === 0 && dy === 0) return distance(point, start);
-	return Math.abs(dy * point[0] - dx * point[1] + end[0] * start[1] - end[1] * start[0]) /
-		Math.hypot(dx, dy);
+	return (
+		Math.abs(dy * point[0] - dx * point[1] + end[0] * start[1] - end[1] * start[0]) /
+		Math.hypot(dx, dy)
+	);
 }
 
 function simplifyOpen(points, tolerance) {
@@ -88,8 +90,10 @@ function segmentsIntersect(a, b, c, d) {
 	const cdA = orientation(c, d, a);
 	const cdB = orientation(c, d, b);
 	const onSegment = (start, point, end) =>
-		point[0] >= Math.min(start[0], end[0]) && point[0] <= Math.max(start[0], end[0]) &&
-		point[1] >= Math.min(start[1], end[1]) && point[1] <= Math.max(start[1], end[1]);
+		point[0] >= Math.min(start[0], end[0]) &&
+		point[0] <= Math.max(start[0], end[0]) &&
+		point[1] >= Math.min(start[1], end[1]) &&
+		point[1] <= Math.max(start[1], end[1]);
 	if (abC === 0 && onSegment(a, c, b)) return true;
 	if (abD === 0 && onSegment(a, d, b)) return true;
 	if (cdA === 0 && onSegment(c, a, d)) return true;
@@ -99,9 +103,16 @@ function segmentsIntersect(a, b, c, d) {
 
 /** Returns whether a normalised, closed polygon is safe to turn into an outline. */
 export function isValidBrushOutline(points, canvasSize = {}, { minAreaPx = 4 } = {}) {
-	if (!Array.isArray(points) || points.length < 4 || !equalPoints(points[0], points.at(-1))) return false;
+	if (!Array.isArray(points) || points.length < 4 || !equalPoints(points[0], points.at(-1)))
+		return false;
 	const polygon = points.slice(0, -1);
-	if (polygon.length < 3 || polygon.some((point) => !Array.isArray(point) || !Number.isFinite(point[0]) || !Number.isFinite(point[1]))) return false;
+	if (
+		polygon.length < 3 ||
+		polygon.some(
+			(point) => !Array.isArray(point) || !Number.isFinite(point[0]) || !Number.isFinite(point[1])
+		)
+	)
+		return false;
 	const pixels = polygon.map((point) => toPixels(point, canvasSize));
 	if (Math.abs(signedArea(pixels)) < minAreaPx) return false;
 	for (let index = 0; index < pixels.length; index++) {
@@ -110,7 +121,8 @@ export function isValidBrushOutline(points, canvasSize = {}, { minAreaPx = 4 } =
 		for (let other = index + 1; other < pixels.length; other++) {
 			const otherNext = (other + 1) % pixels.length;
 			if (index === other || nextIndex === other || otherNext === index) continue;
-			if (segmentsIntersect(pixels[index], pixels[nextIndex], pixels[other], pixels[otherNext])) return false;
+			if (segmentsIntersect(pixels[index], pixels[nextIndex], pixels[other], pixels[otherNext]))
+				return false;
 		}
 	}
 	return true;
@@ -209,11 +221,19 @@ function traceLargestMaskBoundary(mask, origin, cellSize) {
 			if (previous && nexts.length > 1) {
 				const incoming = [current[0] - previous[0], current[1] - previous[1]];
 				const preference = [
-					[-incoming[1], incoming[0]], incoming,
-					[incoming[1], -incoming[0]], [-incoming[0], -incoming[1]]
+					[-incoming[1], incoming[0]],
+					incoming,
+					[incoming[1], -incoming[0]],
+					[-incoming[0], -incoming[1]]
 				];
 				nextIndex = preference
-					.map((direction) => nexts.findIndex((candidate) => candidate[0] - current[0] === direction[0] && candidate[1] - current[1] === direction[1]))
+					.map((direction) =>
+						nexts.findIndex(
+							(candidate) =>
+								candidate[0] - current[0] === direction[0] &&
+								candidate[1] - current[1] === direction[1]
+						)
+					)
 					.find((index) => index >= 0);
 			}
 			const [next] = nexts.splice(nextIndex, 1);
@@ -256,10 +276,22 @@ export function createBrushMaskOutline(
 	for (let index = 0; index < stroke.length; index++) {
 		const previous = stroke[Math.max(0, index - 1)];
 		const current = stroke[index];
-		const steps = Math.max(1, Math.ceil(distance(previous, current) / Math.max(brushRadiusPx / 2, cellSize)));
+		const steps = Math.max(
+			1,
+			Math.ceil(distance(previous, current) / Math.max(brushRadiusPx / 2, cellSize))
+		);
 		for (let step = 0; step <= steps; step++) {
 			const ratio = step / steps;
-			addCircleDab(mask, [previous[0] + (current[0] - previous[0]) * ratio, previous[1] + (current[1] - previous[1]) * ratio], brushRadiusPx, [minX, minY], cellSize);
+			addCircleDab(
+				mask,
+				[
+					previous[0] + (current[0] - previous[0]) * ratio,
+					previous[1] + (current[1] - previous[1]) * ratio
+				],
+				brushRadiusPx,
+				[minX, minY],
+				cellSize
+			);
 		}
 	}
 	const tracedPolygon = traceLargestMaskBoundary(mask, [minX, minY], cellSize);
@@ -275,7 +307,9 @@ export function createBrushMaskOutline(
 	if (isValidBrushOutline(outline, canvasSize)) return outline;
 	// Very tight concave paint regions can make even the lightweight reduction
 	// self-intersect. In that rare case keep the raw traced boundary.
-	outline = simplifyClosed(tracedPolygon, Math.max(simplifyTolerancePx, 0)).map((point) => fromPixels(point, canvasSize));
+	outline = simplifyClosed(tracedPolygon, Math.max(simplifyTolerancePx, 0)).map((point) =>
+		fromPixels(point, canvasSize)
+	);
 	if (!outline.length) return [];
 	outline.push([...outline[0]]);
 	if (isValidBrushOutline(outline, canvasSize)) return outline;

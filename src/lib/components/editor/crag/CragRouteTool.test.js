@@ -57,11 +57,19 @@ test('manages route paths, access copies, and route-specific metadata', () => {
 	tool.updateRoutePath(document.path, route.id, createdPath.id, 'label', 'Main line');
 	assert.equal(route.pathRefs[0].label, 'Main line');
 
-	state.access.features = [{
-		id: 'approach-1',
-		properties: { kind: 'approach', name: 'Approach' },
-		geometry: { type: 'LineString', coordinates: [[0, 0], [1, 1]] }
-	}];
+	state.access.features = [
+		{
+			id: 'approach-1',
+			properties: { kind: 'approach', name: 'Approach' },
+			geometry: {
+				type: 'LineString',
+				coordinates: [
+					[0, 0],
+					[1, 1]
+				]
+			}
+		}
+	];
 	assert.equal(tool.createRoutePathFromAccess(document.path, route.id, 'approach-1'), true);
 	assert.equal(document.data.paths.features.length, 2);
 	assert.equal(route.pathRefs.length, 2);
@@ -73,7 +81,7 @@ test('deletes and restores a route path with its route references', () => {
 	const document = state.routeDocuments[0];
 	const route = document.data.routes[0];
 	tool.addRoutePath(document.path, route.id);
- 	const pathId = document.data.paths.features[0].id;
+	const pathId = document.data.paths.features[0].id;
 
 	assert.equal(tool.deleteRoutePath(document.path, pathId), true);
 	assert.equal(document.data.paths.features.length, 0);
@@ -92,10 +100,27 @@ test('splits a route path and exits track cutting mode', () => {
 	tool.addRoutePath(document.path, route.id);
 	const pathId = document.data.paths.features[0].id;
 	state.updateRouteDocument(document.path, (data) => {
-		data.paths.features[0].geometry.coordinates = [[0, 0], [1, 1], [2, 2]];
+		data.paths.features[0].geometry.coordinates = [
+			[0, 0],
+			[1, 1],
+			[2, 2]
+		];
 	});
 
-	assert.equal(tool.splitRoutePath({ documentPath: document.path, pathId, routeId: route.id }, [[0, 0], [1, 1]], [[1, 1], [2, 2]]), true);
+	assert.equal(
+		tool.splitRoutePath(
+			{ documentPath: document.path, pathId, routeId: route.id },
+			[
+				[0, 0],
+				[1, 1]
+			],
+			[
+				[1, 1],
+				[2, 2]
+			]
+		),
+		true
+	);
 	assert.equal(document.data.paths.features.length, 2);
 	assert.equal(activeTools.at(-1), 'position');
 });

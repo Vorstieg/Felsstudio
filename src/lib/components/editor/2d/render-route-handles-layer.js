@@ -19,7 +19,10 @@ export function renderRouteHandlesLayer({
 		});
 	const selection = layer
 		.selectAll('circle.route-point-handle')
-		.data(handles, (item) => `handle-${item.routeId}-${item.pitchId || item.variantId || 'main'}-${item.index}`);
+		.data(
+			handles,
+			(item) => `handle-${item.routeId}-${item.pitchId || item.variantId || 'main'}-${item.index}`
+		);
 
 	selection
 		.join(
@@ -45,5 +48,8 @@ export function renderRouteHandlesLayer({
 		.attr('r', (item) => item.handleSize)
 		.attr('fill', activeTool === 'eraser' ? '#fee2e2' : 'white')
 		.attr('stroke', activeTool === 'eraser' ? '#ef4444' : '#3b82f6')
-		.attr('class', () => `route-point-handle ${activeTool === 'select' ? 'cursor-move' : 'cursor-pointer'}`);
+		.attr(
+			'class',
+			() => `route-point-handle ${activeTool === 'select' ? 'cursor-move' : 'cursor-pointer'}`
+		);
 }

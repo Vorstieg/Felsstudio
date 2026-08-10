@@ -54,7 +54,7 @@ function formattedNumber(value) {
 
 /** DJI Fly manual waypoint headings use the signed -180°…+180° convention. */
 function normaliseHeading(value) {
-	const heading = ((Number(value) + 180) % 360 + 360) % 360 - 180;
+	const heading = ((((Number(value) + 180) % 360) + 360) % 360) - 180;
 	// Avoid serialising JavaScript's `-0`, which is needlessly ambiguous in WPML.
 	return Object.is(heading, -0) ? 0 : heading;
 }
@@ -109,7 +109,9 @@ function actionXml(actionId, type, parameters) {
 }
 
 function waypointActions(waypoint, actionId) {
-	const gimbalPitch = Number.isFinite(Number(waypoint.gimbalPitch)) ? Number(waypoint.gimbalPitch) : -8;
+	const gimbalPitch = Number.isFinite(Number(waypoint.gimbalPitch))
+		? Number(waypoint.gimbalPitch)
+		: -8;
 	const actions = [
 		actionXml(
 			actionId++,
@@ -193,9 +195,13 @@ export function exportFlightPlanWaylinesWpml(plan) {
 		.map((waypoint, index) => {
 			const actions = waypointActions(waypoint, actionId);
 			actionId = actions.nextActionId;
-			const heading = Number.isFinite(Number(waypoint.heading)) ? normaliseHeading(waypoint.heading) : 0;
+			const heading = Number.isFinite(Number(waypoint.heading))
+				? normaliseHeading(waypoint.heading)
+				: 0;
 			const speed = Number.isFinite(Number(waypoint.speed)) ? Number(waypoint.speed) : 2.5;
-			const pitch = Number.isFinite(Number(waypoint.gimbalPitch)) ? Number(waypoint.gimbalPitch) : -8;
+			const pitch = Number.isFinite(Number(waypoint.gimbalPitch))
+				? Number(waypoint.gimbalPitch)
+				: -8;
 			const turnMode =
 				index === 0 || index === waypoints.length - 1
 					? 'toPointAndStopWithContinuityCurvature'
@@ -231,7 +237,10 @@ export function exportFlightPlanWaylinesWpml(plan) {
       </Placemark>`;
 		})
 		.join('');
-	const speed = Number(plan.metadata?.speed) || waypoints.find((waypoint) => waypoint.phase === 'capture')?.speed || 2.5;
+	const speed =
+		Number(plan.metadata?.speed) ||
+		waypoints.find((waypoint) => waypoint.phase === 'capture')?.speed ||
+		2.5;
 	return `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="${KML_NAMESPACE}" xmlns:wpml="${WPML_NAMESPACE}">
   <Document>${missionConfigXml(speed)}

@@ -73,11 +73,19 @@ export function normalizeTopoPaths(data = {}) {
 			const pathId = stablePathId(asset, next.paths.features.length + index);
 			let feature = next.paths.features.find((item) => String(item.id) === pathId);
 			if (!feature) {
-				feature = createPathFeature(asset.path.coordinates, { name: asset.label || asset.role || 'Route path' }, pathId);
+				feature = createPathFeature(
+					asset.path.coordinates,
+					{ name: asset.label || asset.role || 'Route path' },
+					pathId
+				);
 				next.paths.features.push(feature);
 			}
 			if (!refs.some((ref) => String(ref.pathId) === pathId)) {
-				refs.push({ pathId, role: asset.role || 'main', ...(asset.label ? { label: asset.label } : {}) });
+				refs.push({
+					pathId,
+					role: asset.role || 'main',
+					...(asset.label ? { label: asset.label } : {})
+				});
 			}
 		});
 		route.pathRefs = refs;
@@ -112,7 +120,9 @@ export function ensureTopoPaths(data) {
 }
 
 export function findTopoPath(data, pathId) {
-	return ensureTopoPaths(data).features.find((feature) => String(feature.id) === String(pathId)) || null;
+	return (
+		ensureTopoPaths(data).features.find((feature) => String(feature.id) === String(pathId)) || null
+	);
 }
 
 export function assignTopoPath(data, routeId, pathId, { role = 'main', label = '' } = {}) {
@@ -152,32 +162,62 @@ export function deleteTopoPath(data, pathId) {
 	const paths = ensureTopoPaths(data);
 	const before = paths.features.length;
 	paths.features = paths.features.filter((feature) => String(feature.id) !== String(pathId));
-	for (const route of data.routes || []) route.pathRefs = (route.pathRefs || []).filter((ref) => String(ref.pathId) !== String(pathId));
+	for (const route of data.routes || [])
+		route.pathRefs = (route.pathRefs || []).filter((ref) => String(ref.pathId) !== String(pathId));
 	return paths.features.length !== before;
 }
 
-export function splitTopoPath(data, pathId, startCoordinates, endCoordinates, { mode = 'shared', routeId } = {}) {
+export function splitTopoPath(
+	data,
+	pathId,
+	startCoordinates,
+	endCoordinates,
+	{ mode = 'shared', routeId } = {}
+) {
 	const path = findTopoPath(data, pathId);
 	if (!path || startCoordinates?.length < 2 || endCoordinates?.length < 2) return [];
 	if (mode === 'route-specific') {
 		const route = (data.routes || []).find((item) => String(item.id) === String(routeId));
-		if (!route || !(route.pathRefs || []).some((ref) => String(ref.pathId) === String(pathId))) return [];
+		if (!route || !(route.pathRefs || []).some((ref) => String(ref.pathId) === String(pathId)))
+			return [];
 		const firstId = `${pathId}-1`;
 		const secondId = `${pathId}-2`;
 		data.paths.features.push(
-			{ ...clone(path), id: firstId, geometry: { type: 'LineString', coordinates: clone(startCoordinates) } },
-			{ ...clone(path), id: secondId, geometry: { type: 'LineString', coordinates: clone(endCoordinates) } }
+			{
+				...clone(path),
+				id: firstId,
+				geometry: { type: 'LineString', coordinates: clone(startCoordinates) }
+			},
+			{
+				...clone(path),
+				id: secondId,
+				geometry: { type: 'LineString', coordinates: clone(endCoordinates) }
+			}
 		);
 		route.pathRefs = route.pathRefs.flatMap((ref) =>
-			String(ref.pathId) === String(pathId) ? [{ ...ref, pathId: firstId }, { ...ref, pathId: secondId }] : [ref]
+			String(ref.pathId) === String(pathId)
+				? [
+						{ ...ref, pathId: firstId },
+						{ ...ref, pathId: secondId }
+					]
+				: [ref]
 		);
 		return [firstId, secondId];
 	}
 	path.geometry = { type: 'LineString', coordinates: clone(startCoordinates) };
 	const secondId = `${pathId}-2`;
-	data.paths.features.push({ ...clone(path), id: secondId, geometry: { type: 'LineString', coordinates: clone(endCoordinates) } });
+	data.paths.features.push({
+		...clone(path),
+		id: secondId,
+		geometry: { type: 'LineString', coordinates: clone(endCoordinates) }
+	});
 	for (const route of data.routes || []) {
-		if ((route.pathRefs || []).some((ref) => String(ref.pathId) === String(pathId))) route.pathRefs.push(...(route.pathRefs.filter((ref) => String(ref.pathId) === String(pathId)).map((ref) => ({ ...ref, pathId: secondId }))));
+		if ((route.pathRefs || []).some((ref) => String(ref.pathId) === String(pathId)))
+			route.pathRefs.push(
+				...route.pathRefs
+					.filter((ref) => String(ref.pathId) === String(pathId))
+					.map((ref) => ({ ...ref, pathId: secondId }))
+			);
 	}
 	return [String(pathId), secondId];
 }
@@ -187,12 +227,16 @@ export function validateTopoPaths(data) {
 	const ids = new Set();
 	const errors = [];
 	for (const feature of paths.features) {
-		if (!feature.id || ids.has(String(feature.id))) errors.push(`Invalid or duplicate path id: ${feature.id}`);
+		if (!feature.id || ids.has(String(feature.id)))
+			errors.push(`Invalid or duplicate path id: ${feature.id}`);
 		ids.add(String(feature.id));
-		if (!isLineStringPath(feature)) errors.push(`Path ${feature.id} must be a valid LineString feature.`);
+		if (!isLineStringPath(feature))
+			errors.push(`Path ${feature.id} must be a valid LineString feature.`);
 	}
-	for (const route of data.routes || []) for (const ref of route.pathRefs || []) {
-		if (!ids.has(String(ref.pathId))) errors.push(`Route ${route.id} references missing path ${ref.pathId}.`);
-	}
+	for (const route of data.routes || [])
+		for (const ref of route.pathRefs || []) {
+			if (!ids.has(String(ref.pathId)))
+				errors.push(`Route ${route.id} references missing path ${ref.pathId}.`);
+		}
 	return errors;
 }

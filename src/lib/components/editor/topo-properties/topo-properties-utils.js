@@ -11,15 +11,25 @@ export function addPathAsset(item, document = null) {
 	if (!document) throw new Error('A topo document is required to create a route path.');
 	document.paths = document.paths || { type: 'FeatureCollection', features: [] };
 	let pathId;
-	do { pathId = generateId('path'); } while (document.paths.features.some((feature) => String(feature.id) === pathId));
-	document.paths.features = [...document.paths.features, { type: 'Feature', id: pathId, properties: { name: 'Route path' }, geometry: { type: 'LineString', coordinates: [] } }];
+	do {
+		pathId = generateId('path');
+	} while (document.paths.features.some((feature) => String(feature.id) === pathId));
+	document.paths.features = [
+		...document.paths.features,
+		{
+			type: 'Feature',
+			id: pathId,
+			properties: { name: 'Route path' },
+			geometry: { type: 'LineString', coordinates: [] }
+		}
+	];
 	item.pathRefs = [...(item.pathRefs || []), { pathId, role: 'main', label: '' }];
 	return pathId;
 }
 
-
 export function removePathAsset(item, pathId, document = null) {
-	if (!document || !Array.isArray(item.pathRefs)) throw new Error('A topo document is required to remove a route path.');
+	if (!document || !Array.isArray(item.pathRefs))
+		throw new Error('A topo document is required to remove a route path.');
 	item.pathRefs = item.pathRefs.filter((ref) => String(ref.pathId) !== String(pathId));
 	return pathId;
 }

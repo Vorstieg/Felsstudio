@@ -3,7 +3,8 @@ export class EraserTool {
 
 	constructor({ context, state, saveHistory, deleteSymbolAt } = {}) {
 		this.state = state;
-		this.saveHistory = context?.commands?.commit || context?.history?.save || saveHistory || (() => {});
+		this.saveHistory =
+			context?.commands?.commit || context?.history?.save || saveHistory || (() => {});
 		this.deleteSymbolAt = context?.commands?.deleteSymbolAt || deleteSymbolAt || null;
 	}
 
