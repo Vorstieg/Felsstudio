@@ -578,6 +578,7 @@
 		style="pointer-events: {isShiftPressed ? 'all' : 'none'};"
 		onpointerdown={handleLassoMouseDown}
 		oncontextmenu={(e) => e.preventDefault()}
+		role="presentation"
 	>
 		<svg class="w-full h-full pointer-events-none">
 			{#if lassoPoints.length > 1}

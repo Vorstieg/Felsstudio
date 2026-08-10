@@ -82,7 +82,7 @@
 			</div>
 
 			<div class="space-y-0.5">
-				<label class="text-ui-label block">{$_('ui.location')}</label>
+					<p class="text-ui-label block">{$_('ui.location')}</p>
 				{#if Object.keys(userState.clustering.gpsData || {}).length > 0}
 					<ClusteringMap />
 				{:else}
@@ -132,7 +132,7 @@
 			</div>
 
 			<div class="space-y-0.5">
-				<label class="text-ui-label block">{$_('ui.tags')}</label>
+					<p class="text-ui-label block">{$_('ui.tags')}</p>
 				<TagSelector
 					selectedTags={userState.topo.tags || []}
 					onChange={(value) => updateTopoField('tags', value)}

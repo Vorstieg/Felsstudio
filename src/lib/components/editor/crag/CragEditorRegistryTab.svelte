@@ -66,6 +66,7 @@
 						class="detected-asset-row bg-white rounded-sm p-1.5 shadow-sm border border-black/15 flex items-center justify-between gap-2"
 						onmouseenter={() => onSetHoverHighlight(asset)}
 						onmouseleave={() => onSetHoverHighlight(null)}
+						role="presentation"
 					>
 						<div class="flex items-center gap-2">
 							<div
@@ -111,6 +112,7 @@
 				</div>
 				<button
 					onclick={() => onRemoveAccessFeature(point.id)}
+					aria-label="Remove transit point"
 					class="w-6 h-6 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600"
 				><i class="fa-solid fa-trash-can text-[10px]"></i></button
 				>
@@ -142,6 +144,7 @@
 			</div>
 			<button
 				onclick={() => onRemoveAccessFeature(point.id)}
+				aria-label="Remove parking space"
 				class="w-6 h-6 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600"
 			><i class="fa-solid fa-trash-can text-[10px]"></i></button
 			>
@@ -160,6 +163,7 @@
 				</div>
 				<button
 					onclick={() => onRemoveAccessFeature(hut.id)}
+					aria-label="Remove mountain hut"
 					class="w-6 h-6 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600"
 				><i class="fa-solid fa-trash-can text-[10px]"></i></button
 				>

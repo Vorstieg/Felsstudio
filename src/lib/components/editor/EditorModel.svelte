@@ -608,6 +608,12 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 				ondblclick={(e) => interaction.handleFixPointDblClick(e, point.id, activeTool)}
 				role="button"
 				tabindex="0"
+				onkeydown={(event) => {
+					if (event.key === 'Enter' || event.key === ' ') {
+						event.preventDefault();
+						interaction.handleFixPointClick(event, point.id);
+					}
+				}}
 			>
 				<div
 					class="w-2 h-2 rounded-full shadow-sm border border-white/40 transition-all
@@ -638,6 +644,14 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 					}}
 					role="button"
 					tabindex="0"
+					onkeydown={(event) => {
+						if (event.key === 'Enter' || event.key === ' ') {
+							event.preventDefault();
+							event.stopPropagation();
+							userState.ui.selectedRouteId =
+								userState.ui.selectedRouteId === route.parentId ? null : route.parentId;
+						}
+					}}
 				>
 					{route.label}
 				</div>

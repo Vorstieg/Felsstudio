@@ -248,6 +248,7 @@
 					{#if searchQuery}
 						<button 
 							class="absolute right-3 top-1/2 -translate-y-1/2 text-warm-gray-300 hover:text-near-black flex items-center justify-center"
+							aria-label="Clear search"
 							onclick={() => searchQuery = ''}
 						>
 							<i class="fa-solid fa-xmark"></i>
@@ -261,6 +262,7 @@
 			<div class="px-3 py-2 border-b border-black/15 bg-warm-gray-100 flex items-center gap-2 overflow-x-auto text-micro-data whitespace-nowrap">
 				<button 
 					class="text-warm-gray-500 hover:text-creator-blue transition-colors cursor-pointer flex items-center justify-center w-6 h-6 rounded-sm hover:bg-black/5"
+					aria-label="Go to root"
 					onclick={() => { const u = new URL(window.location.href); u.searchParams.delete('path'); goto(u.toString(), { keepFocus: true }); }}>
 					<i class="fa-solid fa-house"></i>
 				</button>
@@ -382,7 +384,7 @@
 			{#if error}
 				<div class="absolute top-4 left-4 right-4 bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-sm shadow-sm z-20 text-body-text flex justify-between items-center">
 					<span class="font-medium">{error}</span>
-					<button class="w-6 h-6 flex items-center justify-center rounded hover:bg-rose-100" onclick={() => error = null}>
+					<button class="w-6 h-6 flex items-center justify-center rounded hover:bg-rose-100" aria-label="Dismiss error" onclick={() => error = null}>
 						<i class="fa-solid fa-xmark"></i>
 					</button>
 				</div>

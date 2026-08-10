@@ -171,6 +171,7 @@
 				{/each}
 			</select>
 			<button
+				aria-label="Remove fixpoint"
 				class="h-9 flex items-center justify-center gap-1.5 rounded-sm bg-rose-50 px-3 text-[11px] font-bold text-rose-700 transition-none hover:bg-rose-100"
 				onclick={() => removeFixpoint(point, i)}
 			>
@@ -205,6 +206,7 @@
 					</select>
 				</div>
 				<button
+					aria-label="Remove fixpoint"
 					class="text-warm-gray-300 hover:text-rose-600 transition-none w-6 h-6 flex items-center justify-center rounded-sm hover:bg-rose-50"
 					onclick={() => removeFixpoint(point, i)}
 					><i class="fa-solid fa-trash-can text-[10px]"></i></button

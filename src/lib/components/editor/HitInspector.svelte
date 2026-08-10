@@ -145,7 +145,7 @@
 					class="text-near-black font-bold font-mono text-[10px]">{selectedCluster.avg_angle.toFixed(3)}</span></div>
 			</div>
 			<div class="w-px h-5 bg-black/15"></div>
-			<button onclick={close}
+			<button onclick={close} aria-label="Close inspector"
 							class="w-8 h-8 flex items-center justify-center rounded-sm bg-black/5 hover:bg-rose-600 hover:text-white transition-none text-warm-gray-500 border border-black/10 shadow-sm cursor-pointer">
 				<i class="fa-solid fa-xmark text-sm"></i></button>
 		</div>

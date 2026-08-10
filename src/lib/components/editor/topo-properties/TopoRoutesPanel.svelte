@@ -69,7 +69,7 @@
 {/if}
 
 {#each routes as route, i (route.id)}
-	<div
+			<div
 		id={'route-' + route.id}
 		class={mobile
 			? `panel p-3 border-2 $
@@ -82,6 +82,14 @@
 				? 'flex items-center gap-3 cursor-pointer'
 				: 'flex justify-between items-center mb-2 cursor-pointer group'}
 			onclick={() => selectRoute(route)}
+			role="button"
+			tabindex="0"
+			onkeydown={(event) => {
+				if (event.key === 'Enter' || event.key === ' ') {
+					event.preventDefault();
+					selectRoute(route);
+				}
+			}}
 		>
 			<div class={mobile ? 'flex items-center gap-3 min-w-0 flex-1' : 'flex items-center gap-2'}>
 				<div

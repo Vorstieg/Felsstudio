@@ -47,7 +47,7 @@
 		Base Information
 	</h3>
 	<div class="space-y-3">
-		<div class="space-y-0.5"><label class="text-ui-label block">Crag Name</label><input type="text"
+		<div class="space-y-0.5"><label for="crag-name" class="text-ui-label block">Crag Name</label><input id="crag-name" type="text"
 		                                                                    value={cragEditorState.crag.name}
 					                                                                    oninput={(event) => cragEditorState.setCragField('name', event.currentTarget.value)}
 		                                                                                    class="input-studio w-full"
@@ -55,14 +55,14 @@
 		</div>
 		<CragHierarchyPlacement />
 		<div class="grid grid-cols-2 gap-2">
-			<div class="space-y-0.5"><label class="text-ui-label block">Security</label><select
+			<div class="space-y-0.5"><label for="crag-security" class="text-ui-label block">Security</label><select id="crag-security"
 				value={cragEditorState.crag.security} onchange={(event) => cragEditorState.setCragField('security', event.currentTarget.value)} class="input-studio w-full appearance-none">
 				<option value="">Select...</option>
 				{#each securityOptions as opt}
 					<option value={opt}>{opt}</option>
 				{/each}
 			</select></div>
-			<div class="space-y-0.5"><label class="text-ui-label block">Rock Type</label><select
+			<div class="space-y-0.5"><label for="crag-rock-type" class="text-ui-label block">Rock Type</label><select id="crag-rock-type"
 					value={cragEditorState.crag.rock_type} onchange={(event) => cragEditorState.setCragField('rock_type', event.currentTarget.value)} class="input-studio w-full appearance-none">
 				<option value="">Select...</option>
 				{#each rockTypes as opt}
@@ -70,14 +70,14 @@
 				{/each}
 			</select></div>
 		</div>
-		<div class="space-y-0.5"><label class="text-ui-label block">Crag Type</label>
+		<div class="space-y-0.5"><p class="text-ui-label block">Crag Type</p>
 			<TagSelector selectedTags={cragEditorState.crag.type} availableTags={cragTypes} onChange={(value) => cragEditorState.setCragField('type', value)} />
 		</div>
-		<div class="space-y-0.5"><label class="text-ui-label block">Tags</label>
+		<div class="space-y-0.5"><p class="text-ui-label block">Tags</p>
 			<TagSelector selectedTags={cragEditorState.crag.tags} availableTags={availableTags} onChange={(value) => cragEditorState.setCragField('tags', value)} />
 		</div>
 		<div class="space-y-1 pt-2 border-t border-black/15">
-			<div class="flex justify-between items-center"><label class="text-ui-label !m-0">Equipment</label>
+			<div class="flex justify-between items-center"><p class="text-ui-label !m-0">Equipment</p>
 				<button onclick={onAddEquipmentItem} class="text-ui-label text-creator-blue hover:text-creator-blue-active">+
 					Add
 				</button>
@@ -91,7 +91,7 @@
 						{/each}
 					</select><input type="number"
 					                value={item.amount} oninput={(event) => cragEditorState.updateEquipmentItem(i, 'amount', Number(event.currentTarget.value))} class="w-10 bg-black/5 px-1 py-1 rounded-sm text-body-text outline-none text-center" />
-						<button onclick={() => onRemoveEquipmentItem(i)} class="text-warm-gray-300 hover:text-rose-600 px-1.5"><i
+						<button onclick={() => onRemoveEquipmentItem(i)} aria-label="Remove equipment item" class="text-warm-gray-300 hover:text-rose-600 px-1.5"><i
 							class="fa-solid fa-trash-can text-[10px]"></i></button>
 					</div>
 				{/each}
@@ -99,7 +99,7 @@
 		</div>
 		<div class="space-y-2 pt-2 border-t border-black/15">
 			<div class="flex justify-between items-center">
-				<div><label class="text-ui-label !m-0">Pictures</label>
+				<div><p class="text-ui-label !m-0">Pictures</p>
 					{#if pendingCragImageCount > 0}<p class="text-micro-data text-amber-700 !m-0">{pendingCragImageCount}
 						picture{pendingCragImageCount === 1 ? '' : 's'} ready to upload. Press Save to publish.</p>{/if}
 				</div>
@@ -124,10 +124,10 @@
 				</div>
 			{/if}
 		</div>
-		<div class="space-y-0.5 pt-2 border-t border-black/15"><label class="text-ui-label block">Description
-			(DE)</label><textarea rows="2"
+		<div class="space-y-0.5 pt-2 border-t border-black/15"><label for="crag-description-de" class="text-ui-label block">Description
+			(DE)</label><textarea id="crag-description-de" rows="2"
 			                        oninput={(event) => cragEditorState.setCragField('description_de', event.currentTarget.value)} value={cragEditorState.crag.description_de} class="input-studio w-full resize-none"></textarea></div>
-		<div class="space-y-0.5"><label class="text-ui-label block">Description (EN)</label><textarea
+		<div class="space-y-0.5"><label for="crag-description-en" class="text-ui-label block">Description (EN)</label><textarea id="crag-description-en"
 			value={cragEditorState.crag.description_en} oninput={(event) => cragEditorState.setCragField('description_en', event.currentTarget.value)} rows="2" class="input-studio w-full resize-none"></textarea>
 		</div>
 	</div>

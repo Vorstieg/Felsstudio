@@ -129,13 +129,13 @@
 				</div>
 			</div>
 			<div class="grid grid-cols-2 gap-2">
-				<div class="space-y-0.5"><label class="text-ui-label block">Name</label><input type="text"
+			<div class="space-y-0.5"><label for={'sector-name-' + sector.id} class="text-ui-label block">Name</label><input id={'sector-name-' + sector.id} type="text"
 	                                                                               value={sector.name}
 	                                                                               oninput={(event) => cragEditorState.updateSector(sector.id, 'name', event.currentTarget.value)}
 				                                                                               class="input-studio w-full"
 				                                                                               placeholder="Sector name" />
 				</div>
-				<div class="space-y-0.5"><label class="text-ui-label block">ID</label><input type="text" value={sector.id}
+			<div class="space-y-0.5"><label for={'sector-id-' + sector.id} class="text-ui-label block">ID</label><input id={'sector-id-' + sector.id} type="text" value={sector.id}
 				                                                                             oninput={(e) => updateSelectedSectorId(sector, e.currentTarget.value)}
 				                                                                             class="input-studio w-full font-mono"
 				                                                                             placeholder="sector-id" /></div>
@@ -156,7 +156,7 @@
 					<span class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-micro-data">°</span>
 				</div>
 			</div>
-			<div class="space-y-0.5"><label class="text-ui-label block">Geometry</label>
+			<div class="space-y-0.5"><p class="text-ui-label block">Geometry</p>
 				<div class="grid grid-cols-2 gap-1 bg-black/5 rounded-sm p-0.5 border border-black/10">
 					{#each ['Point', 'Polygon'] as type}
 						<button
@@ -166,14 +166,14 @@
 				</div>
 			</div>
 			<div class="grid grid-cols-2 gap-2">
-				<div class="space-y-0.5"><label class="text-ui-label block">Security</label><select value={sector.security} onchange={(event) => cragEditorState.updateSector(sector.id, 'security', event.currentTarget.value)}
+			<div class="space-y-0.5"><label for={'sector-security-' + sector.id} class="text-ui-label block">Security</label><select id={'sector-security-' + sector.id} value={sector.security} onchange={(event) => cragEditorState.updateSector(sector.id, 'security', event.currentTarget.value)}
 				                                                                                    class="input-studio w-full appearance-none">
 					<option value="">Crag default</option>
 					{#each securityOptions as opt}
 						<option value={opt}>{opt}</option>
 					{/each}
 				</select></div>
-				<div class="space-y-0.5"><label class="text-ui-label block">Rock Type</label><select
+			<div class="space-y-0.5"><label for={'sector-rock-type-' + sector.id} class="text-ui-label block">Rock Type</label><select id={'sector-rock-type-' + sector.id}
 					value={sector.rock_type} onchange={(event) => cragEditorState.updateSector(sector.id, 'rock_type', event.currentTarget.value)} class="input-studio w-full appearance-none">
 					<option value="">Crag default</option>
 					{#each rockTypes as opt}
@@ -181,19 +181,19 @@
 					{/each}
 				</select></div>
 			</div>
-			<div class="space-y-0.5"><label class="text-ui-label block">Sector Type</label>
+			<div class="space-y-0.5"><p class="text-ui-label block">Sector Type</p>
 				<TagSelector selectedTags={sector.type} availableTags={cragTypes} onChange={(value) => cragEditorState.updateSector(sector.id, 'type', value)} />
 			</div>
-			<div class="space-y-0.5"><label class="text-ui-label block">Tags</label>
+			<div class="space-y-0.5"><p class="text-ui-label block">Tags</p>
 				<TagSelector selectedTags={sector.tags} availableTags={availableTags} onChange={(value) => cragEditorState.updateSector(sector.id, 'tags', value)} />
 			</div>
-			<div class="space-y-0.5 pt-2 border-t border-black/15"><label class="text-ui-label block">Description (DE)</label><textarea
+			<div class="space-y-0.5 pt-2 border-t border-black/15"><label for={'sector-description-de-' + sector.id} class="text-ui-label block">Description (DE)</label><textarea id={'sector-description-de-' + sector.id}
 				value={sector.description_de} oninput={(event) => cragEditorState.updateSector(sector.id, 'description_de', event.currentTarget.value)} rows="2" class="input-studio w-full resize-none"></textarea></div>
-			<div class="space-y-0.5"><label class="text-ui-label block">Description (EN)</label><textarea
+			<div class="space-y-0.5"><label for={'sector-description-en-' + sector.id} class="text-ui-label block">Description (EN)</label><textarea id={'sector-description-en-' + sector.id}
 				value={sector.description_en} oninput={(event) => cragEditorState.updateSector(sector.id, 'description_en', event.currentTarget.value)} rows="2" class="input-studio w-full resize-none"></textarea></div>
-			<div class="space-y-0.5"><label class="text-ui-label block">Approach (DE)</label><textarea
+			<div class="space-y-0.5"><label for={'sector-approach-de-' + sector.id} class="text-ui-label block">Approach (DE)</label><textarea id={'sector-approach-de-' + sector.id}
 				value={sector.approach_de} oninput={(event) => cragEditorState.updateSector(sector.id, 'approach_de', event.currentTarget.value)} rows="2" class="input-studio w-full resize-none"></textarea></div>
-			<div class="space-y-0.5"><label class="text-ui-label block">Approach (EN)</label><textarea
+			<div class="space-y-0.5"><label for={'sector-approach-en-' + sector.id} class="text-ui-label block">Approach (EN)</label><textarea id={'sector-approach-en-' + sector.id}
 				value={sector.approach_en} oninput={(event) => cragEditorState.updateSector(sector.id, 'approach_en', event.currentTarget.value)} rows="2" class="input-studio w-full resize-none"></textarea></div>
 			<div class="flex items-center justify-between bg-white rounded-sm border border-black/15 p-2"><span
 				class="text-ui-label text-warm-gray-500 !m-0">{sector.geometry?.type === 'Polygon' ? 'Center' : 'Position'}</span>

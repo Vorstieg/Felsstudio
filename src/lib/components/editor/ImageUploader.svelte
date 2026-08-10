@@ -249,6 +249,8 @@
 			ondrop={handleDrop}
 			ondragover={handleDragOver}
 			ondragleave={handleDragLeave}
+			role="region"
+			aria-label={$_('ui.drag_drop_image')}
 		>
 			<i class="fa-solid fa-image text-2xl text-warm-gray-300 mb-2"></i>
 			<p class="text-micro-data text-warm-gray-500 mb-3">{$_('ui.drag_drop_image')}</p>

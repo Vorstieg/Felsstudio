@@ -139,8 +139,9 @@
 <div class={mobile ? 'mt-3 space-y-3 border-t border-black/10 pt-3' : 'space-y-2'}>
 	<div class={mobile ? 'grid grid-cols-[1fr_6.5rem] gap-2' : 'flex gap-1.5'}>
 		<div class={mobile ? 'space-y-1' : 'flex-1 space-y-0.5'}>
-			<label class="text-ui-label block">{$_('ui.name')}</label>
+			<label for={'route-name-' + route.id} class="text-ui-label block">{$_('ui.name')}</label>
 			<input
+				id={'route-name-' + route.id}
 				type="text"
 				value={route.name || ''}
 				oninput={(event) => updateRoute({ name: event.currentTarget.value })}
@@ -148,8 +149,9 @@
 			/>
 		</div>
 		<div class={mobile ? 'space-y-1' : 'w-1/3 space-y-0.5'}>
-			<label class="text-ui-label block">{$_('ui.type')}</label>
+			<label for={'route-type-' + route.id} class="text-ui-label block">{$_('ui.type')}</label>
 			<select
+				id={'route-type-' + route.id}
 				value={Array.isArray(route.type) ? route.type[0] : route.type}
 				onchange={(event) => updateRouteType(event.currentTarget.value)}
 				class="input-studio w-full appearance-none"
@@ -164,8 +166,9 @@
 	<div class="space-y-0.5">
 		{#if hasRouteType(route, 'multi-pitch')}
 			<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
-				<label class="text-ui-label block">Line style</label>
+				<label for={'route-line-style-' + route.id} class="text-ui-label block">Line style</label>
 				<select
+					id={'route-line-style-' + route.id}
 					value={route.lineStyle || 'red'}
 					onchange={(event) => updateRoute({ lineStyle: event.currentTarget.value })}
 					class="input-studio w-full appearance-none"
@@ -187,7 +190,7 @@
 
 	<div class={mobile ? 'space-y-1' : 'space-y-1'}>
 		<div class="flex items-center justify-between gap-2">
-			<label class="text-ui-label block">Paths</label>
+			<p class="text-ui-label block">Paths</p>
 			<div class="flex items-center gap-1">
 				{#if onPathUpload}
 					<label
@@ -221,6 +224,14 @@
 				<div
 					class={`grid grid-cols-12 gap-1 rounded-sm border p-1 cursor-pointer ${String(userState.ui.selectedRouteId) === String(route.id) && String(userState.ui.selectedPathId) === String(pathAsset.pathId) ? 'border-creator-blue bg-creator-blue/5' : 'border-black/10 bg-white'}`}
 					onclick={() => selectPathAsset(route, pathAsset.pathId)}
+					role="button"
+					tabindex="0"
+					onkeydown={(event) => {
+						if (event.key === 'Enter' || event.key === ' ') {
+							event.preventDefault();
+							selectPathAsset(route, pathAsset.pathId);
+						}
+					}}
 				>
 					<select
 						bind:value={pathAsset.role}
@@ -237,6 +248,7 @@
 						placeholder="Label"
 					/>
 					<button
+						aria-label="Remove path"
 						onclick={(event) => {
 							event.stopPropagation();
 							removePathAsset(route, pathAsset.pathId, userState.topo);
@@ -258,7 +270,7 @@
 	{#if hasRouteType(route, 'multi-pitch')}
 		<div class="rounded-sm border border-black/10 bg-warm-white p-2 space-y-2">
 			<div class="flex items-center justify-between gap-2">
-				<label class="text-ui-label block">{$_('ui.pitches')}</label>
+				<p class="text-ui-label block">{$_('ui.pitches')}</p>
 				<div class="flex items-center gap-1">
 					<button
 						class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-warm-gray-500 hover:bg-creator-blue hover:text-white transition-none"
@@ -283,7 +295,7 @@
 
 			<div class="border-t border-black/10 pt-2 space-y-2">
 				<div class="flex items-center justify-between">
-					<label class="text-ui-label block">{$_('ui.variants')}</label>
+					<p class="text-ui-label block">{$_('ui.variants')}</p>
 					<button
 						class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-warm-gray-500 hover:bg-creator-blue hover:text-white transition-none"
 						onclick={() => addVariant(route)}
@@ -307,8 +319,9 @@
 	{/if}
 
 	<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
-		<label class="text-ui-label block">{$_('ui.description')}</label>
+		<label for={'route-description-' + route.id} class="text-ui-label block">{$_('ui.description')}</label>
 		<textarea
+			id={'route-description-' + route.id}
 			value={route.description || ''}
 			oninput={(event) => updateRoute({ description: event.currentTarget.value })}
 			rows={mobile ? 2 : 1}

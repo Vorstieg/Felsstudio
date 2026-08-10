@@ -9,15 +9,18 @@ export function createToolInteraction({
 	setActiveTool,
 	setOptionsOpen,
 	shouldOpenOptionsOnSelect = () => false,
-	neutralTool
+	neutralTool,
+	getNeutralTool = () => neutralTool
 }) {
+	const resolveNeutralTool = () => getNeutralTool();
+
 	function selectTool(tool) {
 		if (tool.disabled) return;
 		vibrateOnAction('selection');
 
 		const isActive = getActiveTool() === tool.id;
-		if (tool.id === neutralTool) {
-			setActiveTool(neutralTool);
+		if (tool.id === resolveNeutralTool()) {
+			setActiveTool(resolveNeutralTool());
 			setOptionsOpen(false);
 			return;
 		}
@@ -36,7 +39,7 @@ export function createToolInteraction({
 		vibrateOnAction(vibration);
 		action.run?.();
 		if ((action === finish || action === cancel) && !action.keepActive) {
-			setActiveTool(neutralTool);
+			setActiveTool(resolveNeutralTool());
 		}
 	}
 

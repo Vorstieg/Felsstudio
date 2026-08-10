@@ -21,7 +21,7 @@
 	<ToolOptions title={$_('ui.outline_tool_options')} open={true} {onClose}>
 
 		<div class="flex flex-col gap-2">
-			<label class="text-xs font-medium text-warm-gray-600">{$_('ui.drawing_mode')}</label>
+			<p class="text-xs font-medium text-warm-gray-600">{$_('ui.drawing_mode')}</p>
 			<div class="grid grid-cols-4 gap-1">
 				{#each OUTLINE_MODES as mode}
 					<button
@@ -42,7 +42,7 @@
 
 		{#if selectedOutlineStyle === 'rock'}
 			<div class="flex flex-col gap-2">
-				<label class="text-xs font-medium text-warm-gray-600">{$_('ui.rock_presets')}</label>
+				<p class="text-xs font-medium text-warm-gray-600">{$_('ui.rock_presets')}</p>
 				<div class="grid grid-cols-5 gap-1">
 					{#each OUTLINE_PRESETS as preset}
 						<button
@@ -64,8 +64,8 @@
 		{/if}
 
 		<div class="flex flex-col gap-2">
-			<label class="text-xs font-medium text-warm-gray-600">{$_('ui.line_style')}</label>
-			<select bind:value={selectedOutlineStyle} class="h-8 rounded-sm border border-black/15 bg-white px-2 text-xs text-near-black outline-none">
+			<label for="outline-line-style" class="text-xs font-medium text-warm-gray-600">{$_('ui.line_style')}</label>
+			<select id="outline-line-style" bind:value={selectedOutlineStyle} class="h-8 rounded-sm border border-black/15 bg-white px-2 text-xs text-near-black outline-none">
 				{#each OUTLINE_STYLES as style}
 					<option value={style.id}>{$_(style.labelKey)}</option>
 				{/each}
@@ -73,7 +73,7 @@
 		</div>
 
 		<div class="flex flex-col gap-2">
-			<label class="text-xs font-medium text-warm-gray-600">{$_('ui.fill_color')}</label>
+			<p class="text-xs font-medium text-warm-gray-600">{$_('ui.fill_color')}</p>
 			<div class="grid grid-cols-6 gap-1">
 				{#each OUTLINE_FILL_COLORS as color}
 					<button
@@ -122,7 +122,7 @@
 
 		<div class="flex flex-col gap-2">
 			<div class="flex items-center gap-2">
-				<label class="text-xs font-medium text-warm-gray-600">{$_('ui.snap_to_grid')}</label>
+				<p class="text-xs font-medium text-warm-gray-600">{$_('ui.snap_to_grid')}</p>
 				<button
 					class="w-8 h-6 flex items-center justify-center rounded-sm transition-none {outlineTool?.snapToGrid
 						? 'bg-creator-blue text-white'

@@ -44,8 +44,9 @@
 
 		<div class="grid grid-cols-1 gap-2">
 			<div class="space-y-1">
-				<label class="text-ui-label">{$_('ui.glb_model')}</label>
+				<label for="glb-model" class="text-ui-label">{$_('ui.glb_model')}</label>
 				<input
+					id="glb-model"
 					type="file"
 					accept=".glb"
 					onchange={(e) => (glbFile = e.target.files[0])}
@@ -53,8 +54,9 @@
 				/>
 			</div>
 			<div class="space-y-1">
-				<label class="text-ui-label">{$_('ui.project_json')}</label>
+				<label for="project-json" class="text-ui-label">{$_('ui.project_json')}</label>
 				<input
+					id="project-json"
 					type="file"
 					accept=".json"
 					onchange={(e) => (projectFile = e.target.files[0])}
@@ -62,8 +64,9 @@
 				/>
 			</div>
 			<div class="space-y-1">
-				<label class="text-ui-label">{$_('ui.crops_directory')}</label>
+				<label for="crops-directory" class="text-ui-label">{$_('ui.crops_directory')}</label>
 				<input
+					id="crops-directory"
 					type="file"
 					multiple
 					webkitdirectory

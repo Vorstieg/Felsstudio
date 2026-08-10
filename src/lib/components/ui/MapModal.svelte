@@ -375,7 +375,7 @@
                 <h2 class="text-section-title leading-none mb-0.5">Geospatial Placement</h2>
                 <p class="text-ui-label !m-0">Coordinate & Orientation Studio</p>
             </div>
-			<button onclick={onClose} class="w-7 h-7 flex items-center justify-center rounded-sm hover:bg-black/5 transition-none border border-transparent hover:border-black/10">
+			<button onclick={onClose} aria-label="Close map" class="w-7 h-7 flex items-center justify-center rounded-sm hover:bg-black/5 transition-none border border-transparent hover:border-black/10">
 				<i class="fa-solid fa-xmark text-near-black text-sm"></i>
 			</button>
 		</div>
@@ -478,7 +478,8 @@
 			<!-- Scale Control -->
 			<div class="absolute right-6 top-1/2 -translate-y-1/2 z-30 bg-white/90 backdrop-blur-md rounded-full shadow-modal border border-black/15 flex flex-col items-center py-4 px-2 gap-3 w-12">
 				<div class="text-[9px] font-bold text-warm-gray-400 uppercase tracking-widest leading-none">Scale</div>
-				<input type="range" min="0.1" max="10" step="0.1" bind:value={uniformScale} oninput={updateScale} class="studio-range-vertical" style="height: 150px;">
+				<label for="model-scale" class="sr-only">Model scale</label>
+				<input id="model-scale" type="range" min="0.1" max="10" step="0.1" bind:value={uniformScale} oninput={updateScale} class="studio-range-vertical" style="height: 150px;">
 				<div class="text-micro-data font-mono font-bold text-near-black leading-none">{uniformScale.toFixed(1)}x</div>
 			</div>
 		</div>
@@ -493,29 +494,6 @@
 </div>
 
 <style>
-	.studio-range {
-		-webkit-appearance: none;
-		background: transparent;
-        height: 18px;
-	}
-	.studio-range::-webkit-slider-thumb {
-		-webkit-appearance: none;
-		height: 10px;
-		width: 10px;
-		border-radius: 2px;
-		background: #ffffff;
-		cursor: pointer;
-		margin-top: -3px;
-		border: 2px solid currentColor;
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-	}
-	.studio-range::-webkit-slider-runnable-track {
-		width: 100%;
-		height: 4px;
-		cursor: pointer;
-		background: rgba(0, 0, 0, 0.1);
-		border-radius: 0px;
-	}
 	.studio-range-vertical {
 		-webkit-appearance: slider-vertical;
 		width: 10px;

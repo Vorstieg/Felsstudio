@@ -25,11 +25,16 @@
 		class="fixed inset-0 z-[9999] flex items-center justify-center"
 		role="dialog"
 		aria-modal="true"
+		tabindex="-1"
 		onkeydown={handleKeydown}
 	>
 		<!-- Backdrop -->
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onclick={handleDismiss}></div>
+		<button
+			type="button"
+			class="absolute inset-0 bg-black/30 backdrop-blur-[2px]"
+			aria-label={$_('auth.cancel')}
+			onclick={handleDismiss}
+		></button>
 
 		<!-- Modal -->
 		<div class="auth-modal panel relative z-10 w-full max-w-sm mx-4 shadow-modal">

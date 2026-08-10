@@ -41,7 +41,7 @@
 		setActiveTool: (value) => (activeTool = value),
 		setOptionsOpen: (value) => (toolOptionsOpen = value),
 		shouldOpenOptionsOnSelect: () => !isCompact,
-		neutralTool
+		getNeutralTool: () => neutralTool
 	});
 </script>
 
