@@ -403,12 +403,6 @@ export function createCirclePoints(center, radius2D, canvasSize = {}, segments =
 	return points;
 }
 
-export function createCirclePointsFromEdge(center, edge, canvasSize = {}) {
-	const { baseWidth } = normalizeCanvasSize(canvasSize);
-	const radius2D = distancePx(edge, center, canvasSize) / baseWidth;
-	return createCirclePoints(center, radius2D, canvasSize);
-}
-
 function perpendicularDistancePx(point, lineStart, lineEnd, canvasSize) {
 	const { baseWidth, baseHeight } = normalizeCanvasSize(canvasSize);
 	const x = point[0] * baseWidth;
@@ -608,6 +602,7 @@ export function prepareOutlinesForExport(outlines = [], canvasSize = {}) {
 		return exported;
 	});
 }
+
 import {
 	getPathMidpoints,
 	insertPathVertex,

@@ -1,7 +1,5 @@
 import { generateId } from './id-utils.js';
 
-export const EMPTY_PATHS = Object.freeze({ type: 'FeatureCollection', features: [] });
-
 function clone(value) {
 	return value == null ? value : JSON.parse(JSON.stringify(value));
 }
@@ -15,7 +13,7 @@ function stablePathId(asset, index) {
 	return `path-${source || index + 1}`;
 }
 
-export function isLineStringPath(feature) {
+function isLineStringPath(feature) {
 	return (
 		feature?.type === 'Feature' &&
 		feature.geometry?.type === 'LineString' &&
@@ -148,14 +146,6 @@ export function routesUsingTopoPath(data, pathId) {
 	return (data.routes || []).filter((route) =>
 		(route.pathRefs || []).some((ref) => String(ref.pathId) === String(pathId))
 	);
-}
-
-export function updateTopoPath(data, pathId, coordinates, metadata) {
-	const path = findTopoPath(data, pathId);
-	if (!path) return false;
-	path.geometry = { type: 'LineString', coordinates: clone(coordinates) };
-	if (metadata) path.properties = { ...(path.properties || {}), ...metadata };
-	return true;
 }
 
 export function deleteTopoPath(data, pathId) {

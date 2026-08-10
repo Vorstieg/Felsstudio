@@ -1,7 +1,3 @@
-export const siteTitle = 'Klettergebiete rund um Wien';
-export const siteDescription = 'Finde Klettergebiete die von Wien aus öffentlich erreichbar sind';
-export const siteLink = 'https://felsstudio.vorstieg.eu/';
-
 // Controls how many posts are shown per page on the main blog index pages
 export const cragsPerPage = 50;
 
@@ -15,13 +11,6 @@ export const types = [
 	'alpine-tour',
 	'via-ferrata'
 ];
-
-export const securityRatings = new Map([
-	['Alpine', 1],
-	['Mittel', 2],
-	['Gut', 3],
-	['Sehr Gut', 4]
-]);
 
 export const rockTypes = [
 	'granite',

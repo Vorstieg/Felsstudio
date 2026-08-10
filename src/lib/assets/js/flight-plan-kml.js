@@ -257,10 +257,7 @@ export function exportFlightPlanWaylinesWpml(plan) {
 `;
 }
 
-/**
- * Retained for callers which need inspectable XML.  It is now the executable
- * WPML document, rather than generic KML with non-executable ExtendedData.
- */
+/** Returns the executable WPML document for callers that need inspectable XML. */
 export function exportFlightPlanKml(plan) {
 	return exportFlightPlanWaylinesWpml(plan);
 }

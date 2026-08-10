@@ -11,23 +11,3 @@ export function parseGpx(text) {
 		.map((point) => [parseFloat(point.getAttribute('lon')), parseFloat(point.getAttribute('lat'))])
 		.filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]));
 }
-
-function cloneCoordinates(coordinates = []) {
-	return coordinates.map((point) => [Number(point?.[0]), Number(point?.[1])]);
-}
-
-export function coordinatesToPathGeoJson(coordinates = []) {
-	return {
-		type: 'LineString',
-		coordinates: cloneCoordinates(coordinates).filter(
-			(point) => Number.isFinite(point[0]) && Number.isFinite(point[1])
-		)
-	};
-}
-
-export function pathGeoJsonToCoordinates(path) {
-	if (!path || path.type !== 'LineString' || !Array.isArray(path.coordinates)) return [];
-	return cloneCoordinates(path.coordinates).filter(
-		(point) => Number.isFinite(point[0]) && Number.isFinite(point[1])
-	);
-}

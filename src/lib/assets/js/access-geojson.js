@@ -30,10 +30,6 @@ export function createAccessFeature({
 	};
 }
 
-export function accessFeaturesByKind(collection, kind) {
-	return (collection?.features || []).filter((feature) => feature?.properties?.kind === kind);
-}
-
 export function normalizeAccessCollection(data) {
 	if (data?.type !== 'FeatureCollection' || !Array.isArray(data.features)) {
 		return createAccessCollection();

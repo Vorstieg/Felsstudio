@@ -62,12 +62,3 @@ export function initializeIdCounters(topo) {
 		}
 	});
 }
-
-// Reset counters (useful for testing or when loading a new topo)
-export function resetIdCounters() {
-	routeIdCounter = 1;
-	outlineIdCounter = 1;
-	symbolIdCounter = 1;
-	textIdCounter = 1;
-	genericIdCounter = 1;
-}
