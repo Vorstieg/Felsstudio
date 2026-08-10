@@ -1,8 +1,6 @@
 <script>
 	import ToolBar from '$lib/components/editor/tools/ToolBar.svelte';
 	import { _ } from 'svelte-i18n';
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 
 	let {
 		activeTool = $bindable(null),

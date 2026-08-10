@@ -36,7 +36,7 @@ export class EditablePathEditTool {
 		return activeTool === 'select' || activeTool === this.id || activeTool === 'eraser';
 	}
 
-	handlePointDown(event, point, canvasInput) {
+	handlePointDown(event, point, _canvasInput) {
 		if (!this.isEditMode()) return false;
 		const target = this.targetFromPoint(point);
 		const path = target && this.getEditablePath(target);
@@ -54,7 +54,7 @@ export class EditablePathEditTool {
 		return true;
 	}
 
-	handleMidpointDown(event, midpoint, canvasInput) {
+	handleMidpointDown(event, midpoint, _canvasInput) {
 		if (!this.isEditMode()) return false;
 		const target = this.targetFromMidpoint(midpoint);
 		const path = target && this.getEditablePath(target);

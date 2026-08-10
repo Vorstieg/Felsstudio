@@ -20,7 +20,7 @@
 	const fixpoints = topoSymbols.filter((symbol) => symbol.type === 'fixpoint');
 	const features = topoSymbols.filter((symbol) => symbol.type === 'feature');
 
-	function selectSymbolTool(id, symbols, { isActive } = {}) {
+	function selectSymbolTool(_id, symbols, { isActive } = {}) {
 		if (isActive) return;
 		if (!symbols.some((symbol) => symbol.id === selectedSymbol)) {
 			selectedSymbol = symbols[0].id;

@@ -17,7 +17,7 @@ function canvasMetrics(canvasSize = {}) {
 	};
 }
 
-function imagePlacementMetrics(imageData, canvas, placement) {
+function imagePlacementMetrics(canvas, placement) {
 	if (!placement) {
 		return { x: 0, y: 0, width: canvas.width, height: canvas.height };
 	}
@@ -155,7 +155,7 @@ export function findBrushImageEdge(
 	if (!imageData?.data || !Number.isFinite(imageData.width) || !Number.isFinite(imageData.height))
 		return null;
 	const canvas = canvasMetrics(canvasSize);
-	const placement = imagePlacementMetrics(imageData, canvas, imagePlacement);
+	const placement = imagePlacementMetrics(canvas, imagePlacement);
 	const stroke = cleanStroke(strokePoints, canvasSize);
 	if (stroke.length < 2) return null;
 	const scaleX = imageData.width / placement.width;

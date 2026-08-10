@@ -1,4 +1,3 @@
-import { select } from 'd3-selection';
 import { topoSymbols } from '@vorstieg/topo-renderer';
 import { getTouchTargetSize } from '$lib/assets/js/mobile-utils.js';
 

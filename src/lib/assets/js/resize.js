@@ -76,7 +76,6 @@ export function resize(element) {
 
 		const currentTop = parseFloat(element.style.top);
 		const currentHeight = parseFloat(element.style.height);
-		let currentBottom = currentTop + currentHeight;
 
 		let direction = 0;
 		if (lastY !== null && initialPos !== null) {
@@ -120,8 +119,6 @@ export function resize(element) {
 		lastY = null;
 	}
 
-	let lastTimestamp;
-
 	function onMousedown(event) {
 		if (!isMobile()) return;
 
@@ -130,7 +127,6 @@ export function resize(element) {
 		initialRect = { top: rect.top, height: rect.height };
 		initialPos = { y: getEventY(event) };
 		lastY = initialPos.y;
-		lastTimestamp = Date.now();
 		active.classList.add('selected');
 		element.style.transition = 'border-radius 0.2s ease-out';
 		document.body.style.setProperty('--info-panel-transition', 'none');
@@ -234,7 +230,6 @@ export function resize(element) {
 				initialRect = { top: rect.top, height: rect.height };
 				initialPos = { y: contentInitialY };
 				lastY = contentInitialY;
-				lastTimestamp = Date.now();
 
 				element.style.transition = 'border-radius 0.2s ease-out';
 				document.body.style.setProperty('--info-panel-transition', 'none');

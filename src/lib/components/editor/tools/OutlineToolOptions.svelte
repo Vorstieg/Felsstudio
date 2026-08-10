@@ -9,7 +9,6 @@
 	import ToolOptions from './ToolOptions.svelte';
 	let {
 		outlineTool = null,
-		activeTool = null,
 		selectedOutlineStyle = $bindable('rock'),
 		onClose = () => {}
 	} = $props();

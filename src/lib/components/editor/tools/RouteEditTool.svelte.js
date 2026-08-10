@@ -92,7 +92,7 @@ export class RouteEditTool extends EditablePathEditTool {
 		};
 	}
 
-	handleLabelDown(event, label, canvasInput) {
+	handleLabelDown(event, label, _canvasInput) {
 		if (!this.isEditMode()) return false;
 		event.stopPropagation?.();
 		this.startInteraction('move-route-label', {

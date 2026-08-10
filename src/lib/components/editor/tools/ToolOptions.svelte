@@ -1,6 +1,5 @@
 <script>
 	import { _ } from 'svelte-i18n';
-	import { onMount } from 'svelte';
 
 	let {
 		title,

@@ -8,7 +8,6 @@
 		activeTool = $bindable('select'),
 		toolOptionsOpen = $bindable(false),
 		currentTrackPoints = [],
-		trackDraftMode = 'routing',
 		isRoutingTrack = false,
 		hasPendingTrackCut = false,
 		onBack = () => {},

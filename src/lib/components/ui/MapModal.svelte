@@ -16,7 +16,6 @@
 	let mapContainer;
 	let map;
 	let customLayer;
-	let isPinned = $state(false);
 	
 	let uniformScale = $state(modelScale?.[0] || 1);
 	function updateScale() {

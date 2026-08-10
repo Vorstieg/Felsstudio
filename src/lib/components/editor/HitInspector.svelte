@@ -2,7 +2,6 @@
 	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
 	const userState = getTopoEditorSession();
 	import { _ } from 'svelte-i18n';
-	import { Vector3 } from 'three';
 
 	let selectedCluster = $derived(
 		userState.clustering.clusters.find((c) => c.id === userState.clustering.lockedClusterId)

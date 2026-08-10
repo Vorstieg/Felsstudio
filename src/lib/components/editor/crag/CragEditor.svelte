@@ -12,13 +12,7 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 	import CragEditorMap from '$lib/components/editor/crag/CragEditorMap.svelte';
 	import CragEditorLayout from '$lib/components/editor/crag/CragEditorLayout.svelte';
 	import RouteDetailModal from '$lib/components/editor/crag/RouteDetailModal.svelte';
-	import {
-		availableTags,
-		commonEquipment,
-		CRAG_SESSION_KEY,
-		cragTypes,
-		securityOptions
-	} from '$lib/components/editor/crag/crag-editor-options.js';
+	import { CRAG_SESSION_KEY } from '$lib/components/editor/crag/crag-editor-options.js';
 	import { writeFile, writeJson } from '$lib/api/felslager.js';
 	import { authState } from '$lib/api/auth.svelte.js';
 	import { storage } from '$lib/assets/js/storage-utils.js';
@@ -42,7 +36,6 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 		syncFlightPlanPreview
 	} from '$lib/components/editor/crag/crag-editor-map.js';
 	import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.js';
-	import { rockTypes } from '$lib/config.js';
 	import { createRouteEditController } from './route-editing.js';
 
 	let { inspectorShadow = true } = $props();
@@ -53,7 +46,6 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 	let isMedium = $derived(viewport.isMedium);
 	let isExpanded = $derived(viewport.isExpanded);
 	let isLandscape = $derived(viewport.isLandscape);
-	let isTouch = $derived(viewport.isTouch);
 
 	let map = $state();
 	let cragMarker;
@@ -126,15 +118,8 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 	const addTrackPoint = (...args) => trackEditor.addTrackPoint(...args);
 	const handleTrackConfirm = (...args) => trackEditor.handleTrackConfirm(...args);
 	const startRoutingDraft = (...args) => trackEditor.startRoutingDraft(...args);
-	const setTrackDraftMode = (...args) => trackEditor.setTrackDraftMode(...args);
 	const undoTrackPoint = (...args) => trackEditor.undoTrackPoint(...args);
-	const reverseTrack = (...args) => trackEditor.reverseTrack(...args);
-	const trimTrackStart = (...args) => trackEditor.trimTrackStart(...args);
-	const trimTrackEnd = (...args) => trackEditor.trimTrackEnd(...args);
-	const simplifyTrack = (...args) => trackEditor.simplifyTrack(...args);
-	const removeTrack = (...args) => trackEditor.removeTrack(...args);
 	const splitEditingTrack = (...args) => trackEditor.splitEditingTrack(...args);
-	const finalizeTrack = (...args) => trackEditor.finalizeTrack(...args);
 	const editTrack = (...args) => {
 		toolOptionsOpen = true;
 		return trackEditor.editTrack(...args);
@@ -144,7 +129,6 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 		return trackEditor.editRoutePath(...args);
 	};
 	const cancelTrackEdit = (...args) => trackEditor.cancelTrackEdit(...args);
-	const handleGpxUpload = (...args) => trackEditor.handleGpxUpload(...args);
 
 	const accessEditor = useCragAccessEditor({
 		state: cragEditorState,
@@ -154,12 +138,10 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 	});
 	let detectedAssets = $derived(accessEditor.detectedAssets);
 	const scanNearbyAssets = (...args) => accessEditor.scanNearbyAssets(...args);
-	const setHoverHighlight = (...args) => accessEditor.setHoverHighlight(...args);
 	const addDetectedAsset = (...args) => accessEditor.addDetectedAsset(...args);
 	const addTransitPoint = (...args) => accessEditor.addTransitPoint(...args);
 	const addParkingPoint = (...args) => accessEditor.addParkingPoint(...args);
 	const addHutPoint = (...args) => accessEditor.addHutPoint(...args);
-	const removeAccessFeature = (...args) => accessEditor.removeAccessFeature(...args);
 
 	const sectorTool = createCragSectorTool({
 		state: cragEditorState,
@@ -186,8 +168,6 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 	let vertexDeleteUndo = $derived(sectorMapEditor.vertexDeleteUndo);
 	let draggingSectorMarkerId = $derived(sectorMapEditor.draggingSectorMarkerId);
 	const syncSectorMarkers = (...args) => sectorMapEditor.syncSectorMarkers(...args);
-	const undoSectorVertexDelete = (...args) => sectorMapEditor.undoSectorVertexDelete(...args);
-	const { createSector, duplicateSector, removeSector, moveSector, setSectorGeometryType, focusSector } = sectorTool;
 
 	routeTool = createCragRouteTool({
 		state: cragEditorState,
@@ -200,19 +180,6 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 		editRoutePathTrack,
 		setActiveTool: (value) => (activeTool = value)
 	});
-	const {
-		addRoute,
-		deleteRoute,
-		selectRoute,
-		updateRoute,
-		addRoutePath,
-		assignExistingRoutePath,
-		createRoutePathFromAccess,
-		editRoutePath,
-		updateRoutePath,
-		removeRoutePath,
-		deleteRoutePath
-	} = routeTool;
 
 	const selectTool = createCragSelectTool({
 		getMap: () => map,

@@ -19,7 +19,6 @@
 	const cragEditorState = createCragEditorSession();
 
 	let isLoading = $state(false);
-	let error = $state(null);
 	let searchQuery = $state('');
 	let workSpaceWrapper = $derived(new WorkSpace(workspace));
 

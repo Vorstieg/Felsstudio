@@ -103,7 +103,6 @@ export function createCanvasInput({
 
 		select(svgElement).call(zoomBehavior);
 
-		const options = { passive: false };
 		const captureOptions = { passive: false, capture: true };
 		const startedOnEditControl = (event) =>
 			event.target?.closest?.(

@@ -33,7 +33,6 @@
 
 	let { workspace = '3d-create', children } = $props();
 	const userState = provideTopoEditorSession(createTopoEditorSession());
-	let isMobile = $state(false);
 	let saveStatus = $state('idle');
 	let saveError = $state('');
 
@@ -51,7 +50,6 @@
 	let modelComponent = $state();
 	let editorInternal = $state();
 	let drawingTarget = $state(null);
-	let hasPendingChanges = $state(false);
 
 	// Lasso state
 	let selectedIndicesMap = $state(new Map());
@@ -83,9 +81,6 @@
 
 	let element = $state();
 	let loadedGltfScene = $state(null);
-	let modelPositionOffset = $state(userState.topo.modelOffset || [0, 0, 0]);
-	let isLoadingGltf = $state(false);
-	let gltfError = $state(null);
 
 	let showMapModal = $state(false);
 
@@ -314,17 +309,6 @@
 		modelComponent?.clearLassoSelection();
 	}
 
-	function handleGenerate2DTopo() {
-		//TODO: Actually implement this
-		try {
-			const result = generate2DFromTopo(userState.topo);
-			if (result.updatedRoutes > 0 || result.updatedFixPoints > 0) {
-				userState.topo.editorMode = '2d';
-			}
-		} catch (err) {
-			console.error('Error generating 2D topo:', err);
-		}
-	}
 
 	function estimateGpsOrigin() {
 		const pairs = [];

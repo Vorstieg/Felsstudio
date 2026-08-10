@@ -5,8 +5,6 @@
  * using cylindrical projection to minimize empty space.
  */
 
-import { generateOutlineId } from './id-utils.js';
-
 /**
  * Calculate the centroid (geometric center) of a set of points
  */

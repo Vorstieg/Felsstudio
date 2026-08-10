@@ -97,7 +97,7 @@ export function buildTopo2DRenderModel({
 	topo.routes.forEach((route, index) => {
 		const addRouteLine = ({
 			points,
-			id,
+			id: _id,
 			label,
 			pitchId = null,
 			variantId = null,
