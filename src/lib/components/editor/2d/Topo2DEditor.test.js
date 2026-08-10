@@ -52,8 +52,8 @@ describe('Topo2DEditor', () => {
 		await fireEvent.mouseUp(canvas, { clientX: 120, clientY: 880 });
 
 		await vi.waitFor(() => {
-			expect(canvas.querySelectorAll('circle.route-point-handle')).toHaveLength(3);
-			expect(canvas.querySelectorAll('circle.route-midpoint')).toHaveLength(2);
+			expect(canvas.querySelectorAll('circle.editable-path-point-handle')).toHaveLength(3);
+			expect(canvas.querySelectorAll('circle.editable-path-midpoint')).toHaveLength(2);
 		});
 	});
 });

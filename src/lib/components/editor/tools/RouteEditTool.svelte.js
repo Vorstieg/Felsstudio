@@ -25,16 +25,16 @@ export class RouteEditTool extends EditablePathEditTool {
 			getEditablePath,
 			startInteraction: context?.selection?.startInteraction || startInteraction,
 			saveHistory: context?.history?.save || saveHistory,
+			isSelected,
+			selectObject,
+			getIsShiftPressed,
+			getMobileSelectionMode,
+			beginSelectionMove,
 			targetFromPoint: ({ routeId, pitchId, variantId }) => ({ routeId, pitchId, variantId }),
 			targetFromMidpoint: ({ routeId, pitchId, variantId }) => ({ routeId, pitchId, variantId })
 		});
 		this.getTopo = getTopo || (() => ({ routes: [] }));
-		this.isSelected = context?.selection?.isSelected || isSelected || (() => false);
-		this.selectObject = context?.selection?.selectObject || selectObject || (() => {});
 		this.selectPath = context?.selection?.selectPath || null;
-		this.getIsShiftPressed = getIsShiftPressed || (() => false);
-		this.getMobileSelectionMode = getMobileSelectionMode || (() => false);
-		this.beginSelectionMove = beginSelectionMove || (() => null);
 		this.setDrawingTarget = setDrawingTarget || (() => {});
 		this.deleteRoutes = context?.commands?.deleteRoutes || null;
 		this.getSelectedRoutePoints = getSelectedRoutePoints || (() => []);
@@ -60,46 +60,36 @@ export class RouteEditTool extends EditablePathEditTool {
 	}
 
 	handleRouteDown(event, routeTarget, canvasInput) {
-		if (!this.isEditMode()) return false;
-		const mouse = canvasInput.normalizeEvent(event)?.point;
-		if (!mouse) return false;
-		event.stopPropagation?.();
-
-		const { id, pitchId = null, variantId = null } = routeTarget;
-		if (this.getActiveTool() === 'eraser') {
-			if (this.delete([id])) this.saveHistory();
-			return true;
-		}
-		if (event?.identifier != null && this.getMobileSelectionMode()) {
-			this.selectObject('route', id, true);
-			return true;
-		}
-		if (this.getIsShiftPressed()) {
-			this.selectObject('route', id, true);
-			return true;
-		}
-		if (this.selectPath && (pitchId || variantId)) {
-			this.selectPath(pitchId ? 'pitch' : 'variant', id, pitchId || variantId);
-		} else if (!this.isSelected('route', id)) {
-			this.selectObject('route', id, this.getIsShiftPressed());
-		}
-		this.setDrawingTarget(
-			pitchId
-				? { type: 'pitch', routeId: id, pitchId }
-				: variantId
-					? { type: 'variant', routeId: id, variantId }
-					: null
-		);
-		this.startInteraction('move-selection', this.beginSelectionMove(mouse));
-		return true;
+		return this.handleItemDown(event, routeTarget, canvasInput, this.routeItemOptions());
 	}
 
 	handleTouchRouteDown(event, routeTarget, canvasInput) {
-		if (event.touches.length !== 1) return false;
-		event.preventDefault();
-		event.stopPropagation();
-		canvasInput.trackTouch(event.touches[0]);
-		return this.handleRouteDown(event.touches[0], routeTarget, canvasInput);
+		return this.handleTouchItemDown(event, routeTarget, canvasInput, this.routeItemOptions());
+	}
+
+	routeItemOptions() {
+		return {
+			type: 'route',
+			remove: (ids) => this.delete(ids),
+			beforeMove: ({ id, pitchId = null, variantId = null }) => {
+				if (this.selectPath && (pitchId || variantId)) {
+					this.selectPath(pitchId ? 'pitch' : 'variant', id, pitchId || variantId);
+					this.setDrawingTarget(
+						pitchId
+							? { type: 'pitch', routeId: id, pitchId }
+							: { type: 'variant', routeId: id, variantId }
+					);
+					return false;
+				}
+				this.setDrawingTarget(
+					pitchId
+						? { type: 'pitch', routeId: id, pitchId }
+						: variantId
+							? { type: 'variant', routeId: id, variantId }
+							: null
+				);
+			}
+		};
 	}
 
 	handleLabelDown(event, label, canvasInput) {

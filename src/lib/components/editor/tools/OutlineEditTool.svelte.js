@@ -33,6 +33,11 @@ export class OutlineEditTool extends EditablePathEditTool {
 			getEditablePath,
 			startInteraction: context?.selection?.startInteraction || startInteraction,
 			saveHistory: context?.history?.save || saveHistory,
+			isSelected,
+			selectObject,
+			getIsShiftPressed,
+			getMobileSelectionMode,
+			beginSelectionMove,
 			targetFromPoint: ({ outlineId }) => ({ outlineId }),
 			targetFromMidpoint: ({ outlineId }) => ({ outlineId })
 		});
@@ -41,11 +46,6 @@ export class OutlineEditTool extends EditablePathEditTool {
 			context?.viewport?.getCanvasSize ||
 			getCanvasSize ||
 			(() => ({ baseWidth: 1, baseHeight: 1 }));
-		this.isSelected = context?.selection?.isSelected || isSelected || (() => false);
-		this.selectObject = context?.selection?.selectObject || selectObject || (() => {});
-		this.getIsShiftPressed = getIsShiftPressed || (() => false);
-		this.getMobileSelectionMode = getMobileSelectionMode || (() => false);
-		this.beginSelectionMove = beginSelectionMove || (() => null);
 		this.updateOutline = context?.commands?.updateOutline || null;
 		this.deleteOutlines = context?.commands?.deleteOutlines || null;
 	}
@@ -129,11 +129,7 @@ export class OutlineEditTool extends EditablePathEditTool {
 	}
 
 	handleSemanticHandleTouch(event, handle, canvasInput) {
-		if (event.touches.length !== 1) return false;
-		event.preventDefault();
-		event.stopPropagation();
-		canvasInput.trackTouch(event.touches[0]);
-		return this.handleSemanticHandleDown(event.touches[0], handle, canvasInput);
+		return this.handleTouchControl(event, this.handleSemanticHandleDown, handle, canvasInput);
 	}
 
 	applySemanticTransform(interaction, mouse) {
@@ -151,36 +147,17 @@ export class OutlineEditTool extends EditablePathEditTool {
 	}
 
 	handleOutlineDown(event, outline, canvasInput) {
-		if (!this.isEditMode()) return false;
-		const mouse = canvasInput.normalizeEvent(event)?.point;
-		if (!mouse) return false;
-		event.stopPropagation?.();
-		if (this.getActiveTool() === 'eraser') {
-			if (this.delete([outline.id])) this.saveHistory();
-			return true;
-		}
-		if (event?.identifier != null && this.getMobileSelectionMode()) {
-			this.selectObject('outline', outline.id, true);
-			return true;
-		}
-		if (this.getIsShiftPressed()) {
-			this.selectObject('outline', outline.id, true);
-			return true;
-		}
-
-		if (!this.isSelected('outline', outline.id)) {
-			this.selectObject('outline', outline.id, this.getIsShiftPressed());
-		}
-		this.startInteraction('move-selection', this.beginSelectionMove(mouse));
-		return true;
+		return this.handleItemDown(event, outline, canvasInput, {
+			type: 'outline',
+			remove: (ids) => this.delete(ids)
+		});
 	}
 
 	handleTouchOutlineDown(event, outline, canvasInput) {
-		if (event.touches.length !== 1) return false;
-		event.preventDefault();
-		event.stopPropagation();
-		canvasInput.trackTouch(event.touches[0]);
-		return this.handleOutlineDown(event.touches[0], outline, canvasInput);
+		return this.handleTouchItemDown(event, outline, canvasInput, {
+			type: 'outline',
+			remove: (ids) => this.delete(ids)
+		});
 	}
 
 	render({ layers, renderModel, baseWidth, baseHeight, canvasInput }) {

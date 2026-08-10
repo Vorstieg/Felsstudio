@@ -8,6 +8,11 @@ export class EditablePathEditTool {
 		mutateDocument,
 		startInteraction,
 		saveHistory,
+		isSelected,
+		selectObject,
+		getIsShiftPressed,
+		getMobileSelectionMode,
+		beginSelectionMove,
 		targetFromPoint,
 		targetFromMidpoint
 	} = {}) {
@@ -18,6 +23,11 @@ export class EditablePathEditTool {
 			context?.commands?.mutateDocument || mutateDocument || ((mutator) => mutator());
 		this.startInteraction = startInteraction || (() => {});
 		this.saveHistory = context?.history?.save || saveHistory || (() => {});
+		this.isSelected = context?.selection?.isSelected || isSelected || (() => false);
+		this.selectObject = context?.selection?.selectObject || selectObject || (() => {});
+		this.getIsShiftPressed = getIsShiftPressed || (() => false);
+		this.getMobileSelectionMode = getMobileSelectionMode || (() => false);
+		this.beginSelectionMove = beginSelectionMove || (() => null);
 		this.targetFromPoint = targetFromPoint || (() => null);
 		this.targetFromMidpoint = targetFromMidpoint || (() => null);
 	}
@@ -57,6 +67,50 @@ export class EditablePathEditTool {
 		return true;
 	}
 
+	/** Shared select, erase, and drag behavior for a rendered editable item. */
+	handleItemDown(
+		event,
+		item,
+		canvasInput,
+		{ type, getId = (value) => value?.id, remove, beforeMove } = {}
+	) {
+		if (!this.isEditMode()) return false;
+		const mouse = canvasInput.normalizeEvent(event)?.point;
+		if (!mouse) return false;
+		event.stopPropagation?.();
+
+		const id = getId(item);
+		if (id == null) return false;
+		if (this.getActiveTool() === 'eraser') {
+			if (remove?.([id])) this.saveHistory();
+			return true;
+		}
+		if (event?.identifier != null && this.getMobileSelectionMode()) {
+			this.selectObject(type, id, true);
+			return true;
+		}
+		if (this.getIsShiftPressed()) {
+			this.selectObject(type, id, true);
+			return true;
+		}
+
+		const shouldSelect = beforeMove?.(item, id) !== false;
+		if (shouldSelect && !this.isSelected(type, id)) {
+			this.selectObject(type, id, false);
+		}
+		this.startInteraction('move-selection', this.beginSelectionMove(mouse));
+		return true;
+	}
+
+	handleTouchItemDown(event, item, canvasInput, options) {
+		return this.handleTouchControl(
+			event,
+			(touchEvent) => this.handleItemDown(touchEvent, item, canvasInput, options),
+			item,
+			canvasInput
+		);
+	}
+
 	handleTouchControl(event, handler, item, canvasInput) {
 		if (event.touches.length !== 1) return false;
 		event.preventDefault();
@@ -86,10 +140,10 @@ export class EditablePathEditTool {
 		const isErasing = this.getActiveTool() === 'eraser';
 
 		handlesLayer
-			.selectAll('circle.route-point-hit-area')
+			.selectAll('circle.editable-path-point-hit-area')
 			.data(pointHandles, pointKey)
 			.join('circle')
-			.attr('class', `route-point-hit-area ${isErasing ? 'cursor-pointer' : 'cursor-move'}`)
+			.attr('class', `editable-path-point-hit-area ${isErasing ? 'cursor-pointer' : 'cursor-move'}`)
 			.attr('cx', (item) => item.point[0] * baseWidth)
 			.attr('cy', (item) => item.point[1] * baseHeight)
 			.attr('r', (item) => item.hitSize)
@@ -101,10 +155,10 @@ export class EditablePathEditTool {
 			.on('click', (event) => event.stopPropagation());
 
 		handlesLayer
-			.selectAll('circle.route-point-handle')
+			.selectAll('circle.editable-path-point-handle')
 			.data(pointHandles, pointKey)
 			.join('circle')
-			.attr('class', 'route-point-handle')
+			.attr('class', 'editable-path-point-handle')
 			.attr('cx', (item) => item.point[0] * baseWidth)
 			.attr('cy', (item) => item.point[1] * baseHeight)
 			.attr('r', (item) => item.handleSize)
@@ -114,10 +168,10 @@ export class EditablePathEditTool {
 			.style('pointer-events', 'none');
 
 		handlesLayer
-			.selectAll('circle.route-midpoint-hit-area')
+			.selectAll('circle.editable-path-midpoint-hit-area')
 			.data(midpoints, midpointKey)
 			.join('circle')
-			.attr('class', 'route-midpoint-hit-area cursor-pointer')
+			.attr('class', 'editable-path-midpoint-hit-area cursor-pointer')
 			.attr('cx', (item) => item.midX * baseWidth)
 			.attr('cy', (item) => item.midY * baseHeight)
 			.attr('r', (item) => item.midpointHitSize)
@@ -130,10 +184,10 @@ export class EditablePathEditTool {
 			);
 
 		handlesLayer
-			.selectAll('circle.route-midpoint')
+			.selectAll('circle.editable-path-midpoint')
 			.data(midpoints, midpointKey)
 			.join('circle')
-			.attr('class', 'route-midpoint')
+			.attr('class', 'editable-path-midpoint')
 			.attr('cx', (item) => item.midX * baseWidth)
 			.attr('cy', (item) => item.midY * baseHeight)
 			.attr('r', (item) => item.midpointSize)
@@ -145,6 +199,6 @@ export class EditablePathEditTool {
 
 		// Midpoint hit targets can overlap nearby vertices on short segments.
 		// Keep vertex targets last in SVG paint order so an existing point wins.
-		handlesLayer.selectAll('circle.route-point-hit-area').raise();
+		handlesLayer.selectAll('circle.editable-path-point-hit-area').raise();
 	}
 }
