@@ -161,7 +161,7 @@
 		</div>
 	</div>
 
-	<div class={mobile ? 'grid grid-cols-2 gap-2' : 'space-y-0.5'}>
+	<div class="space-y-0.5">
 		{#if hasRouteType(route, 'multi-pitch')}
 			<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
 				<label class="text-ui-label block">Line style</label>
@@ -219,7 +219,7 @@
 		<div class="space-y-1">
 			{#each pathRefs() as pathAsset}
 				<div
-					class={`grid grid-cols-12 gap-1 rounded-sm border p-1 cursor-pointer ${userState.ui.selectedRouteId === route.id && userState.ui.selectedPathId === pathAsset.pathId ? 'border-creator-blue bg-creator-blue/5' : 'border-black/10 bg-white'}`}
+					class={`grid grid-cols-12 gap-1 rounded-sm border p-1 cursor-pointer ${String(userState.ui.selectedRouteId) === String(route.id) && String(userState.ui.selectedPathId) === String(pathAsset.pathId) ? 'border-creator-blue bg-creator-blue/5' : 'border-black/10 bg-white'}`}
 					onclick={() => selectPathAsset(route, pathAsset.pathId)}
 				>
 					<select
@@ -241,8 +241,8 @@
 							event.stopPropagation();
 							removePathAsset(route, pathAsset.pathId, userState.topo);
 							if (
-								userState.ui.selectedRouteId === route.id &&
-								userState.ui.selectedPathId === pathAsset.pathId
+								String(userState.ui.selectedRouteId) === String(route.id) &&
+								String(userState.ui.selectedPathId) === String(pathAsset.pathId)
 							)
 								userState.ui.selectedPathId = null;
 						}}

@@ -1,6 +1,5 @@
 {
 	"id": "example-crag:main-wall",
-	"name": "Main Wall",
 	"editorMode": "2d",
 	"paths": {
 		"type": "FeatureCollection",

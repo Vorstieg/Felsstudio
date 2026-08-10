@@ -23,11 +23,14 @@
 		topoJsonError = '',
 		onformatjson,
 		onapplyjson,
+		oneditoutline = null,
 		mobile = false
 	} = $props();
 
 	let selectedOutline = $derived(
-		(userState.topo.outlines || []).find((outline) => outline.id === userState.ui.selectedOutlineId)
+		(userState.topo.outlines || []).find(
+			(outline) => String(outline.id) === String(userState.ui.selectedOutlineId)
+		)
 	);
 
 	function deleteSelectedOutline() {
@@ -86,17 +89,6 @@
 			/>
 		{/if}
 
-		<div class="space-y-1.5 px-1">
-			<label for="name-mobile" class="label-studio">{$_('ui.name')}</label>
-			<input
-				type="text"
-				id="name-mobile"
-				value={userState.topo.name || ''}
-				oninput={(event) => updateTopoField('name', event.currentTarget.value)}
-				class="input-studio w-full"
-				placeholder={$_('ui.name_placeholder')}
-			/>
-		</div>
 		<div class="px-1 pt-2">
 			<ImageUploader />
 		</div>
@@ -112,18 +104,6 @@
 					onapply={onapplyjson}
 				/>
 			{/if}
-
-			<div class="space-y-0.5">
-				<label for="name" class="text-ui-label block">{$_('ui.name')}</label>
-				<input
-					type="text"
-					id="name"
-					value={userState.topo.name || ''}
-					oninput={(event) => updateTopoField('name', event.currentTarget.value)}
-					class="input-studio w-full"
-					placeholder={$_('ui.name_placeholder')}
-				/>
-			</div>
 
 			<div class="space-y-0.5">
 				<label for="author" class="text-ui-label block">{$_('ui.author')}</label>

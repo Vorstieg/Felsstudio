@@ -14,6 +14,13 @@ const COLLECTION_BY_TYPE = Object.freeze({
 
 const collectionForType = (type) => COLLECTION_BY_TYPE[type] || `${type}s`;
 const sameId = (left, right) => String(left) === String(right);
+const routePointKey = ({ routeId, pitchId = null, variantId = null, index }) =>
+	JSON.stringify([
+		String(routeId),
+		pitchId == null ? null : String(pitchId),
+		variantId == null ? null : String(variantId),
+		index
+	]);
 const nextTextId = (topo) => {
 	let id;
 	do id = generateTextId();
@@ -99,6 +106,7 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 		viewport: { baseWidth: 1, baseHeight: 1, transform: null, ...viewport },
 		history: { entries: [], index: -1, savedSnapshot: null },
 		selection: new Set(),
+		selectedRoutePoints: new Set(),
 		selectedItems: new Set(),
 		selectedSymbolInstance: null,
 		interactionState: null,
@@ -110,10 +118,16 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 		state.topo = next;
 		if (setTopo) setTopo(next);
 	};
-	const snapshot = () => clone(readTopo());
+	const snapshot = () => {
+		const document = clone(readTopo());
+		// The display name belongs to the sector/crag entry, not its topo file.
+		delete document.name;
+		return document;
+	};
 
 	function clearSelection() {
 		state.selection = new Set();
+		state.selectedRoutePoints = new Set();
 		projectSelection();
 	}
 
@@ -138,14 +152,26 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 			}
 		}
 		if (!drawingTargetExists(readTopo(), ui.drawingTarget)) ui.drawingTarget = null;
+		if (ui.selectedRouteId == null) state.selectedRoutePoints = new Set();
 	}
 
 	function selectObject(type, id, multi = false) {
+		if (!multi || type !== 'route') state.selectedRoutePoints = new Set();
 		if (!multi) state.selection = new Set();
 		const key = `${type}:${id}`;
 		if (multi && state.selection.has(key)) state.selection.delete(key);
 		else state.selection.add(key);
 		projectSelection();
+	}
+
+	function selectRoutePoints(points, mode = 'replace') {
+		const next = mode === 'replace' ? new Set() : new Set(state.selectedRoutePoints);
+		for (const point of points || []) {
+			const key = routePointKey(point);
+			if (mode === 'subtract') next.delete(key);
+			else next.add(key);
+		}
+		state.selectedRoutePoints = next;
 	}
 
 	function selectItems(items, mode = 'replace') {
@@ -519,6 +545,13 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 		selectObject,
 		selectPath,
 		selectItems,
+		selectRoutePoints,
+		isRoutePointSelected: (target) => state.selectedRoutePoints.has(routePointKey(target)),
+		getSelectedRoutePoints: () =>
+			[...state.selectedRoutePoints].map((key) => {
+				const [routeId, pitchId, variantId, index] = JSON.parse(key);
+				return { routeId, pitchId, variantId, index };
+			}),
 		removeItems,
 		clearSelection,
 		reconcileSelection,

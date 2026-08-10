@@ -4,7 +4,13 @@ import { vibrateOnAction } from '$lib/assets/js/mobile-utils.js';
  * Shared toolbar interaction policy for all editors.
  * Editor-specific state stays in the parent; this module only owns transitions.
  */
-export function createToolInteraction({ getActiveTool, setActiveTool, setOptionsOpen, neutralTool }) {
+export function createToolInteraction({
+	getActiveTool,
+	setActiveTool,
+	setOptionsOpen,
+	shouldOpenOptionsOnSelect = () => false,
+	neutralTool
+}) {
 	function selectTool(tool) {
 		if (tool.disabled) return;
 		vibrateOnAction('selection');
@@ -19,7 +25,7 @@ export function createToolInteraction({ getActiveTool, setActiveTool, setOptions
 		tool.onSelect?.({ tool, isActive });
 		if (!isActive) {
 			setActiveTool(tool.id);
-			setOptionsOpen(Boolean(tool.hasOptions));
+			setOptionsOpen(Boolean(tool.hasOptions && shouldOpenOptionsOnSelect(tool)));
 		} else if (tool.hasOptions) {
 			setOptionsOpen(true);
 		}

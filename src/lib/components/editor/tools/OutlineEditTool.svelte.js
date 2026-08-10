@@ -9,6 +9,9 @@ import {
 
 /** Editing interactions for persisted 2D rock outlines. */
 export class OutlineEditTool extends EditablePathEditTool {
+	snapToGrid = $state(false);
+	gridSize = $state(0.01);
+
 	constructor({
 		context,
 		getTopo,
@@ -44,10 +47,31 @@ export class OutlineEditTool extends EditablePathEditTool {
 		this.getMobileSelectionMode = getMobileSelectionMode || (() => false);
 		this.beginSelectionMove = beginSelectionMove || (() => null);
 		this.updateOutline = context?.commands?.updateOutline || null;
+		this.deleteOutlines = context?.commands?.deleteOutlines || null;
 	}
 
 	getOutline(id) {
-		return this.getTopo().outlines.find((outline) => outline.id === id) || null;
+		return this.getTopo().outlines.find((outline) => String(outline.id) === String(id)) || null;
+	}
+
+	snapPoint(point) {
+		if (!this.snapToGrid || !Number.isFinite(Number(this.gridSize)) || Number(this.gridSize) <= 0) {
+			return point;
+		}
+		const size = Number(this.gridSize);
+		return {
+			x: Math.round(point.x / size) * size,
+			y: Math.round(point.y / size) * size
+		};
+	}
+
+	delete(ids) {
+		if (this.deleteOutlines) return this.deleteOutlines(ids, { recordHistory: false });
+		const idsToDelete = new Set(ids.map(String));
+		const topo = this.getTopo();
+		const before = topo.outlines.length;
+		topo.outlines = topo.outlines.filter((outline) => !idsToDelete.has(String(outline.id)));
+		return topo.outlines.length !== before;
 	}
 
 	simplifyOutline(id, tolerancePx) {
@@ -131,6 +155,10 @@ export class OutlineEditTool extends EditablePathEditTool {
 		const mouse = canvasInput.normalizeEvent(event)?.point;
 		if (!mouse) return false;
 		event.stopPropagation?.();
+		if (this.getActiveTool() === 'eraser') {
+			if (this.delete([outline.id])) this.saveHistory();
+			return true;
+		}
 		if (event?.identifier != null && this.getMobileSelectionMode()) {
 			this.selectObject('outline', outline.id, true);
 			return true;

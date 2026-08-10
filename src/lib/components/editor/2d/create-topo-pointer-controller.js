@@ -1,4 +1,8 @@
-import { createSelectionRegion, getRegionSelection } from './selection-geometry.js';
+import {
+	createSelectionRegion,
+	getRegionSelection,
+	getRoutePointRegionSelection
+} from './selection-geometry.js';
 
 /** Owns the normalized pointer down/up lifecycle for the 2D editor. */
 export function createTopoPointerController({
@@ -8,6 +12,8 @@ export function createTopoPointerController({
 	commitTextComposer,
 	getMobileSelectionMode,
 	getTopo,
+	getSelectedRouteId,
+	getDrawingTarget,
 	getCanvasSize,
 	selection,
 	clearSelection,
@@ -59,10 +65,18 @@ export function createTopoPointerController({
 			const region = createSelectionRegion(interaction.start, interaction.end);
 			const moved = Math.hypot(region.right - region.left, region.bottom - region.top) > 0.005;
 			if (moved) {
-				selection.selectItems(
-					getRegionSelection(getTopo(), region, getCanvasSize()),
-					interaction.mode
-				);
+				const selectedRouteId = getSelectedRouteId?.();
+				const routePoints = selectedRouteId
+					? getRoutePointRegionSelection(getTopo(), selectedRouteId, region, getDrawingTarget?.())
+					: [];
+				if (routePoints.length) selection.selectRoutePoints(routePoints, interaction.mode);
+				else {
+					selection.selectRoutePoints?.([], 'replace');
+					selection.selectItems(
+						getRegionSelection(getTopo(), region, getCanvasSize()),
+						interaction.mode
+					);
+				}
 			} else if (interaction.mode === 'replace') {
 				clearSelection?.();
 			}

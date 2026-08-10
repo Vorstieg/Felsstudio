@@ -17,6 +17,7 @@
 		cancel = null,
 		save = null,
 		mobileSearch,
+		dense = false,
 		controls,
 		children
 	} = $props();
@@ -39,6 +40,7 @@
 		getActiveTool: () => activeTool,
 		setActiveTool: (value) => (activeTool = value),
 		setOptionsOpen: (value) => (toolOptionsOpen = value),
+		shouldOpenOptionsOnSelect: () => !isCompact,
 		neutralTool
 	});
 </script>
@@ -46,11 +48,10 @@
 <div class="fixed top-2 left-2 right-2 z-50">
 	<div class="panel flex items-center justify-between gap-2 bg-white p-1.5 shadow-panel">
 		<div class="flex min-w-0 items-center gap-2.5">
-
 			{#if !isCompact}
 				<div class="flex items-center gap-1">
 					{#each tools.filter((tool) => !tool.hidden) as tool}
-						<ToolButton {tool} active={activeTool === tool.id} onclick={() => selectTool(tool)} />
+						<ToolButton {tool} {dense} active={activeTool === tool.id} onclick={() => selectTool(tool)} />
 					{/each}
 				</div>
 				{@render controls?.()}
@@ -96,16 +97,16 @@
 {#if isCompact}
 	<div class="fixed inset-x-0 z-50 flex justify-center pointer-events-none" style={`bottom: calc(${toolOptionsOpen ? '0px' : 'var(--info-panel-height, 0px)'} + max(0.75rem, env(safe-area-inset-bottom))); transition: var(--info-panel-transition, none); visibility: ${toolOptionsOpen ? 'visible' : 'var(--mobile-toolbar-visibility, visible)'};`}>
 		<div use:observeMobileDock class="flex w-full flex-col gap-0 pointer-events-auto">
-			<div class="panel flex w-full items-center justify-center gap-1 overflow-x-auto rounded-none border-x-0 p-1.5 shadow-panel">
-			{#each tools.filter((tool) => !tool.hidden) as tool}
-				<ToolButton {tool} active={activeTool === tool.id} compact onclick={() => selectTool(tool)} />
-			{/each}
+			<div class={`panel flex w-full items-center justify-center overflow-x-auto rounded-none border-x-0 shadow-panel ${dense ? 'gap-0.5 p-1' : 'gap-1 p-1.5'}`}>
+				{#each tools.filter((tool) => !tool.hidden) as tool}
+					<ToolButton {tool} {dense} active={activeTool === tool.id} compact onclick={() => selectTool(tool)} />
+				{/each}
 				{#if undo || redo}<div class="mx-0.5 h-7 w-px shrink-0 bg-black/15"></div>{/if}
-			{#if undo}<ToolActionButton action={undo} icon="fa-rotate-left" compact onclick={() => runAction(undo, { finish, cancel })} />{/if}
-			{#if redo}<ToolActionButton action={redo} icon="fa-rotate-right" compact onclick={() => runAction(redo, { finish, cancel })} />{/if}
-			{#if finish || cancel}<div class="mx-0.5 h-7 w-px shrink-0 bg-black/15"></div>{/if}
-			{#if finish}<ToolActionButton action={finish} icon="fa-check" variant="finish" compact onclick={() => runAction(finish, { finish, cancel, vibration: 'success' })} />{/if}
-			{#if cancel}<ToolActionButton action={cancel} icon="fa-xmark" variant="cancel" compact onclick={() => runAction(cancel, { finish, cancel })} />{/if}
+				{#if undo}<ToolActionButton action={undo} icon="fa-rotate-left" compact onclick={() => runAction(undo, { finish, cancel })} />{/if}
+				{#if redo}<ToolActionButton action={redo} icon="fa-rotate-right" compact onclick={() => runAction(redo, { finish, cancel })} />{/if}
+				{#if finish || cancel}<div class="mx-0.5 h-7 w-px shrink-0 bg-black/15"></div>{/if}
+				{#if finish}<ToolActionButton action={finish} icon="fa-check" variant="finish" compact onclick={() => runAction(finish, { finish, cancel, vibration: 'success' })} />{/if}
+				{#if cancel}<ToolActionButton action={cancel} icon="fa-xmark" variant="cancel" compact onclick={() => runAction(cancel, { finish, cancel })} />{/if}
 			</div>
 		</div>
 	</div>

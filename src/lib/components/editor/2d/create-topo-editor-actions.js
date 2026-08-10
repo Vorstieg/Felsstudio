@@ -4,6 +4,7 @@ export function createTopoEditorActions({
 	getDraftState,
 	getSelectedOutlineId,
 	getOutlineEditTool,
+	setActiveTool,
 	setDrawingTarget,
 	clearSelection
 }) {
@@ -35,6 +36,7 @@ export function createTopoEditorActions({
 		else tool?.onKeyDown?.({ key: 'Escape' });
 		setDrawingTarget(null);
 		clearSelection();
+		setActiveTool?.('select');
 	}
 
 	function simplifySelectedOutline(tolerancePx) {

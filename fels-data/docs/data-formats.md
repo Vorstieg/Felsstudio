@@ -80,6 +80,7 @@ Sector properties include:
 
 - `id`, `name`, and numeric `sort` order.
 - `type`, `tags`, `security`, and `rock_type`.
+- `wallAzimuth`: compass direction faced by the wall, in degrees from north (`0`–`359`).
 - German and English descriptions and approach information.
 - `topo` for an optional external topo reference.
 - `assets.images`,

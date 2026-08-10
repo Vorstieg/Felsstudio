@@ -48,9 +48,13 @@ export function createTopoInteractionController({
 		}
 
 		if (interaction.kind === 'move-point') {
-			const snapped = snapRoutePoint(mouse);
+			const snapped = interaction.outlineId
+				? { point: outlineEditTool?.snapPoint(mouse) || mouse, fixPointId: null }
+				: snapRoutePoint(mouse);
 			const route = interaction.routeId
-				? getTopo().routes.find((candidate) => candidate.id === interaction.routeId)
+				? getTopo().routes.find(
+						(candidate) => String(candidate.id) === String(interaction.routeId)
+					)
 				: null;
 			(mutateDocument || ((mutator) => mutator()))(() => {
 				if (route) referenceFixpoint(route, snapped.fixPointId);
@@ -58,6 +62,17 @@ export function createTopoInteractionController({
 					snapped.point.x,
 					snapped.point.y
 				]);
+			});
+			return;
+		}
+
+		if (interaction.kind === 'move-points') {
+			const dx = mouse.x - interaction.startMouse.x;
+			const dy = mouse.y - interaction.startMouse.y;
+			(mutateDocument || ((mutator) => mutator()))(() => {
+				for (const { target, start } of interaction.points || []) {
+					getEditablePath?.(target)?.movePoint(target.index, [start[0] + dx, start[1] + dy]);
+				}
 			});
 			return;
 		}

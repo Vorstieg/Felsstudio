@@ -19,7 +19,7 @@ export function renderRoutesLayer({
 		activeTool === 'select' || activeTool === 'eraser' || activeTool === routeEditTool?.id;
 	const handleRouteDown = (event, route) => {
 		const target = { id: route.id, pitchId: route.pitchId, variantId: route.variantId };
-		if (activeTool === 'select' || activeTool === routeEditTool?.id) {
+		if (['select', 'eraser', routeEditTool?.id].includes(activeTool)) {
 			routeEditTool.handleRouteDown(event, target, canvasInput);
 		} else {
 			handleObjectMouseDown(event, { type: 'route', ...target });
@@ -28,7 +28,7 @@ export function renderRoutesLayer({
 	const handleRouteTouch = (event, route) => {
 		if (event.touches.length !== 1) return;
 		const target = { id: route.id, pitchId: route.pitchId, variantId: route.variantId };
-		if (activeTool === 'select' || activeTool === routeEditTool?.id) {
+		if (['select', 'eraser', routeEditTool?.id].includes(activeTool)) {
 			routeEditTool.handleTouchRouteDown(event, target, canvasInput);
 		} else {
 			event.preventDefault();

@@ -59,10 +59,15 @@
 	undo={onUndo ? { label: `${$_('ui.undo_desc')} (Ctrl+Z)`, run: onUndo } : null}
 	redo={onRedo ? { label: `${$_('ui.redo_desc')} (Ctrl+Y)`, run: onRedo } : null}
 	finish={hasPendingChanges && onFinishRoute
-		? { label: $_('ui.finish'), run: onFinishRoute, keepActive: activeTool === 'multipitch' }
+		? {
+				label: $_('ui.finish'),
+				run: onFinishRoute,
+				keepActive: activeTool === 'route' || activeTool === 'multipitch'
+			}
 		: null}
 	cancel={hasPendingChanges && onCancelAction
 		? { label: $_('ui.cancel'), run: onCancelAction }
 		: null}
 	save={onExport ? { status, errorMessage, run: onExport } : null}
+	dense
 />

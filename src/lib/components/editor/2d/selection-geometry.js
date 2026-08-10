@@ -78,3 +78,30 @@ export function getRegionSelection(topo, region, canvasSize) {
 	});
 	return selected;
 }
+
+export function getRoutePointRegionSelection(topo, routeId, region, drawingTarget = null) {
+	const route = (topo.routes || []).find((item) => String(item.id) === String(routeId));
+	if (!route) return [];
+
+	let paths = [];
+	if (drawingTarget?.routeId != null && String(drawingTarget.routeId) === String(route.id)) {
+		if (drawingTarget.type === 'pitch') {
+			const pitch = (route.pitches || []).find(
+				(item) => String(item.id) === String(drawingTarget.pitchId)
+			);
+			if (pitch) paths = [{ points: pitch.points2D, pitchId: pitch.id }];
+		} else if (drawingTarget.type === 'variant') {
+			const variant = (route.variants || []).find(
+				(item) => String(item.id) === String(drawingTarget.variantId)
+			);
+			if (variant) paths = [{ points: variant.points2D, variantId: variant.id }];
+		}
+	}
+	if (!paths.length && route.points2D) paths = [{ points: route.points2D }];
+
+	return paths.flatMap(({ points = [], pitchId = null, variantId = null }) =>
+		points.flatMap((point, index) =>
+			isInside(point, region) ? [{ routeId: route.id, pitchId, variantId, index }] : []
+		)
+	);
+}

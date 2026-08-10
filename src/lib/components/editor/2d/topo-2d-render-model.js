@@ -19,6 +19,7 @@ export function buildTopo2DRenderModel({
 	topo,
 	ui,
 	isSelected,
+	isRoutePointSelected = () => false,
 	selectionSize,
 	activeTool,
 	drawingTarget,
@@ -163,12 +164,11 @@ export function buildTopo2DRenderModel({
 	const routePointHandles = [];
 	const addPointHandles = (routeId, pitchId, variantId, points) => {
 		points?.forEach((point, index) => {
+			const target = { routeId, pitchId, variantId, index };
 			routePointHandles.push({
-				routeId,
-				pitchId,
-				variantId,
-				index,
+				...target,
 				point,
+				selected: isRoutePointSelected(target),
 				// Keep the visual control compact. Its larger hit area is rendered separately
 				// so touch editing stays practical without obscuring the route.
 				handleSize: activeTool === 'eraser' ? 5 : 3,
@@ -177,7 +177,9 @@ export function buildTopo2DRenderModel({
 		});
 	};
 	if (!isInteractionActive && singleSelection && ui.selectedRouteId) {
-		const route = topo.routes.find((item) => item.id === ui.selectedRouteId);
+		const route = topo.routes.find(
+			(item) => String(item.id) === String(ui.selectedRouteId)
+		);
 		if (route?.points2D) addPointHandles(route.id, null, null, route.points2D);
 	}
 	if (
@@ -187,13 +189,19 @@ export function buildTopo2DRenderModel({
 			activeTool === 'multipitch') &&
 		drawingTarget
 	) {
-		const route = topo.routes.find((item) => item.id === drawingTarget.routeId);
+		const route = topo.routes.find(
+			(item) => String(item.id) === String(drawingTarget.routeId)
+		);
 		if (drawingTarget.type === 'pitch') {
-			const pitch = route?.pitches?.find((item) => item.id === drawingTarget.pitchId);
+			const pitch = route?.pitches?.find(
+				(item) => String(item.id) === String(drawingTarget.pitchId)
+			);
 			if (pitch?.points2D) addPointHandles(route.id, pitch.id, null, pitch.points2D);
 		}
 		if (drawingTarget.type === 'variant') {
-			const variant = route?.variants?.find((item) => item.id === drawingTarget.variantId);
+			const variant = route?.variants?.find(
+				(item) => String(item.id) === String(drawingTarget.variantId)
+			);
 			if (variant?.points2D) addPointHandles(route.id, null, variant.id, variant.points2D);
 		}
 	}

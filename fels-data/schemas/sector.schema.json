@@ -27,6 +27,7 @@
 				"tags": { "type": "array", "items": { "type": "string" } },
 				"security": { "type": "string" },
 				"rock_type": { "type": "string" },
+				"wallAzimuth": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
 				"description_de": { "type": "string" },
 				"description_en": { "type": "string" },
 				"approach_de": { "type": "string" },

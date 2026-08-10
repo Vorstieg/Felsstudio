@@ -108,7 +108,7 @@ export class EditablePathEditTool {
 			.attr('cx', (item) => item.point[0] * baseWidth)
 			.attr('cy', (item) => item.point[1] * baseHeight)
 			.attr('r', (item) => item.handleSize)
-			.attr('fill', isErasing ? '#fee2e2' : 'white')
+			.attr('fill', (item) => (isErasing ? '#fee2e2' : item.selected ? '#f59e0b' : 'white'))
 			.attr('stroke', isErasing ? '#ef4444' : '#3b82f6')
 			.attr('stroke-width', 2)
 			.style('pointer-events', 'none');
@@ -142,5 +142,9 @@ export class EditablePathEditTool {
 			.attr('stroke', 'white')
 			.attr('stroke-width', 1)
 			.style('pointer-events', 'none');
+
+		// Midpoint hit targets can overlap nearby vertices on short segments.
+		// Keep vertex targets last in SVG paint order so an existing point wins.
+		handlesLayer.selectAll('circle.route-point-hit-area').raise();
 	}
 }

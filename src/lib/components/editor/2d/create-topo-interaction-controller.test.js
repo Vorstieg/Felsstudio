@@ -2,6 +2,34 @@ import { describe, expect, it, vi } from 'vitest';
 import { createTopoInteractionController } from './create-topo-interaction-controller.js';
 
 describe('createTopoInteractionController', () => {
+	it('moves a marquee-selected group of route points together', () => {
+		const paths = new Map([
+			['0', [[0.1, 0.2]]],
+			['1', [[0.4, 0.5]]]
+		]);
+		const controller = createTopoInteractionController({
+			getInteraction: () => ({
+				kind: 'move-points',
+				startMouse: { x: 0.2, y: 0.2 },
+				points: [
+					{ target: { routeId: 'route', variantId: '0', index: 0 }, start: [0.1, 0.2] },
+					{ target: { routeId: 'route', variantId: '1', index: 0 }, start: [0.4, 0.5] }
+				]
+			}),
+			getCurrentTool: () => ({ onMouseMove: vi.fn() }),
+			getEditablePath: (target) => ({
+				movePoint: (index, point) => (paths.get(target.variantId)[index] = point)
+			})
+		});
+
+		controller.update({ point: { x: 0.3, y: 0.4 }, sourceEvent: {} });
+
+		expect(paths.get('0')[0][0]).toBeCloseTo(0.2);
+		expect(paths.get('0')[0][1]).toBeCloseTo(0.4);
+		expect(paths.get('1')[0][0]).toBeCloseTo(0.5);
+		expect(paths.get('1')[0][1]).toBeCloseTo(0.7);
+	});
+
 	it('moves selected symbols and text labels from their interaction snapshot', () => {
 		const topo = {
 			fixPoints: [{ id: 'symbol-1', position2D: [0.1, 0.2] }],

@@ -66,6 +66,8 @@ export interface SectorProperties {
 	tags: string[];
 	security?: string;
 	rock_type?: string;
+	/** Compass direction faced by the sector wall, in degrees from north. */
+	wallAzimuth?: number;
 	description_de?: string;
 	description_en?: string;
 	approach_de?: string;
@@ -153,7 +155,6 @@ export interface TextLabel {
 
 export interface TopoDocument {
 	id?: string;
-	name?: string;
 	description?: string;
 	rock?: string;
 	tags?: string[];

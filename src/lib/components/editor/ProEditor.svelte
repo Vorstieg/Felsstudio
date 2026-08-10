@@ -389,6 +389,7 @@
 			// Remove internal UI fields before saving
 			delete topoToSave._entryPath;
 			delete topoToSave._topoFileName;
+			delete topoToSave.name;
 
 			if (workspace === '3d-create') {
 				// Convert visible clusters to fixPoints

@@ -20,6 +20,8 @@ export function createTopoToolRegistry({
 	beginSelectionMove,
 	setDrawingTarget,
 	getSelectionSize,
+	getSelectedRoutePoints,
+	isRoutePointSelected,
 	getSelectedSymbolId,
 	snapRoutePoint,
 	referenceFixpoint
@@ -54,7 +56,12 @@ export function createTopoToolRegistry({
 		outline: new OutlineTool(config),
 		select: new SelectTool(config),
 		text: new TextTool(config),
-		routeEdit: new RouteEditTool({ ...editConfig, setDrawingTarget }),
+		routeEdit: new RouteEditTool({
+			...editConfig,
+			setDrawingTarget,
+			getSelectedRoutePoints,
+			isRoutePointSelected
+		}),
 		outlineEdit: new OutlineEditTool(editConfig),
 		symbolEdit: new SymbolEditTool({
 			...editConfig,

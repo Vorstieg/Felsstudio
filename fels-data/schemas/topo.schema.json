@@ -7,7 +7,6 @@
 	"required": ["routes"],
 	"properties": {
 		"id": { "type": "string" },
-		"name": { "type": "string" },
 		"crag_id": { "type": "string" },
 		"sector_id": { "type": "string" },
 		"description": { "type": "string" },

@@ -9,9 +9,8 @@ test('selects geometry according to marquee direction', async () => {
 		server: { middlewareMode: true, hmr: false, ws: false },
 		appType: 'custom'
 	});
-	const { createSelectionRegion, getRegionSelection } = await vite.ssrLoadModule(
-		'/src/lib/components/editor/2d/selection-geometry.js'
-	);
+	const { createSelectionRegion, getRegionSelection, getRoutePointRegionSelection } =
+		await vite.ssrLoadModule('/src/lib/components/editor/2d/selection-geometry.js');
 
 	const topo = {
 		routes: [
@@ -55,6 +54,17 @@ test('selects geometry according to marquee direction', async () => {
 			(item) => item.id === 'crossing-route'
 		),
 		'touching selection includes a crossing route'
+	);
+
+	assert.deepEqual(
+		getRoutePointRegionSelection(topo, 'crossing-route', {
+			left: 0,
+			right: 0.2,
+			top: 0.4,
+			bottom: 0.6
+		}),
+		[{ routeId: 'crossing-route', pitchId: null, variantId: null, index: 0 }],
+		'route-point marquee returns individual vertices rather than the whole route'
 	);
 
 	await vite.close();

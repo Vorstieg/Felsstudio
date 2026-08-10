@@ -20,7 +20,9 @@ export function resize(element) {
 
 	function calculateTargetHeights() {
 		const screenHeight = window.innerHeight;
-		targetHeights = [screenHeight * 0.05, screenHeight * 0.5, screenHeight * 0.9];
+		// Keep the inspector in a clearly collapsed or expanded state. The old
+		// 50% detent was easy to hit accidentally and obscured half the editor.
+		targetHeights = [screenHeight * 0.05, screenHeight * 0.9];
 
 		minHeight = screenHeight * 0.05;
 		maxTop = screenHeight - minHeight;

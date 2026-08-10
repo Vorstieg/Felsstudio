@@ -14,7 +14,7 @@
 		showMapModal = $bindable(false),
 		drawingTarget = $bindable(null),
 		activeTool = $bindable('route'),
-		toolOptionsOpen = false
+		toolOptionsOpen = $bindable(false)
 	} = $props();
 
 	let activeTab = $state('info');
@@ -48,8 +48,11 @@
 
 		if (selectedId && selectedId !== lastSelectedId) {
 			lastSelectedId = selectedId;
-			const route = userState.topo.routes.find((item) => item.id === selectedId);
+			const route = userState.topo.routes.find(
+				(item) => String(item.id) === String(selectedId)
+			);
 			if (route) {
+				activeTool = 'routeEdit';
 				activeTab = 'routes';
 				if (route.type === 'multi-pitch') {
 					drawingTarget = drawingTarget?.routeId === selectedId ? drawingTarget : null;
@@ -107,6 +110,11 @@
 			userState.ui.selectedRouteId = null;
 			userState.ui.selectedFixpointId = null;
 		}
+	}
+
+	function editSelectedOutline() {
+		activeTool = 'outlineEdit';
+		toolOptionsOpen = true;
 	}
 
 	function formatTopoJson() {
@@ -209,6 +217,7 @@
 					{topoJsonError}
 					onformatjson={formatTopoJson}
 					onapplyjson={applyTopoJson}
+					oneditoutline={editSelectedOutline}
 					{mobile}
 				/>
 			{:else if activeTab === 'routes'}

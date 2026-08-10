@@ -27,14 +27,14 @@ export function renderOutlinesLayer({
 	const canInteract =
 		activeTool === 'select' || activeTool === 'eraser' || activeTool === outlineEditTool?.id;
 	const handleOutlineDown = (event, outline) => {
-		if (activeTool === 'select' || activeTool === outlineEditTool?.id) {
+		if (['select', 'eraser', outlineEditTool?.id].includes(activeTool)) {
 			outlineEditTool?.handleOutlineDown(event, outline, canvasInput);
 		} else {
 			handleObjectMouseDown(event, { type: 'outline', id: outline.id });
 		}
 	};
 	const handleOutlineTouch = (event, outline) => {
-		if (activeTool === 'select' || activeTool === outlineEditTool?.id) {
+		if (['select', 'eraser', outlineEditTool?.id].includes(activeTool)) {
 			outlineEditTool?.handleTouchOutlineDown(event, outline, canvasInput);
 		} else if (event.touches.length === 1) {
 			event.preventDefault();

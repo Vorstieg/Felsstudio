@@ -16,6 +16,7 @@ export function createDefaultSector({ sectors = [], cragCoordinates = [] } = {})
 		tags: [],
 		security: '',
 		rock_type: '',
+		wallAzimuth: 0,
 		description_de: '',
 		description_en: '',
 		approach_de: '',

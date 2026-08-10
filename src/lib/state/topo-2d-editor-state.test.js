@@ -66,8 +66,21 @@ describe('createTopo2DEditorState', () => {
 		expect(editor.ui.selectedVariantId).toBe('variant-1');
 	});
 
+	it('tracks route-point marquee selection separately from object selection', () => {
+		const editor = createTopo2DEditorState({ topo: document() });
+		editor.selectObject('route', 'route-1');
+		const first = { routeId: 'route-1', pitchId: null, variantId: null, index: 0 };
+		const second = { routeId: 'route-1', pitchId: null, variantId: null, index: 1 };
+		editor.selectRoutePoints([first, second]);
+
+		expect(editor.isRoutePointSelected(first)).toBe(true);
+		expect(editor.getSelectedRoutePoints()).toEqual([first, second]);
+		expect([...editor.selectedItems]).toEqual(['route:route-1']);
+	});
+
 	it('cleans fixpoint references and keeps transient state out of save snapshots', () => {
 		const editor = createTopo2DEditorState({ topo: document() });
+		editor.topo.name = 'Legacy topo name';
 		editor.topo.routes[0].fixPoints = ['symbol-1'];
 		editor.topo.routes[0].pitches = [
 			{ id: 'pitch-1', startNodeId: 'symbol-1', endNodeId: 'symbol-1' }
@@ -82,6 +95,7 @@ describe('createTopo2DEditorState', () => {
 		editor.startInteraction('move-selection', { x: 1 });
 		const saved = editor.getSaveSnapshot();
 		expect(saved).not.toHaveProperty('drafts');
+		expect(saved).not.toHaveProperty('name');
 		expect(saved.routes[0].fixPoints).toEqual([]);
 		expect(editor.undo()).toBe(true);
 		expect(editor.drafts.route.points).toHaveLength(0);

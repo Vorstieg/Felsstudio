@@ -96,6 +96,8 @@
 		beginSelectionMove: collectDraggingSelection,
 		setDrawingTarget: (target) => editor.setDrawingTarget(target),
 		getSelectionSize: () => editor.selectedItems.size,
+		getSelectedRoutePoints: () => editor.getSelectedRoutePoints(),
+		isRoutePointSelected: (target) => editor.isRoutePointSelected(target),
 		getSelectedSymbolId: () => userState.ui.selectedFixpointId,
 		snapRoutePoint,
 		referenceFixpoint: referenceFixpointInStore
@@ -157,6 +159,8 @@
 	let brushPreview = $derived(currentTool === tools.outline ? currentTool.getBrushPreview() : null);
 	$effect(() => {
 		editor.setDraftPending(
+			currentRoutePoints.length > 0 ||
+			currentOutlinePoints.length > 0 ||
 			Boolean(brushPreview?.points?.length) ||
 				(editor.ui.activeTool === 'multipitch' && editor.ui.drawingTarget?.type === 'newPitch')
 		);
@@ -209,6 +213,8 @@
 		commitTextComposer: () => tools.text.commitEdit(),
 		getMobileSelectionMode: () => editor.ui.mobileSelectionMode,
 		getTopo: () => userState.topo,
+		getSelectedRouteId: () => userState.ui.selectedRouteId,
+		getDrawingTarget: () => editor.ui.drawingTarget,
 		getCanvasSize: () => ({ baseWidth, baseHeight }),
 		selection: editor,
 		clearSelection,
@@ -409,6 +415,7 @@
 			editTools: renderEditServices,
 			draftTools: { route: tools.route, multipitch: tools.multipitch },
 			isSelected,
+			isRoutePointSelected: (target) => editor.isRoutePointSelected(target),
 			selectionSize: editor.selectedItems.size,
 			selectedSymbolInstance: editor.selectedSymbolInstance,
 			textTool: tools.text,
@@ -449,6 +456,7 @@
 				tools.text.textAlign2D
 			],
 			selectedItems: editor.selectedItems.size,
+			selectedRoutePoints: editor.selectedRoutePoints.size,
 			selectionInteraction: editor.interaction?.kind,
 			transform: transform,
 			base: { baseWidth, baseHeight }

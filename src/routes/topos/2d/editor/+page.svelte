@@ -35,6 +35,9 @@
 	let saveError = $state();
 	let outlineSimplifyTolerancePx = $state(2);
 	let outlineSimplifySummary = $state('');
+	let outlineEditTool = $derived(
+		editorState.ui.activeTool === 'outlineEdit' ? editor2D?.getCurrentTool?.() : null
+	);
 	let activeSymbols = $derived(
 		topoSymbols.filter(
 			(symbol) =>
@@ -69,6 +72,7 @@
 			// Remove internal UI fields before saving
 			delete topoToSave._entryPath;
 			delete topoToSave._topoFileName;
+			delete topoToSave.name;
 
 			await writeJson(userState.topo._topoFileName, topoToSave);
 			editorState.markSaved();
@@ -162,6 +166,23 @@
 			onClose={() => (toolOptionsOpen = false)}
 		>
 			<div class="flex flex-col gap-2">
+				<label class="flex items-center justify-between gap-3 text-sm text-near-black">
+					<span>Snap outline points to grid</span>
+					<input type="checkbox" bind:checked={outlineEditTool.snapToGrid} />
+				</label>
+				{#if outlineEditTool?.snapToGrid}
+					<label class="grid grid-cols-[1fr_6rem] items-center gap-2 text-xs text-warm-gray-600">
+						<span>Grid size</span>
+						<input
+							type="number"
+							min="0.001"
+							max="0.25"
+							step="0.005"
+							bind:value={outlineEditTool.gridSize}
+							class="input-studio w-full"
+						/>
+					</label>
+				{/if}
 				<label class="text-xs font-medium text-warm-gray-600" for="outline-simplify-tolerance">
 					Simplify selected outline
 				</label>
@@ -197,5 +218,5 @@
 	bind:showMapModal
 	bind:drawingTarget={editorState.ui.drawingTarget}
 	bind:activeTool={editorState.ui.activeTool}
-	{toolOptionsOpen}
+	bind:toolOptionsOpen
 />

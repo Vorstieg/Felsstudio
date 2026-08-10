@@ -52,17 +52,21 @@ function detachPresetForVertexEdit(outline, canvasSize) {
  */
 export function createEditablePathResolver({ getTopo, getCanvasSize }) {
 	function resolveRouteTarget({ routeId, pitchId, variantId }) {
-		const route = getTopo().routes.find((item) => item.id === routeId);
+		const route = getTopo().routes.find((item) => String(item.id) === String(routeId));
 		if (!route) return null;
-		if (pitchId) return route.pitches?.find((pitch) => pitch.id === pitchId) || null;
-		if (variantId) return route.variants?.find((variant) => variant.id === variantId) || null;
+		if (pitchId != null)
+			return route.pitches?.find((pitch) => String(pitch.id) === String(pitchId)) || null;
+		if (variantId != null)
+			return route.variants?.find((variant) => String(variant.id) === String(variantId)) || null;
 		return route;
 	}
 
 	function resolve(target) {
-		if (target.outlineId) {
+		if (target.outlineId != null) {
 			const getOutline = () =>
-				getTopo().outlines.find((outline) => outline.id === target.outlineId);
+				getTopo().outlines.find(
+					(outline) => String(outline.id) === String(target.outlineId)
+				);
 			if (!getOutline()) return null;
 
 			return {

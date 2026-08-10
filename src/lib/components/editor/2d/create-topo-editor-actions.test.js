@@ -42,7 +42,7 @@ describe('createTopoEditorActions', () => {
 		expect(clearSelection).toHaveBeenCalledOnce();
 	});
 
-	it('finishes the active tool and returns to select, except for multipitch', () => {
+	it('finishes while keeping the route tool active for consecutive routes', () => {
 		const tool = { finalize: vi.fn() };
 		const setActiveTool = vi.fn();
 		const actions = createTopoEditorActions({
@@ -60,7 +60,7 @@ describe('createTopoEditorActions', () => {
 		actions.finalize();
 
 		expect(tool.finalize).toHaveBeenCalledOnce();
-		expect(setActiveTool).toHaveBeenCalledWith('select');
+		expect(setActiveTool).not.toHaveBeenCalled();
 	});
 
 	it('keeps multipitch active for its second finish action', () => {
