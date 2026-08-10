@@ -54,8 +54,11 @@ describe('fetchCrags', () => {
 
 	it('ignores malformed files and falls back to an empty access collection', async () => {
 		api.listDir.mockResolvedValue([{ type: 'file', name: 'broken.json', path: 'broken.json' }]);
-		api.readJson.mockRejectedValue(new Error('invalid JSON'));
+		const error = new Error('invalid JSON');
+		const logWarning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		api.readJson.mockRejectedValue(error);
 		await expect(fetchCrags({ limit: -1 })).resolves.toEqual([]);
+		expect(logWarning).toHaveBeenCalledWith('Failed to load crag entry:', 'broken.json', error);
 
 		const state = { access: null };
 		const topo = { getAccessPath: () => 'access.json' };

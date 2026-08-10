@@ -58,6 +58,7 @@ describe('Felslager API client', () => {
 
 	it('clears credentials when a write is rejected by authentication', async () => {
 		setCredentials('alice', 'secret');
+		const logError = vi.spyOn(console, 'error').mockImplementation(() => {});
 		vi.stubGlobal(
 			'fetch',
 			vi.fn().mockResolvedValue({
@@ -69,6 +70,9 @@ describe('Felslager API client', () => {
 		);
 
 		await expect(writeFile('entries/test.json', '{}')).rejects.toThrow(
+			'Failed to write entries/test.json: 401 Unauthorized - expired'
+		);
+		expect(logError).toHaveBeenCalledWith(
 			'Failed to write entries/test.json: 401 Unauthorized - expired'
 		);
 		expect(getCredentials()).toBeNull();
