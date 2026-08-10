@@ -20,7 +20,6 @@
 </script>
 
 {#if authState.showPrompt}
-	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<div
 		class="fixed inset-0 z-[9999] flex items-center justify-center"
 		role="dialog"

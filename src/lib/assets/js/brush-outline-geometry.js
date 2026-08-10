@@ -211,10 +211,14 @@ function traceLargestMaskBoundary(mask, origin, cellSize) {
 		const loop = [first];
 		let current = first;
 		let previous = null;
-		while (true) {
+		let tracing = true;
+		while (tracing) {
 			const currentKey = key(...current);
 			const nexts = edges.get(currentKey);
-			if (!nexts?.length) break;
+			if (!nexts?.length) {
+				tracing = false;
+				continue;
+			}
 			// At a diagonal touch there can be more than one outgoing edge. Follow
 			// the rightmost continuation to keep tracing the same exterior loop.
 			let nextIndex = nexts.length - 1;
@@ -240,9 +244,12 @@ function traceLargestMaskBoundary(mask, origin, cellSize) {
 			if (!nexts.length) edges.delete(currentKey);
 			previous = current;
 			current = next;
-			if (equalPoints(current, first)) break;
+			if (equalPoints(current, first)) {
+				tracing = false;
+				continue;
+			}
 			loop.push(current);
-			if (loop.length > mask.size * 4) break;
+			if (loop.length > mask.size * 4) tracing = false;
 		}
 		if (loop.length >= 3 && equalPoints(current, first)) loops.push(loop);
 	}
