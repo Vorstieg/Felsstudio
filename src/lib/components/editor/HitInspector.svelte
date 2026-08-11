@@ -1,10 +1,10 @@
 <script>
-	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
-	const userState = getTopoEditorSession();
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+	const topoSession = getTopo2DEditorState();
 	import { _ } from 'svelte-i18n';
 
 	let selectedCluster = $derived(
-		userState.clustering.clusters.find((c) => c.id === userState.clustering.lockedClusterId)
+		topoSession.clustering.clusters.find((c) => c.id === topoSession.clustering.lockedClusterId)
 	);
 
 	let activeHitIdx = $state(null);
@@ -13,8 +13,8 @@
 	let previewHit = $derived(selectedCluster?.members[hoveredHitIdx] ?? selectedCluster?.members[activeHitIdx] ?? selectedCluster?.members[0] ?? null);
 
 	function close() {
-		userState.clustering.lockedClusterId = null;
-		userState.clustering.selectedClusterId = null;
+		topoSession.clustering.lockedClusterId = null;
+		topoSession.clustering.selectedClusterId = null;
 		activeHitIdx = null;
 		hoveredHitIdx = null;
 	}
@@ -22,26 +22,26 @@
 	function getCropSrc(hit) {
 		if (!hit?.crop) return null;
 
-		if (userState.clustering.cropsMap) {
+		if (topoSession.clustering.cropsMap) {
 			const cropKey = hit.crop;
 			const cropKeyLower = cropKey.toLowerCase();
 
-			if (userState.clustering.cropsMap[cropKey]) return userState.clustering.cropsMap[cropKey];
-			if (userState.clustering.cropsMap[cropKeyLower]) return userState.clustering.cropsMap[cropKeyLower];
+			if (topoSession.clustering.cropsMap[cropKey]) return topoSession.clustering.cropsMap[cropKey];
+			if (topoSession.clustering.cropsMap[cropKeyLower]) return topoSession.clustering.cropsMap[cropKeyLower];
 
 			// Try matching just the filename in case the map keys are just filenames
 			const fileName = cropKey.split('/').pop().split('\\').pop();
 			const fileNameLower = fileName.toLowerCase();
 
-			if (userState.clustering.cropsMap[fileName]) return userState.clustering.cropsMap[fileName];
-			if (userState.clustering.cropsMap[fileNameLower]) return userState.clustering.cropsMap[fileNameLower];
+			if (topoSession.clustering.cropsMap[fileName]) return topoSession.clustering.cropsMap[fileName];
+			if (topoSession.clustering.cropsMap[fileNameLower]) return topoSession.clustering.cropsMap[fileNameLower];
 
 			// Try matching with crops/ prefix
-			if (userState.clustering.cropsMap['crops/' + fileName]) return userState.clustering.cropsMap['crops/' + fileName];
-			if (userState.clustering.cropsMap['crops/' + fileNameLower]) return userState.clustering.cropsMap['crops/' + fileNameLower];
+			if (topoSession.clustering.cropsMap['crops/' + fileName]) return topoSession.clustering.cropsMap['crops/' + fileName];
+			if (topoSession.clustering.cropsMap['crops/' + fileNameLower]) return topoSession.clustering.cropsMap['crops/' + fileNameLower];
 
 			// Ultimate Fuzzy Fallback: if any key in the map contains our filename, return it!
-			for (const [key, blobUrl] of Object.entries(userState.clustering.cropsMap)) {
+			for (const [key, blobUrl] of Object.entries(topoSession.clustering.cropsMap)) {
 				if (key.includes(fileName) || key.toLowerCase().includes(fileNameLower)) {
 					return blobUrl;
 				}

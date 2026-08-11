@@ -1,12 +1,12 @@
 // @vitest-environment node
 
 import { describe, expect, it } from 'vitest';
-import { createTopoEditorSession } from './topo-session.svelte.js';
+import { createTopo2DEditorState } from './topo-2d-editor-state.svelte.js';
 
-describe('createTopoEditorSession', () => {
+describe('createTopo2DEditorState', () => {
 	it('creates independent sessions with fresh document and UI state', () => {
-		const first = createTopoEditorSession();
-		const second = createTopoEditorSession();
+		const first = createTopo2DEditorState();
+		const second = createTopo2DEditorState();
 
 		first.topo.routes.push({ id: 'route-1' });
 		first.ui.selectedRouteId = 'route-1';
@@ -16,7 +16,7 @@ describe('createTopoEditorSession', () => {
 	});
 
 	it('loads a draft through one normalized path and clears stale selection', () => {
-		const session = createTopoEditorSession();
+		const session = createTopo2DEditorState();
 		session.ui.selectedRouteId = 'stale';
 
 		session.loadSession(

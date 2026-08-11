@@ -19,12 +19,13 @@ export function useTopoDraftAutosave({
 	onPersisted = null
 }) {
 	if (!session) throw new Error('A topo editor session is required for draft autosave');
-	const userState = session;
+	/** @type {ReturnType<typeof import('$lib/state/topo-2d-editor-state.svelte.js').createTopo2DEditorState>} */
+	const topoSession = session;
 	let canAutosave = $state(false);
 	let saveTimeout = null;
 	let isPersisting = false;
 	let saveAgain = false;
-	const currentSession = () => getSaveSession?.() || userState.getSaveSession();
+	const currentSession = () => getSaveSession?.() || topoSession.getSaveSession();
 
 	async function persistDraftImmediately() {
 		if (isBlankTopoSession(currentSession())) return;
@@ -37,12 +38,12 @@ export function useTopoDraftAutosave({
 		try {
 			do {
 				saveAgain = false;
-				userState.ui.activeDraftId = await draftsState.save(
-					userState.topo,
-					userState.ui.activeDraftId,
+				topoSession.ui.activeDraftId = await draftsState.save(
+					topoSession.topo,
+					topoSession.ui.activeDraftId,
 					getExtra()
 				);
-				userState.ui.lastSaved = new Date().toISOString();
+				topoSession.ui.lastSaved = new Date().toISOString();
 				onPersisted?.();
 			} while (saveAgain);
 		} finally {
@@ -58,19 +59,19 @@ export function useTopoDraftAutosave({
 
 		void (async () => {
 			draftsState.load();
-			if (!userState.ui.activeDraftId && draftId) {
+			if (!topoSession.ui.activeDraftId && draftId) {
 				const requested = await draftsState.getById(draftId);
 				if (!disposed && requested) restoreSession(requested, draftId);
 			} else if (
-				!userState.ui.activeDraftId &&
+				!topoSession.ui.activeDraftId &&
 				(shouldRestore ? shouldRestore() : isBlankTopoSession(currentSession()))
 			) {
 				const latest = await draftsState.getLatest(editorMode);
 				if (!disposed && latest) restoreSession(latest.session, latest.id);
 			}
 			if (disposed) return;
-			userState.topo.editorMode = editorMode;
-			userState.ui.workspace = getWorkspace();
+			topoSession.topo.editorMode = editorMode;
+			topoSession.ui.workspace = getWorkspace();
 			canAutosave = true;
 		})();
 

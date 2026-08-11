@@ -1,4 +1,4 @@
-import { createInitialTopo } from './topo-session.svelte.js';
+import { Vector3 } from 'three';
 import { getContext, setContext } from 'svelte';
 import { generateOutlineId, generateSymbolId, generateTextId } from '$lib/assets/js/id-utils.js';
 import { translateOutline } from '$lib/assets/js/outline-geometry.js';
@@ -35,11 +35,93 @@ export function provideTopo2DEditorState(state) {
 	return state;
 }
 
+/**
+ * Returns the single topo editor store provided by an ancestor component.
+ *
+ * @returns {ReturnType<typeof createTopo2DEditorState>}
+ * @throws {Error} When called outside a component tree with an editor store.
+ */
 export function getTopo2DEditorState() {
-	return getContext(TOPO_2D_EDITOR_STATE);
+	/** @type {ReturnType<typeof createTopo2DEditorState> | undefined} */
+	const state = getContext(TOPO_2D_EDITOR_STATE);
+	if (!state) throw new Error('Topo editor state is not available in this component tree');
+	return state;
 }
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
+
+export function createInitialTopo() {
+	return {
+		name: '',
+		crag_id: '',
+		sector_id: '',
+		description: '',
+		rock: 'granite',
+		tags: [],
+		routes: [],
+		fixPoints: [],
+		outlines: [],
+		textLabels: [],
+		date: '',
+		updated: '',
+		modelOffset: [0, 0, 0],
+		coordinates: [0, 0],
+		wallAzimuth: 0,
+		altitude: 0,
+		scale: 1,
+		image2D: null,
+		imageAspectRatio: 1.5,
+		canvasAspectRatio: 1.5,
+		backgroundFit: 'contain',
+		editorMode: '3d'
+	};
+}
+
+export function createInitialClustering() {
+	return {
+		radius: 0.2,
+		minConfidence: 0.23,
+		maxEdgeDist: 1,
+		minAngleCos: 0.66,
+		maxCamDist: 50,
+		minViewSpread: 0.4,
+		minObservations: 4,
+		initializedHits: 0,
+		rawHits: [],
+		clusters: [],
+		selectedClusterId: null,
+		lockedClusterId: null,
+		cropsMap: {},
+		cameraPositions: {},
+		gpsData: {},
+		registrationCsv: null,
+		showRawHits: false,
+		showAnnotations: false,
+		showCameraTrail: false,
+		stats: {
+			totalHits: 0,
+			confCut: 0,
+			edgeCut: 0,
+			angleCut: 0,
+			distCut: 0,
+			finalHits: 0,
+			initialClusters: 0,
+			spreadCut: 0,
+			obsCut: 0,
+			finalClusters: 0
+		}
+	};
+}
+
+function createTransientState() {
+	return {
+		modelUrl: null,
+		glbBlob: null,
+		modelRevision: 0,
+		targetCameraPosition: new Vector3(0, 1, 5),
+		targetControlsTarget: new Vector3(0, 0, 0)
+	};
+}
 
 function createDrafts() {
 	return {
@@ -53,6 +135,7 @@ function createDrafts() {
 
 function createUi() {
 	return {
+		workspace: null,
 		activeTool: 'select',
 		selectedSymbol: 'bolt',
 		selectedOutlineStyle: 'rock',
@@ -66,7 +149,9 @@ function createUi() {
 		selectedVariantId: null,
 		selectedOutlineId: null,
 		selectedFixpointId: null,
-		selectedTextLabelId: null
+		selectedTextLabelId: null,
+		activeDraftId: null,
+		lastSaved: null
 	};
 }
 
@@ -80,7 +165,9 @@ function itemsForType(topo, type) {
 		return (topo.routes || []).flatMap((route) => route[`${type}s`] || []);
 	}
 	if (type === 'path') {
-		return (topo.routes || []).flatMap((route) => route.paths || route.pathRefs || []);
+		return (topo.routes || []).flatMap((route) =>
+			(route.paths || route.pathRefs || []).map((path) => ({ ...path, id: path.id ?? path.pathId }))
+		);
 	}
 	return topo[`${type}s`] || [];
 }
@@ -96,6 +183,9 @@ function drawingTargetExists(topo, target) {
 	return true;
 }
 
+/**
+ * Creates the single store for one topo editing surface.
+ */
 export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport = {} } = {}) {
 	const state = $state({
 		topo: topo ? clone(topo) : getTopo ? getTopo() : createInitialTopo(),
@@ -110,7 +200,9 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 		selectedItems: new Set(),
 		selectedSymbolInstance: null,
 		interactionState: null,
-		hasPendingChanges: false
+		hasPendingChanges: false,
+		transient: createTransientState(),
+		clustering: createInitialClustering()
 	});
 
 	const readTopo = () => (getTopo ? getTopo() : state.topo);
@@ -124,6 +216,36 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 		delete document.name;
 		return document;
 	};
+	function setModelFile(file) {
+		if (state.transient.modelUrl) URL.revokeObjectURL(state.transient.modelUrl);
+		state.transient.glbBlob = file || null;
+		state.transient.modelUrl = file ? URL.createObjectURL(file) : null;
+		state.transient.modelRevision++;
+	}
+	function loadSession(session, id = null) {
+		const document = session?.topo || session || createInitialTopo();
+		if (state.transient.modelUrl) URL.revokeObjectURL(state.transient.modelUrl);
+		state.transient = createTransientState();
+		state.ui = createUi();
+		writeTopo({ ...createInitialTopo(), ...clone(document) });
+		state.topo.routes = [...(document.routes || [])];
+		state.topo.fixPoints = [...(document.fixPoints || [])];
+		state.topo.outlines = [...(document.outlines || [])];
+		state.topo.textLabels = [...(document.textLabels || [])];
+		state.clustering = session?.clustering
+			? { ...createInitialClustering(), ...session.clustering }
+			: createInitialClustering();
+		if (session?.glbBlob) setModelFile(session.glbBlob);
+		state.ui.activeDraftId = id;
+		state.selection = new Set();
+		state.selectedItems = new Set();
+		projectSelection();
+		state.history = { entries: [], index: -1, savedSnapshot: null };
+		saveHistory();
+	}
+	function getSaveSession() {
+		return { topo: state.topo, clustering: state.clustering, glbBlob: state.transient.glbBlob };
+	}
 
 	function clearSelection() {
 		state.selection = new Set();
@@ -554,6 +676,10 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 			}),
 		removeItems,
 		clearSelection,
+		loadSession,
+		getSaveSession,
+		setModelFile,
+		markModelChanged: () => state.transient.modelRevision++,
 		reconcileSelection,
 		selectedId: (type) =>
 			[...state.selection].find((key) => key.startsWith(`${type}:`))?.split(':')[1] || null,

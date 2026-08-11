@@ -7,8 +7,8 @@
 	import { onMount } from 'svelte';
 	import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh';
 	import CssObject from '../CssObject.svelte';
-	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
-	const userState = getTopoEditorSession();
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+	const topoSession = getTopo2DEditorState();
 	import { Topo3DInteractionManager } from './3d/InteractionManager.svelte.js';
 import { topoSymbols } from '@vorstieg/topo-renderer';
 
@@ -30,7 +30,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 	} = $props();
 
 	// --- Interaction Manager ---
-	const interaction = new Topo3DInteractionManager(userState);
+	const interaction = new Topo3DInteractionManager(topoSession);
 	const topo3DFixpointTypes = new Set(
 		topoSymbols.filter((symbol) => symbol.type === 'fixpoint').map((symbol) => symbol.id)
 	);
@@ -42,13 +42,13 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 		const exporter = new GLTFExporter();
 		const sceneClone = gltfScene.clone();
 
-		const scaleArray = userState.topo.modelScale || [1, 1, 1];
+		const scaleArray = topoSession.topo.modelScale || [1, 1, 1];
 		sceneClone.scale.set(scaleArray[0], scaleArray[1], scaleArray[2]);
 
-		const offset = userState.topo.modelOffset || [0, 0, 0];
+		const offset = topoSession.topo.modelOffset || [0, 0, 0];
 		sceneClone.position.set(offset[0], offset[1], offset[2]);
 
-		const rot = userState.topo.modelRotation || [0, 0, 0];
+		const rot = topoSession.topo.modelRotation || [0, 0, 0];
 		sceneClone.rotation.set(rot[0], rot[1], rot[2]);
 
 		sceneClone.updateMatrixWorld(true);
@@ -91,9 +91,9 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 	export function bakeTransforms() {
 		if (!gltfScene) return false;
 
-		const scaleArray = userState.topo.modelScale || [1, 1, 1];
-		const offset = userState.topo.modelOffset || [0, 0, 0];
-		const rot = userState.topo.modelRotation || [0, 0, 0];
+		const scaleArray = topoSession.topo.modelScale || [1, 1, 1];
+		const offset = topoSession.topo.modelOffset || [0, 0, 0];
+		const rot = topoSession.topo.modelRotation || [0, 0, 0];
 
 		// Only bake if there's an actual transformation
 		if (
@@ -149,7 +149,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 		if (parent) parent.add(gltfScene);
 
 		// Transform all routes
-		(userState.topo.routes || []).forEach(route => {
+		(topoSession.topo.routes || []).forEach(route => {
 			if (route.points) {
 				route.points.forEach(p => {
 					const vec = new THREE.Vector3(p[0], p[1], p[2]).applyMatrix4(bakeMatrix);
@@ -173,7 +173,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 		});
 
 		// Transform all fixpoints
-		(userState.topo.fixPoints || []).forEach(fp => {
+		(topoSession.topo.fixPoints || []).forEach(fp => {
 			if (fp.position) {
 				const vec = new THREE.Vector3(fp.position[0], fp.position[1], fp.position[2]).applyMatrix4(bakeMatrix);
 				fp.position[0] = Number(vec.x.toFixed(4));
@@ -183,9 +183,9 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 		});
 
 		// Reset state transformations
-		userState.topo.modelRotation = [0, 0, 0];
-		userState.topo.modelScale = [1, 1, 1];
-		userState.topo.modelOffset = [0, 0, 0];
+		topoSession.topo.modelRotation = [0, 0, 0];
+		topoSession.topo.modelScale = [1, 1, 1];
+		topoSession.topo.modelOffset = [0, 0, 0];
 
 		// Persist new GLB blob
 		const exporter = new GLTFExporter();
@@ -200,7 +200,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 				exportClone,
 				(glb) => {
 					const blob = new Blob([glb], { type: 'application/octet-stream' });
-					userState.setModelFile(blob);
+					topoSession.setModelFile(blob);
 					resolve(true);
 				},
 				(err) => {
@@ -295,9 +295,9 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 		selectedIndicesMap = new Map();
 
 		// Check if we need to bake existing transforms first
-		const scaleArray = userState.topo.modelScale || [1, 1, 1];
-		const offset = userState.topo.modelOffset || [0, 0, 0];
-		const rot = userState.topo.modelRotation || [0, 0, 0];
+		const scaleArray = topoSession.topo.modelScale || [1, 1, 1];
+		const offset = topoSession.topo.modelOffset || [0, 0, 0];
+		const rot = topoSession.topo.modelRotation || [0, 0, 0];
 		
 		if (
 			scaleArray[0] !== 1 || scaleArray[1] !== 1 || scaleArray[2] !== 1 ||
@@ -320,7 +320,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 			exportClone,
 			(glb) => {
 				const blob = new Blob([glb], { type: 'application/octet-stream' });
-				userState.setModelFile(blob);
+				topoSession.setModelFile(blob);
 			},
 			(err) => console.error(err),
 			{ binary: true }
@@ -453,7 +453,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 
 	// --- State Sync ---
 	let visualRoutes = $derived.by(() => {
-		return userState.topo.routes.flatMap((route) => {
+		return topoSession.topo.routes.flatMap((route) => {
 			const processPoints = (points, subId, label) => {
 				let normal = null;
 				let displacement = new Vector3(0, 0, 0);
@@ -488,7 +488,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 	});
 
 	let visualFixPoints = $derived.by(() => {
-		return userState.topo.fixPoints
+		return topoSession.topo.fixPoints
 			.filter((pt) => Array.isArray(pt.position) && pt.position.length >= 3 && topo3DFixpointTypes.has(pt.type))
 			.map((pt) => ({
 				...pt,
@@ -497,17 +497,17 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 					pt.position[1],
 					pt.position[2]
 				],
-				isAssigned: userState.ui.selectedRouteId
-					? userState.topo.routes
-							.find((r) => r.id === userState.ui.selectedRouteId)
+				isAssigned: topoSession.ui.selectedRouteId
+					? topoSession.topo.routes
+							.find((r) => r.id === topoSession.ui.selectedRouteId)
 							?.fixPoints?.includes(pt.id)
 					: false
 			}));
 	});
 
 	let visualRawHits = $derived.by(() => {
-		const clusterId = userState.clustering.lockedClusterId;
-		const cluster = userState.clustering.clusters.find((c) => c.id === clusterId);
+		const clusterId = topoSession.clustering.lockedClusterId;
+		const cluster = topoSession.clustering.clusters.find((c) => c.id === clusterId);
 		if (!cluster) return [];
 		return cluster.members.map((h, i) => ({
 			id: `hit-${clusterId}-${i}`,
@@ -517,15 +517,15 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 	});
 
 	let visualCameras = $derived.by(() => {
-		if (!userState.clustering.showCameraTrail) return [];
-		return Object.entries(userState.clustering.cameraPositions).map(([idx, pos]) => ({
+		if (!topoSession.clustering.showCameraTrail) return [];
+		return Object.entries(topoSession.clustering.cameraPositions).map(([idx, pos]) => ({
 			id: `cam-${idx}`,
 			pos: [pos[0], pos[1], pos[2]]
 		}));
 	});
 
 	let visualClusters = $derived.by(() => {
-		return userState.clustering.clusters.map((c) => ({
+		return topoSession.clustering.clusters.map((c) => ({
 			...c,
 			anchor: [c.anchor[0], c.anchor[1], c.anchor[2]]
 		}));
@@ -533,7 +533,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 
 	$effect(() => {
 		interaction.gltfScene = gltfScene;
-		interaction.modelPosition = userState.topo.modelOffset || [0, 0, 0];
+		interaction.modelPosition = topoSession.topo.modelOffset || [0, 0, 0];
 		interaction.visualRoutes = visualRoutes;
 		interaction.visualFixPoints = visualFixPoints;
 		interaction.visualClusters = visualClusters;
@@ -560,9 +560,9 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 </script>
 
 <T.Group
-	position={userState.topo.modelOffset || [0, 0, 0]}
-	rotation={userState.topo.modelRotation || [0, 0, 0]}
-	scale={userState.topo.modelScale || [1, 1, 1]}
+	position={topoSession.topo.modelOffset || [0, 0, 0]}
+	rotation={topoSession.topo.modelRotation || [0, 0, 0]}
+	scale={topoSession.topo.modelScale || [1, 1, 1]}
 >
 	{#if gltfScene}
 		<T
@@ -621,7 +621,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 							? 'bg-creator-blue'
 							: 'bg-near-black'} 
                     {point.isAssigned ? 'ring-2 ring-green-500 ring-offset-1' : ''} 
-                    {userState.ui.selectedFixpointId === point.id
+                    {topoSession.ui.selectedFixpointId === point.id
 						? 'ring-2 ring-yellow-400 ring-offset-1 scale-150'
 						: 'group-hover:scale-125'}"
 				></div>
@@ -634,11 +634,11 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 			<CssObject position={route.rawPoints[0]} pointerEvents={true}>
 				<div
 					class={'route-label ' +
-						(userState.ui.selectedRouteId === route.parentId ? 'selected' : '')}
+						(topoSession.ui.selectedRouteId === route.parentId ? 'selected' : '')}
 					onclick={(e) => {
 						e.stopPropagation();
-						userState.ui.selectedRouteId =
-							userState.ui.selectedRouteId === route.parentId ? null : route.parentId;
+						topoSession.ui.selectedRouteId =
+							topoSession.ui.selectedRouteId === route.parentId ? null : route.parentId;
 					}}
 					role="button"
 					tabindex="0"
@@ -646,8 +646,8 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 						if (event.key === 'Enter' || event.key === ' ') {
 							event.preventDefault();
 							event.stopPropagation();
-							userState.ui.selectedRouteId =
-								userState.ui.selectedRouteId === route.parentId ? null : route.parentId;
+							topoSession.ui.selectedRouteId =
+								topoSession.ui.selectedRouteId === route.parentId ? null : route.parentId;
 						}
 					}}
 				>
@@ -661,29 +661,29 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 			<T.Mesh>
 				<MeshLineGeometry points={route.rawPoints} />
 				<MeshLineMaterial
-					width={userState.ui.selectedRouteId === route.parentId
+					width={topoSession.ui.selectedRouteId === route.parentId
 						? 0.12
 						: interaction.lastSnappedRouteId === route.parentId
 							? 0.1
 							: 0.06}
-					color={userState.ui.selectedRouteId === route.parentId
+					color={topoSession.ui.selectedRouteId === route.parentId
 						? '#0075de'
 						: interaction.lastSnappedRouteId === route.parentId
 							? '#f59e0b'
 							: '#0075de'}
 					resolution={[$size.width, $size.height]}
 					transparent
-					opacity={userState.ui.selectedRouteId === route.parentId ? 1 : 0.4}
+					opacity={topoSession.ui.selectedRouteId === route.parentId ? 1 : 0.4}
 				/>
 			</T.Mesh>
 
 			<!-- Vertex Dots (only for selected/hovered routes to reduce clutter) -->
-			{#if userState.ui.selectedRouteId === route.parentId || interaction.hoverSnappedRouteId === route.parentId}
+			{#if topoSession.ui.selectedRouteId === route.parentId || interaction.hoverSnappedRouteId === route.parentId}
 				{#each route.rawPoints as p}
 					<T.Mesh position={[p.x, p.y, p.z]}>
 						<T.SphereGeometry args={[0.015]} />
 						<T.MeshBasicMaterial
-							color={userState.ui.selectedRouteId === route.parentId ? '#0075de' : '#f59e0b'}
+							color={topoSession.ui.selectedRouteId === route.parentId ? '#0075de' : '#f59e0b'}
 						/>
 					</T.Mesh>
 				{/each}
@@ -692,8 +692,8 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 				<T.Mesh
 					onclick={(e) => {
 						e.stopPropagation();
-						userState.ui.selectedRouteId =
-							userState.ui.selectedRouteId === route.parentId ? null : route.parentId;
+						topoSession.ui.selectedRouteId =
+							topoSession.ui.selectedRouteId === route.parentId ? null : route.parentId;
 					}}
 					ondblclick={(e) => interaction.handleRouteDblClick(e, route.parentId, activeTool)}
 					onpointermove={(e) => interaction.handleMeshPointerMove(e, activeTool)}
@@ -707,29 +707,29 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 
 	{#if activeTool === 'ai-bolts'}
 		{#each visualClusters as cluster (cluster.id)}
-			{@const isSelected = userState.clustering.selectedClusterId === cluster.id}
-			{@const isLocked = userState.clustering.lockedClusterId === cluster.id}
+			{@const isSelected = topoSession.clustering.selectedClusterId === cluster.id}
+			{@const isLocked = topoSession.clustering.lockedClusterId === cluster.id}
 			{@const isAnchor = cluster.class === 'anchor' || cluster.class === 'belay'}
 			<T.Group position={cluster.anchor} scale={isSelected || isLocked ? 1.5 : 1}>
 				<T.Mesh
 					onpointerenter={(e) => {
 						e.stopPropagation();
-						userState.clustering.selectedClusterId = cluster.id;
+						topoSession.clustering.selectedClusterId = cluster.id;
 					}}
 					onpointerleave={(e) => {
 						e.stopPropagation();
-						if (userState.clustering.selectedClusterId === cluster.id) {
-							userState.clustering.selectedClusterId = null;
+						if (topoSession.clustering.selectedClusterId === cluster.id) {
+							topoSession.clustering.selectedClusterId = null;
 						}
 					}}
 					onclick={(e) => {
 						e.stopPropagation();
-						if (userState.clustering.lockedClusterId === cluster.id) {
-							userState.clustering.lockedClusterId = null;
+						if (topoSession.clustering.lockedClusterId === cluster.id) {
+							topoSession.clustering.lockedClusterId = null;
 						} else {
-							userState.clustering.lockedClusterId = cluster.id;
+							topoSession.clustering.lockedClusterId = cluster.id;
 						}
-						userState.clustering.selectedClusterId = cluster.id;
+						topoSession.clustering.selectedClusterId = cluster.id;
 					}}
 				>
 					<T.SphereGeometry args={[0.15]} />
@@ -748,10 +748,10 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 					</T.Mesh>
 				{/if}
 			</T.Group>
-			{#if userState.clustering.showAnnotations}
+			{#if topoSession.clustering.showAnnotations}
 				<CssObject position={cluster.anchor} scaleWithZoom={true}>
 					<div
-						class="annotation !bg-black/50 !text-white !p-1 !rounded !text-[8px] border border-white/20 {userState
+						class="annotation !bg-black/50 !text-white !p-1 !rounded !text-[8px] border border-white/20 {topoSession
 							.clustering.selectedClusterId === cluster.id
 							? '!border-cyan-400 !bg-cyan-900/80'
 							: ''}"

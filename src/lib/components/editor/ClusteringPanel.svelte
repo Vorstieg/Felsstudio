@@ -1,11 +1,11 @@
 <script>
-	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
-	const userState = getTopoEditorSession();
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+	const topoSession = getTopo2DEditorState();
 	import { runClusteringPipeline } from '$lib/assets/js/clustering.js';
 	import { _ } from 'svelte-i18n';
 
 	let bounds = $derived.by(() => {
-		let hits = userState.clustering.rawHits;
+		let hits = topoSession.clustering.rawHits;
 		if (!hits || hits.length === 0) return { conf: [0, 1], edge: [0, 1.2], angle: [0, 1], cam: [1, 100] };
 		let conf = [Infinity, -Infinity];
 		let edge = [Infinity, -Infinity];
@@ -33,43 +33,43 @@
 	});
 
 	$effect(() => {
-		const hitCount = userState.clustering.rawHits.length;
+		const hitCount = topoSession.clustering.rawHits.length;
 
-		if (hitCount > 0 && hitCount !== userState.clustering.initializedHits) {
-			userState.clustering.initializedHits = hitCount;
-			userState.clustering.minConfidence = bounds.conf[0] + (bounds.conf[1] - bounds.conf[0]) * 0.33;
-			userState.clustering.maxEdgeDist = bounds.edge[0] + (bounds.edge[1] - bounds.edge[0]) * 0.66;
-			userState.clustering.minAngleCos = bounds.angle[0] + (bounds.angle[1] - bounds.angle[0]) * 0.33;
-			userState.clustering.maxCamDist = Math.round(bounds.cam[0] + (bounds.cam[1] - bounds.cam[0]) * 0.66);
+		if (hitCount > 0 && hitCount !== topoSession.clustering.initializedHits) {
+			topoSession.clustering.initializedHits = hitCount;
+			topoSession.clustering.minConfidence = bounds.conf[0] + (bounds.conf[1] - bounds.conf[0]) * 0.33;
+			topoSession.clustering.maxEdgeDist = bounds.edge[0] + (bounds.edge[1] - bounds.edge[0]) * 0.66;
+			topoSession.clustering.minAngleCos = bounds.angle[0] + (bounds.angle[1] - bounds.angle[0]) * 0.33;
+			topoSession.clustering.maxCamDist = Math.round(bounds.cam[0] + (bounds.cam[1] - bounds.cam[0]) * 0.66);
 		}
 
 		const params = {
-			radius: userState.clustering.radius,
-			minConfidence: userState.clustering.minConfidence,
-			maxEdgeDist: userState.clustering.maxEdgeDist,
-			minAngleCos: userState.clustering.minAngleCos,
-			maxCamDist: userState.clustering.maxCamDist,
-			minViewSpread: userState.clustering.minViewSpread,
-			minObservations: userState.clustering.minObservations
+			radius: topoSession.clustering.radius,
+			minConfidence: topoSession.clustering.minConfidence,
+			maxEdgeDist: topoSession.clustering.maxEdgeDist,
+			minAngleCos: topoSession.clustering.minAngleCos,
+			maxCamDist: topoSession.clustering.maxCamDist,
+			minViewSpread: topoSession.clustering.minViewSpread,
+			minObservations: topoSession.clustering.minObservations
 		};
 
 		if (hitCount > 0) {
 			const result = runClusteringPipeline(
-				userState.clustering.rawHits,
+				topoSession.clustering.rawHits,
 				params,
-				userState.clustering.gpsData
+				topoSession.clustering.gpsData
 			);
-			userState.clustering.clusters = result.clusters;
-			userState.clustering.stats = result.stats;
+			topoSession.clustering.clusters = result.clusters;
+			topoSession.clustering.stats = result.stats;
 
-			if (userState.topo.coordinates[0] === 0 && userState.topo.coordinates[1] === 0) {
-				const gpsKeys = Object.keys(userState.clustering.gpsData);
+			if (topoSession.topo.coordinates[0] === 0 && topoSession.topo.coordinates[1] === 0) {
+				const gpsKeys = Object.keys(topoSession.clustering.gpsData);
 				if (gpsKeys.length > 0) {
-					const firstGps = userState.clustering.gpsData[gpsKeys[0]];
+					const firstGps = topoSession.clustering.gpsData[gpsKeys[0]];
 					if (firstGps.latitude && firstGps.longitude) {
-						userState.topo.coordinates = [firstGps.latitude, firstGps.longitude];
+						topoSession.topo.coordinates = [firstGps.latitude, firstGps.longitude];
 						if (firstGps.abs_alt || firstGps.rel_alt) {
-							userState.topo.altitude = firstGps.abs_alt || firstGps.rel_alt;
+							topoSession.topo.altitude = firstGps.abs_alt || firstGps.rel_alt;
 						}
 					}
 				}
@@ -86,7 +86,7 @@
 		</div>
 		<div class="flex gap-2">
 			<label class="flex items-center gap-1.5 cursor-pointer group">
-				<input type="checkbox" bind:checked={userState.clustering.showAnnotations}
+				<input type="checkbox" bind:checked={topoSession.clustering.showAnnotations}
 							 class="w-3 h-3 rounded-sm border border-black/15 text-creator-blue focus:ring-1 focus:ring-creator-blue transition-none" />
 				<span
 					class="text-micro-data text-warm-gray-400 group-hover:text-near-black transition-none">{$_('ui.labels')}</span>
@@ -99,9 +99,9 @@
 		<div class="space-y-1.5">
 			<div class="flex justify-between items-center px-1">
 				<span class="text-ui-label text-near-black">{$_('ui.clustering_radius')}</span>
-				<span class="text-ui-label text-creator-blue font-mono">{userState.clustering.radius.toFixed(2)}m</span>
+				<span class="text-ui-label text-creator-blue font-mono">{topoSession.clustering.radius.toFixed(2)}m</span>
 			</div>
-			<input type="range" min="0.05" max="1.5" step="0.01" bind:value={userState.clustering.radius}
+			<input type="range" min="0.05" max="1.5" step="0.01" bind:value={topoSession.clustering.radius}
 						 class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue" />
 		</div>
 
@@ -113,40 +113,40 @@
 					<div class="space-y-1">
 						<div class="flex justify-between text-[10px] leading-none">
 							<span class="text-warm-gray-500">{$_('ui.confidence')}</span>
-							<span class="text-near-black font-bold">{Math.round(userState.clustering.minConfidence * 100)}%</span>
+							<span class="text-near-black font-bold">{Math.round(topoSession.clustering.minConfidence * 100)}%</span>
 						</div>
 						<input type="range" min={bounds.conf[0]} max={bounds.conf[1]} step="0.01"
-									 bind:value={userState.clustering.minConfidence}
+									 bind:value={topoSession.clustering.minConfidence}
 									 class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue" />
 					</div>
 
 					<div class="space-y-1">
 						<div class="flex justify-between text-[10px] leading-none">
 							<span class="text-warm-gray-500">{$_('ui.edge_dist')}</span>
-							<span class="text-near-black font-bold">{userState.clustering.maxEdgeDist.toFixed(2)}</span>
+							<span class="text-near-black font-bold">{topoSession.clustering.maxEdgeDist.toFixed(2)}</span>
 						</div>
 						<input type="range" min={bounds.edge[0]} max={bounds.edge[1]} step="0.01"
-									 bind:value={userState.clustering.maxEdgeDist}
+									 bind:value={topoSession.clustering.maxEdgeDist}
 									 class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue" />
 					</div>
 
 					<div class="space-y-1">
 						<div class="flex justify-between text-[10px] leading-none">
 							<span class="text-warm-gray-500">{$_('ui.angle_cos')}</span>
-							<span class="text-near-black font-bold">{userState.clustering.minAngleCos.toFixed(2)}</span>
+							<span class="text-near-black font-bold">{topoSession.clustering.minAngleCos.toFixed(2)}</span>
 						</div>
 						<input type="range" min={bounds.angle[0]} max={bounds.angle[1]} step="0.01"
-									 bind:value={userState.clustering.minAngleCos}
+									 bind:value={topoSession.clustering.minAngleCos}
 									 class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue" />
 					</div>
 
 					<div class="space-y-1">
 						<div class="flex justify-between text-[10px] leading-none">
 							<span class="text-warm-gray-500">{$_('ui.cam_dist')}</span>
-							<span class="text-near-black font-bold">{userState.clustering.maxCamDist}m</span>
+							<span class="text-near-black font-bold">{topoSession.clustering.maxCamDist}m</span>
 						</div>
 						<input type="range" min={bounds.cam[0]} max={bounds.cam[1]} step="1"
-									 bind:value={userState.clustering.maxCamDist}
+									 bind:value={topoSession.clustering.maxCamDist}
 									 class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue" />
 					</div>
 				</div>
@@ -159,17 +159,17 @@
 					<div class="space-y-1">
 						<div class="flex justify-between text-[10px] leading-none">
 							<span class="text-warm-gray-500">{$_('ui.min_spread')}</span>
-							<span class="text-near-black font-bold">{userState.clustering.minViewSpread.toFixed(2)}m</span>
+							<span class="text-near-black font-bold">{topoSession.clustering.minViewSpread.toFixed(2)}m</span>
 						</div>
-						<input type="range" min="0" max="2" step="0.05" bind:value={userState.clustering.minViewSpread}
+						<input type="range" min="0" max="2" step="0.05" bind:value={topoSession.clustering.minViewSpread}
 									 class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue" />
 					</div>
 					<div class="space-y-1">
 						<div class="flex justify-between text-[10px] leading-none">
 							<span class="text-warm-gray-500">{$_('ui.min_obs')}</span>
-							<span class="text-near-black font-bold">{userState.clustering.minObservations}</span>
+							<span class="text-near-black font-bold">{topoSession.clustering.minObservations}</span>
 						</div>
-						<input type="range" min="1" max="50" step="1" bind:value={userState.clustering.minObservations}
+						<input type="range" min="1" max="50" step="1" bind:value={topoSession.clustering.minObservations}
 									 class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue" />
 					</div>
 				</div>
@@ -183,14 +183,14 @@
 		<div class="space-y-0.5 mb-3">
 			<div class="flex justify-between text-micro-data font-mono"><span
 				class="text-warm-gray-500">{$_('ui.input')}</span> <span
-				class="font-bold">{userState.clustering.stats.totalHits}</span></div>
+				class="font-bold">{topoSession.clustering.stats.totalHits}</span></div>
 			<div class="flex justify-between text-micro-data font-mono"><span
 				class="text-warm-gray-500">{$_('ui.filtered')}</span> <span
-				class="font-bold">{userState.clustering.stats.totalHits - userState.clustering.stats.confCut - userState.clustering.stats.edgeCut}</span>
+				class="font-bold">{topoSession.clustering.stats.totalHits - topoSession.clustering.stats.confCut - topoSession.clustering.stats.edgeCut}</span>
 			</div>
 			<div class="flex justify-between text-micro-data font-mono border-t border-black/15 mt-1 pt-1"><span
 				class="text-near-black font-bold">{$_('ui.final_clusters')}</span> <span
-				class="text-creator-blue font-bold">{userState.clustering.stats.finalClusters}</span></div>
+				class="text-creator-blue font-bold">{topoSession.clustering.stats.finalClusters}</span></div>
 		</div>
 	</div>
 </div>

@@ -1,10 +1,6 @@
 <script>
 	import ToolPalette2D from '$lib/components/editor/2d/ToolPalette2D.svelte';
 	import {
-		createTopoEditorSession,
-		provideTopoEditorSession
-	} from '$lib/state/topo-session.svelte.js';
-	import {
 		createTopo2DEditorState,
 		provideTopo2DEditorState
 	} from '$lib/state/topo-2d-editor-state.svelte.js';
@@ -21,13 +17,7 @@
 	import { _ } from 'svelte-i18n';
 	import { browser } from '$app/environment';
 
-	const userState = provideTopoEditorSession(createTopoEditorSession());
-	const editorState = createTopo2DEditorState({
-		getTopo: () => userState.topo,
-		setTopo: (topo) => (userState.topo = topo),
-		ui: userState.ui
-	});
-	provideTopo2DEditorState(editorState);
+	const editorState = provideTopo2DEditorState(createTopo2DEditorState());
 	let toolOptionsOpen = $state(false);
 	let showMapModal = $state(false);
 	let editor2D = $state();
@@ -46,15 +36,15 @@
 	);
 
 	useTopoDraftAutosave({
-		session: userState,
+		session: editorState,
 		draftId: browser ? new URL(window.location.href).searchParams.get('draft') : null,
 		editorMode: '2d',
 		getWorkspace: () => 'topos/2d/editor',
-		getSaveSession: () => ({ ...userState.getSaveSession(), topo: editorState.getSaveSnapshot() }),
+		getSaveSession: () => ({ ...editorState.getSaveSession(), topo: editorState.getSaveSnapshot() }),
 		onPersisted: () => editorState.markSaved(),
 		restoreSession: (session, id) => {
-			userState.loadSession(session, id);
-			initializeIdCounters(userState.topo);
+			editorState.loadSession(session, id);
+			initializeIdCounters(editorState.topo);
 		},
 		getSaveSignature: () => JSON.stringify(editorState.getSaveSnapshot())
 	});
@@ -64,8 +54,10 @@
 		if (!authState.requireAuth(() => saveTopo())) return;
 
 		try {
-			userState.topo.date = userState.topo.date || new Date().toISOString().split('T')[0];
-			userState.topo.updated = new Date().toISOString().split('T')[0];
+			editorState.mutateDocument((topo) => {
+				topo.date = topo.date || new Date().toISOString().split('T')[0];
+				topo.updated = new Date().toISOString().split('T')[0];
+			});
 
 			let topoToSave = editorState.getSaveSnapshot();
 
@@ -74,7 +66,7 @@
 			delete topoToSave._topoFileName;
 			delete topoToSave.name;
 
-			await writeJson(userState.topo._topoFileName, topoToSave);
+		await writeJson(editorState.topo._topoFileName, topoToSave);
 			editorState.markSaved();
 
 			saveStatus = 'success';
@@ -159,7 +151,7 @@
 				{/each}
 			</div>
 		</ToolOptions>
-	{:else if editorState.ui.activeTool === 'outlineEdit' && userState.ui.selectedOutlineId}
+	{:else if editorState.ui.activeTool === 'outlineEdit' && editorState.ui.selectedOutlineId}
 		<ToolOptions
 			title="Outline tools"
 			open={toolOptionsOpen}

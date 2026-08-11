@@ -1,9 +1,9 @@
 <script>
-	import { provideTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	import { provideTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
 	import PitchComponent from './PitchComponent.svelte';
 
 	let { pitch, onFieldChange = null } = $props();
-	provideTopoEditorSession({ topo: { scale: 1, fixPoints: [] } });
+	provideTopo2DEditorState({ topo: { scale: 1, fixPoints: [] } });
 </script>
 
 <PitchComponent {pitch} {onFieldChange} />

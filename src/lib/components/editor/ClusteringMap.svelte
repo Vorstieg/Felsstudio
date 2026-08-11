@@ -2,14 +2,14 @@
 	import { onDestroy } from 'svelte';
 	import maplibregl from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
-	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
-	const userState = getTopoEditorSession();
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+	const topoSession = getTopo2DEditorState();
 
 	let mapContainer = $state();
 	let map;
 
 	$effect(() => {
-		const gpsData = userState.clustering.gpsData;
+		const gpsData = topoSession.clustering.gpsData;
 		const validGpsKeys = Object.keys(gpsData || {})
             .filter(k => {
                 const g = gpsData[k];
@@ -87,7 +87,7 @@
 	});
 </script>
 
-{#if Object.keys(userState.clustering.gpsData || {}).length > 0}
+{#if Object.keys(topoSession.clustering.gpsData || {}).length > 0}
 	<div class="w-full bg-white border border-black/15 rounded-sm overflow-hidden shadow-sm mt-3">
 		<div bind:this={mapContainer} class="w-full h-48 bg-black/5"></div>
 	</div>

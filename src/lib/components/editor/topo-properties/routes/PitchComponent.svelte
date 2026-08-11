@@ -4,8 +4,8 @@
 	import BoltCount from '$lib/components/editor/topo-properties/routes/BoltCount.svelte';
 	import { routeLineStyles } from '$lib/components/editor/topo-properties/topo-properties-utils.js';
 	import { getContext } from 'svelte';
-	import { TOPO_EDITOR_SESSION } from '$lib/state/topo-session.svelte.js';
-	const userState = getContext(TOPO_EDITOR_SESSION);
+	import { TOPO_2D_EDITOR_STATE } from '$lib/state/topo-2d-editor-state.svelte.js';
+	const editorState = getContext(TOPO_2D_EDITOR_STATE);
 	import { _ } from 'svelte-i18n';
 
 	let {
@@ -85,7 +85,7 @@
 			<RouteLength
 				length={pitch.length}
 				route={pitch}
-				topoScale={topoScale ?? userState?.topo?.scale ?? 1}
+			topoScale={topoScale ?? editorState.topo.scale ?? 1}
 				onFieldChange={updateField}
 				onCalculate={() => onChange?.(pitch)}
 			/>
@@ -95,7 +95,7 @@
 				<BoltCount
 					boltCount={pitch.boltAmount}
 					route={pitch}
-					fixPoints={fixPoints ?? userState?.topo?.fixPoints ?? []}
+					fixPoints={fixPoints ?? editorState.topo.fixPoints ?? []}
 					onFieldChange={updateField}
 					onCalculate={() => onChange?.(pitch)}
 				/>

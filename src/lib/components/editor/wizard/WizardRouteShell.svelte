@@ -6,7 +6,7 @@
 	import { fileUrl, listDir, readJson } from '$lib/api/felslager.js';
 	import { loadAccessCollection } from '$lib/assets/js/fetchCrags.js';
 	import { draftsState } from '$lib/state/drafts.svelte.js';
-	import { createTopoEditorSession, provideTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	import { createTopo2DEditorState, provideTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
 	import { Topo } from '$lib/assets/js/topo-paths.js';
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
 	import { loadGlbIntoEditorState } from '$lib/assets/js/gltf-loader.js';
@@ -15,7 +15,7 @@
 	import { createCragEditorSession } from '$lib/state/crag-session.svelte.js';
 
 	let { workspace, titleKey, actionLabelKey, locations = [] } = $props();
-	const userState = provideTopoEditorSession(createTopoEditorSession());
+	const topoSession = provideTopo2DEditorState(createTopo2DEditorState());
 	const cragEditorState = createCragEditorSession();
 
 	let isLoading = $state(false);
@@ -61,11 +61,11 @@
 
 	async function persistTopoSessionImmediately() {
 		draftsState.load();
-		userState.ui.activeDraftId = await draftsState.save(userState.topo, userState.ui.activeDraftId, {
-			clustering: $state.snapshot(userState.clustering),
-			glbBlob: userState.transient.glbBlob
+		topoSession.ui.activeDraftId = await draftsState.save(topoSession.topo, topoSession.ui.activeDraftId, {
+			clustering: $state.snapshot(topoSession.clustering),
+			glbBlob: topoSession.transient.glbBlob
 		});
-		userState.ui.lastSaved = new Date().toISOString();
+		topoSession.ui.lastSaved = new Date().toISOString();
 	}
 
 	async function startNewEntry() {
@@ -105,7 +105,7 @@
 
 	async function loadFromEntry(crag, sector = null) {
 		isLoading = true;
-		userState.reset();
+		topoSession.reset();
 		try {
 			const topo = new Topo(crag.properties.path, crag.properties.id, sector?.id);
 			const name = crag.properties.name;
@@ -163,42 +163,42 @@
 
 			} else if (workSpaceWrapper.is2DEditor()) {
 				try {
-					userState.topo = { ...userState.topo, ...normalizeTopoPaths(await readJson(topo.getTopoPath())).data };
+					topoSession.topo = { ...topoSession.topo, ...normalizeTopoPaths(await readJson(topo.getTopoPath())).data };
 				} catch {
 					/* no topo yet */
 				}
-				userState.topo.editorMode = '2d';
+				topoSession.topo.editorMode = '2d';
 			} else {
 				try {
 					const topoData = normalizeTopoPaths(await readJson(topo.getTopoPath())).data;
-					userState.topo = { ...userState.topo, ...topoData };
+					topoSession.topo = { ...topoSession.topo, ...topoData };
 					loadedTopo = workspace === 'topos/3d/editor' ? loadedTopo : true;
-					initializeIdCounters(userState.topo);
+					initializeIdCounters(topoSession.topo);
 				} catch {
 					/* no topo yet */
 				}
 				if (workspace.includes('/3d/')) {
-					userState.topo.editorMode = '3d';
+					topoSession.topo.editorMode = '3d';
 					const glbUrl = fileUrl(topo.getGlbPath());
 					try {
 						const res = await fetch(glbUrl);
 						if (res.ok) {
 							loadedTopo = workspace === 'topos/3d/editor' ? true : loadedTopo;
 							const blob = await res.blob();
-							await loadGlbIntoEditorState(new File([blob], `${topo.getBaseName()}.glb`), userState);
+							await loadGlbIntoEditorState(new File([blob], `${topo.getBaseName()}.glb`), topoSession);
 						}
 					} catch {
 						/* GLB may not exist */
 					}
 				} else {
-					userState.topo.editorMode = '2d';
+					topoSession.topo.editorMode = '2d';
 					// Try to load 2D image from Felslager
 					const imgNames = [`${name}.jpg`, `${name}.png`, 'topo.jpg'];
 					for (const imgName of imgNames) {
 						try {
 							const res = await fetch(fileUrl(`${topo.path}/${imgName}`));
 							if (res.ok) {
-								userState.topo.image2D = fileUrl(`${topo.path}/${imgName}`);
+								topoSession.topo.image2D = fileUrl(`${topo.path}/${imgName}`);
 								break;
 							}
 						} catch {
@@ -209,8 +209,8 @@
 			}
 
 			// Store the entry path for saving later
-			userState.topo._entryPath = topo._getPath();
-			userState.topo._topoFileName = topo.getTopoPath();
+			topoSession.topo._entryPath = topo._getPath();
+			topoSession.topo._topoFileName = topo.getTopoPath();
 
 			if (workSpaceWrapper.is3DEditor() && !loadedTopo) {
 				goto(resolve('/topos/3d/upload'));
@@ -230,7 +230,7 @@
 					updated: new Date().toISOString()
 				});
 			}
-			goto(`${resolve(workSpaceWrapper.path)}?draft=${encodeURIComponent(userState.ui.activeDraftId)}`);
+			goto(`${resolve(workSpaceWrapper.path)}?draft=${encodeURIComponent(topoSession.ui.activeDraftId)}`);
 		} catch (err) {
 			console.error(err);
 		} finally {

@@ -15,9 +15,9 @@
 	import TopoPropertiesPanel from '$lib/components/editor/TopoPropertiesPanel.svelte';
 	import HitInspector from '$lib/components/editor/HitInspector.svelte';
 	import {
-		createTopoEditorSession,
-		provideTopoEditorSession
-	} from '$lib/state/topo-session.svelte.js';
+		createTopo2DEditorState,
+		provideTopo2DEditorState
+	} from '$lib/state/topo-2d-editor-state.svelte.js';
 	import { isBlankTopoSession } from '$lib/state/drafts.svelte.js';
 	import { useTopoDraftAutosave } from '$lib/components/editor/use-topo-draft-autosave.svelte.js';
 	import { isMobileViewport } from '$lib/assets/js/mobile-utils.js';
@@ -32,19 +32,19 @@
 	import { fixpointSymbols } from '@vorstieg/topo-renderer';
 
 	let { workspace = '3d-create', children } = $props();
-	const userState = provideTopoEditorSession(createTopoEditorSession());
+	const topoSession = provideTopo2DEditorState(createTopo2DEditorState());
 	let saveStatus = $state('idle');
 	let saveError = $state('');
 
 	function getInitialActiveTool() {
-		return userState.clustering.rawHits.length > 0 ? 'ai-bolts' : null;
+		return topoSession.clustering.rawHits.length > 0 ? 'ai-bolts' : null;
 	}
 
 	function getInitialWorkspace() {
 		return workspace;
 	}
 
-	userState.ui.workspace = getInitialWorkspace();
+	topoSession.ui.workspace = getInitialWorkspace();
 
 	let activeTool = $state(getInitialActiveTool());
 	let modelComponent = $state();
@@ -102,12 +102,12 @@
 	let lastSelectedClusterId = null;
 
 	$effect(() => {
-		const clusterId = userState.clustering.lockedClusterId;
+		const clusterId = topoSession.clustering.lockedClusterId;
 		if (clusterId && clusterId !== lastSelectedClusterId) {
 			lastSelectedClusterId = clusterId;
-			const cluster = userState.clustering.clusters.find((c) => c.id === clusterId);
+			const cluster = topoSession.clustering.clusters.find((c) => c.id === clusterId);
 			if (cluster && cluster.members.length > 0) {
-				const offset = userState.topo.modelOffset || [0, 0, 0];
+				const offset = topoSession.topo.modelOffset || [0, 0, 0];
 
 				// Calculate Anchor (Target)
 				const anchor = [
@@ -115,7 +115,7 @@
 					cluster.anchor[1] + offset[1],
 					cluster.anchor[2] + offset[2]
 				];
-				userState.transient.targetControlsTarget = new Vector3(...anchor);
+				topoSession.transient.targetControlsTarget = new Vector3(...anchor);
 
 				// Calculate "Front-Facing" Camera Position
 				const hts = cluster.members;
@@ -129,16 +129,16 @@
 				const viewDir = new Vector3().subVectors(avgCamPos, anchorVec).normalize();
 
 				// Target Position (1.5m away for better overview)
-				userState.transient.targetCameraPosition = anchorVec
+				topoSession.transient.targetCameraPosition = anchorVec
 					.clone()
 					.add(viewDir.multiplyScalar(1.5));
 
 				// Trigger tween
 				targetPosStore.set(anchor);
 				cameraPosStore.set([
-					userState.transient.targetCameraPosition.x,
-					userState.transient.targetCameraPosition.y,
-					userState.transient.targetCameraPosition.z
+					topoSession.transient.targetCameraPosition.x,
+					topoSession.transient.targetCameraPosition.y,
+					topoSession.transient.targetCameraPosition.z
 				]);
 			}
 		} else if (!clusterId) {
@@ -148,13 +148,13 @@
 
 	// Keep OrbitControls in sync with tween
 	$effect(() => {
-		if (controlsRef && userState.clustering.lockedClusterId) {
+		if (controlsRef && topoSession.clustering.lockedClusterId) {
 			controlsRef.update();
 		}
 	});
 
 	onMount(async () => {
-		initializeIdCounters(userState.topo);
+		initializeIdCounters(topoSession.topo);
 
 		// Initialize mobile detection (client-side only)
 		isMobile = isMobileViewport();
@@ -164,10 +164,10 @@
 		window.addEventListener('resize', handleResize);
 
 		// Force model offset from state
-		modelPositionOffset = userState.topo.modelOffset;
+		modelPositionOffset = topoSession.topo.modelOffset;
 
-		if (userState.transient.modelUrl) {
-			loadGlbFromUrl(userState.transient.modelUrl);
+		if (topoSession.transient.modelUrl) {
+			loadGlbFromUrl(topoSession.transient.modelUrl);
 		}
 
 		const handleKeyDown = (e) => {
@@ -192,47 +192,47 @@
 
 	function restoreSession(session, id) {
 		const topo = session.topo || session;
-		userState.loadSession(session, id);
-		userState.ui.workspace = topo.editorMode === '2d' ? 'topos/2d/editor' : 'topos/3d/editor';
+		topoSession.loadSession(session, id);
+		topoSession.ui.workspace = topo.editorMode === '2d' ? 'topos/2d/editor' : 'topos/3d/editor';
 	}
 
 	useTopoDraftAutosave({
-		session: userState,
+		session: topoSession,
 		draftId: browser ? new URL(window.location.href).searchParams.get('draft') : null,
 		editorMode: '3d',
 		getWorkspace: () => workspace,
 		shouldRestore: () =>
 			workspace.endsWith('edit') ||
 			isBlankTopoSession({
-				topo: userState.topo,
-				clustering: userState.clustering,
-				glbBlob: userState.transient.glbBlob
+				topo: topoSession.topo,
+				clustering: topoSession.clustering,
+				glbBlob: topoSession.transient.glbBlob
 			}),
 		restoreSession: (session, id) => {
 			restoreSession(session, id);
 			activeTool = getInitialActiveTool();
-			initializeIdCounters(userState.topo);
+			initializeIdCounters(topoSession.topo);
 		},
 		getSaveSignature: () =>
 			JSON.stringify({
-				routes: userState.topo.routes,
-				fixPoints: userState.topo.fixPoints,
-				outlines: userState.topo.outlines,
-				textLabels: userState.topo.textLabels,
-				image2D: userState.topo.image2D,
-				imageAspectRatio: userState.topo.imageAspectRatio,
-				canvasAspectRatio: userState.topo.canvasAspectRatio,
-				backgroundFit: userState.topo.backgroundFit,
-				name: userState.topo.name,
-				crag_id: userState.topo.crag_id,
-				sector_id: userState.topo.sector_id,
-				clustering: userState.clustering,
-				glbBlob: userState.transient.glbBlob,
-				modelRevision: userState.transient.modelRevision
+				routes: topoSession.topo.routes,
+				fixPoints: topoSession.topo.fixPoints,
+				outlines: topoSession.topo.outlines,
+				textLabels: topoSession.topo.textLabels,
+				image2D: topoSession.topo.image2D,
+				imageAspectRatio: topoSession.topo.imageAspectRatio,
+				canvasAspectRatio: topoSession.topo.canvasAspectRatio,
+				backgroundFit: topoSession.topo.backgroundFit,
+				name: topoSession.topo.name,
+				crag_id: topoSession.topo.crag_id,
+				sector_id: topoSession.topo.sector_id,
+				clustering: topoSession.clustering,
+				glbBlob: topoSession.transient.glbBlob,
+				modelRevision: topoSession.transient.modelRevision
 			}),
 		getExtra: () => ({
-			clustering: $state.snapshot(userState.clustering),
-			glbBlob: userState.transient.glbBlob
+			clustering: $state.snapshot(topoSession.clustering),
+			glbBlob: topoSession.transient.glbBlob
 		})
 	});
 
@@ -312,8 +312,8 @@
 
 	function estimateGpsOrigin() {
 		const pairs = [];
-		const camPositions = userState.clustering.cameraPositions;
-		const gpsData = userState.clustering.gpsData;
+		const camPositions = topoSession.clustering.cameraPositions;
+		const gpsData = topoSession.clustering.gpsData;
 
 		for (let fIdx in camPositions) {
 			// Find corresponding GPS entry (handling string keys/frame padding)
@@ -365,10 +365,10 @@
 				await modelComponent.bakeTransforms();
 			}
 
-			userState.topo.date = userState.topo.date || new Date().toISOString().split('T')[0];
-			userState.topo.updated = new Date().toISOString().split('T')[0];
+			topoSession.topo.date = topoSession.topo.date || new Date().toISOString().split('T')[0];
+			topoSession.topo.updated = new Date().toISOString().split('T')[0];
 
-			let topoToSave = JSON.parse(JSON.stringify(userState.topo));
+			let topoToSave = JSON.parse(JSON.stringify(topoSession.topo));
 
 			// Remove internal UI fields before saving
 			delete topoToSave._entryPath;
@@ -377,7 +377,7 @@
 
 			if (workspace === '3d-create') {
 				// Convert visible clusters to fixPoints
-				const confirmedBolts = userState.clustering.clusters.map((c) => ({
+				const confirmedBolts = topoSession.clustering.clusters.map((c) => ({
 					id: generateSymbolId(),
 					type: c.class || 'bolt',
 					position: c.anchor,
@@ -398,13 +398,13 @@
 			}
 
 			// Save topo JSON to Felslager
-			await writeJson(userState.topo._topoFileName, topoToSave);
+			await writeJson(topoSession.topo._topoFileName, topoToSave);
 
 			// Upload GLB model if available (3D mode)
-			if (userState.transient.glbBlob) {
+			if (topoSession.transient.glbBlob) {
 				await writeFile(
-					userState.topo._topoFileName.replace(/-topo\.json$/, '.glb'),
-					userState.transient.glbBlob,
+					topoSession.topo._topoFileName.replace(/-topo\.json$/, '.glb'),
+					topoSession.transient.glbBlob,
 					'model/gltf-binary'
 				);
 			}
@@ -429,7 +429,7 @@
 		bind:activeTool
 		bind:drawingTarget
 		bind:lassoPoints
-		bind:clustering={userState.clustering}
+		bind:clustering={topoSession.clustering}
 	></ToolPalette3D>
 </div>
 
@@ -500,17 +500,17 @@
 				<div class="flex items-center gap-1">
 					{#each fixpointSymbols as symbol}
 						<button
-							class="flex items-center gap-2 h-7 px-2.5 rounded-sm transition-none border {userState
+							class="flex items-center gap-2 h-7 px-2.5 rounded-sm transition-none border {topoSession
 								.ui.selectedSymbol === symbol.id
 								? 'bg-creator-blue text-white border-creator-blue shadow-sm'
 								: 'bg-black/5 text-warm-gray-500 border-black/5 hover:bg-black/10 hover:text-near-black'}"
-							onclick={() => (userState.ui.selectedSymbol = symbol.id)}
+							onclick={() => (topoSession.ui.selectedSymbol = symbol.id)}
 							title={$_(`topo.fixpoints.${symbol.id}`)}
 						>
 							<img
 								src={symbol.icon}
 								alt={symbol.name}
-								class="w-3 h-3 {userState.ui.selectedSymbol === symbol.id
+								class="w-3 h-3 {topoSession.ui.selectedSymbol === symbol.id
 									? 'invert brightness-0'
 									: 'opacity-70'}"
 							/>
@@ -592,7 +592,7 @@
 	{/if}
 </div>
 
-{#if activeTool === 'ai-bolts' && userState.clustering.rawHits.length > 0}
+{#if activeTool === 'ai-bolts' && topoSession.clustering.rawHits.length > 0}
 	<HitInspector />
 {/if}
 
@@ -641,11 +641,11 @@
 
 {#if showMapModal}
 	<MapModal
-		bind:coordinates={userState.topo.coordinates}
-		bind:altitude={userState.topo.altitude}
+		bind:coordinates={topoSession.topo.coordinates}
+		bind:altitude={topoSession.topo.altitude}
 		gltfScene={loadedGltfScene}
-		bind:modelRotation={userState.topo.modelRotation}
-		bind:modelScale={userState.topo.modelScale}
+		bind:modelRotation={topoSession.topo.modelRotation}
+		bind:modelScale={topoSession.topo.modelScale}
 		onClose={() => {
 			showMapModal = false;
 		}}

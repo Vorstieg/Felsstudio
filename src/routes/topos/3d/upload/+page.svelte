@@ -5,11 +5,11 @@
 	import JSZip from 'jszip';
 	import { loadGlbIntoEditorState } from '$lib/assets/js/gltf-loader.js';
 	import { draftsState } from '$lib/state/drafts.svelte.js';
-	import { createTopoEditorSession, provideTopoEditorSession } from '$lib/state/topo-session.svelte.js';
+	import { createTopo2DEditorState, provideTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
 	import Topo3DUploadForm from '$lib/components/editor/wizard/Topo3DUploadForm.svelte';
 
 	let isLoading = $state(false);
-	const userState = provideTopoEditorSession(createTopoEditorSession());
+	const topoSession = provideTopo2DEditorState(createTopo2DEditorState());
 	let zipFile = $state(null);
 	let glbFile = $state(null);
 	let projectFile = $state(null);
@@ -17,9 +17,9 @@
 
 	async function processFiles() {
 		isLoading = true;
-		const seededTopo = { ...userState.topo };
-		userState.reset();
-		userState.topo = { ...userState.topo, ...seededTopo, editorMode: '3d' };
+		const seededTopo = { ...topoSession.topo };
+		topoSession.reset();
+		topoSession.topo = { ...topoSession.topo, ...seededTopo, editorMode: '3d' };
 
 		try {
 			if (zipFile) {
@@ -51,15 +51,15 @@
 					cropsMap[entry.name] = blobUrl;
 					cropsMap[entry.name.toLowerCase()] = blobUrl;
 				}
-				if (Object.keys(cropsMap).length) userState.clustering.cropsMap = cropsMap;
+				if (Object.keys(cropsMap).length) topoSession.clustering.cropsMap = cropsMap;
 			}
 
 			if (!glbFile) throw new Error('GLB Model is required');
-			await loadGlbIntoEditorState(glbFile, userState);
+			await loadGlbIntoEditorState(glbFile, topoSession);
 
 			if (projectFile) {
 				const project = JSON.parse(await projectFile.text());
-				userState.clustering.rawHits = (project.hits || []).map((hit) => ({
+				topoSession.clustering.rawHits = (project.hits || []).map((hit) => ({
 					...hit,
 					crop: hit.crop || hit.hit_crop || hit.img,
 					edge_dist: hit.edge_dist ?? 0,
@@ -67,56 +67,56 @@
 					cam_dist: hit.cam_dist ?? 1.0
 				}));
 				const cameras = {};
-				for (const hit of userState.clustering.rawHits) {
+				for (const hit of topoSession.clustering.rawHits) {
 					const match = hit.img?.match(/[fF](\d+)/);
 					const index = match ? parseInt(match[1]) : hit.img;
 					if (index && !cameras[index]) cameras[index] = hit.cam_pos;
 				}
-				userState.clustering.cameraPositions = cameras;
+				topoSession.clustering.cameraPositions = cameras;
 				if (Array.isArray(project.gps)) {
 					const gpsData = {};
 					for (const gps of project.gps) {
 						const index = gps.frame_index ?? gps.img?.match(/[fF](\d+)/)?.[1];
 						if (index !== undefined) gpsData[index] = gps;
 					}
-					userState.clustering.gpsData = gpsData;
+					topoSession.clustering.gpsData = gpsData;
 				}
-				if (project.name) userState.topo.name = project.name;
+				if (project.name) topoSession.topo.name = project.name;
 			}
 
 			if (cropFolderFiles.length) {
-				const cropsMap = { ...(userState.clustering.cropsMap || {}) };
+				const cropsMap = { ...(topoSession.clustering.cropsMap || {}) };
 				for (const file of cropFolderFiles) {
 					const blobUrl = URL.createObjectURL(file);
 					cropsMap[file.name] = blobUrl;
 					cropsMap[file.name.toLowerCase()] = blobUrl;
 				}
-				userState.clustering.cropsMap = cropsMap;
+				topoSession.clustering.cropsMap = cropsMap;
 			}
 
-			if (userState.topo.coordinates[0] === 0 && userState.topo.coordinates[1] === 0) {
-				const validGpsKeys = Object.keys(userState.clustering.gpsData)
+			if (topoSession.topo.coordinates[0] === 0 && topoSession.topo.coordinates[1] === 0) {
+				const validGpsKeys = Object.keys(topoSession.clustering.gpsData)
 					.filter((key) => {
-						const gps = userState.clustering.gpsData[key];
+						const gps = topoSession.clustering.gpsData[key];
 						return gps && gps.latitude !== 0 && gps.longitude !== 0;
 					})
 					.sort((a, b) => parseInt(a) - parseInt(b));
 				if (validGpsKeys.length) {
-					const gps = userState.clustering.gpsData[
+					const gps = topoSession.clustering.gpsData[
 						validGpsKeys[Math.floor(validGpsKeys.length / 2)]
 					];
-					userState.topo.coordinates = [gps.latitude, gps.longitude];
-					userState.topo.altitude = gps.abs_alt || gps.rel_alt || 0;
+					topoSession.topo.coordinates = [gps.latitude, gps.longitude];
+					topoSession.topo.altitude = gps.abs_alt || gps.rel_alt || 0;
 				}
 			}
 
 			draftsState.load();
-			userState.ui.activeDraftId = await draftsState.save(userState.topo, userState.ui.activeDraftId, {
-				clustering: $state.snapshot(userState.clustering),
-			glbBlob: userState.transient.glbBlob
+			topoSession.ui.activeDraftId = await draftsState.save(topoSession.topo, topoSession.ui.activeDraftId, {
+				clustering: $state.snapshot(topoSession.clustering),
+			glbBlob: topoSession.transient.glbBlob
 			});
-			userState.ui.lastSaved = new Date().toISOString();
-			goto(`${resolve('/topos/3d/editor')}?draft=${encodeURIComponent(userState.ui.activeDraftId)}`);
+			topoSession.ui.lastSaved = new Date().toISOString();
+			goto(`${resolve('/topos/3d/editor')}?draft=${encodeURIComponent(topoSession.ui.activeDraftId)}`);
 		} catch (error) {
 			console.error(error);
 			alert(error.message);

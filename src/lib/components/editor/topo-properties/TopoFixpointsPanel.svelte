@@ -1,8 +1,8 @@
 <script>
-	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
 	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
-	const userState = getTopoEditorSession();
 	const editorState = getTopo2DEditorState();
+	let topo = $derived(editorState.topo);
+	const ui = editorState.ui;
 	import { _ } from 'svelte-i18n';
 	import { topoSymbols } from '@vorstieg/topo-renderer';
 	import { createAiFixpoint } from './topo-properties-utils.js';
@@ -10,33 +10,26 @@
 	let { aiSuggestions = [], mobile = false } = $props();
 
 	function toggleCluster(cluster) {
-		if (userState.clustering.lockedClusterId === cluster.id) {
-			userState.clustering.lockedClusterId = null;
+		if (editorState.clustering.lockedClusterId === cluster.id) {
+			editorState.clustering.lockedClusterId = null;
 		} else {
-			userState.clustering.lockedClusterId = cluster.id;
+			editorState.clustering.lockedClusterId = cluster.id;
 		}
-		userState.clustering.selectedClusterId = cluster.id;
+		editorState.clustering.selectedClusterId = cluster.id;
 	}
 
 	function addAiBolt(cluster) {
-		if (editorState) editorState.addFixpoint(createAiFixpoint(cluster));
-		else userState.topo.fixPoints.push(createAiFixpoint(cluster));
-		userState.clustering.selectedClusterId = null;
+		editorState.addFixpoint(createAiFixpoint(cluster));
+		editorState.clustering.selectedClusterId = null;
 	}
 
 	function removeFixpoint(point, index) {
 		const pointId = point?.id;
-		if (editorState) {
-			editorState.removeFixpoint(pointId);
-			return;
-		}
-		userState.topo.fixPoints.splice(index, 1);
-		if (userState.ui.selectedFixpointId === pointId) userState.ui.selectedFixpointId = null;
-		userState.topo.routes.forEach((route) => {
-			if (route.fixPoints && route.fixPoints.includes(pointId)) {
-				route.fixPoints = route.fixPoints.filter((id) => id !== pointId);
-			}
-		});
+		editorState.removeFixpoint(pointId);
+	}
+
+	function updateFixpointType(point, type) {
+		editorState.updateFixpoint(point.id, { type });
 	}
 </script>
 
@@ -47,7 +40,7 @@
 			: 'bg-creator-blue/5 rounded-sm p-2 border border-creator-blue/20 space-y-1.5 mb-4'}
 		style={mobile
 			? undefined
-			: `margin-bottom: ${userState.clustering.lockedClusterId ? '70px' : '1rem'}`}
+			: `margin-bottom: ${editorState.clustering.lockedClusterId ? '70px' : '1rem'}`}
 	>
 		{#if mobile}
 			<p class="text-ui-label text-creator-blue px-1 mb-0.5">{$_('ui.nearby_suggestions')}</p>
@@ -65,16 +58,16 @@
 					id={'ai-bolt-' + cluster.id}
 					class={mobile
 						? `panel p-3 flex items-center gap-3 border-2 cursor-pointer transition-none ${
-								userState.clustering.lockedClusterId === cluster.id
+								editorState.clustering.lockedClusterId === cluster.id
 									? 'border-creator-blue bg-creator-blue/10'
-									: userState.clustering.selectedClusterId === cluster.id
+									: editorState.clustering.selectedClusterId === cluster.id
 										? 'border-creator-blue/60 bg-creator-blue/10'
 										: 'border-creator-blue/30 bg-creator-blue/5 hover:border-creator-blue/60 hover:bg-creator-blue/10'
 							}`
 						: `bg-white rounded-sm p-1.5 shadow-sm border flex items-center justify-between gap-2 group transition-none cursor-pointer ${
-								userState.clustering.lockedClusterId === cluster.id
+								editorState.clustering.lockedClusterId === cluster.id
 									? 'border-creator-blue ring-1 ring-creator-blue'
-									: userState.clustering.selectedClusterId === cluster.id
+									: editorState.clustering.selectedClusterId === cluster.id
 										? 'border-creator-blue/60'
 										: 'border-black/15 hover:border-creator-blue'
 							}`}
@@ -133,15 +126,15 @@
 	</div>
 {/if}
 
-{#if userState.topo.fixPoints.length === 0}
+{#if topo.fixPoints.length === 0}
 	<div class="bg-warm-white rounded-sm p-4 text-center border border-black/15">
 		<p class="text-body-text text-warm-gray-500 font-medium">{$_('ui.no_fixpoints_yet')}</p>
 	</div>
 {:else if mobile}
-	{#each userState.topo.fixPoints as point, i (point.id)}
+	{#each topo.fixPoints as point, i (point.id)}
 		<div
 			id={'fixpoint-' + point.id}
-			class="panel p-3 flex items-center gap-3 border-2 {userState.ui.selectedFixpointId ===
+			class="panel p-3 flex items-center gap-3 border-2 {ui.selectedFixpointId ===
 			point.id
 				? 'border-creator-blue'
 				: 'border-transparent'}"
@@ -149,21 +142,16 @@
 			<button
 				class="w-9 h-9 rounded-sm transition-none bg-warm-gray-100 flex items-center justify-center text-warm-gray-500 text-xs font-black shadow-sm"
 				onclick={() => {
-					if (editorState) {
-						if (userState.ui.selectedFixpointId === point.id) editorState.clearSelection();
-						else editorState.selectObject('symbol', point.id);
-					} else {
-						userState.ui.selectedFixpointId =
-							userState.ui.selectedFixpointId === point.id ? null : point.id;
-						userState.ui.selectedRouteId = null;
-					}
+					if (ui.selectedFixpointId === point.id) editorState.clearSelection();
+					else editorState.selectObject('symbol', point.id);
 				}}
 				aria-label={`${$_('ui.fixpoints')} ${i + 1}`}
 			>
 				{i + 1}
 			</button>
-			<select
-				bind:value={point.type}
+				<select
+					value={point.type}
+					onchange={(event) => updateFixpointType(point, event.currentTarget.value)}
 				class="min-w-0 flex-1 bg-transparent text-sm font-black text-near-black outline-none appearance-none"
 			>
 				{#each topoSymbols as symbol}
@@ -182,11 +170,11 @@
 	{/each}
 {:else}
 	<div class="grid grid-cols-1 gap-1.5">
-		{#each userState.topo.fixPoints as point, i (point.id)}
+	{#each topo.fixPoints as point, i (point.id)}
 			<div
 				id={'fixpoint-' + point.id}
 				class={'panel-inner p-2 transition-none flex items-center gap-2 border ' +
-					(userState.ui.selectedFixpointId === point.id
+					(ui.selectedFixpointId === point.id
 						? 'border-creator-blue'
 						: 'border-transparent')}
 			>
@@ -196,8 +184,9 @@
 					{i + 1}
 				</div>
 				<div class="flex-1">
-					<select
-						bind:value={point.type}
+						<select
+							value={point.type}
+							onchange={(event) => updateFixpointType(point, event.currentTarget.value)}
 						class="w-full bg-transparent text-body-text font-bold text-near-black outline-none appearance-none"
 					>
 						{#each topoSymbols as symbol}

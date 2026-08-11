@@ -31,7 +31,7 @@ export function generateId(prefix = 'id') {
 
 /**
  * Initialize counters from existing data to avoid collisions
- * @param {Object} topo - The topo object from userState
+ * @param {Object} topo - The topo object from topoSession
  */
 export function initializeIdCounters(topo) {
 	if (!topo) return;

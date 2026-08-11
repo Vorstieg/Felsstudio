@@ -1,8 +1,6 @@
 <script>
-	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
 	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
 
-	const userState = getTopoEditorSession();
 	const editorState = getTopo2DEditorState();
 	import { cragTypes } from '$lib/components/editor/crag/crag-editor-options.js';
 	import { availableRouteTags, convertRouteType } from '$lib/assets/js/topo-utils.js';
@@ -19,8 +17,6 @@
 
 	let {
 		route = $bindable(null),
-		drawingTarget = $bindable(null),
-		activeTool = $bindable('route'),
 		mobile = false,
 		onPathSelect = null
 	} = $props();
@@ -30,25 +26,19 @@
 	}
 
 	function updateRoute(changes) {
-		if (editorState) editorState.updateRoute(route.id, changes);
-		else Object.assign(route, changes);
+		editorState.updateRoute(route.id, changes);
 	}
 
 	function updateRouteType(value) {
-		if (editorState) {
-			editorState.commit('Change route type', () => {
-				convertRouteType(route, value);
-				return true;
-			});
-		} else convertRouteType(route, value);
+		editorState.commit('Change route type', () => {
+			convertRouteType(route, value);
+			return true;
+		});
 	}
 
 	function selectPathAsset(route, index) {
-		if (editorState) editorState.selectObject('route', route.id);
-		else userState.ui.selectedRouteId = route.id;
-		userState.ui.selectedPathId = index;
-		userState.ui.selectedFixpointId = null;
-		drawingTarget = null;
+		editorState.selectPath('path', route.id, index);
+		editorState.ui.drawingTarget = null;
 		onPathSelect?.(route, index);
 	}
 
@@ -57,73 +47,50 @@
 	}
 
 	function addPitch(route) {
-		if (!route.pitches && editorState) editorState.updateRoute(route.id, { pitches: [] });
-		else if (!route.pitches) route.pitches = [];
+		if (!route.pitches) editorState.updateRoute(route.id, { pitches: [] });
 		const lastPitch = route.pitches.at(-1);
 		if (lastPitch && (lastPitch.points2D?.length || 0) < 2) {
 			drawPitch(route, lastPitch);
 			return;
 		}
 
-		if (editorState) editorState.selectObject('route', route.id);
-		else userState.ui.selectedRouteId = route.id;
-		userState.ui.selectedFixpointId = null;
-		drawingTarget = { type: 'newPitch', routeId: route.id };
-		activeTool = 'multipitch';
+		editorState.selectObject('route', route.id);
+		editorState.ui.drawingTarget = { type: 'newPitch', routeId: route.id };
+		editorState.ui.activeTool = 'multipitch';
 		if (mobile) snapToSmallestHeight?.();
 	}
 
 	function drawPitch(route, pitch) {
-		if (editorState) editorState.selectObject('route', route.id);
-		else userState.ui.selectedRouteId = route.id;
-		userState.ui.selectedFixpointId = null;
-		drawingTarget = { type: 'pitch', routeId: route.id, pitchId: pitch.id };
-		activeTool = 'multipitch';
+		editorState.selectObject('route', route.id);
+		editorState.ui.drawingTarget = { type: 'pitch', routeId: route.id, pitchId: pitch.id };
+		editorState.ui.activeTool = 'multipitch';
 		if (mobile) snapToSmallestHeight?.();
 	}
 
 	function addVariant(route) {
 		const variant = createVariant(route);
-		if (editorState) {
-			editorState.commit('Add route variant', () => {
-				route.variants = [...(route.variants || []), variant];
-				return true;
-			});
-		} else {
+		editorState.commit('Add route variant', () => {
 			route.variants = [...(route.variants || []), variant];
-		}
+			return true;
+		});
 		drawVariant(route, variant);
 	}
 
 	function drawVariant(route, variant) {
-		if (editorState) editorState.selectObject('route', route.id);
-		else userState.ui.selectedRouteId = route.id;
-		userState.ui.selectedFixpointId = null;
-		drawingTarget = { type: 'variant', routeId: route.id, variantId: variant.id };
-		activeTool = 'multipitch';
+		editorState.selectObject('route', route.id);
+		editorState.ui.drawingTarget = { type: 'variant', routeId: route.id, variantId: variant.id };
+		editorState.ui.activeTool = 'multipitch';
 		if (mobile) snapToSmallestHeight?.();
 	}
 
-	function removePitch(route, pitch, index) {
-		if (editorState) {
-			editorState.removePitch(route.id, pitch.id);
-			if (drawingTarget?.pitchId === pitch.id) drawingTarget = null;
-			return;
-		}
-		route.pitches.splice(index, 1);
-		route.pitches = [...route.pitches];
-		if (drawingTarget?.pitchId === pitch.id) drawingTarget = null;
+	function removePitch(route, pitch) {
+		editorState.removePitch(route.id, pitch.id);
+		if (editorState.ui.drawingTarget?.pitchId === pitch.id) editorState.ui.drawingTarget = null;
 	}
 
-	function removeVariant(route, variant, index) {
-		if (editorState) {
-			editorState.removeVariant(route.id, variant.id);
-			if (drawingTarget?.variantId === variant.id) drawingTarget = null;
-			return;
-		}
-		route.variants.splice(index, 1);
-		route.variants = [...route.variants];
-		if (drawingTarget?.variantId === variant.id) drawingTarget = null;
+	function removeVariant(route, variant) {
+		editorState.removeVariant(route.id, variant.id);
+		if (editorState.ui.drawingTarget?.variantId === variant.id) editorState.ui.drawingTarget = null;
 	}
 
 	function toggleRouteFixpoint(route, fixpointId) {
@@ -131,8 +98,7 @@
 		const nextFixPoints = fixPoints.includes(fixpointId)
 			? fixPoints.filter((id) => id !== fixpointId)
 			: [...fixPoints, fixpointId];
-		if (editorState) editorState.updateRoute(route.id, { fixPoints: nextFixPoints });
-		else route.fixPoints = nextFixPoints;
+		editorState.updateRoute(route.id, { fixPoints: nextFixPoints });
 	}
 </script>
 
@@ -193,7 +159,7 @@
 				<button
 					class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-warm-gray-500 hover:bg-creator-blue hover:text-white transition-none"
 					onclick={() => {
-						const pathId = addPathAsset(route, userState.topo);
+						const pathId = addPathAsset(route, editorState.topo);
 						selectPathAsset(route, pathId);
 					}}
 				>
@@ -207,7 +173,7 @@
 		<div class="space-y-1">
 			{#each pathRefs() as pathAsset}
 				<div
-					class={`grid grid-cols-12 gap-1 rounded-sm border p-1 cursor-pointer ${String(userState.ui.selectedRouteId) === String(route.id) && String(userState.ui.selectedPathId) === String(pathAsset.pathId) ? 'border-creator-blue bg-creator-blue/5' : 'border-black/10 bg-white'}`}
+					class={`grid grid-cols-12 gap-1 rounded-sm border p-1 cursor-pointer ${String(editorState.ui.selectedRouteId) === String(route.id) && String(editorState.ui.selectedPathId) === String(pathAsset.pathId) ? 'border-creator-blue bg-creator-blue/5' : 'border-black/10 bg-white'}`}
 					onclick={() => selectPathAsset(route, pathAsset.pathId)}
 					role="button"
 					tabindex="0"
@@ -236,12 +202,12 @@
 						aria-label="Remove path"
 						onclick={(event) => {
 							event.stopPropagation();
-							removePathAsset(route, pathAsset.pathId, userState.topo);
+							removePathAsset(route, pathAsset.pathId, editorState.topo);
 							if (
-								String(userState.ui.selectedRouteId) === String(route.id) &&
-								String(userState.ui.selectedPathId) === String(pathAsset.pathId)
+								String(editorState.ui.selectedRouteId) === String(route.id) &&
+								String(editorState.ui.selectedPathId) === String(pathAsset.pathId)
 							)
-								userState.ui.selectedPathId = null;
+								editorState.ui.selectedPathId = null;
 						}}
 						class="col-span-1 text-warm-gray-300 hover:text-rose-600 transition-none"
 					>
@@ -274,7 +240,7 @@
 					{mobile}
 					inheritLineStyle={true}
 					onDraw={(pitch) => drawPitch(route, pitch)}
-					onRemove={(pitch, index) => removePitch(route, pitch, index)}
+					onRemove={(pitch) => removePitch(route, pitch)}
 				/>
 			{/each}
 
@@ -296,7 +262,7 @@
 						{mobile}
 						defaultLineStyle="variant"
 						onDraw={(variant) => drawVariant(route, variant)}
-						onRemove={(variant, index) => removeVariant(route, variant, index)}
+						onRemove={(variant) => removeVariant(route, variant)}
 					/>
 				{/each}
 			</div>
@@ -323,7 +289,7 @@
 				small={true}
 			/>
 		</div>
-		{#if !mobile && userState.topo.fixPoints.length > 0}
+		{#if !mobile && editorState.topo.fixPoints.length > 0}
 			<details class="group/fp flex-none relative">
 				<summary
 					class="list-none flex items-center justify-center w-6 h-6 rounded-sm bg-black/5 text-warm-gray-500 cursor-pointer hover:bg-creator-blue hover:text-white transition-none shadow-sm"
@@ -337,7 +303,7 @@
 						{$_('ui.assign_fixpoints')}
 					</p>
 					<div class="grid grid-cols-5 gap-1">
-						{#each userState.topo.fixPoints as fixpoint, idx}
+						{#each editorState.topo.fixPoints as fixpoint, idx}
 							<button
 								class={'w-6 h-6 flex items-center justify-center rounded-sm text-micro-data font-bold transition-none ' +
 									(route.fixPoints?.includes(fixpoint.id)

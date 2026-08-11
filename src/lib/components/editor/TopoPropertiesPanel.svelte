@@ -1,10 +1,10 @@
 <script>
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
-	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
 	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
-	const userState = getTopoEditorSession();
 	const editorState = getTopo2DEditorState();
+	let topo = $derived(editorState.topo);
+	const ui = editorState.ui;
 	import DetailsComponent from './DetailsComponent.svelte';
 	import TopoInfoPanel from './topo-properties/TopoInfoPanel.svelte';
 	import TopoRoutesPanel from './topo-properties/routes/TopoRoutesPanel.svelte';
@@ -25,11 +25,11 @@
 	let topoJsonText = $state('');
 	let topoJsonError = $state('');
 
-	let routes = $derived(userState.topo.routes);
+	let routes = $derived(topo.routes);
 	let aiSuggestions = $derived.by(() => {
-		if (activeTool !== 'ai-bolts' || !userState.clustering.clusters) return [];
-		return userState.clustering.clusters.filter((cluster) => {
-			return !userState.topo.fixPoints.some((fixpoint) => {
+		if (activeTool !== 'ai-bolts' || !editorState.clustering.clusters) return [];
+		return editorState.clustering.clusters.filter((cluster) => {
+			return !topo.fixPoints.some((fixpoint) => {
 				if (!Array.isArray(fixpoint.position) || fixpoint.position.length < 3) return false;
 				const dist = Math.sqrt(
 					Math.pow(fixpoint.position[0] - cluster.anchor[0], 2) +
@@ -42,13 +42,13 @@
 	});
 
 	$effect(() => {
-		const selectedId = userState.ui.selectedRouteId;
-		const selectedFpId = userState.ui.selectedFixpointId;
-		const lockedClusterId = userState.clustering.lockedClusterId;
+		const selectedId = ui.selectedRouteId;
+		const selectedFpId = ui.selectedFixpointId;
+		const lockedClusterId = editorState.clustering.lockedClusterId;
 
 		if (selectedId && selectedId !== lastSelectedId) {
 			lastSelectedId = selectedId;
-			const route = userState.topo.routes.find(
+			const route = topo.routes.find(
 				(item) => String(item.id) === String(selectedId)
 			);
 			if (route) {
@@ -105,15 +105,11 @@
 
 	function switchTab(tab) {
 		activeTab = tab;
-		if (editorState) editorState.clearSelection();
-		else {
-			userState.ui.selectedRouteId = null;
-			userState.ui.selectedFixpointId = null;
-		}
+		editorState.clearSelection();
 	}
 
 	function formatTopoJson() {
-		topoJsonText = JSON.stringify($state.snapshot(userState.topo), null, 2);
+		topoJsonText = JSON.stringify($state.snapshot(topo), null, 2);
 		topoJsonError = '';
 	}
 
@@ -139,8 +135,8 @@
 			return;
 		}
 
-		const currentMode = userState.topo.editorMode;
-		userState.topo = {
+		const currentMode = topo.editorMode;
+		const nextTopo = {
 			...parsed,
 			routes: Array.isArray(parsed.routes) ? parsed.routes : [],
 			fixPoints: Array.isArray(parsed.fixPoints) ? parsed.fixPoints : [],
@@ -161,13 +157,8 @@
 			backgroundFit: parsed.backgroundFit === 'cover' ? 'cover' : 'contain',
 			editorMode: parsed.editorMode || currentMode
 		};
-		if (editorState) editorState.clearSelection();
-		else {
-			userState.ui.selectedRouteId = null;
-			userState.ui.selectedFixpointId = null;
-			userState.ui.selectedTextLabelId = null;
-			userState.ui.selectedOutlineId = null;
-		}
+		editorState.load(nextTopo);
+		editorState.clearSelection();
 		drawingTarget = null;
 		topoJsonError = '';
 		formatTopoJson();
@@ -180,7 +171,7 @@
 			id: 'fixpoints',
 			label: $_('ui.fixpoints'),
 			icon: 'fa-location-dot',
-			count: userState.topo.fixPoints.length
+			count: topo.fixPoints.length
 		}
 	]);
 </script>

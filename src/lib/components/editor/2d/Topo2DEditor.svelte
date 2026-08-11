@@ -1,6 +1,8 @@
 <script>
-	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
-	import { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+	import {
+		createTopo2DEditorState,
+		getTopo2DEditorState
+	} from '$lib/state/topo-2d-editor-state.svelte.js';
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { untrack } from 'svelte';
@@ -22,15 +24,8 @@
 
 	let { editorState: providedEditorState = null } = $props();
 
-	const userState = getTopoEditorSession();
 	// svelte-ignore state_referenced_locally
-	const editor =
-		providedEditorState ||
-		createTopo2DEditorState({
-			getTopo: () => userState.topo,
-			setTopo: (topo) => (userState.topo = topo),
-			ui: userState.ui
-		});
+	const editor = providedEditorState || getTopo2DEditorState() || createTopo2DEditorState();
 	const referenceFixpointInStore = (route, fixPointId) =>
 		editor.mutateDocument(() => referenceFixpoint(route, fixPointId));
 	const commands = editor;
@@ -40,7 +35,7 @@
 		clear: editor.clearClipboard
 	};
 	const toolContext = {
-		document: { getTopo: () => userState.topo, ui: editor.ui },
+		document: { getTopo: () => editor.topo, ui: editor.ui },
 		selection: {
 			selectObject: editor.selectObject,
 			selectPath: editor.selectPath,
@@ -58,29 +53,17 @@
 			setTarget: (target) => editor.setDrawingTarget(target)
 		},
 		image: {
-			getSrc: () => userState.topo.image2D,
-			getFit: () => userState.topo.backgroundFit ?? 'contain'
+		getSrc: () => editor.topo.image2D,
+		getFit: () => editor.topo.backgroundFit ?? 'contain'
 		},
 		commands
 	};
 
 	let svgElement = $state(null);
 	let gElement = $state(null);
-	let observedTopo = userState.topo;
-
-	// Session loads replace the canonical document. Reset all 2D-only state at
-	// that boundary so stale selection, drafts, interaction, and history cannot
-	// leak into the newly loaded document.
-	$effect(() => {
-		const topo = userState.topo;
-		if (topo !== observedTopo) {
-			editor.load(topo);
-			observedTopo = userState.topo;
-		}
-	});
 
 	function snapRoutePoint(point) {
-		return snapRoutePointToFixpoint(point, userState.topo.fixPoints, {
+	return snapRoutePointToFixpoint(point, editor.topo.fixPoints, {
 			enabled: editor.ui.snapRoutesToFixpoints,
 			canvasSize: { baseWidth, baseHeight }
 		});
@@ -88,7 +71,7 @@
 	const tools = createTopoToolRegistry({
 		context: toolContext,
 		state: editor,
-		getTopo: () => userState.topo,
+		getTopo: () => editor.topo,
 		getActiveTool: () => editor.ui.activeTool,
 		getEditablePath: (target) => editablePaths.resolve(target),
 		getIsShiftPressed: () => editor.ui.isShiftPressed,
@@ -98,7 +81,7 @@
 		getSelectionSize: () => editor.selectedItems.size,
 		getSelectedRoutePoints: () => editor.getSelectedRoutePoints(),
 		isRoutePointSelected: (target) => editor.isRoutePointSelected(target),
-		getSelectedSymbolId: () => userState.ui.selectedFixpointId,
+		getSelectedSymbolId: () => editor.ui.selectedFixpointId,
 		snapRoutePoint,
 		referenceFixpoint: referenceFixpointInStore
 	});
@@ -166,19 +149,18 @@
 		);
 	});
 
-	// Symbol tool manages symbol creation directly into userState, so no "currentSymbolPoints" needed for preview distinct from cursor?
+	// Symbol tool manages symbol creation directly into topoSession, so no "currentSymbolPoints" needed for preview distinct from cursor?
 	// RouteTool owns route draft points, target transitions, and previews.
 
 	const editablePaths = createEditablePathResolver({
-		getTopo: () => userState.topo,
+		getTopo: () => editor.topo,
 		getCanvasSize: () => ({ baseWidth, baseHeight })
 	});
 
 	const saveHistory = () => editor.saveHistory();
 	const canvasInput = createCanvasInput({
 		getActiveTool: () => editor.ui.activeTool,
-		getAspectRatio: () =>
-			userState.topo.canvasAspectRatio ?? userState.topo.imageAspectRatio ?? 1.5,
+		getAspectRatio: () => editor.topo.canvasAspectRatio ?? editor.topo.imageAspectRatio ?? 1.5,
 		getMobileSelectionMode: () => editor.ui.mobileSelectionMode,
 		onDown: handleCanvasDown,
 		onMove: handleCanvasMove,
@@ -194,7 +176,7 @@
 		editor.viewport.transform = transform;
 	});
 	const interactionController = createTopoInteractionController({
-		getTopo: () => userState.topo,
+		getTopo: () => editor.topo,
 		mutateDocument: editor.mutateDocument,
 		getInteraction: () => editor.interaction,
 		getCurrentTool: () => currentTool,
@@ -212,8 +194,8 @@
 		getTextComposerOpen: () => Boolean(tools.text.editingPosition),
 		commitTextComposer: () => tools.text.commitEdit(),
 		getMobileSelectionMode: () => editor.ui.mobileSelectionMode,
-		getTopo: () => userState.topo,
-		getSelectedRouteId: () => userState.ui.selectedRouteId,
+		getTopo: () => editor.topo,
+		getSelectedRouteId: () => editor.ui.selectedRouteId,
 		getDrawingTarget: () => editor.ui.drawingTarget,
 		getCanvasSize: () => ({ baseWidth, baseHeight }),
 		selection: editor,
@@ -244,7 +226,7 @@
 			routePoints: currentRoutePoints.length,
 			outlinePoints: currentOutlinePoints.length
 		}),
-		getSelectedOutlineId: () => userState.ui.selectedOutlineId,
+		getSelectedOutlineId: () => editor.ui.selectedOutlineId,
 		getOutlineEditTool: () => tools.outlineEdit,
 		getActiveTool: () => editor.ui.activeTool,
 		setActiveTool: (tool) => editor.setActiveTool(tool),
@@ -259,14 +241,14 @@
 	onMount(() => {
 		if (!svgElement || !gElement) return;
 		// Migrate old topographies lazily: their current canvas appearance becomes permanent.
-		if (!userState.topo.canvasAspectRatio) {
-			userState.topo.canvasAspectRatio = userState.topo.imageAspectRatio || 1.5;
+		if (!editor.topo.canvasAspectRatio) {
+			editor.topo.canvasAspectRatio = editor.topo.imageAspectRatio || 1.5;
 		}
-		if (!userState.topo.backgroundFit) userState.topo.backgroundFit = 'contain';
+		if (!editor.topo.backgroundFit) editor.topo.backgroundFit = 'contain';
 		canvasInput.setElements({ svg: svgElement, content: gElement });
 
 		// Initialize ID counters from existing data to avoid collisions
-		initializeIdCounters(userState.topo);
+		initializeIdCounters(editor.topo);
 
 		// Initialize first history state
 		saveHistory();
@@ -276,7 +258,7 @@
 
 	// Canvas dimensions change only when its explicit logical aspect ratio changes.
 	$effect(() => {
-		if (userState.topo.canvasAspectRatio ?? userState.topo.imageAspectRatio) {
+		if (editor.topo.canvasAspectRatio ?? editor.topo.imageAspectRatio) {
 			canvasInput.refreshDimensions();
 		}
 	});
@@ -330,7 +312,7 @@
 
 	function collectDraggingSelection(mouse) {
 		return createTopoSelectionSnapshot({
-			getTopo: () => userState.topo,
+			getTopo: () => editor.topo,
 			selectedItems: editor.selectedItems,
 			drawingTarget: editor.ui.drawingTarget,
 			getEditablePath: (target) => editablePaths.resolve(target),
@@ -358,7 +340,7 @@
 		getSelectedItems: () => editor.selectedItems,
 		getCanvasSize: () => ({ baseWidth, baseHeight }),
 		clipboard,
-		getTopo: () => userState.topo,
+		getTopo: () => editor.topo,
 		selection: editor,
 		setActiveTool: (tool) => editor.setActiveTool(tool),
 		setDrawingTarget: (target) => editor.setDrawingTarget(target),
@@ -395,7 +377,7 @@
 		renderTopo2D({
 			svgElement,
 			gElement,
-			topo: userState.topo,
+			topo: editor.topo,
 			activeTool: editor.ui.activeTool,
 			drawingTarget: editor.ui.drawingTarget,
 			baseWidth,
@@ -431,7 +413,7 @@
 	// Trigger D3 render on state changes
 	$effect(() => {
 		trackTopoRenderDependencies({
-			topo: userState.topo,
+			topo: editor.topo,
 			currentRoutePoints,
 			currentOutlinePoints,
 			brushPreview,
@@ -442,10 +424,10 @@
 		// Map these as dependencies too
 		const _deps = {
 			active: editor.ui.activeTool,
-			selectedRoute: userState.ui.selectedRouteId,
-			selectedOutline: userState.ui.selectedOutlineId,
-			selectedFixpoint: userState.ui.selectedFixpointId,
-			selectedText: userState.ui.selectedTextLabelId,
+			selectedRoute: editor.ui.selectedRouteId,
+			selectedOutline: editor.ui.selectedOutlineId,
+			selectedFixpoint: editor.ui.selectedFixpointId,
+			selectedText: editor.ui.selectedTextLabelId,
 			textDraft: tools.text.editingValue,
 			textDraftPosition: tools.text.editingPosition,
 			textDraftStyle: [

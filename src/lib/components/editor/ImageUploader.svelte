@@ -1,6 +1,7 @@
 <script>
-	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
-	const userState = getTopoEditorSession();
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+	const editorState = getTopo2DEditorState();
+	let topo = $derived(editorState.topo);
 	import { isTouchDevice } from '$lib/assets/js/mobile-utils.js';
 	import { _ } from 'svelte-i18n';
 
@@ -9,36 +10,45 @@
 	let urlInput = $state('');
 	let showUrlInput = $state(false);
 	let isDragging = $state(false);
-	let hasEstablishedCanvas = Boolean(userState.topo.image2D);
+	let hasEstablishedCanvas = $state(false);
+	$effect(() => {
+		if (topo.image2D) hasEstablishedCanvas = true;
+	});
 
 	/**
 	 * The topo canvas is a stable coordinate system. A replacement image must not
 	 * redefine it, otherwise every existing route and outline appears stretched.
 	 */
 	function setBackgroundImage(imageData, imageAspectRatio) {
-		const topo = userState.topo;
-		const hasCanvasAspectRatio =
-			Number.isFinite(topo.canvasAspectRatio) && topo.canvasAspectRatio > 0;
-		const hasBackground = Boolean(topo.image2D);
-		const hasAnnotations = [topo.routes, topo.outlines, topo.fixPoints, topo.textLabels].some(
-			(items) => Array.isArray(items) && items.length > 0
-		);
+		const update = (document) => {
+			const hasCanvasAspectRatio =
+				Number.isFinite(document.canvasAspectRatio) && document.canvasAspectRatio > 0;
+			const hasBackground = Boolean(document.image2D);
+			const hasAnnotations = [
+				document.routes,
+				document.outlines,
+				document.fixPoints,
+				document.textLabels
+			].some((items) => Array.isArray(items) && items.length > 0);
 
-		if (!hasBackground && !hasAnnotations && !hasEstablishedCanvas) {
-			// A first image may define a genuinely blank topo's canvas.
-			topo.canvasAspectRatio = imageAspectRatio;
-		} else if (!hasCanvasAspectRatio) {
-			const legacyAspectRatio = Number(topo.imageAspectRatio);
-			topo.canvasAspectRatio =
-				hasBackground && Number.isFinite(legacyAspectRatio) && legacyAspectRatio > 0
-					? legacyAspectRatio
-					: imageAspectRatio;
-		}
+			if (!hasBackground && !hasAnnotations && !hasEstablishedCanvas) {
+				// A first image may define a genuinely blank topo's canvas.
+				document.canvasAspectRatio = imageAspectRatio;
+			} else if (!hasCanvasAspectRatio) {
+				const legacyAspectRatio = Number(document.imageAspectRatio);
+				document.canvasAspectRatio =
+					hasBackground && Number.isFinite(legacyAspectRatio) && legacyAspectRatio > 0
+						? legacyAspectRatio
+						: imageAspectRatio;
+			}
 
-		// This remains metadata about the image itself; only canvasAspectRatio is stable.
-		topo.imageAspectRatio = imageAspectRatio;
-		if (!topo.backgroundFit) topo.backgroundFit = 'contain';
-		topo.image2D = imageData;
+			// This remains metadata about the image itself; only canvasAspectRatio is stable.
+			document.imageAspectRatio = imageAspectRatio;
+			if (!document.backgroundFit) document.backgroundFit = 'contain';
+			document.image2D = imageData;
+			return true;
+		};
+		editorState.commit('Update background image', update);
 		hasEstablishedCanvas = true;
 	}
 
@@ -104,7 +114,7 @@
 	}
 
 	function removeImage() {
-		userState.topo.image2D = null;
+		editorState.updateNestedPath('image2D', null);
 		showUrlInput = false;
 	}
 
@@ -162,7 +172,7 @@
 	}
 </script>
 
-{#if userState.topo.image2D}
+{#if topo.image2D}
 	<div class="panel p-2.5 mb-2 shadow-sm border border-black/15">
 		<div class="flex items-center justify-between mb-2">
 			<h4 class="text-ui-label text-near-black !m-0">{$_('ui.background_image')}</h4>
@@ -176,7 +186,7 @@
 		</div>
 		<div class="relative group">
 			<img
-				src={userState.topo.image2D}
+				src={topo.image2D}
 				alt="Topo background"
 				class="w-full rounded-sm border border-black/10"
 			/>
@@ -218,8 +228,10 @@
 				<select
 					id="background-fit"
 					class="input-studio !w-auto !py-1 text-micro-data"
-					value={userState.topo.backgroundFit ?? 'contain'}
-					onchange={(event) => (userState.topo.backgroundFit = event.currentTarget.value)}
+					value={topo.backgroundFit ?? 'contain'}
+					onchange={(event) => {
+						editorState.updateNestedPath('backgroundFit', event.currentTarget.value);
+					}}
 				>
 					<option value="contain">{$_('ui.fit_contain')}</option>
 					<option value="cover">{$_('ui.fit_cover')}</option>
