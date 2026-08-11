@@ -8,6 +8,13 @@
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
 	import Topo2DEditor from '$lib/components/editor/2d/Topo2DEditor.svelte';
 	import OutlineToolOptions from '$lib/components/editor/tools/OutlineToolOptions.svelte';
+	import SelectToolOptions from '$lib/components/editor/tools/SelectToolOptions.svelte';
+	import PathDrawingOptions from '$lib/components/editor/tools/PathDrawingOptions.svelte';
+	import {
+		createOutlineGridOptionsLogic,
+		createSelectedOutlineCurveLogic
+	} from '$lib/components/editor/tools/outline-tool-options-logic.js';
+	import { createPathDrawingOptionsLogic } from '$lib/components/editor/tools/path-drawing-logic.js';
 	import TextToolOptions from '$lib/components/editor/tools/TextToolOptions.svelte';
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
 	import TopoPropertiesPanel from '$lib/components/editor/TopoPropertiesPanel.svelte';
@@ -25,9 +32,44 @@
 	let saveError = $state();
 	let outlineSimplifyTolerancePx = $state(2);
 	let outlineSimplifySummary = $state('');
-	let outlineEditTool = $derived(
-		editorState.ui.activeTool === 'outlineEdit' ? editor2D?.getCurrentTool?.() : null
+	let outlineEditTool = $derived(editor2D?.getOutlineEditTool?.() || null);
+	let lastOpenedOutlineEditId = $state(null);
+	let isEditingSelectedPath = $derived(
+		editorState.ui.activeTool === 'select' &&
+			editorState.selectedItems.size === 1 &&
+			((editorState.ui.selectedOutlineId != null) !== (editorState.ui.selectedRouteId != null))
 	);
+	const outlineEditGridActions = createOutlineGridOptionsLogic(() => outlineEditTool, {
+		maxGridSize: 0.25
+	});
+	let selectedOutline = $derived(
+		editorState.topo.outlines.find((outline) => String(outline.id) === String(editorState.ui.selectedOutlineId)) || null
+	);
+	let selectedRoute = $derived(editorState.topo.routes.find((route) => String(route.id) === String(editorState.ui.selectedRouteId)) || null);
+	let routeEditTool = $derived(editor2D?.getRouteEditTool?.() || null);
+	const outlineCurveActions = createSelectedOutlineCurveLogic(
+		() => outlineEditTool,
+		() => editorState.ui.selectedOutlineId
+	);
+	const routeDrawingActions = createPathDrawingOptionsLogic({
+		getGridTool: () => editor2D?.getCurrentTool?.(),
+		getCurveTarget: () => editor2D?.getCurrentTool?.(),
+		updateCurve: (tool, changes) => {
+			if ('enabled' in changes) tool.curveEnabled = changes.enabled;
+			if ('tension' in changes) tool.curveTension = changes.tension;
+		}
+	});
+
+	$effect(() => {
+		const selectionId = editorState.ui.selectedOutlineId || editorState.ui.selectedRouteId;
+		if (!isEditingSelectedPath) {
+			lastOpenedOutlineEditId = null;
+			return;
+		}
+		if (selectionId === lastOpenedOutlineEditId) return;
+		toolOptionsOpen = true;
+		lastOpenedOutlineEditId = selectionId;
+	});
 	let activeSymbols = $derived(
 		topoSymbols.filter(
 			(symbol) =>
@@ -125,6 +167,17 @@
 			open={toolOptionsOpen}
 			onClose={() => (toolOptionsOpen = false)}
 		>
+			{@const routeTool = editor2D?.getCurrentTool?.()}
+			<PathDrawingOptions
+				snapToGrid={routeTool?.snapToGrid}
+				gridSize={routeTool?.gridSize}
+				curveEnabled={routeTool?.curveEnabled}
+				curveTension={routeTool?.curveTension}
+				onToggleSnapToGrid={routeDrawingActions.toggleSnapToGrid}
+				onGridSizeChange={routeDrawingActions.setGridSize}
+				onCurveEnabledChange={routeDrawingActions.setCurveEnabled}
+				onCurveTensionChange={routeDrawingActions.setCurveTension}
+			/>
 			<label class="flex cursor-pointer items-center justify-between gap-3 text-sm text-near-black">
 				<span>{$_('ui.snap_routes_to_fixpoints')}</span>
 				<input type="checkbox" bind:checked={editorState.ui.snapRoutesToFixpoints} />
@@ -151,58 +204,19 @@
 				{/each}
 			</div>
 		</ToolOptions>
-	{:else if editorState.ui.activeTool === 'outlineEdit' && editorState.ui.selectedOutlineId}
-		<ToolOptions
-			title="Outline tools"
-			open={toolOptionsOpen}
+	{:else if editorState.ui.activeTool === 'select'}
+		<SelectToolOptions
+			selectedOutlineId={isEditingSelectedPath ? editorState.ui.selectedOutlineId : null}
+			selectedRoute={isEditingSelectedPath && selectedRoute && { ...selectedRoute, routeEditTool, onCurveChange: (changes) => editorState.updateRoute(selectedRoute.id, { curve: { enabled: false, tension: 0.45, ...(selectedRoute.curve || {}), ...changes } }) }}
+			{selectedOutline}
+			{outlineEditTool}
+			outlineGridActions={outlineEditGridActions}
+			outlineCurveActions={outlineCurveActions}
+			bind:simplifyTolerancePx={outlineSimplifyTolerancePx}
+			simplifySummary={outlineSimplifySummary}
+			onSimplify={simplifySelectedOutline}
 			onClose={() => (toolOptionsOpen = false)}
-		>
-			<div class="flex flex-col gap-2">
-				<label class="flex items-center justify-between gap-3 text-sm text-near-black">
-					<span>Snap outline points to grid</span>
-					<input type="checkbox" bind:checked={outlineEditTool.snapToGrid} />
-				</label>
-				{#if outlineEditTool?.snapToGrid}
-					<label class="grid grid-cols-[1fr_6rem] items-center gap-2 text-xs text-warm-gray-600">
-						<span>Grid size</span>
-						<input
-							type="number"
-							min="0.001"
-							max="0.25"
-							step="0.005"
-							bind:value={outlineEditTool.gridSize}
-							class="input-studio w-full"
-						/>
-					</label>
-				{/if}
-				<label class="text-xs font-medium text-warm-gray-600" for="outline-simplify-tolerance">
-					Simplify selected outline
-				</label>
-				<div class="grid grid-cols-[1fr_auto] gap-1 items-center">
-					<input
-						id="outline-simplify-tolerance"
-						bind:value={outlineSimplifyTolerancePx}
-						type="number"
-						min="0.5"
-						step="0.5"
-						class="input-studio w-full"
-						aria-label="Simplification tolerance in pixels"
-					/>
-					<button
-						type="button"
-						class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
-						onclick={simplifySelectedOutline}
-						>Simplify
-					</button>
-				</div>
-				<p class="text-[10px] text-warm-gray-400">
-					Removes redundant vertices using a pixel tolerance. Undo restores the original.
-				</p>
-				{#if outlineSimplifySummary}
-					<p class="text-[10px] text-warm-gray-500">{outlineSimplifySummary}</p>
-				{/if}
-			</div>
-		</ToolOptions>
+		/>
 	{/if}
 {/if}
 

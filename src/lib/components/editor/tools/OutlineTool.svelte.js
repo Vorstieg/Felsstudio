@@ -17,6 +17,7 @@ import {
 	normalizeCanvasSize,
 	simplifyPoints
 } from '$lib/assets/js/outline-geometry.js';
+import { snapPointToGrid } from './path-drawing-logic.js';
 
 export const OUTLINE_STYLES = [
 	{ id: 'rock', labelKey: 'ui.outline_style_rock' },
@@ -339,9 +340,7 @@ export class OutlineTool {
 	}
 
 	snapPointToGrid(point) {
-		const snappedX = Math.round(point.x / this.gridSize) * this.gridSize;
-		const snappedY = Math.round(point.y / this.gridSize) * this.gridSize;
-		return { x: snappedX, y: snappedY };
+		return snapPointToGrid(point, { enabled: true, gridSize: this.gridSize }) || point;
 	}
 
 	normalizePoint(point) {

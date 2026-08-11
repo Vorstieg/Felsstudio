@@ -21,7 +21,7 @@ export function createToolInteraction({
 		const isActive = getActiveTool() === tool.id;
 		if (tool.id === resolveNeutralTool()) {
 			setActiveTool(resolveNeutralTool());
-			setOptionsOpen(false);
+			setOptionsOpen(Boolean(tool.hasOptions && shouldOpenOptionsOnSelect(tool)));
 			return;
 		}
 

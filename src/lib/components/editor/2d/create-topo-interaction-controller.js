@@ -12,6 +12,7 @@ export function createTopoInteractionController({
 	snapRoutePoint,
 	referenceFixpoint,
 	outlineEditTool,
+	routeEditTool,
 	symbolEditTool,
 	onMoveRouteLabel
 } = {}) {
@@ -48,9 +49,12 @@ export function createTopoInteractionController({
 		}
 
 		if (interaction.kind === 'move-point') {
+			const gridSnappedRoutePoint = routeEditTool?.snapPoint(mouse);
 			const snapped = interaction.outlineId
 				? { point: outlineEditTool?.snapPoint(mouse) || mouse, fixPointId: null }
-				: snapRoutePoint(mouse);
+				: gridSnappedRoutePoint
+					? { point: gridSnappedRoutePoint, fixPointId: null }
+					: snapRoutePoint(mouse);
 			const route = interaction.routeId
 				? getTopo().routes.find((candidate) => String(candidate.id) === String(interaction.routeId))
 				: null;

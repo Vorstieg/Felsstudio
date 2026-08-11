@@ -233,6 +233,7 @@ export function getRenderableRoutes(routes = []) {
 							points2D: item.points2D,
 							label,
 							lineStyle: item.lineStyle || route.lineStyle,
+							curve: item.curve || route.curve,
 							labelOffset2D: item.labelOffset2D,
 							route,
 							item
@@ -335,15 +336,18 @@ export function renderTopoSvg({
 
 	const lines = getRenderableRoutes(routes).map((line) => ({
 		...line,
-		points: pointsToSvg(line.points2D, size)
+		points: pointsToSvg(line.points2D, size),
+		path: line.curve?.enabled
+			? pointsToSmoothSvgPath(line.points2D, { tension: line.curve.tension, ...size })
+			: null
 	}));
 	const groups = routesLayer
 		.selectAll('g.route-group')
 		.data(lines, (line) => line.key)
 		.join((enter) => {
 			const group = enter.append('g').attr('class', 'route-group');
-			group.append('polyline').attr('class', 'hit-area');
-			group.append('polyline').attr('class', 'visible-line');
+			group.append('path').attr('class', 'hit-area');
+			group.append('path').attr('class', 'visible-line');
 			group.append('text').attr('class', 'route-label');
 			return group;
 		});
@@ -362,7 +366,7 @@ export function renderTopoSvg({
 			.on('mouseleave', () => onRouteHover(null));
 		group
 			.select('.hit-area')
-			.attr('points', line.points)
+			.attr('d', line.path || `M ${line.points.replaceAll(' ', ' L ')}`)
 			.attr('fill', 'none')
 			.attr('stroke', 'transparent')
 			.attr('stroke-width', getHitAreaSize(7))
@@ -370,7 +374,7 @@ export function renderTopoSvg({
 			.attr('stroke-linejoin', 'round');
 		group
 			.select('.visible-line')
-			.attr('points', line.points)
+			.attr('d', line.path || `M ${line.points.replaceAll(' ', ' L ')}`)
 			.attr('fill', 'none')
 			.attr('stroke', highlighted ? '#3b82f6' : style.stroke)
 			.attr('stroke-width', highlighted ? style.width + 2 : style.width)

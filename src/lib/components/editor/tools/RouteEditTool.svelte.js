@@ -1,7 +1,15 @@
 import { EditablePathEditTool } from './EditablePathEditTool.svelte.js';
+import { snapPointToGrid } from './path-drawing-logic.js';
 
 /** Editing controls and mutations for persisted 2D routes, pitches, and variants. */
 export class RouteEditTool extends EditablePathEditTool {
+	snapToGrid = $state(false);
+	gridSize = $state(0.01);
+
+	snapPoint(point) {
+		return snapPointToGrid(point, { enabled: this.snapToGrid, gridSize: this.gridSize });
+	}
+
 	constructor({
 		context,
 		getTopo,

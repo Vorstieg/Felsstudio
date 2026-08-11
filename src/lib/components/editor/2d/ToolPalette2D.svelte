@@ -28,7 +28,7 @@
 	}
 
 	let tools = $derived([
-		{ id: 'select', icon: 'fa-arrow-pointer', label: $_('ui.select') },
+		{ id: 'select', icon: 'fa-arrow-pointer', label: $_('ui.select'), hasOptions: true },
 		{ id: 'route', icon: 'fa-route', label: $_('ui.route'), hasOptions: true },
 		{ id: 'multipitch', icon: 'fa-timeline', label: $_('ui.multipitch'), hasOptions: true },
 		{ id: 'outline', icon: 'fa-draw-polygon', label: $_('ui.outline'), hasOptions: true },

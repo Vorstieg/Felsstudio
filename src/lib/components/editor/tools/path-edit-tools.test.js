@@ -28,6 +28,10 @@ describe('persisted path edit tools', () => {
 		expect(tool.snapPoint({ x: 0.16, y: 0.24 })).toEqual({ x: 0.2, y: 0.2 });
 	});
 
+	it('returns no grid snap for route vertices when its grid is disabled', () => {
+		expect(new RouteEditTool().snapPoint({ x: 0.16, y: 0.24 })).toBeNull();
+	});
+
 	it('deletes a route when its path is pressed with the eraser', () => {
 		const deleteRoutes = vi.fn(() => true);
 		const save = vi.fn();

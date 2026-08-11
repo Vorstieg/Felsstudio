@@ -184,6 +184,7 @@
 		snapRoutePoint,
 		referenceFixpoint: referenceFixpointInStore,
 		outlineEditTool: tools.outlineEdit,
+		routeEditTool: tools.routeEdit,
 		symbolEditTool: tools.symbolEdit,
 		onMoveRouteLabel: (interaction, mouse) =>
 			commands.moveRouteLabel(interaction.routeId, interaction, mouse)
@@ -329,6 +330,14 @@
 
 	export function getCurrentTool() {
 		return currentTool;
+	}
+
+	export function getOutlineEditTool() {
+		return tools.outlineEdit;
+	}
+
+	export function getRouteEditTool() {
+		return tools.routeEdit;
 	}
 
 	export const simplifySelectedOutline = actions.simplifySelectedOutline;

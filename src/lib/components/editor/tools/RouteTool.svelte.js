@@ -1,8 +1,13 @@
 import { getTouchTargetSize } from '$lib/assets/js/mobile-utils.js';
 import { generateId, generateRouteId } from '$lib/assets/js/id-utils.js';
+import { snapPointToGrid } from './path-drawing-logic.js';
 
 export class RouteTool {
 	draftPoints = $state([]);
+	snapToGrid = $state(false);
+	gridSize = $state(0.01);
+	curveEnabled = $state(false);
+	curveTension = $state(0.45);
 
 	constructor({
 		context,
@@ -68,6 +73,7 @@ export class RouteTool {
 	draftFixPointIds = $state([]);
 
 	appendPoint(mode, point) {
+		point = snapPointToGrid(point, { enabled: this.snapToGrid, gridSize: this.gridSize }) || point;
 		const snapped = this.snapPoint(point);
 		point = snapped.point;
 		const target = this.getDrawingTarget();
@@ -204,7 +210,8 @@ export class RouteTool {
 			fixPoints: [],
 			tags: [],
 			name: `Route ${this.state.topo.routes.length + 1}`,
-			lineStyle: 'red'
+			lineStyle: 'red',
+			curve: { enabled: this.curveEnabled, tension: this.curveTension }
 		};
 		if (mode === 'multipitch')
 			return {

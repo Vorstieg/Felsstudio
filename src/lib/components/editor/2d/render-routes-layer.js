@@ -1,4 +1,5 @@
 import { getRouteLineStyle } from '@vorstieg/topo-renderer';
+import { pointsToSmoothSvgPath } from '$lib/assets/js/outline-geometry.js';
 import { getHitAreaSize } from '$lib/assets/js/mobile-utils.js';
 
 /** Renders persisted route paths and delegates their edit controls to RouteEditTool. */
@@ -14,6 +15,14 @@ export function renderRoutesLayer({
 	onObjectClick: handleObjectClick
 }) {
 	const routeEditTool = editTools?.route;
+	const routePath = (route) =>
+		route.curve?.enabled
+			? pointsToSmoothSvgPath(route.points, {
+					tension: route.curve.tension,
+					baseWidth,
+					baseHeight
+				})
+			: `M ${route.pointsStr.replaceAll(' ', ' L ')}`;
 	const routesLayer = layers.routes;
 	const canInteract =
 		activeTool === 'select' || activeTool === 'eraser' || activeTool === routeEditTool?.id;
@@ -57,13 +66,13 @@ export function renderRoutesLayer({
 		.style('touch-action', 'none');
 
 	routeGroups
-		.selectAll('polyline.hit-area')
+		.selectAll('path.hit-area')
 		.data((route) => [route])
-		.join('polyline')
+		.join('path')
 		.attr('class', 'hit-area cursor-pointer')
 		.attr('fill', 'none')
 		.attr('stroke', 'transparent')
-		.attr('points', (route) => route.pointsStr)
+		.attr('d', routePath)
 		.attr('stroke-width', getHitAreaSize(7))
 		.style('pointer-events', canInteract ? 'auto' : 'none')
 		.on('mousedown', handleRouteDown)
@@ -74,14 +83,14 @@ export function renderRoutesLayer({
 		});
 
 	routeGroups
-		.selectAll('polyline.main-path')
+		.selectAll('path.main-path')
 		.data((route) => [route])
-		.join('polyline')
+		.join('path')
 		.attr('class', 'main-path cursor-move')
 		.attr('fill', 'none')
 		.attr('stroke-linecap', 'round')
 		.attr('stroke-linejoin', 'round')
-		.attr('points', (route) => route.pointsStr)
+		.attr('d', routePath)
 		.attr('stroke', (route) =>
 			route.lineSelected
 				? '#3b82f6'

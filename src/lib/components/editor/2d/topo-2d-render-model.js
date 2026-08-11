@@ -124,6 +124,7 @@ export function buildTopo2DRenderModel({
 				label,
 				routeObj: routeObject,
 				parentRoute: route,
+				curve: routeObject?.curve || route.curve,
 				index
 			};
 			if (!labelOnly) routes.push(line);

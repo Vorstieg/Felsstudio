@@ -1,11 +1,13 @@
 import { EditablePathEditTool } from './EditablePathEditTool.svelte.js';
 import {
 	applyPresetSemanticHandle,
+	DEFAULT_OUTLINE_CURVE_TENSION,
 	getOutlinePoints,
 	isClosedShape,
 	simplifyClosedPoints,
 	simplifyPoints
 } from '$lib/assets/js/outline-geometry.js';
+import { snapPointToGrid } from './path-drawing-logic.js';
 
 /** Editing interactions for persisted 2D rock outlines. */
 export class OutlineEditTool extends EditablePathEditTool {
@@ -54,15 +56,23 @@ export class OutlineEditTool extends EditablePathEditTool {
 		return this.getTopo().outlines.find((outline) => String(outline.id) === String(id)) || null;
 	}
 
-	snapPoint(point) {
-		if (!this.snapToGrid || !Number.isFinite(Number(this.gridSize)) || Number(this.gridSize) <= 0) {
-			return point;
-		}
-		const size = Number(this.gridSize);
-		return {
-			x: Math.round(point.x / size) * size,
-			y: Math.round(point.y / size) * size
+	updateCurve(id, changes) {
+		const outline = this.getOutline(id);
+		if (!outline) return false;
+		const curve = {
+			enabled: false,
+			tension: DEFAULT_OUTLINE_CURVE_TENSION,
+			...(outline.curve || {}),
+			...changes
 		};
+		if (this.updateOutline) this.updateOutline(outline.id, { curve }, { recordHistory: false });
+		else outline.curve = curve;
+		this.saveHistory();
+		return true;
+	}
+
+	snapPoint(point) {
+		return snapPointToGrid(point, { enabled: this.snapToGrid, gridSize: this.gridSize }) || point;
 	}
 
 	delete(ids) {
