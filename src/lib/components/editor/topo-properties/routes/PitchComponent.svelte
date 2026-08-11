@@ -1,7 +1,7 @@
 <script>
-	import GradeSelector from '$lib/components/editor/topo-properties/GradeSelector.svelte';
-	import RouteLength from '$lib/components/editor/topo-properties/RouteLength.svelte';
-	import BoltCount from '$lib/components/editor/topo-properties/BoltCount.svelte';
+	import GradeSelector from '$lib/components/editor/topo-properties/routes/GradeSelector.svelte';
+	import RouteLength from '$lib/components/editor/topo-properties/routes/RouteLength.svelte';
+	import BoltCount from '$lib/components/editor/topo-properties/routes/BoltCount.svelte';
 	import { routeLineStyles } from '$lib/components/editor/topo-properties/topo-properties-utils.js';
 	import { getContext } from 'svelte';
 	import { TOPO_EDITOR_SESSION } from '$lib/state/topo-session.svelte.js';
@@ -31,7 +31,7 @@
 </script>
 
 <div
-	class="gap-1 rounded-sm border border-black/10 bg-white p-1"
+	class="gap-1 rounded-sm"
 	onchange={() => onChange?.(pitch)}
 >
 	{#if kind !== 'single' || onDraw || onRemove}

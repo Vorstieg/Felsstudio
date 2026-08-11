@@ -1,6 +1,7 @@
 <script>
 	import { getTopoEditorSession } from '$lib/state/topo-session.svelte.js';
 	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+
 	const userState = getTopoEditorSession();
 	const editorState = getTopo2DEditorState();
 	import { cragTypes } from '$lib/components/editor/crag/crag-editor-options.js';
@@ -13,7 +14,7 @@
 		createVariant,
 		removePathAsset,
 		routeLineStyles
-	} from './topo-properties-utils.js';
+	} from '../topo-properties-utils.js';
 	import { _ } from 'svelte-i18n';
 
 	let {
@@ -21,7 +22,6 @@
 		drawingTarget = $bindable(null),
 		activeTool = $bindable('route'),
 		mobile = false,
-		onPathUpload = null,
 		onPathSelect = null
 	} = $props();
 
@@ -163,48 +163,33 @@
 		</div>
 	</div>
 
-	<div class="space-y-0.5">
-		{#if hasRouteType(route, 'multi-pitch')}
-			<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
-				<label for={'route-line-style-' + route.id} class="text-ui-label block">Line style</label>
-				<select
-					id={'route-line-style-' + route.id}
-					value={route.lineStyle || 'red'}
-					onchange={(event) => updateRoute({ lineStyle: event.currentTarget.value })}
-					class="input-studio w-full appearance-none"
-				>
-					{#each routeLineStyles as style}
-						<option value={style.id}>{style.label}</option>
-					{/each}
-				</select>
-			</div>
-		{:else}
-			<PitchComponent
-				pitch={route}
-				{mobile}
-				showBoltCount={hasRouteType(route, 'sports-climbing')}
-				onFieldChange={(field, value) => updateRoute({ [field]: value })}
-			/>
-		{/if}
-	</div>
+	{#if hasRouteType(route, 'multi-pitch')}
+		<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
+			<label for={'route-line-style-' + route.id} class="text-ui-label block">Line style</label>
+			<select
+				id={'route-line-style-' + route.id}
+				value={route.lineStyle || 'red'}
+				onchange={(event) => updateRoute({ lineStyle: event.currentTarget.value })}
+				class="input-studio w-full appearance-none"
+			>
+				{#each routeLineStyles as style}
+					<option value={style.id}>{style.label}</option>
+				{/each}
+			</select>
+		</div>
+	{:else}
+		<PitchComponent
+			pitch={route}
+			{mobile}
+			showBoltCount={hasRouteType(route, 'sports-climbing')}
+			onFieldChange={(field, value) => updateRoute({ [field]: value })}
+		/>
+	{/if}
 
-	<div class={mobile ? 'space-y-1' : 'space-y-1'}>
+	<div class='space-y-1'>
 		<div class="flex items-center justify-between gap-2">
 			<p class="text-ui-label block">Paths</p>
 			<div class="flex items-center gap-1">
-				{#if onPathUpload}
-					<label
-						class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-warm-gray-500 hover:bg-creator-blue hover:text-white transition-none cursor-pointer"
-					>
-						Import
-						<input
-							type="file"
-							accept=".gpx,application/gpx+xml"
-							class="hidden"
-							onchange={(event) => onPathUpload(route, event)}
-						/>
-					</label>
-				{/if}
 				<button
 					class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-warm-gray-500 hover:bg-creator-blue hover:text-white transition-none"
 					onclick={() => {

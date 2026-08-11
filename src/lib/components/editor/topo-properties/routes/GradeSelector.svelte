@@ -2,7 +2,7 @@
 	import {
 		gradeSystems,
 		getAvailableGradeSystems
-	} from '$lib/components/editor/topo-properties/grades.js';
+	} from '$lib/components/editor/topo-properties/routes/grades.js';
 	import { _ } from 'svelte-i18n';
 
 	let {

@@ -1,5 +1,5 @@
 <script>
-	import PitchComponent from '$lib/components/editor/topo-properties/PitchComponent.svelte';
+	import PitchComponent from '$lib/components/editor/topo-properties/routes/PitchComponent.svelte';
 	import { createVariant } from '$lib/components/editor/topo-properties/topo-properties-utils.js';
 	import { generateId } from '$lib/assets/js/id-utils.js';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
@@ -122,7 +122,7 @@
 				</div>
 
 				{#if route.type === 'multi-pitch'}
-					<div class="space-y-2 rounded-sm border border-black/10 bg-black/[0.02] p-2">
+					<div class="space-y-2">
 						<div class="flex items-center justify-between">
 							<span class="text-ui-label">Pitches</span>
 							<button type="button" class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-creator-blue" onclick={addPitch}>+ Add</button>
@@ -130,6 +130,7 @@
 						{#each route.pitches || [] as pitch, index}
 							<PitchComponent {pitch} kind="pitch" {index} inheritLineStyle={true} topoScale={1} fixPoints={[]} onRemove={(_, index) => removePitch(index)} onFieldChange={(field, value) => updatePitch(index, field, value)} />
 						{/each}
+
 						<div class="space-y-2 border-t border-black/10 pt-2">
 							<div class="flex items-center justify-between">
 								<span class="text-ui-label">Variants</span>

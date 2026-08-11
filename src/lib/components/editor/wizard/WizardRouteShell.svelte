@@ -105,7 +105,6 @@
 
 	async function loadFromEntry(crag, sector = null) {
 		isLoading = true;
-		error = null;
 		userState.reset();
 		try {
 			const topo = new Topo(crag.properties.path, crag.properties.id, sector?.id);
@@ -234,7 +233,6 @@
 			goto(`${resolve(workSpaceWrapper.path)}?draft=${encodeURIComponent(userState.ui.activeDraftId)}`);
 		} catch (err) {
 			console.error(err);
-			error = 'Failed to load entry: ' + err.message;
 		} finally {
 			isLoading = false;
 		}

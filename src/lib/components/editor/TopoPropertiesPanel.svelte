@@ -7,7 +7,7 @@
 	const editorState = getTopo2DEditorState();
 	import DetailsComponent from './DetailsComponent.svelte';
 	import TopoInfoPanel from './topo-properties/TopoInfoPanel.svelte';
-	import TopoRoutesPanel from './topo-properties/TopoRoutesPanel.svelte';
+	import TopoRoutesPanel from './topo-properties/routes/TopoRoutesPanel.svelte';
 	import TopoFixpointsPanel from './topo-properties/TopoFixpointsPanel.svelte';
 
 	let {
