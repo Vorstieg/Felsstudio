@@ -120,6 +120,12 @@ export class RouteTool {
 		return this.getTopo().routes.find((route) => route.id === id);
 	}
 
+	isMultiPitch(route) {
+		return Array.isArray(route?.type)
+			? route.type.includes('multi-pitch')
+			: route?.type === 'multi-pitch';
+	}
+
 	getTargetPath(route, target) {
 		if (!route || target?.type === 'newPitch') return null;
 		if (target?.type === 'pitch')
@@ -131,7 +137,7 @@ export class RouteTool {
 
 	appendToSelectedRoute(point) {
 		const route = this.findRoute(this.getSelectedId('route'));
-		if (!route || route.type === 'multi-pitch') return null;
+		if (!route || this.isMultiPitch(route)) return null;
 		if (this.appendRoutePoint) this.appendRoutePoint(route.id, {}, point, { recordHistory: false });
 		else if (this.state.appendRoutePoint)
 			this.state.appendRoutePoint(route.id, {}, point, { recordHistory: false });
@@ -146,7 +152,7 @@ export class RouteTool {
 		}
 		if (mode === 'multipitch' && target?.type === 'newPitch') {
 			const route = this.findRoute(target.routeId);
-			if (!route || route.type !== 'multi-pitch') return null;
+			if (!route || !this.isMultiPitch(route)) return null;
 		}
 		const points2D = $state.snapshot(this.draftPoints);
 		const fixPointIds = $state.snapshot(this.draftFixPointIds);
@@ -173,7 +179,7 @@ export class RouteTool {
 	}
 
 	selectNextPitch(route) {
-		if (!route || route.type !== 'multi-pitch' || !route.pitches?.length) return;
+		if (!route || !this.isMultiPitch(route) || !route.pitches?.length) return;
 		const target = this.getDrawingTarget();
 		const selectedIndex =
 			target?.type === 'pitch'

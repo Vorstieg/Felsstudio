@@ -65,11 +65,13 @@ export function convertRouteType(route, newType) {
 				_gradeScale: route._gradeScale || 'french',
 				length: route.length,
 				description: route.description,
+				points2D: route.points2D || [],
 				points: route.points || [],
 				type: 'pitch'
 			}
 		];
 		route.length = 0;
+		route.points2D = [];
 		route.points = [];
 	} else if (!willBeMultiPitch && wasMultiPitch) {
 		if (route.pitches?.length) {
@@ -78,6 +80,7 @@ export function convertRouteType(route, newType) {
 			route._gradeScale = first._gradeScale;
 			route.length = first.length;
 			route.description = first.description;
+			route.points2D = first.points2D;
 			route.points = first.points;
 		}
 		delete route.pitches;

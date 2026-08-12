@@ -50,6 +50,10 @@ describe('topo utilities', () => {
 			_gradeScale: 'french',
 			length: 24,
 			description: 'A sustained wall',
+			points2D: [
+				[0.1, 0.2],
+				[0.8, 0.9]
+			],
 			points: [
 				[0, 0, 0],
 				[1, 1, 0]
@@ -64,6 +68,10 @@ describe('topo utilities', () => {
 			pitchNumber: 1,
 			grade: '6a',
 			length: 24,
+			points2D: [
+				[0.1, 0.2],
+				[0.8, 0.9]
+			],
 			points: [
 				[0, 0, 0],
 				[1, 1, 0]
@@ -80,6 +88,10 @@ describe('topo utilities', () => {
 			_gradeScale: 'french',
 			length: 24,
 			description: 'A sustained wall',
+			points2D: [
+				[0.1, 0.2],
+				[0.8, 0.9]
+			],
 			points: [
 				[0, 0, 0],
 				[1, 1, 0]

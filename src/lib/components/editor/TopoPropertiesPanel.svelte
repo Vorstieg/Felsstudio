@@ -24,6 +24,8 @@
 	let showJsonEditor = $state(false);
 	let topoJsonText = $state('');
 	let topoJsonError = $state('');
+	const hasRouteType = (route, type) =>
+		Array.isArray(route.type) ? route.type.includes(type) : route.type === type;
 
 	let routes = $derived(topo.routes);
 	let aiSuggestions = $derived.by(() => {
@@ -54,7 +56,7 @@
 			if (route) {
 				activeTool = 'routeEdit';
 				activeTab = 'routes';
-				if (route.type === 'multi-pitch') {
+				if (hasRouteType(route, 'multi-pitch')) {
 					drawingTarget = drawingTarget?.routeId === selectedId ? drawingTarget : null;
 				} else {
 					drawingTarget = { type: 'route', id: selectedId };

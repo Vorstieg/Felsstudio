@@ -216,4 +216,28 @@ describe('RouteTool', () => {
 		expect(route.pitches).toHaveLength(2);
 		expect(route.pitches[1].pitchNumber).toBe(2);
 	});
+
+	it('draws the first pitch for a multi-pitch route imported from the crag editor', () => {
+		const { state, tool, target } = createTool();
+		state.topo.routes.push({
+			id: 'crag-route-1',
+			type: ['multi-pitch'],
+			pitches: [{ id: 'pitch-1', pitchNumber: 1, points2D: [] }]
+		});
+		tool.setDrawingTarget({ type: 'pitch', routeId: 'crag-route-1', pitchId: 'pitch-1' });
+
+		tool.appendPoint('multipitch', { x: 0.2, y: 0.3 });
+		tool.appendPoint('multipitch', { x: 0.6, y: 0.7 });
+		tool.finish('multipitch');
+
+		expect(state.topo.routes[0].pitches).toHaveLength(1);
+		expect(state.topo.routes[0].pitches[0]).toMatchObject({
+			pitchNumber: 1,
+			points2D: [
+				[0.2, 0.3],
+				[0.6, 0.7]
+			]
+		});
+		expect(target()).toEqual({ type: 'newPitch', routeId: 'crag-route-1' });
+	});
 });

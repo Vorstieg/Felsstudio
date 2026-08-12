@@ -1,6 +1,7 @@
 <script>
 	import PitchComponent from '$lib/components/editor/topo-properties/routes/PitchComponent.svelte';
 	import { createVariant } from '$lib/components/editor/topo-properties/topo-properties-utils.js';
+	import { convertRouteType } from '$lib/assets/js/topo-utils.js';
 	import { generateId } from '$lib/assets/js/id-utils.js';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
 	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
@@ -77,6 +78,14 @@
 	function updateRouteField(field, value) {
 		onUpdateRoute(document.path, route.id, field, value);
 	}
+
+	function hasRouteType(route, type) {
+		return Array.isArray(route.type) ? route.type.includes(type) : route.type === type;
+	}
+
+	function updateRouteType(value) {
+		cragEditorState.updateRoute(document.path, route.id, (current) => convertRouteType(current, value));
+	}
 </script>
 
 {#if route && document}
@@ -110,7 +119,7 @@
 					</div>
 					<div>
 						<label class="text-ui-label block" for="route-type">Type</label>
-						<select id="route-type" class="input-studio w-full" value={route.type || ''} onchange={(event) => onUpdateRoute(document.path, route.id, 'type', event.currentTarget.value)}>
+						<select id="route-type" class="input-studio w-full" value={Array.isArray(route.type) ? route.type[0] : route.type || ''} onchange={(event) => updateRouteType(event.currentTarget.value)}>
 							<option value="sports-climbing">Sportklettern</option>
 							<option value="bouldering">Bouldern</option>
 							<option value="trad">Trad</option>
@@ -121,7 +130,7 @@
 					</div>
 				</div>
 
-				{#if route.type === 'multi-pitch'}
+				{#if hasRouteType(route, 'multi-pitch')}
 					<div class="space-y-2">
 						<div class="flex items-center justify-between">
 							<span class="text-ui-label">Pitches</span>
@@ -142,7 +151,7 @@
 						</div>
 					</div>
 				{:else}
-					<PitchComponent pitch={route} showBoltCount={route.type === 'sports-climbing'} topoScale={1} fixPoints={[]} onFieldChange={updateRouteField} />
+					<PitchComponent pitch={route} showBoltCount={hasRouteType(route, 'sports-climbing')} topoScale={1} fixPoints={[]} onFieldChange={updateRouteField} />
 				{/if}
 
 				<div>
