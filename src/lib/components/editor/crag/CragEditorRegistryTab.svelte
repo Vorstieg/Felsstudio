@@ -13,6 +13,8 @@
 
 	let {
 		detectedAssets = [],
+		isDetectionLoading = false,
+		isDetectionZoomLimited = false,
 		activeTrackTarget = null
 	} = $props();
 	let accessFeatures = $derived(cragEditorState.access?.features || []);
@@ -48,6 +50,18 @@
 </script>
 
 <div class="flex flex-col gap-2">
+	{#if isDetectionLoading}
+		<div class="flex items-center gap-2 rounded-sm border border-creator-blue/20 bg-creator-blue/5 p-2 text-ui-label text-creator-blue">
+			<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+			<span>Searching nearby access points…</span>
+		</div>
+	{/if}
+	{#if isDetectionZoomLimited}
+		<div class="flex items-start gap-2 rounded-sm border border-amber-500/30 bg-amber-50 p-2 text-ui-label text-amber-800">
+			<i class="fa-solid fa-triangle-exclamation mt-0.5" aria-hidden="true"></i>
+			<span>Nearby access data is unavailable at this zoom level. Zoom in to find suggestions.</span>
+		</div>
+	{/if}
 	{#if detectedAssets.length > 0}
 		<div class="bg-creator-blue/5 rounded-sm p-2 border border-creator-blue/20 space-y-1.5 mb-1">
 			<div class="flex justify-between items-center">

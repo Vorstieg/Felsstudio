@@ -40,6 +40,8 @@
 		mapStyle = $bindable('transport'),
 		activeTab = $bindable('info'),
 		detectedAssets = [],
+		isDetectionLoading = false,
+		isDetectionZoomLimited = false,
 		selectedObject = $bindable(null),
 		currentTrackPoints = [],
 		activeTrackTarget = null,
@@ -232,6 +234,8 @@
 		{map}
 		bind:activeTab
 		{detectedAssets}
+		{isDetectionLoading}
+		{isDetectionZoomLimited}
 		{activeTrackTarget}
 		bind:selectedObject
 		{saveStatus}

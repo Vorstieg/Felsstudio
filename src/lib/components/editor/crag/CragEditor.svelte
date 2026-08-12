@@ -137,6 +137,8 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 		getActiveTool: () => activeTool
 	});
 	let detectedAssets = $derived(accessEditor.detectedAssets);
+	let isDetectionLoading = $derived(accessEditor.isDetectionLoading);
+	let isDetectionZoomLimited = $derived(accessEditor.isDetectionZoomLimited);
 	const scanNearbyAssets = (...args) => accessEditor.scanNearbyAssets(...args);
 	const addDetectedAsset = (...args) => accessEditor.addDetectedAsset(...args);
 	const addTransitPoint = (...args) => accessEditor.addTransitPoint(...args);
@@ -614,12 +616,12 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 
 	$effect(() => {
 		const tool = activeTool;
+		const mapReady = isMapLoaded;
 		if (tool === 'parking' || tool === 'transit' || tool === 'hut') {
-			setTimeout(() => {
-				if (activeTool === tool) scanNearbyAssets(tool);
-			}, 300);
+			untrack(() => accessEditor.startNearbyAssetScan(tool));
+			if (!mapReady) return;
 		} else {
-			accessEditor.clearDetectedAssets();
+			untrack(() => accessEditor.clearDetectedAssets());
 		}
 	});
 
@@ -942,6 +944,8 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 	bind:mapStyle
 	bind:activeTab
 	{detectedAssets}
+	{isDetectionLoading}
+	{isDetectionZoomLimited}
 	bind:selectedObject
 	{currentTrackPoints}
 	{activeTrackTarget}

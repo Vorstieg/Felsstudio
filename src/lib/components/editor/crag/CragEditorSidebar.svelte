@@ -5,7 +5,7 @@
 	import CragEditorPanelContent from './CragEditorPanelContent.svelte';
 
 	let {
-		inspectorShadow = true, map = null, activeTab = $bindable('info'), detectedAssets = [], activeTrackTarget = null,
+		inspectorShadow = true, map = null, activeTab = $bindable('info'), detectedAssets = [], isDetectionLoading = false, isDetectionZoomLimited = false, activeTrackTarget = null,
 		selectedObject = $bindable(null), saveStatus = 'idle'
 	} = $props();
 
@@ -25,7 +25,7 @@
                   width="20rem">
 	{#snippet children()}
 		<CragEditorPanelContent
-			bind:activeTab bind:selectedObject showTabs={false} {map} {detectedAssets} {activeTrackTarget} {saveStatus}
+			bind:activeTab bind:selectedObject showTabs={false} {map} {detectedAssets} {isDetectionLoading} {isDetectionZoomLimited} {activeTrackTarget} {saveStatus}
 		/>
 	{/snippet}
 </DetailsComponent>

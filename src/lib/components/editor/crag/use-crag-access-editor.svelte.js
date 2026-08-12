@@ -7,9 +7,12 @@ import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.j
 
 export function useCragAccessEditor({ state, getMap, getIsMapLoaded, getActiveTool }) {
 	let detectedAssets = $state([]);
+	let isDetectionLoading = $state(false);
+	let isDetectionZoomLimited = $state(false);
 	let pointMarkers = $state([]);
 	let hoverMarker = null;
 	let areDetectionPointHandlersReady = false;
+	let detectionRescanTimeout = null;
 
 	const accessFeatures = () => state.access.features || [];
 	const pointFeatures = () =>
@@ -20,6 +23,7 @@ export function useCragAccessEditor({ state, getMap, getIsMapLoaded, getActiveTo
 	}
 
 	function cleanup() {
+		if (detectionRescanTimeout) clearTimeout(detectionRescanTimeout);
 		if (hoverMarker) hoverMarker.remove();
 		pointMarkers.forEach(({ marker }) => marker.remove());
 		pointMarkers = [];
@@ -27,14 +31,19 @@ export function useCragAccessEditor({ state, getMap, getIsMapLoaded, getActiveTo
 
 	function clearDetectedAssets() {
 		detectedAssets = [];
+		isDetectionLoading = false;
+		isDetectionZoomLimited = false;
 		if (hoverMarker) hoverMarker.remove();
 	}
 
 	function scanNearbyAssets(filterType = null) {
 		const map = getMap();
 		if (!map || !getIsMapLoaded()) return;
+		isDetectionLoading = !map.isSourceLoaded('maptiler_planet');
 		const coords = $state.snapshot(state.crag.geometry.coordinates);
 		const features = map.querySourceFeatures('maptiler_planet', { sourceLayer: 'poi' });
+		isDetectionZoomLimited =
+			!isDetectionLoading && map.getZoom() <= 16 && features.length === 0;
 		const suggestions = [];
 		const seen = new Set();
 		features.forEach((feature) => {
@@ -92,6 +101,24 @@ export function useCragAccessEditor({ state, getMap, getIsMapLoaded, getActiveTo
 		detectedAssets = suggestions.sort((a, b) => a.distance - b.distance).slice(0, 100);
 	}
 
+	function startNearbyAssetScan(filterType) {
+		isDetectionLoading = true;
+		scanNearbyAssets(filterType);
+	}
+
+	function scheduleNearbyAssetScan() {
+		const tool = getActiveTool();
+		if (!['parking', 'transit', 'hut'].includes(tool)) return;
+		if (detectionRescanTimeout) return;
+
+		// Source-data events can arrive in bursts while a vector tile is decoded.
+		// Scan once after the current burst, when querySourceFeatures can see the POIs.
+		detectionRescanTimeout = setTimeout(() => {
+			detectionRescanTimeout = null;
+			if (getActiveTool() === tool) scanNearbyAssets(tool);
+		}, 0);
+	}
+
 	function initDetectionPointHandlers() {
 		const map = getMap();
 		if (!map || areDetectionPointHandlersReady) return;
@@ -111,6 +138,10 @@ export function useCragAccessEditor({ state, getMap, getIsMapLoaded, getActiveTo
 		map.on('mouseleave', () => {
 			if (map.getCanvas().style.cursor === 'pointer') map.getCanvas().style.cursor = '';
 		});
+		map.on('sourcedata', (event) => {
+			if (event.sourceId === 'maptiler_planet') scheduleNearbyAssetScan();
+		});
+		map.on('moveend', scheduleNearbyAssetScan);
 	}
 
 	function syncDetectionHighlights() {
@@ -232,7 +263,14 @@ export function useCragAccessEditor({ state, getMap, getIsMapLoaded, getActiveTo
 		get detectedAssets() {
 			return detectedAssets;
 		},
+		get isDetectionLoading() {
+			return isDetectionLoading;
+		},
+		get isDetectionZoomLimited() {
+			return isDetectionZoomLimited;
+		},
 		scanNearbyAssets,
+		startNearbyAssetScan,
 		scanForActiveTool,
 		clearDetectedAssets,
 		initDetectionPointHandlers,

@@ -10,6 +10,8 @@
 		map = null,
 		activeTab = $bindable('info'),
 		detectedAssets = [],
+		isDetectionLoading = false,
+		isDetectionZoomLimited = false,
 		activeTrackTarget = null,
 		selectedObject = $bindable(null),
 		saveStatus = 'idle'
@@ -34,7 +36,7 @@
 	{#if activeTab === 'info'}
 		<CragEditorInfoTab {saveStatus} />
 	{:else if activeTab === 'registry'}
-		<CragEditorRegistryTab {detectedAssets} {activeTrackTarget} />
+		<CragEditorRegistryTab {detectedAssets} {isDetectionLoading} {isDetectionZoomLimited} {activeTrackTarget} />
 	{:else}
 		<CragEditorSectorsTab {map} bind:selectedObject />
 	{/if}
