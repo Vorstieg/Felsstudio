@@ -1,4 +1,5 @@
 import { getMapHitRadius, getTouchTargetSize } from '$lib/assets/js/mobile-utils.js';
+import { maptilerTilesUrl } from '$lib/map-style.js';
 import { PathLayer, ScatterplotLayer } from '@deck.gl/layers';
 import { MapboxOverlay } from '@deck.gl/mapbox';
 
@@ -605,12 +606,13 @@ export function ensureCragEditorLayers(map) {
 	const vertexRadius = getTouchTargetSize(7);
 	const deleteTextSize = getTouchTargetSize(17);
 
-	if (!map.getSource('maptiler_planet'))
+	const maptilerSourceUrl = maptilerTilesUrl();
+	if (maptilerSourceUrl && !map.getSource('maptiler_planet'))
 		map.addSource('maptiler_planet', {
 			type: 'vector',
-			url: 'https://api.maptiler.com/tiles/v3/tiles.json?key=ic9EbrsUoaMeSBLjjuEO'
+			url: maptilerSourceUrl
 		});
-	if (!map.getLayer('snap-helper'))
+	if (map.getSource('maptiler_planet') && !map.getLayer('snap-helper'))
 		map.addLayer({
 			id: 'snap-helper',
 			type: 'line',

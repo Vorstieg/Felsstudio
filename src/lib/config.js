@@ -1,7 +1,9 @@
 // Controls how many posts are shown per page on the main blog index pages
 export const cragsPerPage = 50;
 
-export const maptilerApiKey = 'ic9EbrsUoaMeSBLjjuEO';
+// Browser keys are public, but are supplied by each deployment so their
+// allowed origins and quotas can be managed outside the source tree.
+export const maptilerApiKey = (import.meta.env.VITE_MAPTILER_API_KEY || '').trim();
 
 export const types = [
 	'sports-climbing',

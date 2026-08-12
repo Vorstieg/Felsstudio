@@ -7,7 +7,7 @@
 	},
 	"sources": {
 		"maptiler_planet": {
-			"url": "https://api.maptiler.com/tiles/v3/tiles.json?key=ic9EbrsUoaMeSBLjjuEO",
+			"url": "https://api.maptiler.com/tiles/v3/tiles.json?key={MAPTILER_API_KEY}",
 			"type": "vector"
 		},
 		"places": {
@@ -3309,8 +3309,8 @@
 	"metadata": {
 		"maptiler:copyright": "You are licensed to use the style or its derivate for serving map tiles exclusively with MapTiler Server or MapTiler Cloud and in accordance with their licenses and terms. If you plan to use the style in a different way, contact us at sales@maptiler.com."
 	},
-	"glyphs": "https://api.maptiler.com/fonts/{fontstack}/{range}.pbf?key=ic9EbrsUoaMeSBLjjuEO",
-	"sprite": "https://api.maptiler.com/maps/bright-v2/sprite",
+	"glyphs": "https://api.maptiler.com/fonts/{fontstack}/{range}.pbf?key={MAPTILER_API_KEY}",
+	"sprite": "https://api.maptiler.com/maps/bright-v2/sprite?key={MAPTILER_API_KEY}",
 	"bearing": 0,
 	"pitch": 0,
 	"center": [0, 0],

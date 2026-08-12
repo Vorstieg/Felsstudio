@@ -42,6 +42,10 @@
 	});
 
 	async function searchPlaces(query) {
+		if (!maptilerApiKey) {
+			searchError = 'Search unavailable';
+			return;
+		}
 		abortController = new AbortController();
 		const params = new URLSearchParams({
 			key: maptilerApiKey,
@@ -120,7 +124,9 @@
 	}
 
 	function getFeatureTitle(feature) {
-		return feature.text_de || feature.text_en || feature.text || feature.place_name || 'Unnamed place';
+		return (
+			feature.text_de || feature.text_en || feature.text || feature.place_name || 'Unnamed place'
+		);
 	}
 
 	function getFeatureSubtitle(feature) {
@@ -131,7 +137,9 @@
 	}
 
 	function getFeatureType(feature) {
-		return feature.place_type_name?.[0] || feature.place_type?.[0] || feature.properties?.kind || 'place';
+		return (
+			feature.place_type_name?.[0] || feature.place_type?.[0] || feature.properties?.kind || 'place'
+		);
 	}
 </script>
 
@@ -157,16 +165,24 @@
 	</div>
 
 	{#if searchError}
-		<div class={`${resultPanelClass} px-3 pb-2 text-micro-data text-rose-600 font-bold`}>{searchError}</div>
+		<div class={`${resultPanelClass} px-3 pb-2 text-micro-data text-rose-600 font-bold`}>
+			{searchError}
+		</div>
 	{:else if results.length > 0}
-		<div class={`${resultPanelClass} border-t border-black/10 p-1.5 max-h-72 overflow-y-auto custom-scrollbar`}>
+		<div
+			class={`${resultPanelClass} border-t border-black/10 p-1.5 max-h-72 overflow-y-auto custom-scrollbar`}
+		>
 			{#each results as feature}
 				<div
 					class={`group flex items-center gap-2 rounded-sm p-1.5 transition-none ${selectedFeature === feature ? 'bg-creator-blue/10' : 'hover:bg-black/5'}`}
 				>
 					<button class="min-w-0 flex-1 text-left" onclick={() => selectFeature(feature)}>
-						<div class="text-body-text font-bold text-near-black truncate">{getFeatureTitle(feature)}</div>
-						<div class="text-micro-data text-warm-gray-400 truncate">{getFeatureSubtitle(feature)}</div>
+						<div class="text-body-text font-bold text-near-black truncate">
+							{getFeatureTitle(feature)}
+						</div>
+						<div class="text-micro-data text-warm-gray-400 truncate">
+							{getFeatureSubtitle(feature)}
+						</div>
 					</button>
 					<div class="text-[9px] font-bold uppercase text-warm-gray-300 w-14 truncate text-right">
 						{getFeatureType(feature)}
@@ -174,8 +190,11 @@
 				</div>
 			{/each}
 		</div>
-
 	{:else if searchQuery.trim().length >= 3 && !isSearching}
-		<div class={`${resultPanelClass} border-t border-black/10 px-3 py-2 text-micro-data text-warm-gray-400 font-bold`}>No results</div>
+		<div
+			class={`${resultPanelClass} border-t border-black/10 px-3 py-2 text-micro-data text-warm-gray-400 font-bold`}
+		>
+			No results
+		</div>
 	{/if}
 </div>
