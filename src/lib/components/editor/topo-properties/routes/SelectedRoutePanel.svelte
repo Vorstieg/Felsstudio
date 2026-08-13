@@ -29,6 +29,14 @@
 		editorState.updateRoute(route.id, changes);
 	}
 
+	function updatePitch(pitchId, changes) {
+		editorState.updatePitch(route.id, pitchId, changes);
+	}
+
+	function updateVariant(variantId, changes) {
+		editorState.updateVariant(route.id, variantId, changes);
+	}
+
 	function updateRouteType(value) {
 		editorState.commit('Change route type', () => {
 			convertRouteType(route, value);
@@ -146,8 +154,8 @@
 	{:else}
 		<PitchComponent
 			pitch={route}
-			{mobile}
-			showBoltCount={hasRouteType(route, 'sports-climbing')}
+			kind="single"
+			topoScale={editorState.scale} fixPoints={editorState.fixPoints}
 			onFieldChange={(field, value) => updateRoute({ [field]: value })}
 		/>
 	{/if}
@@ -237,10 +245,10 @@
 					{pitch}
 					index={idx}
 					kind="pitch"
-					{mobile}
-					inheritLineStyle={true}
+					topoScale={editorState.scale} fixPoints={editorState.fixPoints}
 					onDraw={(pitch) => drawPitch(route, pitch)}
 					onRemove={(pitch) => removePitch(route, pitch)}
+					onFieldChange={(field, value) => updatePitch(pitch.id,{ [field]: value })}
 				/>
 			{/each}
 
@@ -259,10 +267,10 @@
 						pitch={variant}
 						index={idx}
 						kind="variant"
-						{mobile}
-						defaultLineStyle="variant"
+						topoScale={editorState.scale} fixPoints={editorState.fixPoints}
 						onDraw={(variant) => drawVariant(route, variant)}
 						onRemove={(variant) => removeVariant(route, variant)}
+						onFieldChange={(field, value) => updateVariant(variant.id,{ [field]: value })}
 					/>
 				{/each}
 			</div>

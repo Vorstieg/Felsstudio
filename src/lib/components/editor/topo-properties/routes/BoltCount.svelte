@@ -2,31 +2,30 @@
 	import { calculateBoltAmount } from '$lib/assets/js/topo-utils.js';
 	import { _ } from 'svelte-i18n';
 
-	let { route, boltCount = $bindable(), fixPoints, onCalculate = null, onFieldChange = null } = $props();
+	let { route, fixPoints, onFieldChange } = $props();
 </script>
+<div>
+	<label class="text-ui-label block" for="route-length">{$_('topo.protection')}</label>
+	<div class="flex items-center gap-1">
+		<div class="relative min-w-0 flex-1">
+			<input
+				type="text" inputmode="numeric" pattern="[0-9]*"
+				value={route.boltCount ?? ''}
+				oninput={(event) => { onFieldChange('boltAmount', event.currentTarget.value); }}
+				class="input-studio w-full pl-8 pr-8!"
+				id="route-length"
+			/>
 
-<label class="text-ui-label block" for="route-length">{$_('topo.protection')}</label>
-<div class="flex items-center gap-1">
-	<div class="relative min-w-0 flex-1">
-		<input
-			type="number"
-			value={boltCount ?? ''}
-			oninput={(event) => { boltCount = event.currentTarget.valueAsNumber; onFieldChange?.('boltAmount', boltCount); }}
-			class="input-studio w-full pl-8 pr-8!"
-			id="route-length"
-		/>
-
-		<button
-			onclick={() => {
-				boltCount = calculateBoltAmount(route, fixPoints);
-				onFieldChange?.('boltAmount', boltCount);
-				onCalculate?.();
+			<button
+				onclick={() => {
+				onFieldChange('boltAmount', calculateBoltAmount(route, fixPoints));
 			}}
-			title={$_('ui.length')}
-			aria-label={$_('ui.length')}
-			class="fa-solid fa-calculator absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 z-10"
-		>
-		</button>
-	</div>
+				title={$_('ui.length')}
+				aria-label={$_('ui.length')}
+				class="fa-solid fa-calculator absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 z-10"
+			>
+			</button>
+		</div>
 
+	</div>
 </div>

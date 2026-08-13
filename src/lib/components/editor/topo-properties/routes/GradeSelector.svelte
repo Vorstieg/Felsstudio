@@ -9,7 +9,6 @@
 		route,
 		grade = $bindable(),
 		scale = $bindable(),
-		mobile = false,
 		onFieldChange = null
 	} = $props();
 	let availableGradeSystems = $derived(getAvailableGradeSystems(route?.type));
@@ -26,7 +25,7 @@
 				onFieldChange?.('_gradeScale', scale);
 			}}
 			id="gradeSystem"
-			class={mobile ? 'input-studio w-32 font-bold' : 'input-studio w-24 font-bold'}
+			class='input-studio w-24 font-bold'
 		>
 			{#each availableGradeSystems as system}
 				<option value={system}>{$_(`grade.system.${system}`)}</option>

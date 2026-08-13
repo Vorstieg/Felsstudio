@@ -3,43 +3,43 @@
 	import RouteLength from '$lib/components/editor/topo-properties/routes/RouteLength.svelte';
 	import BoltCount from '$lib/components/editor/topo-properties/routes/BoltCount.svelte';
 	import { routeLineStyles } from '$lib/components/editor/topo-properties/topo-properties-utils.js';
-	import { getContext } from 'svelte';
-	import { TOPO_2D_EDITOR_STATE } from '$lib/state/topo-2d-editor-state.svelte.js';
-	const editorState = getContext(TOPO_2D_EDITOR_STATE);
+
 	import { _ } from 'svelte-i18n';
 
 	let {
 		pitch = $bindable(),
 		kind = 'single',
 		index = 0,
-		mobile = false,
-		showBoltCount = true,
-		inheritLineStyle = false,
-		defaultLineStyle = 'red',
 		topoScale = null,
 		fixPoints = null,
 		onDraw = null,
 		onRemove = null,
-		onChange = null,
-		onFieldChange = null
+		onFieldChange
 	} = $props();
 
-	function updateField(field, value) {
-		if (onFieldChange) onFieldChange(field, value);
-		else pitch[field] = value;
+	function defaultLineStyle() {
+		switch (kind) {
+			case 'single':
+				return 'red';
+			case 'pitch':
+				return '';
+		}
+		return 'variant';
 	}
+
+	function hasInheritStyle() {
+		return kind !== 'single';
+	}
+
 </script>
 
-<div
-	class="gap-1 rounded-sm"
-	onchange={() => onChange?.(pitch)}
->
-	{#if kind !== 'single' || onDraw || onRemove}
+<div class="gap-1">
+	{#if kind !== 'single'}
 		<div class="flex items-center justify-between w-full">
 			{#if kind === 'variant'}
 				<input
 					value={pitch.name || ''}
-					oninput={(event) => updateField('name', event.currentTarget.value)}
+					oninput={(event) => onFieldChange('name', event.currentTarget.value)}
 					placeholder={$_('ui.variant_name_placeholder')}
 					class="min-w-0 flex-1 rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none"
 				/>
@@ -78,36 +78,27 @@
 		route={pitch}
 		grade={pitch.grade}
 		scale={pitch._gradeScale}
-		onFieldChange={updateField}
+		onFieldChange={onFieldChange}
 	/>
-	<div class={showBoltCount ? 'grid grid-cols-2 gap-2' : ''}>
-		<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
-			<RouteLength
-				length={pitch.length}
-				route={pitch}
-			topoScale={topoScale ?? editorState.topo.scale ?? 1}
-				onFieldChange={updateField}
-				onCalculate={() => onChange?.(pitch)}
-			/>
-		</div>
-		{#if showBoltCount}
-			<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
-				<BoltCount
-					boltCount={pitch.boltAmount}
-					route={pitch}
-					fixPoints={fixPoints ?? editorState.topo.fixPoints ?? []}
-					onFieldChange={updateField}
-					onCalculate={() => onChange?.(pitch)}
-				/>
-			</div>
-		{/if}
+	<div class='grid grid-cols-2 gap-2 mt-1'>
+		<RouteLength
+			route={pitch}
+			topoScale={topoScale ?? 1}
+			onFieldChange={onFieldChange}
+		/>
+		<BoltCount
+			boltCount={pitch.boltAmount}
+			route={pitch}
+			fixPoints={fixPoints ?? []}
+			onFieldChange={onFieldChange}
+		/>
 	</div>
 	<select
-		value={pitch.lineStyle || (inheritLineStyle ? '' : defaultLineStyle)}
-		onchange={(event) => updateField('lineStyle', event.currentTarget.value)}
+		value={pitch.lineStyle || defaultLineStyle()}
+		onchange={(event) => onFieldChange('lineStyle', event.currentTarget.value)}
 		class="w-full rounded-sm border border-black/15 bg-white px-1 py-1 text-micro-data outline-none"
 	>
-		{#if inheritLineStyle}
+		{#if hasInheritStyle()}
 			<option value="">Use route line style</option>
 		{/if}
 		{#each routeLineStyles as style}

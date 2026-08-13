@@ -750,6 +750,17 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 				reconcileSelection();
 				return true;
 			}),
+		updateVariant: (routeId, id, changes) =>
+			commit('Update variant', () => {
+				const item = readTopo()
+					.routes.find((r) => r.id === routeId)
+					?.variants?.find((p) => p.id === id);
+				console.log(item)
+				console.log(changes)
+				if (!item) return false;
+				Object.assign(item, clone(changes));
+				return true;
+			}),
 		addFixpoint: (item) => collectionMethod('fixPoints', item, 'Add fixpoint'),
 		updateFixpoint: (id, changes, options) =>
 			updateItem('fixPoints', id, changes, 'Update fixpoint', options),

@@ -137,7 +137,7 @@
 							<button type="button" class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-creator-blue" onclick={addPitch}>+ Add</button>
 						</div>
 						{#each route.pitches || [] as pitch, index}
-							<PitchComponent {pitch} kind="pitch" {index} inheritLineStyle={true} topoScale={1} fixPoints={[]} onRemove={(_, index) => removePitch(index)} onFieldChange={(field, value) => updatePitch(index, field, value)} />
+							<PitchComponent {pitch} kind="pitch" {index} topoScale={1} fixPoints={[]} onRemove={(_, index) => removePitch(index)} onFieldChange={(field, value) => updatePitch(index, field, value)} />
 						{/each}
 
 						<div class="space-y-2 border-t border-black/10 pt-2">
@@ -146,12 +146,12 @@
 								<button type="button" class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-creator-blue" onclick={addVariant}>+ Add</button>
 							</div>
 							{#each route.variants || [] as variant, index}
-								<PitchComponent pitch={variant} kind="variant" {index} defaultLineStyle="variant" topoScale={1} fixPoints={[]} onRemove={(_, index) => removeVariant(index)} onFieldChange={(field, value) => updateVariant(index, field, value)} />
+								<PitchComponent pitch={variant} kind="variant" {index} topoScale={1} fixPoints={[]} onRemove={(_, index) => removeVariant(index)} onFieldChange={(field, value) => updateVariant(index, field, value)} />
 							{/each}
 						</div>
 					</div>
 				{:else}
-					<PitchComponent pitch={route} showBoltCount={hasRouteType(route, 'sports-climbing')} topoScale={1} fixPoints={[]} onFieldChange={updateRouteField} />
+					<PitchComponent pitch={route} kind="single" topoScale={1} fixPoints={[]} onFieldChange={updateRouteField} />
 				{/if}
 
 				<div>

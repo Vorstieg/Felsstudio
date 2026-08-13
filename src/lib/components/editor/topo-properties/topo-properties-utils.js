@@ -37,7 +37,7 @@ export function removePathAsset(item, pathId, document = null) {
 export function createVariant(route) {
 	return {
 		id: generateId('variant'),
-		name: `Variant ${route.variants.length + 1}`,
+		name: `Variant ${(route.variants?.length ?? 0) + 1}`,
 		points2D: [],
 		points: [],
 		grade: '',

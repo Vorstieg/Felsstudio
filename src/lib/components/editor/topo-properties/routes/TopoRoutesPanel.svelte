@@ -2,7 +2,6 @@
 	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
 
 	const editorState = getTopo2DEditorState();
-	const ui = editorState.ui;
 	import { _ } from 'svelte-i18n';
 	import { snapToBiggestHeight } from '$lib/assets/js/resize.js';
 	import SelectedRoutePanel from '$lib/components/editor/topo-properties/routes/SelectedRoutePanel.svelte';
@@ -16,7 +15,7 @@
 	} = $props();
 
 	function selectRoute(route) {
-		if (ui.selectedRouteId === route.id) {
+		if (editorState.ui.selectedRouteId === route.id) {
 			editorState.clearSelection();
 			drawingTarget = null;
 			return;
@@ -31,7 +30,7 @@
 	}
 
 	function deleteRoute(route) {
-		const wasSelected = ui.selectedRouteId === route.id;
+		const wasSelected = editorState.ui.selectedRouteId === route.id;
 		editorState.removeRoute(route.id);
 		if (wasSelected) drawingTarget = null;
 	}
@@ -54,8 +53,8 @@
 {#each routes as route, i (route.id)}
 	<div
 		id={'route-' + route.id}
-		class={`panel-inner p-2.5 relative overflow-visible transition-none border $
-					{ui.selectedRouteId === route.id ? 'border-creator-blue' : 'border-black/10'}`}
+		class={`panel-inner p-2.5 relative overflow-visible transition-none border
+		${editorState.ui.selectedRouteId === route.id ? 'border-creator-blue' : 'border-black/10'}`}
 	>
 		<div
 			class={mobile
@@ -67,8 +66,8 @@
 		>
 			<div class={mobile ? 'flex items-center gap-3 min-w-0 flex-1' : 'flex items-center gap-2'}>
 				<div
-					class={`w-8 h-8 rounded-sm transition-none flex items-center justify-center text-xs font-black transition-colors shadow-sm $
-							{ui.selectedRouteId === route.id
+					class={`w-8 h-8 rounded-sm transition-none flex items-center justify-center text-xs font-black transition-colors shadow-sm
+					${editorState.ui.selectedRouteId === route.id
 								? 'bg-creator-blue text-white'
 								: 'bg-warm-gray-100 text-warm-gray-500'}`}
 				>
@@ -76,8 +75,7 @@
 				</div>
 				<div class="min-w-0">
 					<h3
-						class={`font-black text-sm truncate $
-								{ui.selectedRouteId === route.id
+						class={`font-black text-sm truncate ${editorState.ui.selectedRouteId === route.id
 									? 'text-creator-blue'
 									: 'text-near-black'}`}
 
@@ -106,7 +104,7 @@
 			</button>
 		</div>
 
-		{#if !mobile || ui.selectedRouteId === route.id}
+		{#if !mobile || editorState.ui.selectedRouteId === route.id}
 		<SelectedRoutePanel
 			route={routes[i]}
 			{mobile}
