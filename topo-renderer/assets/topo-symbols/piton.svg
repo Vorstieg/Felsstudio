@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg
-   viewBox="0 0 24 24"
+   viewBox="0 0 24 19.5"
    fill="none"
    stroke="currentColor"
    stroke-width="2"
@@ -10,6 +10,8 @@
    id="svg2"
    sodipodi:docname="piton.svg"
    inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   width="24"
+   height="19.5"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -35,9 +37,11 @@
      inkscape:window-maximized="1"
      inkscape:current-layer="svg2" />
   <path
-     d="M 17.898506,3.9634105 3.4723429,17.815697"
-     id="path1" />
+     d="M 18.596841,0.99697535 0.99706436,17.989789"
+     id="path1"
+     style="stroke-width:2.00001" />
   <path
-     d="m 16.45589,5.3486391 4.155685,4.3278488 A 3,3 0 0 1 16.283726,13.832173 L 12.12804,9.5043248"
-     id="path2" />
+     d="m 16.836863,2.6962566 5.069895,5.3090388 A 3.6599703,3.6801462 0 0 1 16.626825,13.103138 L 11.556929,7.7941003"
+     id="path2"
+     style="stroke-width:2.00001" />
 </svg>

@@ -1,5 +1,4 @@
 import { topoSymbols } from '@vorstieg/topo-renderer';
-import { getTouchTargetSize } from '$lib/assets/js/mobile-utils.js';
 
 /** Renders fixed-point symbols and their selection transform gizmos. */
 export function renderSymbolsLayer({
@@ -19,6 +18,12 @@ export function renderSymbolsLayer({
 	const symbolEditTool = editTools?.symbol;
 	const symbolsLayer = layers.symbols;
 	const symbols = topo.fixPoints;
+	const hasSelectedRouteOrOutline =
+		topo.routes.some((route) => isSelected('route', route.id)) ||
+		topo.outlines.some((outline) => isSelected('outline', outline.id));
+	const symbolsSelectable =
+		!hasSelectedRouteOrOutline &&
+		(activeTool === 'select' || activeTool === 'eraser' || activeTool === symbolEditTool?.id);
 	// 5. Symbols (FixPoints) Rendering
 	const symbolGroupSelection = symbolsLayer.selectAll('g.symbol-group').data(symbols, (d) => d.id);
 
@@ -60,12 +65,7 @@ export function renderSymbolsLayer({
 		.attr('opacity', (d) =>
 			selectedSymbolInstance?.id === d.id || isSelected('symbol', d.id) ? 0.9 : 1
 		)
-		.style(
-			'pointer-events',
-			activeTool !== 'select' && activeTool !== 'eraser' && activeTool !== symbolEditTool?.id
-				? 'none'
-				: 'auto'
-		)
+		.style('pointer-events', symbolsSelectable ? 'auto' : 'none')
 		.on('mousedown', (event, symbol) => {
 			if (activeTool === 'select' || activeTool === symbolEditTool?.id) {
 				symbolEditTool.handlePointerDown(event, symbol.id, 'move', canvasInput);
@@ -87,27 +87,6 @@ export function renderSymbolsLayer({
 		.on('click', (e, d) => {
 			handleObjectClick(e, 'symbol', d.id);
 		});
-
-	// Invisible hit area for easier selecting on mobile
-	symbolGroups
-		.selectAll('circle.hit-area')
-		.data((d) => [d])
-		.join(
-			(enter) => enter.append('circle').attr('class', 'hit-area').attr('fill', 'transparent'),
-			(update) => update,
-			(exit) => exit.remove()
-		)
-		.attr('r', (d) => {
-			const meta = topoSymbols.find((s) => s.id === d.type);
-			const radius = (meta?.width || 24) / 2;
-			return getTouchTargetSize(radius);
-		})
-		.style(
-			'pointer-events',
-			activeTool !== 'select' && activeTool !== 'eraser' && activeTool !== symbolEditTool?.id
-				? 'none'
-				: 'all'
-		);
 
 	// Symbol Icon
 	symbolGroups
@@ -141,7 +120,8 @@ export function renderSymbolsLayer({
 		.attr('transform', (d) => {
 			const scale = d.scale2D || 1;
 			return `scale(${scale * (d.scaleX2D || 1)}, ${scale * (d.scaleY2D || 1)})`;
-		});
+		})
+		.style('pointer-events', symbolsSelectable ? 'all' : 'none');
 
 	symbolEditTool?.render({ symbolGroups, activeTool, selectedSymbolInstance, canvasInput });
 }

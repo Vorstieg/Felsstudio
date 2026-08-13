@@ -36,18 +36,18 @@ export function renderTextLabelLines(textSelection, label) {
 }
 
 export const ROUTE_LINE_STYLES = {
-	red: { stroke: '#dc2626', width: 4, dash: null },
-	redDashed: { stroke: '#dc2626', width: 4, dash: '18 12' },
-	redDotted: { stroke: '#dc2626', width: 4, dash: '1 10' },
-	variant: { stroke: '#8f8a84', width: 3, dash: '8 8' }
+	red: { stroke: '#dc2626', width: 3, dash: null },
+	redDashed: { stroke: '#dc2626', width: 3, dash: '18 12' },
+	redDotted: { stroke: '#dc2626', width: 3, dash: '1 10' },
+	variant: { stroke: '#8f8a84', width: 2, dash: '8 8' }
 };
 
 export const OUTLINE_LINE_STYLES = {
-	rock: { stroke: '#000000', width: 3, dash: null },
-	approach: { stroke: '#eab308', width: 4, dash: null },
-	descent: { stroke: '#6b7280', width: 3, dash: '10 10' },
-	variant: { stroke: '#8f8a84', width: 3, dash: '8 8' },
-	fixedRope: { stroke: '#1d70b8', width: 5, dash: null }
+	rock: { stroke: '#000000', width: 1, dash: null },
+	approach: { stroke: '#eab308', width: 2, dash: null },
+	descent: { stroke: '#6b7280', width: 2, dash: '10 10' },
+	variant: { stroke: '#8f8a84', width: 2, dash: '8 8' },
+	fixedRope: { stroke: '#1d70b8', width: 2, dash: null }
 };
 
 export function getRouteLineStyle(styleId = 'red') {
