@@ -207,17 +207,9 @@
 			editor.startInteraction('selection-region', interaction)
 	});
 	const objectInteractionController = createTopoObjectInteractionController({
-		getActiveTool: () => editor.ui.activeTool,
-		normalizeEvent: (event) => canvasInput.normalizeEvent(event),
-		getMobileSelectionMode: () => editor.ui.mobileSelectionMode,
-		getIsShiftPressed: () => editor.ui.isShiftPressed,
-		getDraftState: () => ({
-			routePoints: currentRoutePoints.length,
-			outlinePoints: currentOutlinePoints.length
-		}),
-		selection: editor,
-		createSelectionSnapshot: (mouse) => collectDraggingSelection(mouse),
-		setDrawingTarget: (target) => editor.setDrawingTarget(target)
+		editor,
+		canvasInput,
+		createSelectionSnapshot: (mouse) => collectDraggingSelection(mouse)
 	});
 
 	const actions = createTopoEditorActions({
@@ -276,14 +268,6 @@
 		pointerController.up(input);
 	}
 
-	function isSelected(type, id) {
-		return editor.isSelected(type, id);
-	}
-
-	function selectObject(type, id, multi = false) {
-		editor.selectObject(type, id, multi);
-	}
-
 	function handleObjectMouseDown(event, { type, id, pitchId = null, variantId = null }) {
 		objectInteractionController.objectMouseDown(event, { type, id, pitchId, variantId });
 	}
@@ -319,10 +303,6 @@
 			getEditablePath: (target) => editablePaths.resolve(target),
 			startMouse: mouse
 		});
-	}
-
-	function handleLabelMouseDown(event, { routeId, pitchId, variantId }) {
-		objectInteractionController.routeLabelMouseDown(event, { routeId, pitchId, variantId });
 	}
 
 	export const finalize = actions.finalize;

@@ -1,34 +1,27 @@
 /** Owns object-level selection and drag interaction dispatch. */
 export function createTopoObjectInteractionController({
-	getActiveTool,
-	normalizeEvent,
-	getMobileSelectionMode,
-	getIsShiftPressed,
-	getDraftState,
-	selection,
-	createSelectionSnapshot,
-	setDrawingTarget
+	editor,
+	canvasInput,
+	createSelectionSnapshot
 } = {}) {
 	function selectAndStart(event, target) {
-		if (getActiveTool() !== 'select') return;
+		if (editor.ui.activeTool !== 'select') return;
 		event?.stopPropagation?.();
-		const mouse = normalizeEvent(event)?.point;
+		const mouse = canvasInput.normalizeEvent(event)?.point;
 		if (!mouse) return;
 
 		const isTouch = event?.identifier != null;
-		if (isTouch && getMobileSelectionMode()) {
-			selection.selectObject(target.type, target.id, true);
+		if (isTouch && editor.ui.mobileSelectionMode) {
+			editor.selectObject(target.type, target.id, true);
 			return;
 		}
-		if (!selection.isSelected(target.type, target.id)) {
-			selection.selectObject(target.type, target.id, getIsShiftPressed());
+		if (!editor.isSelected(target.type, target.id)) {
+			editor.selectObject(target.type, target.id, editor.ui.isShiftPressed);
 		}
 		if (target.type === 'route') {
-			if (target.pitchId && selection.selectPath)
-				selection.selectPath('pitch', target.id, target.pitchId);
-			else if (target.variantId && selection.selectPath)
-				selection.selectPath('variant', target.id, target.variantId);
-			setDrawingTarget(
+			if (target.pitchId) editor.selectPath('pitch', target.id, target.pitchId);
+			else if (target.variantId) editor.selectPath('variant', target.id, target.variantId);
+			editor.setDrawingTarget(
 				target.pitchId
 					? { type: 'pitch', routeId: target.id, pitchId: target.pitchId }
 					: target.variantId
@@ -36,7 +29,7 @@ export function createTopoObjectInteractionController({
 						: null
 			);
 		}
-		selection.startInteraction('move-selection', createSelectionSnapshot(mouse));
+		editor.startInteraction('move-selection', createSelectionSnapshot(mouse));
 	}
 
 	function objectMouseDown(event, target) {
@@ -44,32 +37,27 @@ export function createTopoObjectInteractionController({
 	}
 
 	function textMouseDown(event, label) {
-		if (getActiveTool() !== 'select') return;
+		if (editor.ui.activeTool !== 'select') return;
 		event?.stopPropagation?.();
-		const mouse = normalizeEvent(event)?.point;
+		const mouse = canvasInput.normalizeEvent(event)?.point;
 		if (!mouse || !label.position2D) return;
-		if (event?.identifier != null && getMobileSelectionMode()) {
-			selection.selectObject('text', label.id, true);
+		if (event?.identifier != null && editor.ui.mobileSelectionMode) {
+			editor.selectObject('text', label.id, true);
 			return;
 		}
-		if (!selection.isSelected('text', label.id)) {
-			selection.selectObject('text', label.id, getIsShiftPressed());
+		if (!editor.isSelected('text', label.id)) {
+			editor.selectObject('text', label.id, editor.ui.isShiftPressed);
 		}
-		selection.startInteraction('move-selection', createSelectionSnapshot(mouse));
+		editor.startInteraction('move-selection', createSelectionSnapshot(mouse));
 	}
 
 	function objectClick(event, type, id) {
 		event?.stopPropagation?.();
-		if (getActiveTool() !== 'select') return;
-		const draft = getDraftState();
-		if (draft.routePoints > 0 || draft.outlinePoints > 0) return;
-		selection.selectObject(type, id, getIsShiftPressed());
+		if (editor.ui.activeTool !== 'select') return;
+		const { route, multipitch, outline } = editor.drafts;
+		if (route.points.length || multipitch.points.length || outline.points.length) return;
+		editor.selectObject(type, id, editor.ui.isShiftPressed);
 	}
 
-	function routeLabelMouseDown(event, target) {
-		event?.stopPropagation?.();
-		selection.startInteraction('move-route-label', target);
-	}
-
-	return { objectMouseDown, textMouseDown, objectClick, routeLabelMouseDown };
+	return { objectMouseDown, textMouseDown, objectClick };
 }
