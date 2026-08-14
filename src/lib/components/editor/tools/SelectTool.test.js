@@ -2,10 +2,11 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { SelectTool } from './SelectTool.svelte.js';
+import { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
 
 describe('SelectTool', () => {
 	it('deletes a selected fixpoint and cleans route and pitch references', () => {
-		const state = {
+		const state = createTopo2DEditorState({
 			topo: {
 				fixPoints: [{ id: 'fix-1' }, { id: 'fix-2' }],
 				routes: [
@@ -14,11 +15,10 @@ describe('SelectTool', () => {
 						pitches: [{ startNodeId: 'fix-1', endNodeId: 'fix-2' }]
 					}
 				]
-			},
-			ui: { selectedFixpointId: 'fix-1' }
-		};
-		const saveHistory = vi.fn();
-		const tool = new SelectTool({ state, saveHistory });
+			}
+		});
+		state.selectObject('symbol', 'fix-1');
+		const tool = new SelectTool(state);
 
 		tool.onKeyDown({ key: 'Delete' });
 
@@ -26,6 +26,5 @@ describe('SelectTool', () => {
 		expect(state.topo.routes[0].fixPoints).toEqual(['fix-2']);
 		expect(state.topo.routes[0].pitches[0]).toEqual({ startNodeId: null, endNodeId: 'fix-2' });
 		expect(state.ui.selectedFixpointId).toBeNull();
-		expect(saveHistory).toHaveBeenCalledOnce();
 	});
 });

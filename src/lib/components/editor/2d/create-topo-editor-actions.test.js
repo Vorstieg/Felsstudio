@@ -3,16 +3,12 @@ import { createTopoEditorActions } from './create-topo-editor-actions.js';
 
 describe('createTopoEditorActions', () => {
 	it('undoes a draft point before touching history', () => {
-		const tool = { id: 'route', undoLastPoint: vi.fn() };
+		const tool = { id: 'route', draftPoints: [[0.1, 0.2]], undoLastPoint: vi.fn() };
 		const editor = { history: { undo: vi.fn(), redo: vi.fn() } };
 		const actions = createTopoEditorActions({
 			editor,
 			getCurrentTool: () => tool,
-			getDraftState: () => ({ routePoints: 2, outlinePoints: 0 }),
-			getSelectedOutlineId: () => null,
-			getOutlineEditTool: () => null,
-			setDrawingTarget: vi.fn(),
-			clearSelection: vi.fn()
+			outlineEditTool: null
 		});
 
 		actions.undo();
@@ -23,81 +19,68 @@ describe('createTopoEditorActions', () => {
 
 	it('cancels the active tool and clears its drawing target', () => {
 		const tool = { cancel: vi.fn() };
-		const setDrawingTarget = vi.fn();
-		const clearSelection = vi.fn();
+		const editor = {
+			history: {},
+			setDrawingTarget: vi.fn(),
+			clearSelection: vi.fn(),
+			setActiveTool: vi.fn()
+		};
 		const actions = createTopoEditorActions({
-			editor: { history: {} },
+			editor,
 			getCurrentTool: () => tool,
-			getDraftState: () => ({ routePoints: 0, outlinePoints: 0 }),
-			getSelectedOutlineId: () => null,
-			getOutlineEditTool: () => null,
-			setDrawingTarget,
-			clearSelection
+			outlineEditTool: null
 		});
 
 		actions.cancel();
 
 		expect(tool.cancel).toHaveBeenCalledOnce();
-		expect(setDrawingTarget).toHaveBeenCalledWith(null);
-		expect(clearSelection).toHaveBeenCalledOnce();
+		expect(editor.setDrawingTarget).toHaveBeenCalledWith(null);
+		expect(editor.clearSelection).toHaveBeenCalledOnce();
 	});
 
 	it('finishes while keeping the route tool active for consecutive routes', () => {
 		const tool = { finalize: vi.fn() };
-		const setActiveTool = vi.fn();
+		const editor = { history: {}, setActiveTool: vi.fn() };
 		const actions = createTopoEditorActions({
-			editor: { history: {} },
+			editor,
 			getCurrentTool: () => tool,
-			getActiveTool: () => 'route',
-			setActiveTool,
-			getDraftState: () => ({ routePoints: 2, outlinePoints: 0 }),
-			getSelectedOutlineId: () => null,
-			getOutlineEditTool: () => null,
-			setDrawingTarget: vi.fn(),
-			clearSelection: vi.fn()
+			outlineEditTool: null
 		});
 
 		actions.finalize();
 
 		expect(tool.finalize).toHaveBeenCalledOnce();
-		expect(setActiveTool).not.toHaveBeenCalled();
+		expect(editor.setActiveTool).not.toHaveBeenCalled();
 	});
 
 	it('keeps multipitch active for its second finish action', () => {
-		const setActiveTool = vi.fn();
+		const editor = { history: {}, setActiveTool: vi.fn() };
 		const actions = createTopoEditorActions({
-			editor: { history: {} },
+			editor,
 			getCurrentTool: () => ({ finalize: vi.fn() }),
-			getActiveTool: () => 'multipitch',
-			setActiveTool,
-			getDraftState: () => ({ routePoints: 0, outlinePoints: 0 }),
-			getSelectedOutlineId: () => null,
-			getOutlineEditTool: () => null,
-			setDrawingTarget: vi.fn(),
-			clearSelection: vi.fn()
+			outlineEditTool: null
 		});
 
 		actions.finalize();
 
-		expect(setActiveTool).not.toHaveBeenCalled();
+		expect(editor.setActiveTool).not.toHaveBeenCalled();
 	});
 
 	it('cancels through the shared action and returns to select', () => {
-		const setActiveTool = vi.fn();
-		const actions = createTopoEditorActions({
-			editor: { history: {} },
-			getCurrentTool: () => ({ cancel: vi.fn() }),
-			getActiveTool: () => 'route',
-			setActiveTool,
-			getDraftState: () => ({ routePoints: 2, outlinePoints: 0 }),
-			getSelectedOutlineId: () => null,
-			getOutlineEditTool: () => null,
+		const editor = {
+			history: {},
 			setDrawingTarget: vi.fn(),
-			clearSelection: vi.fn()
+			clearSelection: vi.fn(),
+			setActiveTool: vi.fn()
+		};
+		const actions = createTopoEditorActions({
+			editor,
+			getCurrentTool: () => ({ cancel: vi.fn() }),
+			outlineEditTool: null
 		});
 
 		actions.cancel();
 
-		expect(setActiveTool).toHaveBeenCalledWith('select');
+		expect(editor.setActiveTool).toHaveBeenCalledWith('select');
 	});
 });

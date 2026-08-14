@@ -10,43 +10,20 @@ export class RouteEditTool extends EditablePathEditTool {
 		return snapPointToGrid(point, { enabled: this.snapToGrid, gridSize: this.gridSize });
 	}
 
-	constructor({
-		context,
-		getTopo,
-		getActiveTool,
-		getEditablePath,
-		startInteraction,
-		isSelected,
-		selectObject,
-		getIsShiftPressed,
-		getMobileSelectionMode,
-		beginSelectionMove,
-		setDrawingTarget,
-		getSelectedRoutePoints,
-		isRoutePointSelected,
-		saveHistory
-	} = {}) {
-		super({
-			context,
+	constructor(editor, { getEditablePath, beginSelectionMove } = {}) {
+		super(editor, {
 			id: 'routeEdit',
-			getActiveTool,
 			getEditablePath,
-			startInteraction: context?.selection?.startInteraction || startInteraction,
-			saveHistory: context?.history?.save || saveHistory,
-			isSelected,
-			selectObject,
-			getIsShiftPressed,
-			getMobileSelectionMode,
 			beginSelectionMove,
 			targetFromPoint: ({ routeId, pitchId, variantId }) => ({ routeId, pitchId, variantId }),
 			targetFromMidpoint: ({ routeId, pitchId, variantId }) => ({ routeId, pitchId, variantId })
 		});
-		this.getTopo = getTopo || (() => ({ routes: [] }));
-		this.selectPath = context?.selection?.selectPath || null;
-		this.setDrawingTarget = setDrawingTarget || (() => {});
-		this.deleteRoutes = context?.commands?.deleteRoutes || null;
-		this.getSelectedRoutePoints = getSelectedRoutePoints || (() => []);
-		this.isRoutePointSelected = isRoutePointSelected || (() => false);
+		this.getTopo = () => editor.topo;
+		this.selectPath = (...args) => editor.selectPath(...args);
+		this.setDrawingTarget = (target) => editor.setDrawingTarget(target);
+		this.deleteRoutes = (...args) => editor.deleteRoutes(...args);
+		this.getSelectedRoutePoints = () => editor.getSelectedRoutePoints();
+		this.isRoutePointSelected = (target) => editor.isRoutePointSelected(target);
 	}
 
 	handlePointDown(event, point, canvasInput) {
@@ -112,13 +89,7 @@ export class RouteEditTool extends EditablePathEditTool {
 	}
 
 	delete(ids) {
-		if (this.deleteRoutes) return this.deleteRoutes(ids, { recordHistory: false });
-		const idsToDelete = new Set(ids.map(String));
-		if (!idsToDelete.size) return false;
-		const topo = this.getTopo();
-		if (!topo.routes.some((route) => idsToDelete.has(String(route.id)))) return false;
-		topo.routes = topo.routes.filter((route) => !idsToDelete.has(String(route.id)));
-		return true;
+		return this.deleteRoutes(ids, { recordHistory: false });
 	}
 
 	onMouseDown() {}

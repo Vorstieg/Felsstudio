@@ -5,38 +5,21 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 export class SymbolEditTool {
 	id = 'symbolEdit';
 
-	constructor({
-		context,
-		getTopo,
-		getCanvasSize,
-		getInteraction,
-		startInteraction,
-		isSelected,
-		selectObject,
-		getSelectionSize,
-		getIsShiftPressed,
-		getMobileSelectionMode,
-		beginSelectionMove,
-		getSelectedSymbolId,
-		saveHistory
-	} = {}) {
-		this.getTopo = getTopo || (() => ({ fixPoints: [], routes: [] }));
-		this.mutateDocument = context?.commands?.mutateDocument || ((mutator) => mutator());
-		this.getCanvasSize =
-			context?.viewport?.getCanvasSize ||
-			getCanvasSize ||
-			(() => ({ baseWidth: 1, baseHeight: 1 }));
-		this.getInteraction = context?.selection?.getInteraction || getInteraction || (() => null);
-		this.startInteraction = context?.selection?.startInteraction || startInteraction || (() => {});
-		this.isSelected = context?.selection?.isSelected || isSelected || (() => false);
-		this.selectObject = context?.selection?.selectObject || selectObject || (() => {});
-		this.getSelectionSize = getSelectionSize || (() => 0);
-		this.getIsShiftPressed = getIsShiftPressed || (() => false);
-		this.getMobileSelectionMode = getMobileSelectionMode || (() => false);
+	constructor(editor, { getCanvasSize, beginSelectionMove } = {}) {
+		this.getTopo = () => editor.topo;
+		this.mutateDocument = (mutator) => editor.mutateDocument(mutator);
+		this.getCanvasSize = getCanvasSize || (() => editor.viewport);
+		this.getInteraction = () => editor.interaction;
+		this.startInteraction = (...args) => editor.startInteraction(...args);
+		this.isSelected = (...args) => editor.isSelected(...args);
+		this.selectObject = (...args) => editor.selectObject(...args);
+		this.getSelectionSize = () => editor.selectedItems.size;
+		this.getIsShiftPressed = () => editor.ui.isShiftPressed;
+		this.getMobileSelectionMode = () => editor.ui.mobileSelectionMode;
 		this.beginSelectionMove = beginSelectionMove || (() => null);
-		this.getSelectedSymbolId = getSelectedSymbolId || (() => null);
-		this.saveHistory = context?.history?.save || saveHistory || (() => {});
-		this.deleteSymbols = context?.commands?.deleteSymbols || null;
+		this.getSelectedSymbolId = () => editor.selectedId('symbol');
+		this.saveHistory = () => editor.saveHistory();
+		this.deleteSymbols = (...args) => editor.deleteSymbols(...args);
 	}
 
 	getSymbol(id) {
@@ -221,21 +204,7 @@ export class SymbolEditTool {
 	}
 
 	delete(ids) {
-		if (this.deleteSymbols) return this.deleteSymbols(ids, { recordHistory: false });
-		const idsToDelete = new Set(ids);
-		if (!idsToDelete.size) return false;
-		const topo = this.getTopo();
-		if (!topo.fixPoints.some((symbol) => idsToDelete.has(symbol.id))) return false;
-
-		topo.fixPoints = topo.fixPoints.filter((symbol) => !idsToDelete.has(symbol.id));
-		for (const route of topo.routes) {
-			if (route.fixPoints) route.fixPoints = route.fixPoints.filter((id) => !idsToDelete.has(id));
-			for (const pitch of route.pitches || []) {
-				if (idsToDelete.has(pitch.startNodeId)) pitch.startNodeId = null;
-				if (idsToDelete.has(pitch.endNodeId)) pitch.endNodeId = null;
-			}
-		}
-		return true;
+		return this.deleteSymbols(ids, { recordHistory: false });
 	}
 
 	/** Renders only the controls belonging to symbol editing, over existing symbol groups. */

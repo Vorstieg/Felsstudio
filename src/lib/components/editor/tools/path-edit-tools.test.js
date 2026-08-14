@@ -6,22 +6,39 @@ const canvasInput = {
 	normalizeEvent: () => ({ point: { x: 0.2, y: 0.3 } })
 };
 
+function createEditor(overrides = {}) {
+	return {
+		topo: { routes: [], outlines: [], fixPoints: [] },
+		ui: { activeTool: 'select', isShiftPressed: false, mobileSelectionMode: false },
+		selectedItems: new Set(),
+		mutateDocument: (mutator) => mutator(),
+		startInteraction: vi.fn(),
+		saveHistory: vi.fn(),
+		isSelected: () => false,
+		selectObject: vi.fn(),
+		selectPath: vi.fn(),
+		setDrawingTarget: vi.fn(),
+		getSelectedRoutePoints: () => [],
+		isRoutePointSelected: () => false,
+		deleteOutlines: vi.fn(() => true),
+		deleteRoutes: vi.fn(() => true),
+		updateOutline: vi.fn(),
+		...overrides
+	};
+}
+
 describe('persisted path edit tools', () => {
 	it('deletes an outline when its path is pressed with the eraser', () => {
-		const deleteOutlines = vi.fn(() => true);
-		const save = vi.fn();
-		const tool = new OutlineEditTool({
-			context: { commands: { deleteOutlines }, history: { save } },
-			getActiveTool: () => 'eraser'
-		});
+		const editor = createEditor({ ui: { activeTool: 'eraser' } });
+		const tool = new OutlineEditTool(editor);
 
 		expect(tool.handleOutlineDown({ stopPropagation: vi.fn() }, { id: 7 }, canvasInput)).toBe(true);
-		expect(deleteOutlines).toHaveBeenCalledWith([7], { recordHistory: false });
-		expect(save).toHaveBeenCalledOnce();
+		expect(editor.deleteOutlines).toHaveBeenCalledWith([7], { recordHistory: false });
+		expect(editor.saveHistory).toHaveBeenCalledOnce();
 	});
 
 	it('snaps edited outline vertices to their own grid', () => {
-		const tool = new OutlineEditTool();
+		const tool = new OutlineEditTool(createEditor());
 		tool.snapToGrid = true;
 		tool.gridSize = 0.1;
 
@@ -29,52 +46,36 @@ describe('persisted path edit tools', () => {
 	});
 
 	it('returns no grid snap for route vertices when its grid is disabled', () => {
-		expect(new RouteEditTool().snapPoint({ x: 0.16, y: 0.24 })).toBeNull();
+		expect(new RouteEditTool(createEditor()).snapPoint({ x: 0.16, y: 0.24 })).toBeNull();
 	});
 
 	it('deletes a route when its path is pressed with the eraser', () => {
-		const deleteRoutes = vi.fn(() => true);
-		const save = vi.fn();
-		const tool = new RouteEditTool({
-			context: { commands: { deleteRoutes }, history: { save } },
-			getActiveTool: () => 'eraser'
-		});
+		const editor = createEditor({ ui: { activeTool: 'eraser' } });
+		const tool = new RouteEditTool(editor);
 
 		expect(tool.handleRouteDown({ stopPropagation: vi.fn() }, { id: 'route-1' }, canvasInput)).toBe(
 			true
 		);
-		expect(deleteRoutes).toHaveBeenCalledWith(['route-1'], { recordHistory: false });
-		expect(save).toHaveBeenCalledOnce();
+		expect(editor.deleteRoutes).toHaveBeenCalledWith(['route-1'], { recordHistory: false });
+		expect(editor.saveHistory).toHaveBeenCalledOnce();
 	});
 
 	it('uses the shared item interaction to select and drag an outline', () => {
-		const selectObject = vi.fn();
-		const startInteraction = vi.fn();
-		const tool = new OutlineEditTool({
-			getActiveTool: () => 'select',
-			isSelected: () => false,
-			selectObject,
-			beginSelectionMove: (mouse) => ({ startMouse: mouse }),
-			startInteraction
+		const editor = createEditor();
+		const tool = new OutlineEditTool(editor, {
+			beginSelectionMove: (mouse) => ({ startMouse: mouse })
 		});
 
 		expect(tool.handleOutlineDown({ stopPropagation: vi.fn() }, { id: 7 }, canvasInput)).toBe(true);
-		expect(selectObject).toHaveBeenCalledWith('outline', 7, false);
-		expect(startInteraction).toHaveBeenCalledWith('move-selection', {
+		expect(editor.selectObject).toHaveBeenCalledWith('outline', 7, false);
+		expect(editor.startInteraction).toHaveBeenCalledWith('move-selection', {
 			startMouse: { x: 0.2, y: 0.3 }
 		});
 	});
 
 	it('keeps pitch selection separate from whole-route selection', () => {
-		const selectObject = vi.fn();
-		const selectPath = vi.fn();
-		const setDrawingTarget = vi.fn();
-		const tool = new RouteEditTool({
-			context: { selection: { selectPath } },
-			getActiveTool: () => 'select',
-			selectObject,
-			setDrawingTarget
-		});
+		const editor = createEditor();
+		const tool = new RouteEditTool(editor);
 
 		tool.handleRouteDown(
 			{ stopPropagation: vi.fn() },
@@ -82,9 +83,9 @@ describe('persisted path edit tools', () => {
 			canvasInput
 		);
 
-		expect(selectPath).toHaveBeenCalledWith('pitch', 'route-1', 'pitch-1');
-		expect(selectObject).not.toHaveBeenCalled();
-		expect(setDrawingTarget).toHaveBeenCalledWith({
+		expect(editor.selectPath).toHaveBeenCalledWith('pitch', 'route-1', 'pitch-1');
+		expect(editor.selectObject).not.toHaveBeenCalled();
+		expect(editor.setDrawingTarget).toHaveBeenCalledWith({
 			type: 'pitch',
 			routeId: 'route-1',
 			pitchId: 'pitch-1'

@@ -7,15 +7,19 @@ describe('createTopoInteractionController', () => {
 			['0', [[0.1, 0.2]]],
 			['1', [[0.4, 0.5]]]
 		]);
-		const controller = createTopoInteractionController({
-			getInteraction: () => ({
+		const editor = {
+			interaction: {
 				kind: 'move-points',
 				startMouse: { x: 0.2, y: 0.2 },
 				points: [
 					{ target: { routeId: 'route', variantId: '0', index: 0 }, start: [0.1, 0.2] },
 					{ target: { routeId: 'route', variantId: '1', index: 0 }, start: [0.4, 0.5] }
 				]
-			}),
+			},
+			mutateDocument: (mutator) => mutator()
+		};
+		const controller = createTopoInteractionController({
+			editor,
 			getCurrentTool: () => ({ onMouseMove: vi.fn() }),
 			getEditablePath: (target) => ({
 				movePoint: (index, point) => (paths.get(target.variantId)[index] = point)
@@ -36,9 +40,9 @@ describe('createTopoInteractionController', () => {
 			textLabels: [{ id: 'text-1', text: 'Label', position2D: [0.2, 0.1] }],
 			routes: []
 		};
-		const controller = createTopoInteractionController({
-			getTopo: () => topo,
-			getInteraction: () => ({
+		const editor = {
+			topo,
+			interaction: {
 				kind: 'move-selection',
 				startMouse: { x: 0.2, y: 0.2 },
 				items: {
@@ -46,7 +50,11 @@ describe('createTopoInteractionController', () => {
 					symbols: [{ symbolId: 'symbol-1', startPos: [0.1, 0.2] }],
 					texts: [{ textId: 'text-1', startPos: [0.2, 0.1] }]
 				}
-			}),
+			},
+			mutateDocument: (mutator) => mutator()
+		};
+		const controller = createTopoInteractionController({
+			editor,
 			getCurrentTool: () => ({ onMouseMove: vi.fn() })
 		});
 
@@ -61,11 +69,15 @@ describe('createTopoInteractionController', () => {
 	it('keeps anchor snapping available while a route edit grid is disabled', () => {
 		const movePoint = vi.fn();
 		const referenceFixpoint = vi.fn();
+		const editor = {
+			topo: { routes: [{ id: 'route-1' }] },
+			interaction: { kind: 'move-point', routeId: 'route-1', pointIndex: 0 },
+			mutateDocument: (mutator) => mutator()
+		};
 		const controller = createTopoInteractionController({
-			getTopo: () => ({ routes: [{ id: 'route-1' }] }),
-			getInteraction: () => ({ kind: 'move-point', routeId: 'route-1', pointIndex: 0 }),
+			editor,
 			getCurrentTool: () => ({ onMouseMove: vi.fn() }),
-			routeEditTool: { snapPoint: () => null },
+			editTools: { route: { snapPoint: () => null } },
 			snapRoutePoint: () => ({ point: { x: 0.4, y: 0.5 }, anchorId: 'belay-1' }),
 			referenceFixpoint,
 			getEditablePath: () => ({ movePoint })

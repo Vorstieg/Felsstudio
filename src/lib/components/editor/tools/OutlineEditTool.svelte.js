@@ -14,42 +14,18 @@ export class OutlineEditTool extends EditablePathEditTool {
 	snapToGrid = $state(false);
 	gridSize = $state(0.01);
 
-	constructor({
-		context,
-		getTopo,
-		getCanvasSize,
-		getActiveTool,
-		getEditablePath,
-		startInteraction,
-		saveHistory,
-		isSelected,
-		selectObject,
-		getIsShiftPressed,
-		getMobileSelectionMode,
-		beginSelectionMove
-	} = {}) {
-		super({
-			context,
+	constructor(editor, { getCanvasSize, getEditablePath, beginSelectionMove } = {}) {
+		super(editor, {
 			id: 'outlineEdit',
-			getActiveTool,
 			getEditablePath,
-			startInteraction: context?.selection?.startInteraction || startInteraction,
-			saveHistory: context?.history?.save || saveHistory,
-			isSelected,
-			selectObject,
-			getIsShiftPressed,
-			getMobileSelectionMode,
 			beginSelectionMove,
 			targetFromPoint: ({ outlineId }) => ({ outlineId }),
 			targetFromMidpoint: ({ outlineId }) => ({ outlineId })
 		});
-		this.getTopo = getTopo || (() => ({ outlines: [] }));
-		this.getCanvasSize =
-			context?.viewport?.getCanvasSize ||
-			getCanvasSize ||
-			(() => ({ baseWidth: 1, baseHeight: 1 }));
-		this.updateOutline = context?.commands?.updateOutline || null;
-		this.deleteOutlines = context?.commands?.deleteOutlines || null;
+		this.getTopo = () => editor.topo;
+		this.getCanvasSize = getCanvasSize || (() => editor.viewport);
+		this.updateOutline = (...args) => editor.updateOutline(...args);
+		this.deleteOutlines = (...args) => editor.deleteOutlines(...args);
 	}
 
 	getOutline(id) {
@@ -65,8 +41,7 @@ export class OutlineEditTool extends EditablePathEditTool {
 			...(outline.curve || {}),
 			...changes
 		};
-		if (this.updateOutline) this.updateOutline(outline.id, { curve }, { recordHistory: false });
-		else outline.curve = curve;
+		this.updateOutline(outline.id, { curve }, { recordHistory: false });
 		this.saveHistory();
 		return true;
 	}
@@ -76,12 +51,7 @@ export class OutlineEditTool extends EditablePathEditTool {
 	}
 
 	delete(ids) {
-		if (this.deleteOutlines) return this.deleteOutlines(ids, { recordHistory: false });
-		const idsToDelete = new Set(ids.map(String));
-		const topo = this.getTopo();
-		const before = topo.outlines.length;
-		topo.outlines = topo.outlines.filter((outline) => !idsToDelete.has(String(outline.id)));
-		return topo.outlines.length !== before;
+		return this.deleteOutlines(ids, { recordHistory: false });
 	}
 
 	simplifyOutline(id, tolerancePx) {
@@ -105,8 +75,7 @@ export class OutlineEditTool extends EditablePathEditTool {
 			points2D: simplified,
 			closed: isClosedShape(simplified)
 		};
-		if (this.updateOutline) this.updateOutline(outline.id, changes, { recordHistory: false });
-		else Object.assign(outline, changes);
+		this.updateOutline(outline.id, changes, { recordHistory: false });
 		this.saveHistory();
 		return {
 			changed: true,
@@ -151,8 +120,7 @@ export class OutlineEditTool extends EditablePathEditTool {
 			[mouse.x, mouse.y],
 			this.getCanvasSize()
 		);
-		if (this.updateOutline) this.updateOutline(outline.id, changes, { recordHistory: false });
-		else Object.assign(outline, changes);
+		this.updateOutline(outline.id, changes, { recordHistory: false });
 		return true;
 	}
 

@@ -8,66 +8,43 @@ import { RouteEditTool } from '../tools/RouteEditTool.svelte.js';
 import { OutlineEditTool } from '../tools/OutlineEditTool.svelte.js';
 import { TextTool } from '../tools/TextTool.svelte.js';
 
-/** Creates all tools from the editor's narrow capability context. */
+/** Creates tools from the editor plus their few external interaction services. */
 export function createTopoToolRegistry({
-	context,
-	state,
-	getTopo,
-	getActiveTool,
+	editor,
+	getCanvasSize,
 	getEditablePath,
-	getIsShiftPressed,
-	getMobileSelectionMode,
 	beginSelectionMove,
-	setDrawingTarget,
-	getSelectionSize,
-	getSelectedRoutePoints,
-	isRoutePointSelected,
-	getSelectedSymbolId,
 	snapRoutePoint,
 	referenceFixpoint
 }) {
-	const config = { context, state };
-	const editConfig = {
-		context,
-		getTopo,
-		getActiveTool,
-		getEditablePath,
-		getIsShiftPressed,
-		getMobileSelectionMode,
-		beginSelectionMove
+	const createRouteTool = (mode) => {
+		const tool = new RouteTool(editor, { snapPoint: snapRoutePoint, referenceFixpoint });
+		tool.mode = mode;
+		tool.id = mode;
+		return tool;
 	};
 
 	return {
-		route: new RouteTool({
-			...config,
-			mode: 'route',
-			snapPoint: snapRoutePoint,
-			referenceFixpoint
+		route: createRouteTool('route'),
+		multipitch: createRouteTool('multipitch'),
+		symbol: new SymbolTool(editor),
+		fixpoint: new SymbolTool(editor),
+		eraser: new EraserTool(editor),
+		outline: new OutlineTool(editor, { getCanvasSize }),
+		select: new SelectTool(editor),
+		text: new TextTool(editor),
+		routeEdit: new RouteEditTool(editor, {
+			getEditablePath,
+			beginSelectionMove
 		}),
-		multipitch: new RouteTool({
-			...config,
-			mode: 'multipitch',
-			snapPoint: snapRoutePoint,
-			referenceFixpoint
+		outlineEdit: new OutlineEditTool(editor, {
+			getEditablePath,
+			beginSelectionMove,
+			getCanvasSize
 		}),
-		symbol: new SymbolTool(config),
-		fixpoint: new SymbolTool(config),
-		eraser: new EraserTool(config),
-		outline: new OutlineTool(config),
-		select: new SelectTool(config),
-		text: new TextTool(config),
-		routeEdit: new RouteEditTool({
-			...editConfig,
-			setDrawingTarget,
-			getSelectedRoutePoints,
-			isRoutePointSelected
-		}),
-		outlineEdit: new OutlineEditTool(editConfig),
-		symbolEdit: new SymbolEditTool({
-			...editConfig,
-			getSelectionSize,
-			getSelectedSymbolId,
-			beginSelectionMove: (mouse) => ({ kind: 'move-selection', ...beginSelectionMove(mouse) })
+		symbolEdit: new SymbolEditTool(editor, {
+			beginSelectionMove: (mouse) => ({ kind: 'move-selection', ...beginSelectionMove(mouse) }),
+			getCanvasSize
 		})
 	};
 }

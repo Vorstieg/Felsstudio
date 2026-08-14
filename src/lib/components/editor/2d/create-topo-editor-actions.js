@@ -1,21 +1,11 @@
-export function createTopoEditorActions({
-	editor,
-	getCurrentTool,
-	getDraftState,
-	getSelectedOutlineId,
-	getOutlineEditTool,
-	setActiveTool,
-	setDrawingTarget,
-	clearSelection
-}) {
+export function createTopoEditorActions({ editor, getCurrentTool, outlineEditTool }) {
 	function undo() {
 		const tool = getCurrentTool();
-		const draft = getDraftState();
-		if ((tool?.id === 'route' || tool?.id === 'multipitch') && draft.routePoints > 0) {
+		if ((tool?.id === 'route' || tool?.id === 'multipitch') && tool.draftPoints.length > 0) {
 			tool.undoLastPoint();
 			return;
 		}
-		if (tool?.id === 'outline' && draft.outlinePoints > 0) {
+		if (tool?.id === 'outline' && tool.getPreviewPoints().length > 0) {
 			tool.undoLastPoint();
 			return;
 		}
@@ -34,14 +24,14 @@ export function createTopoEditorActions({
 		const tool = getCurrentTool();
 		if (tool?.cancel) tool.cancel();
 		else tool?.onKeyDown?.({ key: 'Escape' });
-		setDrawingTarget(null);
-		clearSelection();
-		setActiveTool?.('select');
+		editor.setDrawingTarget(null);
+		editor.clearSelection();
+		editor.setActiveTool('select');
 	}
 
 	function simplifySelectedOutline(tolerancePx) {
-		const outlineId = getSelectedOutlineId();
-		return outlineId ? getOutlineEditTool().simplifyOutline(outlineId, tolerancePx) : null;
+		const outlineId = editor.ui.selectedOutlineId;
+		return outlineId ? outlineEditTool.simplifyOutline(outlineId, tolerancePx) : null;
 	}
 
 	return { undo, redo, finalize, cancel, simplifySelectedOutline };

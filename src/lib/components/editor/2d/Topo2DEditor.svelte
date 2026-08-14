@@ -34,31 +34,6 @@
 		paste: ({ canvasSize } = {}) => editor.pasteSelection(canvasSize),
 		clear: editor.clearClipboard
 	};
-	const toolContext = {
-		document: { getTopo: () => editor.topo, ui: editor.ui },
-		selection: {
-			selectObject: editor.selectObject,
-			selectPath: editor.selectPath,
-			selectedId: editor.selectedId,
-			isSelected: editor.isSelected,
-			removeItems: editor.removeItems,
-			clear: editor.clearSelection,
-			startInteraction: editor.startInteraction,
-			getInteraction: () => editor.interaction
-		},
-		history: { save: editor.saveHistory },
-		viewport: { getCanvasSize: () => ({ baseWidth, baseHeight }) },
-		drawing: {
-			getTarget: () => editor.ui.drawingTarget,
-			setTarget: (target) => editor.setDrawingTarget(target)
-		},
-		image: {
-		getSrc: () => editor.topo.image2D,
-		getFit: () => editor.topo.backgroundFit ?? 'contain'
-		},
-		commands
-	};
-
 	let svgElement = $state(null);
 	let gElement = $state(null);
 
@@ -69,19 +44,10 @@
 		});
 	}
 	const tools = createTopoToolRegistry({
-		context: toolContext,
-		state: editor,
-		getTopo: () => editor.topo,
-		getActiveTool: () => editor.ui.activeTool,
+		editor,
+		getCanvasSize: () => ({ baseWidth, baseHeight }),
 		getEditablePath: (target) => editablePaths.resolve(target),
-		getIsShiftPressed: () => editor.ui.isShiftPressed,
-		getMobileSelectionMode: () => editor.ui.mobileSelectionMode,
 		beginSelectionMove: collectDraggingSelection,
-		setDrawingTarget: (target) => editor.setDrawingTarget(target),
-		getSelectionSize: () => editor.selectedItems.size,
-		getSelectedRoutePoints: () => editor.getSelectedRoutePoints(),
-		isRoutePointSelected: (target) => editor.isRoutePointSelected(target),
-		getSelectedSymbolId: () => editor.ui.selectedFixpointId,
 		snapRoutePoint,
 		referenceFixpoint: referenceFixpointInStore
 	});
@@ -176,35 +142,22 @@
 		editor.viewport.transform = transform;
 	});
 	const interactionController = createTopoInteractionController({
-		getTopo: () => editor.topo,
-		mutateDocument: editor.mutateDocument,
-		getInteraction: () => editor.interaction,
+		editor,
 		getCurrentTool: () => currentTool,
 		getEditablePath: (target) => editablePaths.resolve(target),
 		snapRoutePoint,
 		referenceFixpoint: referenceFixpointInStore,
-		outlineEditTool: tools.outlineEdit,
-		routeEditTool: tools.routeEdit,
-		symbolEditTool: tools.symbolEdit,
-		onMoveRouteLabel: (interaction, mouse) =>
-			commands.moveRouteLabel(interaction.routeId, interaction, mouse)
+		editTools: {
+			outline: tools.outlineEdit,
+			route: tools.routeEdit,
+			symbol: tools.symbolEdit
+		}
 	});
 	const pointerController = createTopoPointerController({
-		getActiveTool: () => editor.ui.activeTool,
+		editor,
 		getCurrentTool: () => currentTool,
-		getTextComposerOpen: () => Boolean(tools.text.editingPosition),
-		commitTextComposer: () => tools.text.commitEdit(),
-		getMobileSelectionMode: () => editor.ui.mobileSelectionMode,
-		getTopo: () => editor.topo,
-		getSelectedRouteId: () => editor.ui.selectedRouteId,
-		getDrawingTarget: () => editor.ui.drawingTarget,
+		textTool: tools.text,
 		getCanvasSize: () => ({ baseWidth, baseHeight }),
-		selection: editor,
-		clearSelection,
-		deselectEditTarget,
-		saveHistory,
-		onBeginSelectionRegion: (interaction) =>
-			editor.startInteraction('selection-region', interaction)
 	});
 	const objectInteractionController = createTopoObjectInteractionController({
 		editor,
@@ -215,16 +168,7 @@
 	const actions = createTopoEditorActions({
 		editor,
 		getCurrentTool: () => currentTool,
-		getDraftState: () => ({
-			routePoints: currentRoutePoints.length,
-			outlinePoints: currentOutlinePoints.length
-		}),
-		getSelectedOutlineId: () => editor.ui.selectedOutlineId,
-		getOutlineEditTool: () => tools.outlineEdit,
-		getActiveTool: () => editor.ui.activeTool,
-		setActiveTool: (tool) => editor.setActiveTool(tool),
-		setDrawingTarget: (target) => editor.setDrawingTarget(target),
-		clearSelection
+		outlineEditTool: tools.outlineEdit
 	});
 
 	export const undo = actions.undo;

@@ -12,14 +12,14 @@ export class TextTool {
 	textAlign2D = $state(TEXT_LABEL_DEFAULTS.textAlign2D);
 	focusRequested = false;
 
-	constructor({ context, state } = {}) {
-		this.state = state;
-		this.getTopo = context?.document?.getTopo || (() => state?.topo || {});
-		this.selectObject = context?.selection?.selectObject || (() => {});
-		this.selectedId = context?.selection?.selectedId || (() => null);
-		this.createTextLabel = context?.commands?.createTextLabel;
-		this.updateTextLabel = context?.commands?.updateTextLabel;
-		this.removeTextLabel = context?.commands?.removeTextLabel;
+	constructor(editor) {
+		this.state = editor;
+		this.getTopo = this.state.topo;
+		this.selectObject = this.state.selectObject;
+		this.selectedId = this.state.selectedId;
+		this.createTextLabel = this.state.createTextLabel;
+		this.updateTextLabel = this.state.updateTextLabel;
+		this.removeTextLabel = this.state.removeTextLabel;
 	}
 
 	onMouseDown(event, point) {
@@ -128,7 +128,7 @@ export class TextTool {
 	}
 
 	getLabel(id) {
-		return (this.getTopo().textLabels || []).find((label) => String(label.id) === String(id));
+		return (this.getTopo.textLabels || []).find((label) => String(label.id) === String(id));
 	}
 
 	requestFocus() {

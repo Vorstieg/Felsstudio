@@ -83,17 +83,17 @@ export class OutlineTool {
 	brushOutlinePoints = $state([]);
 	brushGeneration = 0;
 
-	constructor({ context, state, saveHistory, getCanvasSize, getImageSrc, getImageFit } = {}) {
-		this.state = state;
-		if (state?.drafts?.outline) {
-			const draft = state.drafts.outline;
+	constructor(editor, { getCanvasSize } = {}) {
+		this.state = editor;
+		if (editor?.drafts?.outline) {
+			const draft = editor.drafts.outline;
 			Object.defineProperties(this, {
 				currentPoints: {
 					configurable: true,
 					get: () => draft.points,
 					set: (value) => {
 						draft.points = value;
-						state.refreshPendingChanges?.();
+						editor.refreshPendingChanges();
 					}
 				},
 				previewShape: {
@@ -108,7 +108,7 @@ export class OutlineTool {
 					get: () => draft.brushPoints,
 					set: (value) => {
 						draft.brushPoints = value;
-						state.refreshPendingChanges?.();
+						editor.refreshPendingChanges();
 					}
 				},
 				brushOutlinePoints: {
@@ -128,16 +128,12 @@ export class OutlineTool {
 				}
 			});
 		}
-		this.saveHistory =
-			context?.history?.save || context?.commands?.commit || saveHistory || (() => {});
-		this.getCanvasSize =
-			context?.viewport?.getCanvasSize ||
-			getCanvasSize ||
-			(() => ({ baseWidth: 1, baseHeight: 1 }));
-		this.getImageSrc = context?.image?.getSrc || getImageSrc || (() => null);
-		this.getImageFit = context?.image?.getFit || getImageFit || (() => 'contain');
-		this.addOutline = context?.commands?.addOutline || null;
-		this.appendOutlinePoint = context?.commands?.appendOutlinePoint || null;
+		this.saveHistory = () => this.state.saveHistory();
+		this.getCanvasSize = getCanvasSize || (() => this.state.viewport);
+		this.getImageSrc = () => this.state.topo.image2D;
+		this.getImageFit = () => this.state.topo.backgroundFit ?? 'contain';
+		this.addOutline = (...args) => this.state.addOutline(...args);
+		this.appendOutlinePoint = (...args) => this.state.appendOutlinePoint(...args);
 	}
 
 	onMouseDown(event, point) {
@@ -149,9 +145,7 @@ export class OutlineTool {
 				(o) => o.id === this.state.ui.selectedOutlineId
 			);
 			if (outline) {
-				if (this.appendOutlinePoint)
-					this.appendOutlinePoint(outline.id, nextPoint, { recordHistory: false });
-				else this.state.appendOutlinePoint(outline.id, nextPoint, { recordHistory: false });
+				this.appendOutlinePoint(outline.id, nextPoint, { recordHistory: false });
 				this.saveHistory();
 				return;
 			}
@@ -424,8 +418,7 @@ export class OutlineTool {
 			curve: { enabled: this.curveEnabled, tension: this.curveTension },
 			canvasSize: this.canvasSize
 		});
-		if (this.addOutline) this.addOutline(outline);
-		else this.state.addOutline(outline);
+		this.addOutline(outline);
 
 		this.resetDrawingState();
 	}

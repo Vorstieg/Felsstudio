@@ -6,42 +6,33 @@ import {
 
 /** Owns the normalized pointer down/up lifecycle for the 2D editor. */
 export function createTopoPointerController({
-	getActiveTool,
+	editor,
 	getCurrentTool,
-	getTextComposerOpen,
-	commitTextComposer,
-	getMobileSelectionMode,
-	getTopo,
-	getSelectedRouteId,
-	getDrawingTarget,
-	getCanvasSize,
-	selection,
-	clearSelection,
-	deselectEditTarget,
-	saveHistory,
-	onBeginSelectionRegion,
-	onCommitSelectionRegion
+	textTool,
+	getCanvasSize
 } = {}) {
 	function down(input) {
 		if (!input || (input.button !== 0 && !input.isTouch)) return;
 		const { point, sourceEvent: event } = input;
-		if (getTextComposerOpen?.()) {
-			commitTextComposer?.();
+		if (textTool?.editingPosition) {
+			textTool.commitEdit();
 			event.stopPropagation?.();
 			return;
 		}
 
-		if (['symbolEdit', 'routeEdit', 'outlineEdit'].includes(getActiveTool())) {
-			deselectEditTarget?.();
+		if (['symbolEdit', 'routeEdit', 'outlineEdit'].includes(editor.ui.activeTool)) {
+			editor.clearSelection();
+			editor.setDrawingTarget(null);
+			editor.setActiveTool('select');
 			return;
 		}
 
-		if (getActiveTool() === 'select') {
-			onBeginSelectionRegion?.({
+		if (editor.ui.activeTool === 'select') {
+			editor.startInteraction('selection-region', {
 				start: point,
 				end: point,
 				mode:
-					input.isTouch && getMobileSelectionMode?.()
+					input.isTouch && editor.ui.mobileSelectionMode
 						? 'add'
 						: event.altKey
 							? 'subtract'
@@ -60,29 +51,28 @@ export function createTopoPointerController({
 		const { point, sourceEvent: event } = input;
 		getCurrentTool()?.onMouseUp?.(event, point);
 
-		const interaction = selection.endInteraction();
+		const interaction = editor.endInteraction();
 		if (interaction?.kind === 'selection-region') {
 			const region = createSelectionRegion(interaction.start, interaction.end);
 			const moved = Math.hypot(region.right - region.left, region.bottom - region.top) > 0.005;
 			if (moved) {
-				const selectedRouteId = getSelectedRouteId?.();
+				const selectedRouteId = editor.ui.selectedRouteId;
 				const routePoints = selectedRouteId
-					? getRoutePointRegionSelection(getTopo(), selectedRouteId, region, getDrawingTarget?.())
+					? getRoutePointRegionSelection(editor.topo, selectedRouteId, editor.ui.drawingTarget)
 					: [];
-				if (routePoints.length) selection.selectRoutePoints(routePoints, interaction.mode);
+				if (routePoints.length) editor.selectRoutePoints(routePoints, interaction.mode);
 				else {
-					selection.selectRoutePoints?.([], 'replace');
-					selection.selectItems(
-						getRegionSelection(getTopo(), region, getCanvasSize()),
+					editor.selectRoutePoints([], 'replace');
+					editor.selectItems(
+						getRegionSelection(editor.topo, region, getCanvasSize()),
 						interaction.mode
 					);
 				}
 			} else if (interaction.mode === 'replace') {
-				clearSelection?.();
+				editor.clearSelection();
 			}
-			onCommitSelectionRegion?.(interaction);
 		} else if (interaction) {
-			saveHistory?.();
+			editor.saveHistory();
 		}
 	}
 

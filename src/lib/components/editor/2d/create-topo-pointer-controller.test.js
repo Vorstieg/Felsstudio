@@ -3,11 +3,12 @@ import { createTopoPointerController } from './create-topo-pointer-controller.js
 
 describe('createTopoPointerController', () => {
 	it('starts a selection region on select-tool pointer down', () => {
-		const startInteraction = vi.fn();
+		const editor = {
+			ui: { activeTool: 'select', mobileSelectionMode: false },
+			startInteraction: vi.fn()
+		};
 		const controller = createTopoPointerController({
-			getActiveTool: () => 'select',
-			getMobileSelectionMode: () => false,
-			onBeginSelectionRegion: startInteraction
+			editor
 		});
 
 		controller.down({
@@ -18,7 +19,7 @@ describe('createTopoPointerController', () => {
 			shiftKey: true
 		});
 
-		expect(startInteraction).toHaveBeenCalledWith({
+		expect(editor.startInteraction).toHaveBeenCalledWith('selection-region', {
 			start: { x: 0.2, y: 0.3 },
 			end: { x: 0.2, y: 0.3 },
 			mode: 'add'
@@ -26,14 +27,13 @@ describe('createTopoPointerController', () => {
 	});
 
 	it('commits an open text composer before handling the click-away target', () => {
-		const commitTextComposer = vi.fn();
+		const textTool = { editingPosition: [0.1, 0.2], commitEdit: vi.fn() };
 		const onMouseDown = vi.fn();
 		const stopPropagation = vi.fn();
 		const controller = createTopoPointerController({
-			getActiveTool: () => 'text',
+			editor: { ui: { activeTool: 'text' } },
 			getCurrentTool: () => ({ onMouseDown }),
-			getTextComposerOpen: () => true,
-			commitTextComposer
+			textTool
 		});
 
 		controller.down({
@@ -43,7 +43,7 @@ describe('createTopoPointerController', () => {
 			isTouch: false
 		});
 
-		expect(commitTextComposer).toHaveBeenCalledOnce();
+		expect(textTool.commitEdit).toHaveBeenCalledOnce();
 		expect(stopPropagation).toHaveBeenCalledOnce();
 		expect(onMouseDown).not.toHaveBeenCalled();
 	});

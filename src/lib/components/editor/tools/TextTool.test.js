@@ -22,14 +22,12 @@ function setup(labels = []) {
 		topo.textLabels = topo.textLabels.filter((label) => label.id !== id);
 	});
 	const tool = new TextTool({
-		context: {
-			document: { getTopo: () => topo },
-			selection: {
-				selectObject: (_type, id) => (selected = id),
-				selectedId: () => selected
-			},
-			commands: { createTextLabel, updateTextLabel, removeTextLabel }
-		}
+		topo,
+		selectObject: (_type, id) => (selected = id),
+		selectedId: () => selected,
+		createTextLabel,
+		updateTextLabel,
+		removeTextLabel
 	});
 	return { tool, topo, createTextLabel, updateTextLabel, removeTextLabel };
 }

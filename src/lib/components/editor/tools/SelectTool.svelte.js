@@ -1,23 +1,7 @@
 export class SelectTool {
 	id = 'select';
-	constructor({ context, state, saveHistory, getSelectedId, removeItems, deleteSymbols } = {}) {
-		this.state = state;
-		this.saveHistory =
-			context?.commands?.commit || context?.history?.save || saveHistory || (() => {});
-		this.getSelectedId = getSelectedId || (() => this.state.ui.selectedFixpointId);
-		this.removeItems =
-			removeItems ||
-			((items) => {
-				if (
-					items.some(({ type, id }) => type === 'symbol' && id === this.state.ui.selectedFixpointId)
-				) {
-					this.state.ui.selectedFixpointId = null;
-				}
-			});
-		this.getSelectedId =
-			context?.selection?.selectedId || getSelectedId || (() => this.state.ui.selectedFixpointId);
-		this.removeItems = context?.selection?.removeItems || this.removeItems;
-		this.deleteSymbols = context?.commands?.deleteSymbols || deleteSymbols || null;
+	constructor(editor) {
+		this.state = editor;
 	}
 
 	onMouseDown(event, point) {
@@ -35,21 +19,9 @@ export class SelectTool {
 	onMouseUp(event, point) {}
 	onKeyDown(event) {
 		if (event.key === 'Delete' || event.key === 'Backspace') {
-			const idToDelete = this.getSelectedId('symbol');
+			const idToDelete = this.state.selectedId('symbol');
 			if (idToDelete) {
-				if (this.deleteSymbols) this.deleteSymbols([idToDelete]);
-				else {
-					this.state.topo.fixPoints = this.state.topo.fixPoints.filter((p) => p.id !== idToDelete);
-					this.state.topo.routes.forEach((route) => {
-						route.fixPoints = (route.fixPoints || []).filter((id) => id !== idToDelete);
-						(route.pitches || []).forEach((pitch) => {
-							if (pitch.startNodeId === idToDelete) pitch.startNodeId = null;
-							if (pitch.endNodeId === idToDelete) pitch.endNodeId = null;
-						});
-					});
-				}
-				if (!this.deleteSymbols) this.removeItems([{ type: 'symbol', id: idToDelete }]);
-				if (!this.deleteSymbols) this.saveHistory();
+				this.state.deleteSymbols([idToDelete]);
 			}
 		}
 	}

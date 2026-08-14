@@ -5,21 +5,14 @@ import { RouteTool } from './RouteTool.svelte.js';
 import { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
 
 function createTool() {
-	const state = {
-		topo: { routes: [], fixPoints: [] },
-		ui: { selectedRouteId: null, selectedFixpointId: null }
-	};
-	let target = null;
-	const setDrawingTarget = vi.fn((value) => (target = value));
-	const tool = new RouteTool({
-		state,
-		getDrawingTarget: () => target,
-		setDrawingTarget,
-		saveHistory: vi.fn(),
+	const state = createTopo2DEditorState({
+		topo: { routes: [], fixPoints: [], outlines: [], textLabels: [] }
+	});
+	const tool = new RouteTool(state, {
 		snapPoint: (point) => ({ point, anchorId: point.anchorId || null }),
 		referenceFixpoint: vi.fn()
 	});
-	return { state, tool, target: () => target, setDrawingTarget };
+	return { state, tool, target: () => state.ui.drawingTarget };
 }
 
 describe('RouteTool', () => {
@@ -39,7 +32,7 @@ describe('RouteTool', () => {
 				[0.8, 0.9]
 			]
 		});
-		expect(state.ui.selectedRouteId).toBe(state.topo.routes[0].id);
+		expect(state.ui.selectedRouteId).toBeNull();
 		expect(tool.draftPoints).toEqual([]);
 	});
 
@@ -53,26 +46,14 @@ describe('RouteTool', () => {
 
 		expect(state.topo.routes).toHaveLength(1);
 		expect(tool.selectPath).not.toHaveBeenCalled();
-		expect(state.ui.selectedRouteId).toBe(state.topo.routes[0].id);
+		expect(state.ui.selectedRouteId).toBeNull();
 	});
 
 	it('keeps a store-backed two-point route draft pending until it is finished', () => {
 		const editor = createTopo2DEditorState({
 			topo: { routes: [], fixPoints: [], outlines: [], textLabels: [] }
 		});
-		const tool = new RouteTool({
-			state: editor,
-			context: {
-				document: { getTopo: () => editor.topo, ui: editor.ui },
-				selection: editor,
-				history: { save: editor.saveHistory },
-				commands: editor,
-				drawing: {
-					getTarget: () => editor.ui.drawingTarget,
-					setTarget: editor.setDrawingTarget
-				}
-			}
-		});
+		const tool = new RouteTool(editor);
 
 		tool.appendPoint('route', { x: 0.1, y: 0.2 });
 		tool.appendPoint('route', { x: 0.8, y: 0.9 });
@@ -84,19 +65,7 @@ describe('RouteTool', () => {
 		const editor = createTopo2DEditorState({
 			topo: { routes: [], fixPoints: [], outlines: [], textLabels: [] }
 		});
-		const tool = new RouteTool({
-			state: editor,
-			context: {
-				document: { getTopo: () => editor.topo, ui: editor.ui },
-				selection: editor,
-				history: { save: editor.saveHistory },
-				commands: editor,
-				drawing: {
-					getTarget: () => editor.ui.drawingTarget,
-					setTarget: editor.setDrawingTarget
-				}
-			}
-		});
+		const tool = new RouteTool(editor);
 
 		editor.load({ routes: [], fixPoints: [], outlines: [], textLabels: [] });
 		tool.appendPoint('route', { x: 0.1, y: 0.2 });
@@ -113,20 +82,8 @@ describe('RouteTool', () => {
 		const editor = createTopo2DEditorState({
 			topo: { routes: [], fixPoints: [], outlines: [], textLabels: [] }
 		});
-		const tool = new RouteTool({
-			state: editor,
-			mode: 'multipitch',
-			context: {
-				document: { getTopo: () => editor.topo, ui: editor.ui },
-				selection: editor,
-				history: { save: editor.saveHistory },
-				commands: editor,
-				drawing: {
-					getTarget: () => editor.ui.drawingTarget,
-					setTarget: editor.setDrawingTarget
-				}
-			}
-		});
+		const tool = new RouteTool(editor);
+		tool.mode = tool.id = 'multipitch';
 
 		tool.appendPoint('multipitch', { x: 0, y: 0 });
 		tool.appendPoint('multipitch', { x: 1, y: 1 });
@@ -148,20 +105,8 @@ describe('RouteTool', () => {
 			getTopo: () => topo,
 			setTopo: (next) => Object.assign(topo, next)
 		});
-		const tool = new RouteTool({
-			state: editor,
-			mode: 'multipitch',
-			context: {
-				document: { getTopo: () => topo },
-				selection: editor,
-				history: { save: editor.saveHistory },
-				commands: editor,
-				drawing: {
-					getTarget: () => editor.ui.drawingTarget,
-					setTarget: editor.setDrawingTarget
-				}
-			}
-		});
+		const tool = new RouteTool(editor);
+		tool.mode = tool.id = 'multipitch';
 
 		tool.appendPoint('multipitch', { x: 0, y: 0 });
 		tool.appendPoint('multipitch', { x: 1, y: 1 });

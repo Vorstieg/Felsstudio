@@ -1,32 +1,23 @@
 /** Shared point and midpoint editing behavior for persisted editable paths. */
 export class EditablePathEditTool {
-	constructor({
-		context,
+	constructor(editor, {
 		id,
-		getActiveTool,
 		getEditablePath,
-		mutateDocument,
-		startInteraction,
-		saveHistory,
-		isSelected,
-		selectObject,
-		getIsShiftPressed,
-		getMobileSelectionMode,
 		beginSelectionMove,
 		targetFromPoint,
 		targetFromMidpoint
 	} = {}) {
+		this.editor = editor;
 		this.id = id;
-		this.getActiveTool = getActiveTool || (() => null);
+		this.getActiveTool = () => editor.ui.activeTool;
 		this.getEditablePath = getEditablePath || (() => null);
-		this.mutateDocument =
-			context?.commands?.mutateDocument || mutateDocument || ((mutator) => mutator());
-		this.startInteraction = startInteraction || (() => {});
-		this.saveHistory = context?.history?.save || saveHistory || (() => {});
-		this.isSelected = context?.selection?.isSelected || isSelected || (() => false);
-		this.selectObject = context?.selection?.selectObject || selectObject || (() => {});
-		this.getIsShiftPressed = getIsShiftPressed || (() => false);
-		this.getMobileSelectionMode = getMobileSelectionMode || (() => false);
+		this.mutateDocument = (mutator) => editor.mutateDocument(mutator);
+		this.startInteraction = (...args) => editor.startInteraction(...args);
+		this.saveHistory = () => editor.saveHistory();
+		this.isSelected = (...args) => editor.isSelected(...args);
+		this.selectObject = (...args) => editor.selectObject(...args);
+		this.getIsShiftPressed = () => editor.ui.isShiftPressed;
+		this.getMobileSelectionMode = () => editor.ui.mobileSelectionMode;
 		this.beginSelectionMove = beginSelectionMove || (() => null);
 		this.targetFromPoint = targetFromPoint || (() => null);
 		this.targetFromMidpoint = targetFromMidpoint || (() => null);
