@@ -298,6 +298,17 @@
 		const _deps = {
 			active: editor.ui.activeTool,
 			selectedRoute: editor.ui.selectedRouteId,
+			selectedPitch: editor.ui.selectedPitchId,
+			selectedVariant: editor.ui.selectedVariantId,
+			drawingTarget: editor.ui.drawingTarget
+				? [
+					editor.ui.drawingTarget.type,
+					editor.ui.drawingTarget.routeId,
+					editor.ui.drawingTarget.id,
+					editor.ui.drawingTarget.pitchId,
+					editor.ui.drawingTarget.variantId
+				]
+				: null,
 			selectedOutline: editor.ui.selectedOutlineId,
 			selectedFixpoint: editor.ui.selectedFixpointId,
 			selectedText: editor.ui.selectedTextLabelId,

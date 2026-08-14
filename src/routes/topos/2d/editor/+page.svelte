@@ -35,11 +35,20 @@
 	let outlineSimplifySummary = $state('');
 	let outlineEditTool = $derived(editor2D?.getOutlineEditTool?.() || null);
 	let lastOpenedOutlineEditId = $state(null);
-	let isEditingSelectedPath = $derived(
-		editorState.ui.activeTool === 'select' &&
-			editorState.selectedItems.size === 1 &&
-			((editorState.ui.selectedOutlineId != null) !== (editorState.ui.selectedRouteId != null))
-	);
+	let isEditingSelectedPath = $derived.by(() => {
+		if (editorState.ui.activeTool !== 'select') return false;
+
+		const { selectedOutlineId, selectedRouteId, selectedPitchId, selectedVariantId } =
+			editorState.ui;
+		if (selectedOutlineId != null) return selectedRouteId == null && editorState.selectedItems.size === 1;
+		if (selectedRouteId == null) return false;
+
+		const hasNestedPath = (selectedPitchId != null) !== (selectedVariantId != null);
+		return (
+			editorState.selectedItems.size === (hasNestedPath ? 2 : 1) &&
+			editorState.selectedItems.has(`route:${selectedRouteId}`)
+		);
+	});
 	const outlineEditGridActions = createOutlineGridOptionsLogic(() => outlineEditTool, {
 		maxGridSize: 0.25
 	});

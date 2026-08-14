@@ -46,7 +46,7 @@ describe('Topo2DEditor', () => {
 		render(Topo2DEditorTestWrapper, { topo: structuredClone(fixture), activeTool: 'routeEdit' });
 		const canvas = screen.getByTestId('topo-2d-canvas');
 		const route = await screen.findByTestId('topo-object-route-route-1-main');
-		const hitArea = route.querySelector('polyline.hit-area');
+		const hitArea = route.querySelector('path.hit-area');
 
 		await fireEvent.mouseDown(hitArea, { clientX: 120, clientY: 880 });
 		await fireEvent.mouseUp(canvas, { clientX: 120, clientY: 880 });
