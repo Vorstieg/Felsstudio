@@ -12,7 +12,8 @@
 	import PathDrawingOptions from '$lib/components/editor/tools/PathDrawingOptions.svelte';
 	import {
 		createOutlineGridOptionsLogic,
-		createSelectedOutlineCurveLogic
+		createSelectedOutlineCurveLogic,
+		createSelectedOutlineStyleLogic
 	} from '$lib/components/editor/tools/outline-tool-options-logic.js';
 	import { createPathDrawingOptionsLogic } from '$lib/components/editor/tools/path-drawing-logic.js';
 	import TextToolOptions from '$lib/components/editor/tools/TextToolOptions.svelte';
@@ -48,6 +49,10 @@
 	let selectedRoute = $derived(editorState.topo.routes.find((route) => String(route.id) === String(editorState.ui.selectedRouteId)) || null);
 	let routeEditTool = $derived(editor2D?.getRouteEditTool?.() || null);
 	const outlineCurveActions = createSelectedOutlineCurveLogic(
+		() => outlineEditTool,
+		() => editorState.ui.selectedOutlineId
+	);
+	const outlineStyleActions = createSelectedOutlineStyleLogic(
 		() => outlineEditTool,
 		() => editorState.ui.selectedOutlineId
 	);
@@ -212,6 +217,7 @@
 			{outlineEditTool}
 			outlineGridActions={outlineEditGridActions}
 			outlineCurveActions={outlineCurveActions}
+			{outlineStyleActions}
 			bind:simplifyTolerancePx={outlineSimplifyTolerancePx}
 			simplifySummary={outlineSimplifySummary}
 			onSimplify={simplifySelectedOutline}

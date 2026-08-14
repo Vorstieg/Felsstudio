@@ -45,6 +45,20 @@ describe('persisted path edit tools', () => {
 		expect(tool.snapPoint({ x: 0.16, y: 0.24 })).toEqual({ x: 0.2, y: 0.2 });
 	});
 
+	it('updates selected outline properties as an undoable edit', () => {
+		const outline = { id: 'outline-1', lineStyle: 'rock' };
+		const editor = createEditor({ topo: { routes: [], outlines: [outline], fixPoints: [] } });
+		const tool = new OutlineEditTool(editor);
+
+		expect(tool.updateProperties('outline-1', { lineStyle: 'fixedRope' })).toBe(true);
+		expect(editor.updateOutline).toHaveBeenCalledWith(
+			'outline-1',
+			{ lineStyle: 'fixedRope' },
+			{ recordHistory: false }
+		);
+		expect(editor.saveHistory).toHaveBeenCalledOnce();
+	});
+
 	it('returns no grid snap for route vertices when its grid is disabled', () => {
 		expect(new RouteEditTool(createEditor()).snapPoint({ x: 0.16, y: 0.24 })).toBeNull();
 	});

@@ -56,3 +56,16 @@ export function createSelectedOutlineCurveLogic(getOutlineEditTool, getSelectedO
 		}
 	};
 }
+
+/** Style-setting behavior for the outline currently selected in Select mode. */
+export function createSelectedOutlineStyleLogic(getOutlineEditTool, getSelectedOutlineId) {
+	const update = (changes) => {
+		const outlineId = getSelectedOutlineId?.();
+		if (outlineId == null) return;
+		getOutlineEditTool?.()?.updateProperties?.(outlineId, changes);
+	};
+	return {
+		setLineStyle: (lineStyle) => update({ lineStyle }),
+		setFillColor: (fillColor) => update({ fillColor })
+	};
+}

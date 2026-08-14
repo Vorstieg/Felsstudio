@@ -46,6 +46,14 @@ export class OutlineEditTool extends EditablePathEditTool {
 		return true;
 	}
 
+	updateProperties(id, changes) {
+		const outline = this.getOutline(id);
+		if (!outline) return false;
+		this.updateOutline(outline.id, changes, { recordHistory: false });
+		this.saveHistory();
+		return true;
+	}
+
 	snapPoint(point) {
 		return snapPointToGrid(point, { enabled: this.snapToGrid, gridSize: this.gridSize }) || point;
 	}

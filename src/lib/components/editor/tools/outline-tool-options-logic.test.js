@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
 	createOutlineGridOptionsLogic,
 	createOutlineToolOptionsLogic,
-	createSelectedOutlineCurveLogic
+	createSelectedOutlineCurveLogic,
+	createSelectedOutlineStyleLogic
 } from './outline-tool-options-logic.js';
 
 function createOutlineTool() {
@@ -91,5 +92,23 @@ describe('createOutlineToolOptionsLogic', () => {
 		expect(updateCurve).toHaveBeenNthCalledWith(1, 'outline-1', { enabled: true });
 		expect(updateCurve).toHaveBeenNthCalledWith(2, 'outline-1', { tension: 0.75 });
 		expect(updateCurve).toHaveBeenCalledTimes(2);
+	});
+
+	it('updates the selected outline type and fill color', () => {
+		const updateProperties = vi.fn();
+		const actions = createSelectedOutlineStyleLogic(
+			() => ({ updateProperties }),
+			() => 'outline-1'
+		);
+
+		actions.setLineStyle('fixedRope');
+		actions.setFillColor('rgba(255, 165, 0, 0.3)');
+
+		expect(updateProperties).toHaveBeenNthCalledWith(1, 'outline-1', {
+			lineStyle: 'fixedRope'
+		});
+		expect(updateProperties).toHaveBeenNthCalledWith(2, 'outline-1', {
+			fillColor: 'rgba(255, 165, 0, 0.3)'
+		});
 	});
 });

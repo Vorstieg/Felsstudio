@@ -286,6 +286,7 @@
 		"close": "Schließen",
 		"drawing_mode": "Zeichenmodus",
 		"line_style": "Linienstil",
+		"outline_type": "Konturtyp",
 		"fill_color": "Füllfarbe",
 		"fill_none": "Keine Füllung",
 		"fill_orange": "Orange",

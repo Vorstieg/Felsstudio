@@ -285,6 +285,7 @@
 		"close": "Close",
 		"drawing_mode": "Drawing Mode",
 		"line_style": "Line Style",
+		"outline_type": "Outline Type",
 		"fill_color": "Fill Color",
 		"fill_none": "No fill",
 		"fill_orange": "Orange",
