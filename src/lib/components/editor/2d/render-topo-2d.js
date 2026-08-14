@@ -7,81 +7,69 @@ import { renderRoutesLayer } from './render-routes-layer.js';
 import { renderSymbolsLayer } from './render-symbols-layer.js';
 import { renderTextLabelsLayer } from './render-text-labels-layer.js';
 import { createTopoLayerStack } from './create-topo-layer-stack.js';
-import { createTopo2DRenderContext } from './create-topo-render-context.js';
 import { createSelectionRegion } from './selection-geometry.js';
 import { renderSelectionRegion } from './render-selection-region.js';
 
 export function renderTopo2D({
 	svgElement,
 	gElement,
-	topo,
-	activeTool,
-	drawingTarget,
+	editor,
 	baseWidth,
 	baseHeight,
 	currentRoutePoints,
 	currentOutlinePoints,
-	selectedOutlineStyle,
 	outlinePreview,
 	brushPreview,
 	canvasInput,
 	editTools,
 	draftTools,
-	isSelected,
-	isRoutePointSelected,
-	selectionSize,
-	selectedSymbolInstance,
 	textTool,
-	interaction,
 	basePath,
 	onObjectMouseDown,
 	onObjectClick,
-	onLabelMouseDown,
-	onTextMouseDown,
-	setActiveTouch
+	onTextMouseDown
 }) {
 	if (!svgElement || !gElement) return;
 
 	const svg = select(svgElement);
 	const layers = createTopoLayerStack(gElement);
 	const renderModel = buildTopo2DRenderModel({
-		topo,
-		isSelected,
-		isRoutePointSelected,
-		selectionSize,
-		activeTool,
-		drawingTarget,
-		isInteractionActive: interaction && !['move-point', 'move-points'].includes(interaction.kind),
+		topo: editor.topo,
+		isSelected: editor.isSelected,
+		isRoutePointSelected: editor.isRoutePointSelected,
+		selectionSize: editor.selectedItems.size,
+		activeTool: editor.ui.activeTool,
+		drawingTarget: editor.ui.drawingTarget,
+		isInteractionActive:
+			editor.interaction && !['move-point', 'move-points'].includes(editor.interaction.kind),
 		baseWidth,
 		baseHeight,
 		currentRoutePoints,
 		currentOutlinePoints
 	});
-	const renderContext = createTopo2DRenderContext({
+	const renderContext = {
 		svg,
 		layers,
-		topo,
+		topo: editor.topo,
 		renderModel,
-		activeTool,
+		activeTool: editor.ui.activeTool,
 		baseWidth,
 		baseHeight,
 		currentRoutePoints,
 		currentOutlinePoints,
-		selectedOutlineStyle,
+		selectedOutlineStyle: editor.ui.selectedOutlineStyle,
 		outlinePreview,
 		brushPreview,
 		canvasInput,
 		editTools,
-		isSelected,
-		selectedSymbolInstance,
+		isSelected: editor.isSelected,
+		selectedSymbolInstance: editor.selectedSymbolInstance,
 		textTool,
 		basePath,
 		onObjectMouseDown,
 		onObjectClick,
-		onLabelMouseDown,
-		onTextMouseDown,
-		setActiveTouch
-	});
+		onTextMouseDown
+	};
 
 	renderBackgroundLayer(renderContext);
 	renderOutlinesLayer(renderContext);
@@ -94,8 +82,8 @@ export function renderTopo2D({
 	renderSelectionRegion({
 		layers,
 		region:
-			interaction?.kind === 'selection-region'
-				? createSelectionRegion(interaction.start, interaction.end)
+			editor.interaction?.kind === 'selection-region'
+				? createSelectionRegion(editor.interaction.start, editor.interaction.end)
 				: null,
 		baseWidth,
 		baseHeight

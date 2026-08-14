@@ -386,14 +386,11 @@
 		renderTopo2D({
 			svgElement,
 			gElement,
-			topo: editor.topo,
-			activeTool: editor.ui.activeTool,
-			drawingTarget: editor.ui.drawingTarget,
+			editor,
 			baseWidth,
 			baseHeight,
 			currentRoutePoints,
 			currentOutlinePoints,
-			selectedOutlineStyle: editor.ui.selectedOutlineStyle,
 			outlinePreview: {
 				baseWidth,
 				baseHeight,
@@ -404,18 +401,11 @@
 			canvasInput,
 			editTools: renderEditServices,
 			draftTools: { route: tools.route, multipitch: tools.multipitch },
-			isSelected,
-			isRoutePointSelected: (target) => editor.isRoutePointSelected(target),
-			selectionSize: editor.selectedItems.size,
-			selectedSymbolInstance: editor.selectedSymbolInstance,
 			textTool: tools.text,
-			interaction: editor.interaction,
 			basePath: base,
 			onObjectMouseDown: handleObjectMouseDown,
 			onObjectClick: handleObjectClick,
-			onLabelMouseDown: handleLabelMouseDown,
-			onTextMouseDown: handleTextMouseDown,
-			setActiveTouch: (identifier) => canvasInput.trackTouch({ identifier })
+			onTextMouseDown: handleTextMouseDown
 		});
 	}
 
