@@ -50,7 +50,10 @@ function detachPresetForVertexEdit(outline, canvasSize) {
  * only needs to retain a target descriptor ({ routeId, pitchId, variantId } or
  * { outlineId }); the adapter owns the different storage and geometry rules.
  */
-export function createEditablePathResolver({ getTopo, getCanvasSize }) {
+export function createEditablePathResolver(editor) {
+	const getTopo = () => editor.topo;
+	const getCanvasSize = () => editor.viewport;
+
 	function resolveRouteTarget({ routeId, pitchId, variantId }) {
 		const route = getTopo().routes.find((item) => String(item.id) === String(routeId));
 		if (!route) return null;

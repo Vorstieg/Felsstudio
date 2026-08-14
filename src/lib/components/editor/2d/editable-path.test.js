@@ -9,8 +9,8 @@ function createResolver() {
 	return {
 		topo,
 		resolver: createEditablePathResolver({
-			getTopo: () => topo,
-			getCanvasSize: () => ({ baseWidth: 1000, baseHeight: 667 })
+			topo,
+			viewport: { baseWidth: 1000, baseHeight: 667 }
 		})
 	};
 }

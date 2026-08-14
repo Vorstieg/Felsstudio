@@ -11,8 +11,7 @@
 	import { createCanvasInput } from './create-canvas-input.svelte.js';
 	import { referenceFixpoint, snapRoutePointToAnchor } from './route-fixpoint-snap.js';
 	import { createTopoKeyboardController } from './create-topo-keyboard-controller.js';
-	import { createTopoInteractionController } from './create-topo-interaction-controller.js';
-	import { createTopoPointerController } from './create-topo-pointer-controller.js';
+	import { createTopoInputController } from './create-topo-input-controller.js';
 	import { createTopoSelectionSnapshot } from './create-topo-selection-snapshot.js';
 	import { createTopoObjectInteractionController } from './create-topo-object-interaction-controller.js';
 	import { trackTopoRenderDependencies } from './track-topo-render-dependencies.svelte.js';
@@ -27,7 +26,6 @@
 	const editor = providedEditorState || getTopo2DEditorState() || createTopo2DEditorState();
 	const referenceFixpointInStore = (route, fixPointId) =>
 		editor.mutateDocument(() => referenceFixpoint(route, fixPointId));
-	const commands = editor;
 	const clipboard = {
 		copy: () => editor.copySelection(),
 		paste: ({ canvasSize } = {}) => editor.pasteSelection(canvasSize),
@@ -42,6 +40,7 @@
 			canvasSize: editor.viewport
 		});
 	}
+	const editablePaths = createEditablePathResolver(editor);
 	const tools = createTopoToolRegistry({
 		editor,
 		getCanvasSize: () => editor.viewport,
@@ -111,29 +110,12 @@
 	// Symbol tool manages symbol creation directly into topoSession, so no "currentSymbolPoints" needed for preview distinct from cursor?
 	// RouteTool owns route draft points, target transitions, and previews.
 
-	const editablePaths = createEditablePathResolver({
-		getTopo: () => editor.topo,
-		getCanvasSize: () => editor.viewport
-	});
-
 	const saveHistory = () => editor.saveHistory();
-	const canvasInput = createCanvasInput({
-		getActiveTool: () => editor.ui.activeTool,
-		getAspectRatio: () => editor.topo.canvasAspectRatio ?? editor.topo.imageAspectRatio ?? 1.5,
-		getMobileSelectionMode: () => editor.ui.mobileSelectionMode,
-		onDown: handleCanvasDown,
-		onMove: handleCanvasMove,
-		onUp: handleCanvasUp,
-		onEmptyTouchTap: handleEmptyTouchTap
-	});
-	$effect(() => {
-		editor.viewport.baseWidth = canvasInput.baseWidth;
-		editor.viewport.baseHeight = canvasInput.baseHeight;
-		editor.viewport.transform = canvasInput.transform;
-	});
-	const interactionController = createTopoInteractionController({
+	const inputController = createTopoInputController({
 		editor,
 		getCurrentTool: () => currentTool,
+		textTool: tools.text,
+		getCanvasSize: () => editor.viewport,
 		getEditablePath: (target) => editablePaths.resolve(target),
 		snapRoutePoint,
 		referenceFixpoint: referenceFixpointInStore,
@@ -143,11 +125,15 @@
 			symbol: tools.symbolEdit
 		}
 	});
-	const pointerController = createTopoPointerController({
-		editor,
-		getCurrentTool: () => currentTool,
-		textTool: tools.text,
-		getCanvasSize: () => editor.viewport,
+	const canvasInput = createCanvasInput({
+		getAspectRatio: () => editor.topo.canvasAspectRatio ?? editor.topo.imageAspectRatio ?? 1.5,
+		getGesturePolicy: inputController.getGesturePolicy,
+		onInput: inputController
+	});
+	$effect(() => {
+		editor.viewport.baseWidth = canvasInput.baseWidth;
+		editor.viewport.baseHeight = canvasInput.baseHeight;
+		editor.viewport.transform = canvasInput.transform;
 	});
 	const objectInteractionController = createTopoObjectInteractionController({
 		editor,
@@ -190,35 +176,8 @@
 		}
 	});
 
-	function handleCanvasDown(input) {
-		pointerController.down(input);
-	}
-
-	function handleCanvasMove(input) {
-		interactionController.update(input);
-	}
-
-	function handleCanvasUp(input) {
-		pointerController.up(input);
-	}
-
 	function handleObjectMouseDown(event, { type, id, pitchId = null, variantId = null }) {
 		objectInteractionController.objectMouseDown(event, { type, id, pitchId, variantId });
-	}
-
-	function clearSelection() {
-		editor.clearSelection();
-	}
-
-	function handleEmptyTouchTap() {
-		deselectEditTarget();
-	}
-
-	function deselectEditTarget() {
-		if (!['symbolEdit', 'routeEdit', 'outlineEdit'].includes(editor.ui.activeTool)) return;
-		clearSelection();
-		editor.setDrawingTarget(null);
-		editor.setActiveTool('select');
 	}
 
 	function handleObjectClick(event, type, id) {
@@ -267,8 +226,8 @@
 		selection: editor,
 		setActiveTool: (tool) => editor.setActiveTool(tool),
 		setDrawingTarget: (target) => editor.setDrawingTarget(target),
-		clearSelection,
-		deleteSelection: (selectedItems) => commands.deleteSelection(selectedItems),
+		clearSelection: editor.clearSelection,
+		deleteSelection: editor.deleteSelection,
 		recordHistory: saveHistory,
 		undo,
 		redo,
@@ -279,17 +238,14 @@
 		}
 	});
 
-	function handleKeyDown(event) {
-		keyboard.handleKeyDown(event);
-	}
 	onMount(() => {
 		const handleKeyUp = (event) => {
 			if (event.key === 'Shift') editor.setShiftPressed(false);
 		};
-		window.addEventListener('keydown', handleKeyDown);
+		window.addEventListener('keydown', keyboard.handleKeyDown);
 		window.addEventListener('keyup', handleKeyUp);
 		return () => {
-			window.removeEventListener('keydown', handleKeyDown);
+			window.removeEventListener('keydown', keyboard.handleKeyDown);
 			window.removeEventListener('keyup', handleKeyUp);
 		};
 	});

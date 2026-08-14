@@ -7,15 +7,7 @@ import { vibrateOnAction } from '$lib/assets/js/mobile-utils.js';
  * conversion, and the mouse/touch event lifecycle. Consumers only receive
  * normalized topo points and keep their domain editing behaviour separate.
  */
-export function createCanvasInput({
-	getActiveTool,
-	getAspectRatio,
-	getMobileSelectionMode,
-	onDown,
-	onMove,
-	onUp,
-	onEmptyTouchTap
-}) {
+export function createCanvasInput({ getAspectRatio, getGesturePolicy, onInput }) {
 	let svgElement = $state(null);
 	let contentElement = $state(null);
 	let transform = $state({ x: 0, y: 0, k: 1 });
@@ -91,9 +83,7 @@ export function createCanvasInput({
 				if (event.type.startsWith('touch')) {
 					return (
 						event.touches?.length >= 2 ||
-						((['symbolEdit', 'routeEdit', 'outlineEdit'].includes(getActiveTool()) ||
-							(getActiveTool() === 'select' && !getMobileSelectionMode?.())) &&
-							event.touches?.length === 1)
+						(event.touches?.length === 1 && Boolean(getGesturePolicy?.().panSingleTouch))
 					);
 				}
 				return false;
@@ -108,31 +98,32 @@ export function createCanvasInput({
 			event.target?.closest?.(
 				'.symbol-group, .text-label-group, .text-composer, .route-container, .route-label, .route-point-hit-area, .route-point-handle, .route-midpoint-hit-area, .route-midpoint, .editable-path-point-hit-area, .editable-path-point-handle, .editable-path-midpoint-hit-area, .editable-path-midpoint, .outline-hit-area, .gizmo'
 			);
-		const handleMouseDown = (event) => onDown?.(normalizeEvent(event));
-		const handleMouseMove = (event) => onMove?.(normalizeEvent(event));
-		const handleMouseUp = (event) => onUp?.(normalizeEvent(event));
+		const handleMouseDown = (event) => onInput?.down?.(normalizeEvent(event));
+		const handleMouseMove = (event) => onInput?.move?.(normalizeEvent(event));
+		const handleMouseUp = (event) => onInput?.up?.(normalizeEvent(event));
 		const handleTouchStart = (event) => {
+			const policy = getGesturePolicy?.() || {};
 			if (event.touches.length >= 2) {
 				event.preventDefault();
 				return;
 			}
 			if (event.touches.length !== 1) return;
-			if (['symbolEdit', 'routeEdit', 'outlineEdit'].includes(getActiveTool())) {
+			if (policy.trackEmptyTouch) {
 				if (startedOnEditControl(event)) return;
 				const touch = event.touches[0];
 				emptyTouch = { id: touch.identifier, x: touch.clientX, y: touch.clientY, moved: false };
 				return;
 			}
-			if (getActiveTool() === 'select') {
-				if (getMobileSelectionMode?.()) onDown?.(normalizeEvent(event, event.touches[0]));
+			if (!policy.routeSingleTouchToInput) {
 				return;
 			}
 			event.preventDefault();
 			activeTouchId = event.touches[0].identifier;
-			onDown?.(normalizeEvent(event, event.touches[0]));
+			onInput?.down?.(normalizeEvent(event, event.touches[0]));
 			vibrateOnAction('selection');
 		};
 		const handleTouchMove = (event) => {
+			const policy = getGesturePolicy?.() || {};
 			if (emptyTouch) {
 				const touch = Array.from(event.touches).find((item) => item.identifier === emptyTouch.id);
 				if (touch && Math.hypot(touch.clientX - emptyTouch.x, touch.clientY - emptyTouch.y) > 8) {
@@ -145,14 +136,14 @@ export function createCanvasInput({
 				return;
 			}
 			const touch = Array.from(event.touches).find((item) => item.identifier === activeTouchId);
-			if (!touch && getActiveTool() === 'select' && getMobileSelectionMode?.()) {
+			if (!touch && policy.routeSingleTouchToInput) {
 				const selectionTouch = event.touches[0];
-				if (selectionTouch) onMove?.(normalizeEvent(event, selectionTouch));
+				if (selectionTouch) onInput?.move?.(normalizeEvent(event, selectionTouch));
 				return;
 			}
 			if (!touch) return;
 			event.preventDefault();
-			onMove?.(normalizeEvent(event, touch));
+			onInput?.move?.(normalizeEvent(event, touch));
 		};
 		const handleTouchEnd = (event) => {
 			if (emptyTouch) {
@@ -160,14 +151,14 @@ export function createCanvasInput({
 					(item) => item.identifier === emptyTouch.id
 				);
 				if (touchEnded) {
-					if (!emptyTouch.moved) onEmptyTouchTap?.();
+					if (!emptyTouch.moved) onInput?.emptyTouchTap?.();
 					emptyTouch = null;
 					return;
 				}
 			}
-			if (getActiveTool() === 'select' && getMobileSelectionMode?.()) {
+			if (getGesturePolicy?.().routeSingleTouchToInput && activeTouchId === null) {
 				const touch = event.changedTouches[0];
-				if (touch) onUp?.(normalizeEvent(event, touch));
+				if (touch) onInput?.up?.(normalizeEvent(event, touch));
 				return;
 			}
 			if (activeTouchId === null) return;
@@ -175,7 +166,7 @@ export function createCanvasInput({
 			const touch = Array.from(event.changedTouches).find(
 				(item) => item.identifier === activeTouchId
 			);
-			if (touch) onUp?.(normalizeEvent(event, touch));
+			if (touch) onInput?.up?.(normalizeEvent(event, touch));
 			activeTouchId = null;
 		};
 
