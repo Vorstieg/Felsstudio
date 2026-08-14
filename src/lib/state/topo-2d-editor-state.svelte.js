@@ -139,7 +139,7 @@ function createUi() {
 		activeTool: 'select',
 		selectedSymbol: 'bolt',
 		selectedOutlineStyle: 'rock',
-		snapRoutesToFixpoints: false,
+		snapRoutesToAnchors: false,
 		drawingTarget: null,
 		mobileSelectionMode: false,
 		isShiftPressed: false,
@@ -695,7 +695,7 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 		setActiveTool: (tool) => (state.ui.activeTool = tool || 'select'),
 		setSelectedSymbol: (symbol) => (state.ui.selectedSymbol = symbol),
 		setSelectedOutlineStyle: (style) => (state.ui.selectedOutlineStyle = style),
-		setSnapRoutesToFixpoints: (enabled) => (state.ui.snapRoutesToFixpoints = Boolean(enabled)),
+		setSnapRoutesToAnchors: (enabled) => (state.ui.snapRoutesToAnchors = Boolean(enabled)),
 		setDrawingTarget: (target) => {
 			state.ui.drawingTarget = target;
 			updatePendingChanges();
@@ -755,8 +755,6 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 				const item = readTopo()
 					.routes.find((r) => r.id === routeId)
 					?.variants?.find((p) => p.id === id);
-				console.log(item)
-				console.log(changes)
 				if (!item) return false;
 				Object.assign(item, clone(changes));
 				return true;

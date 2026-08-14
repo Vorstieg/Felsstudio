@@ -51,15 +51,15 @@ export function createTopoInteractionController({
 		if (interaction.kind === 'move-point') {
 			const gridSnappedRoutePoint = routeEditTool?.snapPoint(mouse);
 			const snapped = interaction.outlineId
-				? { point: outlineEditTool?.snapPoint(mouse) || mouse, fixPointId: null }
+				? { point: outlineEditTool?.snapPoint(mouse) || mouse, anchorId: null }
 				: gridSnappedRoutePoint
-					? { point: gridSnappedRoutePoint, fixPointId: null }
+					? { point: gridSnappedRoutePoint, anchorId: null }
 					: snapRoutePoint(mouse);
 			const route = interaction.routeId
 				? getTopo().routes.find((candidate) => String(candidate.id) === String(interaction.routeId))
 				: null;
 			(mutateDocument || ((mutator) => mutator()))(() => {
-				if (route) referenceFixpoint(route, snapped.fixPointId);
+				if (route) referenceFixpoint(route, snapped.anchorId);
 				getEditablePath?.(interaction)?.movePoint(interaction.pointIndex, [
 					snapped.point.x,
 					snapped.point.y

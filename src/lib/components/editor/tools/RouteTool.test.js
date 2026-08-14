@@ -16,7 +16,7 @@ function createTool() {
 		getDrawingTarget: () => target,
 		setDrawingTarget,
 		saveHistory: vi.fn(),
-		snapPoint: (point) => ({ point, fixPointId: point.fixPointId || null }),
+		snapPoint: (point) => ({ point, anchorId: point.anchorId || null }),
 		referenceFixpoint: vi.fn()
 	});
 	return { state, tool, target: () => target, setDrawingTarget };

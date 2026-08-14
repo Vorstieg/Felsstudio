@@ -58,7 +58,7 @@ describe('createTopoInteractionController', () => {
 		expect(topo.textLabels[0].position2D[1]).toBeCloseTo(0.4);
 	});
 
-	it('keeps fixpoint snapping available while a route edit grid is disabled', () => {
+	it('keeps anchor snapping available while a route edit grid is disabled', () => {
 		const movePoint = vi.fn();
 		const referenceFixpoint = vi.fn();
 		const controller = createTopoInteractionController({
@@ -66,7 +66,7 @@ describe('createTopoInteractionController', () => {
 			getInteraction: () => ({ kind: 'move-point', routeId: 'route-1', pointIndex: 0 }),
 			getCurrentTool: () => ({ onMouseMove: vi.fn() }),
 			routeEditTool: { snapPoint: () => null },
-			snapRoutePoint: () => ({ point: { x: 0.4, y: 0.5 }, fixPointId: 'bolt-1' }),
+			snapRoutePoint: () => ({ point: { x: 0.4, y: 0.5 }, anchorId: 'belay-1' }),
 			referenceFixpoint,
 			getEditablePath: () => ({ movePoint })
 		});
@@ -74,6 +74,6 @@ describe('createTopoInteractionController', () => {
 		controller.update({ point: { x: 0.39, y: 0.51 }, sourceEvent: {} });
 
 		expect(movePoint).toHaveBeenCalledWith(0, [0.4, 0.5]);
-		expect(referenceFixpoint).toHaveBeenCalledWith({ id: 'route-1' }, 'bolt-1');
+		expect(referenceFixpoint).toHaveBeenCalledWith({ id: 'route-1' }, 'belay-1');
 	});
 });

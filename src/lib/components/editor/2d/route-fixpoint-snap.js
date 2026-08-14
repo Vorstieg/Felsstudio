@@ -1,11 +1,13 @@
-/** Finds the closest placed fixed point within the route snapping radius. */
-export function snapRoutePointToFixpoint(
+const ROUTE_ANCHOR_TYPES = new Set(['belay', 'abseil']);
+
+/** Finds the closest placed belay or abseil anchor within the route snapping radius. */
+export function snapRoutePointToAnchor(
 	point,
-	fixPoints = [],
+	anchors = [],
 	{ enabled = false, thresholdPx = 18, canvasSize } = {}
 ) {
 	if (!enabled || !canvasSize?.baseWidth || !canvasSize?.baseHeight) {
-		return { point, fixPointId: null };
+		return { point, anchorId: null };
 	}
 
 	const thresholdX = thresholdPx / canvasSize.baseWidth;
@@ -13,19 +15,20 @@ export function snapRoutePointToFixpoint(
 	let closest = null;
 	let closestDistance = Infinity;
 
-	for (const fixPoint of fixPoints) {
-		const [x, y] = fixPoint.position2D || [];
+	for (const anchor of anchors) {
+		if (!ROUTE_ANCHOR_TYPES.has(anchor.type)) continue;
+		const [x, y] = anchor.position2D || [];
 		if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
 		const distance = Math.hypot((point.x - x) / thresholdX, (point.y - y) / thresholdY);
 		if (distance <= 1 && distance < closestDistance) {
-			closest = fixPoint;
+			closest = anchor;
 			closestDistance = distance;
 		}
 	}
 
 	return closest
-		? { point: { x: closest.position2D[0], y: closest.position2D[1] }, fixPointId: closest.id }
-		: { point, fixPointId: null };
+		? { point: { x: closest.position2D[0], y: closest.position2D[1] }, anchorId: closest.id }
+		: { point, anchorId: null };
 }
 
 /** Adds a fixed-point reference once while keeping legacy routes compatible. */

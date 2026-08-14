@@ -179,10 +179,10 @@
 				onCurveTensionChange={routeDrawingActions.setCurveTension}
 			/>
 			<label class="flex cursor-pointer items-center justify-between gap-3 text-sm text-near-black">
-				<span>{$_('ui.snap_routes_to_fixpoints')}</span>
-				<input type="checkbox" bind:checked={editorState.ui.snapRoutesToFixpoints} />
+				<span>{$_('ui.snap_routes_to_anchors')}</span>
+				<input type="checkbox" bind:checked={editorState.ui.snapRoutesToAnchors} />
 			</label>
-			<p class="text-[10px] text-warm-gray-500">{$_('ui.snap_routes_to_fixpoints_hint')}</p>
+			<p class="text-[10px] text-warm-gray-500">{$_('ui.snap_routes_to_anchors_hint')}</p>
 		</ToolOptions>
 	{:else if ['symbol', 'fixpoint'].includes(editorState.ui.activeTool)}
 		<ToolOptions

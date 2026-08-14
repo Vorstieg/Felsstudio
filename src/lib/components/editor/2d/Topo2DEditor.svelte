@@ -9,7 +9,7 @@
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
 	import { createEditablePathResolver } from './editable-path.js';
 	import { createCanvasInput } from './create-canvas-input.svelte.js';
-	import { referenceFixpoint, snapRoutePointToFixpoint } from './route-fixpoint-snap.js';
+	import { referenceFixpoint, snapRoutePointToAnchor } from './route-fixpoint-snap.js';
 	import { createTopoKeyboardController } from './create-topo-keyboard-controller.js';
 	import { createTopoInteractionController } from './create-topo-interaction-controller.js';
 	import { createTopoPointerController } from './create-topo-pointer-controller.js';
@@ -63,8 +63,8 @@
 	let gElement = $state(null);
 
 	function snapRoutePoint(point) {
-	return snapRoutePointToFixpoint(point, editor.topo.fixPoints, {
-			enabled: editor.ui.snapRoutesToFixpoints,
+		return snapRoutePointToAnchor(point, editor.topo.fixPoints, {
+			enabled: editor.ui.snapRoutesToAnchors,
 			canvasSize: { baseWidth, baseHeight }
 		});
 	}

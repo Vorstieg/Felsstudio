@@ -63,7 +63,7 @@ export class RouteTool {
 		this.deactivate = deactivate || (() => {});
 		this.saveHistory =
 			context?.history?.save || context?.commands?.commit || saveHistory || (() => {});
-		this.snapPoint = snapPoint || ((point) => ({ point, fixPointId: null }));
+		this.snapPoint = snapPoint || ((point) => ({ point, anchorId: null }));
 		this.referenceFixpoint = referenceFixpoint || (() => {});
 		this.selectPath = context?.selection?.selectPath || null;
 		this.addRoute = context?.commands?.addRoute || null;
@@ -85,13 +85,13 @@ export class RouteTool {
 			else if (this.state.appendRoutePoint)
 				this.state.appendRoutePoint(target.routeId, target, point, { recordHistory: false });
 			else path.points2D = [...(path.points2D || []), [point.x, point.y]];
-			this.referenceFixpoint(route, snapped.fixPointId);
+			this.referenceFixpoint(route, snapped.anchorId);
 		} else {
 			const selectedRoute = mode === 'route' ? this.appendToSelectedRoute(point) : null;
-			if (selectedRoute) this.referenceFixpoint(selectedRoute, snapped.fixPointId);
+			if (selectedRoute) this.referenceFixpoint(selectedRoute, snapped.anchorId);
 			else {
 				this.draftPoints = [...this.draftPoints, [point.x, point.y]];
-				this.draftFixPointIds = [...this.draftFixPointIds, snapped.fixPointId];
+				this.draftFixPointIds = [...this.draftFixPointIds, snapped.anchorId];
 			}
 		}
 		this.saveHistory();
