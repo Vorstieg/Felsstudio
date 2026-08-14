@@ -15,7 +15,6 @@
 	import { createTopoPointerController } from './create-topo-pointer-controller.js';
 	import { createTopoSelectionSnapshot } from './create-topo-selection-snapshot.js';
 	import { createTopoObjectInteractionController } from './create-topo-object-interaction-controller.js';
-	import { createTopoRenderEditServices } from './create-topo-render-edit-services.js';
 	import { trackTopoRenderDependencies } from './track-topo-render-dependencies.svelte.js';
 	import { createTopoToolRegistry } from './create-topo-tool-registry.js';
 	import { renderTopo2D } from './render-topo-2d.js';
@@ -40,23 +39,17 @@
 	function snapRoutePoint(point) {
 		return snapRoutePointToAnchor(point, editor.topo.fixPoints, {
 			enabled: editor.ui.snapRoutesToAnchors,
-			canvasSize: { baseWidth, baseHeight }
+			canvasSize: editor.viewport
 		});
 	}
 	const tools = createTopoToolRegistry({
 		editor,
-		getCanvasSize: () => ({ baseWidth, baseHeight }),
+		getCanvasSize: () => editor.viewport,
 		getEditablePath: (target) => editablePaths.resolve(target),
 		beginSelectionMove: collectDraggingSelection,
 		snapRoutePoint,
 		referenceFixpoint: referenceFixpointInStore
 	});
-	const renderEditServices = createTopoRenderEditServices({
-		route: tools.routeEdit,
-		outline: tools.outlineEdit,
-		symbol: tools.symbolEdit
-	});
-
 	// Track previous tool for lifecycle
 	let previousTool = $state(null);
 
@@ -120,7 +113,7 @@
 
 	const editablePaths = createEditablePathResolver({
 		getTopo: () => editor.topo,
-		getCanvasSize: () => ({ baseWidth, baseHeight })
+		getCanvasSize: () => editor.viewport
 	});
 
 	const saveHistory = () => editor.saveHistory();
@@ -133,13 +126,10 @@
 		onUp: handleCanvasUp,
 		onEmptyTouchTap: handleEmptyTouchTap
 	});
-	let baseWidth = $derived(canvasInput.baseWidth);
-	let baseHeight = $derived(canvasInput.baseHeight);
-	let transform = $derived(canvasInput.transform);
 	$effect(() => {
-		editor.viewport.baseWidth = baseWidth;
-		editor.viewport.baseHeight = baseHeight;
-		editor.viewport.transform = transform;
+		editor.viewport.baseWidth = canvasInput.baseWidth;
+		editor.viewport.baseHeight = canvasInput.baseHeight;
+		editor.viewport.transform = canvasInput.transform;
 	});
 	const interactionController = createTopoInteractionController({
 		editor,
@@ -157,7 +147,7 @@
 		editor,
 		getCurrentTool: () => currentTool,
 		textTool: tools.text,
-		getCanvasSize: () => ({ baseWidth, baseHeight }),
+		getCanvasSize: () => editor.viewport,
 	});
 	const objectInteractionController = createTopoObjectInteractionController({
 		editor,
@@ -271,7 +261,7 @@
 		finalize: actions.finalize,
 		cancel: actions.cancel,
 		getSelectedItems: () => editor.selectedItems,
-		getCanvasSize: () => ({ baseWidth, baseHeight }),
+		getCanvasSize: () => editor.viewport,
 		clipboard,
 		getTopo: () => editor.topo,
 		selection: editor,
@@ -311,19 +301,23 @@
 			svgElement,
 			gElement,
 			editor,
-			baseWidth,
-			baseHeight,
+			baseWidth: editor.viewport.baseWidth,
+			baseHeight: editor.viewport.baseHeight,
 			currentRoutePoints,
 			currentOutlinePoints,
 			outlinePreview: {
-				baseWidth,
-				baseHeight,
+				baseWidth: editor.viewport.baseWidth,
+				baseHeight: editor.viewport.baseHeight,
 				fillColor: currentTool === tools.outline ? currentTool.fillColor : null,
 				fillOpacity: currentTool === tools.outline ? currentTool.fillOpacity : null
 			},
 			brushPreview,
 			canvasInput,
-			editTools: renderEditServices,
+			editTools: {
+				route: tools.routeEdit,
+				outline: tools.outlineEdit,
+				symbol: tools.symbolEdit
+			},
 			draftTools: { route: tools.route, multipitch: tools.multipitch },
 			textTool: tools.text,
 			basePath: base,
@@ -340,8 +334,8 @@
 			currentRoutePoints,
 			currentOutlinePoints,
 			brushPreview,
-			baseWidth,
-			baseHeight
+			baseWidth: editor.viewport.baseWidth,
+			baseHeight: editor.viewport.baseHeight
 		});
 
 		// Map these as dependencies too
@@ -362,8 +356,8 @@
 			selectedItems: editor.selectedItems.size,
 			selectedRoutePoints: editor.selectedRoutePoints.size,
 			selectionInteraction: editor.interaction?.kind,
-			transform: transform,
-			base: { baseWidth, baseHeight }
+			transform: editor.viewport.transform,
+			base: editor.viewport
 		};
 
 		updateD3Rendering();
@@ -388,7 +382,7 @@
 	<svg
 		data-testid="topo-2d-canvas"
 		bind:this={svgElement}
-		viewBox="0 0 {baseWidth} {baseHeight}"
+		viewBox="0 0 {editor.viewport.baseWidth} {editor.viewport.baseHeight}"
 		preserveAspectRatio="xMidYMid meet"
 		class="w-full h-full cursor-{editor.ui.activeTool === 'eraser' ? 'crosshair' : 'crosshair'}"
 		style="touch-action: none;"

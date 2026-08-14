@@ -127,7 +127,14 @@ function createDrafts() {
 	return {
 		route: { points: [], fixPointIds: [], mode: 'route' },
 		multipitch: { points: [], fixPointIds: [], target: null },
-		outline: { points: [], preview: null, brushPoints: [], brushOutlinePoints: [], mode: null },
+		outline: {
+			points: [],
+			temporaryPoints: [],
+			preview: null,
+			brushPoints: [],
+			brushOutlinePoints: [],
+			mode: null
+		},
 		text: { id: null, value: '', originalValue: '', isNew: false },
 		pathEdit: { target: null, points: [], selectedPointIndex: null }
 	};

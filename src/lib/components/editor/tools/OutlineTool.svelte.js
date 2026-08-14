@@ -62,7 +62,6 @@ export class OutlineTool {
 	mode = $state('polyline'); // 'polyline', 'rectangle', 'circle', 'freehand', 'brush'
 	preset = $state('slab');
 	isDrawing = $state(false);
-	temporaryPoints = $state([]);
 	startPoint = $state(null);
 	centerPoint = $state(null);
 	dragShape = $state(null);
@@ -101,6 +100,13 @@ export class OutlineTool {
 					get: () => draft.preview,
 					set: (value) => {
 						draft.preview = value;
+					}
+				},
+				temporaryPoints: {
+					configurable: true,
+					get: () => draft.temporaryPoints,
+					set: (value) => {
+						draft.temporaryPoints = value;
 					}
 				},
 				brushPoints: {
