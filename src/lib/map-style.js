@@ -11,7 +11,9 @@ export function maptilerTilesUrl(tileset = 'v3') {
 
 export async function loadMapStyle(name) {
 	if (!maptilerApiKey) {
-		console.warn('MapTiler is not configured; using the fallback map style. Set VITE_MAPTILER_API_KEY.');
+		console.warn(
+			'MapTiler is not configured; using the fallback map style. Set VITE_MAPTILER_API_KEY.'
+		);
 		return FALLBACK_STYLE;
 	}
 

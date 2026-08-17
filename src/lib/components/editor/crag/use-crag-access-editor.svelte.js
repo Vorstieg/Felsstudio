@@ -42,8 +42,7 @@ export function useCragAccessEditor({ state, getMap, getIsMapLoaded, getActiveTo
 		isDetectionLoading = !map.isSourceLoaded('maptiler_planet');
 		const coords = $state.snapshot(state.crag.geometry.coordinates);
 		const features = map.querySourceFeatures('maptiler_planet', { sourceLayer: 'poi' });
-		isDetectionZoomLimited =
-			!isDetectionLoading && map.getZoom() <= 16 && features.length === 0;
+		isDetectionZoomLimited = !isDetectionLoading && map.getZoom() <= 16 && features.length === 0;
 		const suggestions = [];
 		const seen = new Set();
 		features.forEach((feature) => {

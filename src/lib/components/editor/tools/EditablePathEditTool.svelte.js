@@ -1,12 +1,9 @@
 /** Shared point and midpoint editing behavior for persisted editable paths. */
 export class EditablePathEditTool {
-	constructor(editor, {
-		id,
-		getEditablePath,
-		beginSelectionMove,
-		targetFromPoint,
-		targetFromMidpoint
-	} = {}) {
+	constructor(
+		editor,
+		{ id, getEditablePath, beginSelectionMove, targetFromPoint, targetFromMidpoint } = {}
+	) {
 		this.editor = editor;
 		this.id = id;
 		this.getActiveTool = () => editor.ui.activeTool;

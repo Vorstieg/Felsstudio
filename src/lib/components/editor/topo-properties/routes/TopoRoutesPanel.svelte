@@ -61,6 +61,11 @@
 				? 'flex items-center gap-3 cursor-pointer'
 				: 'flex justify-between items-center mb-2 cursor-pointer group'}
 			onclick={() => selectRoute(route)}
+			onkeydown={(event) => {
+				if (event.target !== event.currentTarget || !['Enter', ' '].includes(event.key)) return;
+				event.preventDefault();
+				selectRoute(route);
+			}}
 			role="button"
 			tabindex="0"
 		>
