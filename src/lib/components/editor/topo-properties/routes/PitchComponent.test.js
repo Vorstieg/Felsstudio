@@ -40,5 +40,4 @@ describe('PitchComponent', () => {
 		expect(onFieldChange).toHaveBeenCalledWith('lineStyle', expect.any(String));
 		expect(pitch).toEqual(createPitch());
 	});
-
 });
