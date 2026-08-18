@@ -3,9 +3,6 @@
 	const editorState = getTopo2DEditorState();
 	let topo = $derived(editorState.topo);
 	const ui = editorState.ui;
-	import { _ } from 'svelte-i18n';
-	import { topoSymbols } from '@vorstieg/topo-renderer';
-	import { createAiFixpoint } from './topo-properties-utils.js';
 
 	let { aiSuggestions = [], mobile = false } = $props();
 
@@ -23,7 +20,7 @@
 		editorState.clustering.selectedClusterId = null;
 	}
 
-	function removeFixpoint(point, index) {
+	function removeFixpoint(point) {
 		const pointId = point?.id;
 		editorState.removeFixpoint(pointId);
 	}
@@ -92,7 +89,7 @@
 										? $_('ui.ai_anchor')
 										: $_('ui.ai_bolt')}
 									<span class="text-[10px] text-warm-gray-500 font-normal ml-0.5"
-										>({Math.round(cluster.conf)}
+									>({Math.round(cluster.conf)}
 										%)</span
 									>
 								</p>
@@ -118,7 +115,8 @@
 						onclick={(e) => {
 							e.stopPropagation();
 							addAiBolt(cluster);
-						}}>Add</button
+						}}>Add
+					</button
 					>
 				</div>
 			{/each}
@@ -149,9 +147,9 @@
 			>
 				{i + 1}
 			</button>
-				<select
-					value={point.type}
-					onchange={(event) => updateFixpointType(point, event.currentTarget.value)}
+			<select
+				value={point.type}
+				onchange={(event) => updateFixpointType(point, event.currentTarget.value)}
 				class="min-w-0 flex-1 bg-transparent text-sm font-black text-near-black outline-none appearance-none"
 			>
 				{#each topoSymbols as symbol}
@@ -161,7 +159,7 @@
 			<button
 				aria-label="Remove fixpoint"
 				class="h-9 flex items-center justify-center gap-1.5 rounded-sm bg-rose-50 px-3 text-[11px] font-bold text-rose-700 transition-none hover:bg-rose-100"
-				onclick={() => removeFixpoint(point, i)}
+				onclick={() => removeFixpoint(point)}
 			>
 				<i class="fa-solid fa-trash-can text-[10px]"></i>
 				<span>{$_('ui.remove')}</span>
@@ -170,7 +168,7 @@
 	{/each}
 {:else}
 	<div class="grid grid-cols-1 gap-1.5">
-	{#each topo.fixPoints as point, i (point.id)}
+		{#each topo.fixPoints as point, i (point.id)}
 			<div
 				id={'fixpoint-' + point.id}
 				class={'panel-inner p-2 transition-none flex items-center gap-2 border ' +
@@ -184,9 +182,9 @@
 					{i + 1}
 				</div>
 				<div class="flex-1">
-						<select
-							value={point.type}
-							onchange={(event) => updateFixpointType(point, event.currentTarget.value)}
+					<select
+						value={point.type}
+						onchange={(event) => updateFixpointType(point, event.currentTarget.value)}
 						class="w-full bg-transparent text-body-text font-bold text-near-black outline-none appearance-none"
 					>
 						{#each topoSymbols as symbol}
@@ -197,8 +195,8 @@
 				<button
 					aria-label="Remove fixpoint"
 					class="text-warm-gray-300 hover:text-rose-600 transition-none w-6 h-6 flex items-center justify-center rounded-sm hover:bg-rose-50"
-					onclick={() => removeFixpoint(point, i)}
-					><i class="fa-solid fa-trash-can text-[10px]"></i></button
+					onclick={() => removeFixpoint(point)}
+				><i class="fa-solid fa-trash-can text-[10px]"></i></button
 				>
 			</div>
 		{/each}
