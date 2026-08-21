@@ -208,8 +208,8 @@
 
 <div class="creator-studio flex flex-col w-full h-full bg-warm-white text-body-text text-near-black">
 	<!-- Header -->
-	<header class="flex items-center justify-between px-4 py-3 bg-white border-b border-black/15 shadow-panel z-10">
-		<div class="flex items-center gap-4">
+	<header class="flex items-center justify-between px-3 py-3 bg-white border-b border-black/15 shadow-panel z-10 md:px-4">
+		<div class="flex min-w-0 items-center gap-2 md:gap-4">
 			<button
 				class="tool-btn"
 				onclick={() => currentPath ? navigateUp() : goto(base + '/')}
@@ -217,7 +217,7 @@
 			>
 				<i class="fa-solid fa-arrow-left"></i>
 			</button>
-			<div>
+			<div class="min-w-0">
 				<h1 class="text-section-title leading-tight">{$_('ui.felslager_studio')}</h1>
 				<p class="text-micro-data text-warm-gray-500 mt-0.5">{$_('ui.data_management')}</p>
 			</div>
@@ -231,9 +231,9 @@
 		</div>
 	</header>
 
-	<div class="flex flex-1 overflow-hidden p-4 gap-4">
+	<div class="flex flex-1 min-h-0 flex-col overflow-hidden gap-2 p-2 md:flex-row md:gap-4 md:p-4">
 		<!-- Left Pane: File Explorer -->
-		<div class="w-1/3 panel flex flex-col overflow-hidden shadow-panel">
+		<div class="h-[35dvh] min-h-60 w-full shrink-0 panel flex flex-col overflow-hidden shadow-panel md:h-auto md:min-h-0 md:w-1/3">
 			<!-- Search Bar -->
 			<div class="p-3 border-b border-black/15 bg-white">
 				<div class="relative">
@@ -329,7 +329,7 @@
 							{#if currentPath}
 								<li>
 									<button 
-										class="w-full flex items-center gap-3 px-3 py-2 rounded-sm hover:bg-black/5 text-left text-body-text group transition-colors"
+										class="w-full flex items-center gap-3 px-3 py-2.5 rounded-sm hover:bg-black/5 text-left text-body-text group transition-colors md:py-2"
 										onclick={navigateUp}
 									>
 										<i class="fa-solid fa-level-up-alt text-warm-gray-300 w-4 text-center"></i>
@@ -346,7 +346,7 @@
 									<!-- svelte-ignore a11y_click_events_have_key_events -->
 									<div 
 										role="button"
-										class="w-full flex items-center justify-between px-3 py-2 rounded-sm hover:bg-black/5 text-left text-body-text group transition-colors cursor-pointer {selectedFile?.path === item.path ? 'bg-creator-blue/10 text-creator-blue' : ''}"
+										class="w-full flex items-center justify-between px-3 py-2.5 rounded-sm hover:bg-black/5 text-left text-body-text group transition-colors cursor-pointer md:py-2 {selectedFile?.path === item.path ? 'bg-creator-blue/10 text-creator-blue' : ''}"
 										onclick={() => openItem(item)}
 									>
 										<div class="flex items-center gap-3 truncate">
@@ -355,14 +355,14 @@
 										</div>
 										<div class="flex items-center gap-1">
 											<button 
-												class="text-warm-gray-300 hover:text-creator-blue hover:bg-creator-blue/10 w-6 h-6 rounded flex items-center justify-center transition-colors"
+												class="text-warm-gray-300 hover:text-creator-blue hover:bg-creator-blue/10 w-10 h-10 rounded flex items-center justify-center transition-colors md:w-6 md:h-6"
 												onclick={(e) => renameItem(item, e)}
 												title="Rename"
 											>
 												<i class="fa-solid fa-pen text-[11px]"></i>
 											</button>
 											<button 
-												class="text-warm-gray-300 hover:text-rose-600 hover:bg-rose-50 w-6 h-6 rounded flex items-center justify-center transition-colors"
+												class="text-warm-gray-300 hover:text-rose-600 hover:bg-rose-50 w-10 h-10 rounded flex items-center justify-center transition-colors md:w-6 md:h-6"
 												onclick={(e) => deleteItem(item, e)}
 												title={$_('ui.delete')}
 											>
@@ -379,7 +379,7 @@
 		</div>
 
 		<!-- Right Pane: Editor -->
-		<div class="w-2/3 panel flex flex-col relative overflow-hidden shadow-panel">
+		<div class="min-h-0 w-full flex-1 panel flex flex-col relative overflow-hidden shadow-panel md:w-2/3">
 			{#if error}
 				<div class="absolute top-4 left-4 right-4 bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-sm shadow-sm z-20 text-body-text flex justify-between items-center">
 					<span class="font-medium">{error}</span>
