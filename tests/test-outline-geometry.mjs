@@ -5,7 +5,8 @@ import { test } from 'vitest';
 import { createServer } from 'vite';
 
 test('supports outline and path geometry workflows', async () => {
-	// The production module imports the renderer, which uses Vite's import.meta.glob.
+	// The production module imports SVG URLs from the renderer, so use Vite's
+	// SSR loader to apply its asset-import transform.
 	// Load it through Vite so this remains an executable smoke test rather than a
 	// Node-only duplicate of the geometry implementation.
 	const vite = await createServer({

@@ -1,6 +1,6 @@
 {
 	"name": "@vorstieg/topo-renderer",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"description": "Shared SVG renderer, topo geometry, symbols, and assets for Vorstieg climbing topos.",
 	"type": "module",
 	"exports": "./src/index.js",
