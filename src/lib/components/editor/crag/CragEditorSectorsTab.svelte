@@ -15,6 +15,7 @@
 	const onPlanGenerated = actions.handleFlightPlanGenerated;
 	let routeDocuments = $derived(cragEditorState.routeDocuments);
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
+	import WallDirectionPicker from '$lib/components/ui/WallDirectionPicker.svelte';
 	import { getGeometryCenter } from '$lib/assets/js/sector-utils.js';
 	import CragFlightPlanPanel from './CragFlightPlanPanel.svelte';
 	import CragEditorRouteTable from './CragEditorRouteTable.svelte';
@@ -51,10 +52,6 @@
 		onFocusSector(sector);
 	}
 
-	function updateWallAzimuth(sector, value) {
-		if (!Number.isFinite(value)) return;
-		cragEditorState.updateSector(sector.id, 'wallAzimuth', Math.max(0, Math.min(359, value)));
-	}
 </script>
 
 <div class="flex flex-col gap-3">
@@ -142,19 +139,11 @@
 			</div>
 			<div class="space-y-0.5">
 				<label for="sector-wall-azimuth" class="text-ui-label block">Wall compass direction</label>
-				<div class="relative">
-					<input
-						id="sector-wall-azimuth"
-						type="number"
-						min="0"
-						max="359"
-						step="1"
-						value={sector.wallAzimuth ?? 0}
-						oninput={(event) => updateWallAzimuth(sector, event.currentTarget.valueAsNumber)}
-						class="input-studio w-full pr-8!"
-					/>
-					<span class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-micro-data">°</span>
-				</div>
+				<WallDirectionPicker
+					id="sector-wall-azimuth"
+					azimuth={sector.wallAzimuth}
+					onChange={(azimuth) => cragEditorState.updateSector(sector.id, 'wallAzimuth', azimuth)}
+				/>
 			</div>
 			<div class="space-y-0.5"><p class="text-ui-label block">Geometry</p>
 				<div class="grid grid-cols-2 gap-1 bg-black/5 rounded-sm p-0.5 border border-black/10">

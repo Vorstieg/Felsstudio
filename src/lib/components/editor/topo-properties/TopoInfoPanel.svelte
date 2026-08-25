@@ -10,17 +10,8 @@
 	import { availableTopoTags } from '$lib/assets/js/topo-utils.js';
 	import TopoJsonEditor from './TopoJsonEditor.svelte';
 	import { rockTypes } from '$lib/config.js';
-
-	const wallDirections = [
-		{ id: 'N', azimuth: 0 },
-		{ id: 'NE', azimuth: 45 },
-		{ id: 'E', azimuth: 90 },
-		{ id: 'SE', azimuth: 135 },
-		{ id: 'S', azimuth: 180 },
-		{ id: 'SW', azimuth: 225 },
-		{ id: 'W', azimuth: 270 },
-		{ id: 'NW', azimuth: 315 }
-	];
+	import WallDirectionPicker from '$lib/components/ui/WallDirectionPicker.svelte';
+	import { wallDirectionForAzimuth } from '$lib/assets/js/wall-directions.js';
 
 	let {
 		showMapModal = $bindable(false),
@@ -36,15 +27,6 @@
 		editorState.updateNestedPath(field, value);
 	}
 
-	function wallDirectionForAzimuth(azimuth) {
-		const normalized = ((Number(azimuth) % 360) + 360) % 360;
-		return wallDirections[Math.round(normalized / 45) % wallDirections.length];
-	}
-
-	function updateWallDirection(directionId) {
-		const direction = wallDirections.find((item) => item.id === directionId);
-		if (direction) updateTopoField('wallAzimuth', direction.azimuth);
-	}
 </script>
 
 <div class="space-y-3">
@@ -125,21 +107,16 @@
 			</div>
 		{/if}
 
-		{#if topo.editorMode === '2d'}
-			<div class="space-y-0.5">
-				<label for="wall-azimuth" class="text-ui-label block">{$_('topo.wall_direction')}</label>
-				<select
-					id="wall-azimuth"
-					value={wallDirectionForAzimuth(topo.wallAzimuth).id}
-					onchange={(event) => updateWallDirection(event.currentTarget.value)}
-					class="input-studio w-full appearance-none"
-				>
-					{#each wallDirections as direction}
-						<option value={direction.id}>{direction.id} — {$_(`directions.${direction.id}`)}</option>
-					{/each}
-				</select>
-			</div>
-		{/if}
+			{#if topo.editorMode === '2d'}
+				<div class="space-y-0.5">
+					<label for="wall-azimuth" class="text-ui-label block">{$_('topo.wall_direction')}</label>
+					<WallDirectionPicker
+						id="wall-azimuth"
+						azimuth={topo.wallAzimuth}
+						onChange={(azimuth) => updateTopoField('wallAzimuth', azimuth)}
+					/>
+				</div>
+			{/if}
 
 		<div class="space-y-0.5">
 			<label for="description" class="text-ui-label block">{$_('ui.description')}</label>
