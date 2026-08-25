@@ -222,21 +222,6 @@
 				class="input-studio w-full"
 				placeholder="Track Name"
 			/>
-			{#if activeTrackTarget?.kind === 'access' && activeTrackTarget.featureId === track.id}
-				<div class="flex items-center gap-1.5">
-					<button
-						onclick={onFinalizeTrack}
-						class="flex-1 bg-creator-blue text-white rounded-sm py-1 text-micro-data font-bold uppercase tracking-widest"
-					>
-						Save Track
-					</button>
-					<button
-						onclick={onCancelTrackEdit}
-						class="w-8 bg-black/5 text-warm-gray-500 rounded-sm py-1"
-						title="Cancel track edit"><i class="fa-solid fa-xmark text-[10px]"></i></button
-					>
-				</div>
-			{/if}
 		</div>
 	{/each}
 	<div class="mt-3 space-y-2 border-t border-black/10 pt-3">
