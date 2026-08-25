@@ -161,6 +161,38 @@ export function createCragRouteTool({
 		return true;
 	}
 
+	function moveApproachTrackToTopoPaths(documentPath, accessFeatureId) {
+		const document = state.routeDocuments.find((entry) => entry.path === documentPath);
+		const access = state.access.features.find(
+			(feature) => feature.id === accessFeatureId && feature.properties?.kind === 'approach'
+		);
+		if (!document || !access?.geometry?.coordinates || access.geometry.coordinates.length < 2)
+			return false;
+
+		let pathId;
+		do {
+			pathId = generateId('path');
+		} while (document.data.paths?.features?.some((feature) => String(feature.id) === pathId));
+
+		state.commit('Move approach track to topo paths', () => {
+			document.data.paths = document.data.paths || { type: 'FeatureCollection', features: [] };
+			document.data.paths.features = [
+				...document.data.paths.features,
+				createPathFeature(
+					access.geometry.coordinates,
+					{ name: access.properties?.name || 'Approach track' },
+					pathId
+				)
+			];
+			document.dirty = true;
+			state.access = {
+				...state.access,
+				features: state.access.features.filter((feature) => feature.id !== accessFeatureId)
+			};
+		});
+		return true;
+	}
+
 	function saveRoutePathCoordinates({ documentPath, pathId }, coordinates) {
 		const document = state.routeDocuments.find((entry) => entry.path === documentPath);
 		const feature = document?.data.paths?.features?.find(
@@ -259,6 +291,7 @@ export function createCragRouteTool({
 		addRoutePath,
 		assignExistingRoutePath,
 		createRoutePathFromAccess,
+		moveApproachTrackToTopoPaths,
 		saveRoutePathCoordinates,
 		editRoutePath,
 		splitRoutePath,

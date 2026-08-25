@@ -700,10 +700,15 @@ export function ensureCragEditorLayers(map) {
 			source: 'crag-editor-data',
 			filter: ['==', ['get', 'feature'], 'track-vertex'],
 			paint: {
-				'circle-radius': drawingPointRadius,
-				'circle-color': '#ffffff',
-				'circle-stroke-width': 2,
-				'circle-stroke-color': '#0075de'
+				'circle-radius': [
+					'case',
+					['==', ['get', 'selected'], true],
+					drawingPointRadius + 2,
+					drawingPointRadius
+				],
+				'circle-color': ['case', ['==', ['get', 'selected'], true], '#f59e0b', '#ffffff'],
+				'circle-stroke-width': ['case', ['==', ['get', 'selected'], true], 3, 2],
+				'circle-stroke-color': ['case', ['==', ['get', 'selected'], true], '#92400e', '#0075de']
 			}
 		});
 	if (!map.getLayer('tracks-point-midpoints'))
@@ -830,6 +835,7 @@ export function buildEditorFeatureCollection({
 	visibleDrawingPointIndexes = [],
 	editingDrawingPath = false,
 	selectedTrackPointIndex = null,
+	selectedTrackPointIndexes = [],
 	draggingTrackPointIndex = null,
 	activeTrackTarget = null,
 	flightPlan = null
@@ -902,7 +908,13 @@ export function buildEditorFeatureCollection({
 		features.push({
 			type: 'Feature',
 			geometry: { type: 'Point', coordinates: drawingPoints[pointIndex] },
-			properties: { feature: 'track-vertex', type: 'Point', state: 'drawing', pointIndex }
+			properties: {
+				feature: 'track-vertex',
+				type: 'Point',
+				state: 'drawing',
+				pointIndex,
+				selected: selectedTrackPointIndexes.includes(pointIndex)
+			}
 		});
 	}
 	if (editingDrawingPath && drawingPoints.length > 1) {

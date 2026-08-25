@@ -12,6 +12,7 @@
 	const {
 		startRoutingDraft: onStartRoutingDraft,
 		setTrackDraftMode: onSetTrackDraftMode,
+		deleteSelectedTrackPoints: onDeleteSelectedTrackPoints,
 		handleTrackConfirm: onHandleTrackConfirm,
 		cancelTrackEdit: onCancelTrackEdit,
 		undoTrackPoint: onUndoTrackPoint,
@@ -47,6 +48,7 @@
 		currentTrackPoints = [],
 		activeTrackTarget = null,
 		trackDraftMode = 'routing',
+		selectedTrackPointCount = 0,
 		isRoutingTrack = false,
 		hasPendingTrackCut = false,
 		isRoutePathDrawing = false,
@@ -152,6 +154,16 @@
 				</button>
 				<button
 					type="button"
+					class={`flex flex-col items-center gap-1 rounded-sm p-2 transition-none ${trackDraftMode === 'delete'
+						? 'bg-red-600 text-white'
+						: 'bg-black/5 text-warm-gray-500 hover:bg-black/10'}`}
+					onclick={() => onSetTrackDraftMode('delete')}
+				>
+					<i class="fa-solid fa-trash text-sm"></i>
+					<span class="text-[9px] font-medium">Delete</span>
+				</button>
+				<button
+					type="button"
 					class={`flex flex-col items-center gap-1 rounded-sm p-2 transition-none ${trackDraftMode === 'editing'
 						? 'bg-creator-blue text-white'
 						: 'bg-black/5 text-warm-gray-500 hover:bg-black/10'}`}
@@ -160,6 +172,27 @@
 					<i class="fa-solid fa-pen-to-square text-sm"></i>
 					<span class="text-[9px] font-medium">{$_('ui.editing_mode')}</span>
 				</button>
+				<button
+					type="button"
+					class={`flex flex-col items-center gap-1 rounded-sm p-2 transition-none ${trackDraftMode === 'select'
+						? 'bg-creator-blue text-white'
+						: 'bg-black/5 text-warm-gray-500 hover:bg-black/10'}`}
+					onclick={() => onSetTrackDraftMode('select')}
+				>
+					<i class="fa-solid fa-arrow-pointer text-sm"></i>
+					<span class="text-[9px] font-medium">Select</span>
+				</button>
+			</div>
+		</div>
+		<div class="rounded-sm border border-black/10 bg-black/[0.02] p-2">
+			<div class="flex items-center justify-between gap-2">
+				<span class="text-[10px] text-warm-gray-500">{selectedTrackPointCount} selected</span>
+				<button
+					type="button"
+					class="px-2 py-1 rounded-sm border border-red-200 bg-white text-ui-label text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+					onclick={onDeleteSelectedTrackPoints}
+					disabled={selectedTrackPointCount === 0 || currentTrackPoints.length - selectedTrackPointCount < 2}
+				>Delete selected</button>
 			</div>
 		</div>
 		<label

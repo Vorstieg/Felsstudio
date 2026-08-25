@@ -114,6 +114,8 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 	let isRoutingTrack = $derived(trackEditor.isRoutingTrack);
 	let activeTrackDragState = $derived(trackEditor.draggingTrackPoint);
 	let activeTrackTarget = $derived(trackEditor.activeTrackTarget);
+	let selectedTrackPointIndexes = $derived(trackEditor.selectedTrackPointIndexes);
+	let selectedTrackPointCount = $derived(trackEditor.selectedTrackPointCount);
 
 	const addTrackPoint = (...args) => trackEditor.addTrackPoint(...args);
 	const handleTrackConfirm = (...args) => trackEditor.handleTrackConfirm(...args);
@@ -506,6 +508,10 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 			selectTool.handleMapClick(e);
 			return;
 		}
+		if (activeTool === 'track' && ['select', 'delete'].includes(trackDraftMode)) {
+			if (trackDraftMode === 'select') trackEditor.clearTrackSelection();
+			return;
+		}
 
 		if (
 			activeTool === 'track' &&
@@ -757,6 +763,7 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 				visibleDrawingPointIndexes: visibleDrawingPointIndexes(drawingPoints),
 				editingDrawingPath: trackDraftMode === 'editing',
 				selectedTrackPointIndex: trackEditor.selectedTrackPointIndex,
+				selectedTrackPointIndexes,
 				activeTrackTarget,
 				draggingTrackPointIndex: untrack(() => activeTrackDragState?.pointIndex ?? null),
 				flightPlan: $state.snapshot(flightPlan)
@@ -950,6 +957,7 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 	{currentTrackPoints}
 	{activeTrackTarget}
 	{trackDraftMode}
+	{selectedTrackPointCount}
 	{isRoutingTrack}
 	{hasPendingTrackCut}
 	{isRoutePathDrawing}

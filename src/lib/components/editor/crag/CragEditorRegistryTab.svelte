@@ -5,7 +5,10 @@
 	const cragEditorState = getCragEditorSession();
 	const { accessEditor, trackEditor, routeTool } = getCragEditorTools();
 	const {
-		addRoutePath: onAddRoutePath, editRoutePath: onEditRoutePath, deleteRoutePath: onDeleteRoutePath
+		addRoutePath: onAddRoutePath,
+		editRoutePath: onEditRoutePath,
+		deleteRoutePath: onDeleteRoutePath,
+		moveApproachTrackToTopoPaths: onMoveApproachTrackToTopoPaths
 	} = routeTool;
 	const { setHoverHighlight: onSetHoverHighlight, clearDetectedAssets: onClearDetectedAssets, addDetectedAsset: onAddDetectedAsset, removeAccessFeature: onRemoveAccessFeature } = accessEditor;
 	const { editTrack: onEditTrack, removeTrack: onRemoveTrack, finalizeTrack: onFinalizeTrack, cancelTrackEdit: onCancelTrackEdit } = trackEditor;
@@ -46,6 +49,13 @@
 	function editPath(document, feature) {
 		const route = assignedRoutes(document, feature.id)[0];
 		if (route) onEditRoutePath(document.path, route.id, feature.id);
+	}
+
+	function moveApproachTrack(event, track) {
+		const documentPath = event.currentTarget.value;
+		if (!documentPath) return;
+		onMoveApproachTrackToTopoPaths(documentPath, track.id);
+		event.currentTarget.value = '';
 	}
 </script>
 
@@ -222,6 +232,20 @@
 				class="input-studio w-full"
 				placeholder="Track Name"
 			/>
+			{#if routeDocuments.length > 0}
+				<select
+					class="input-studio w-full"
+					aria-label="Move approach track to topo paths"
+					onchange={(event) => moveApproachTrack(event, track)}
+				>
+					<option value="" selected>Move to topo paths…</option>
+					{#each routeDocuments as document}
+						<option value={document.path}>{document.path.split('/').at(-1)}</option>
+					{/each}
+				</select>
+			{:else}
+				<div class="text-micro-data text-warm-gray-500">Add a route first to create a topo-path destination.</div>
+			{/if}
 		</div>
 	{/each}
 	<div class="mt-3 space-y-2 border-t border-black/10 pt-3">

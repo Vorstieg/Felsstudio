@@ -59,6 +59,11 @@ export function useCragTrackEditor({
 	let isRoutingTrack = $state(false);
 	let draggingTrackPoint = $state(null);
 	let selectedTrackPointIndex = $state(null);
+	let selectedTrackPointIndexes = $state(new Set());
+	let trackSelectionAnchor = $state(null);
+	let touchLongPress = null;
+	let isTouchRangePending = false;
+	let skipLongPressClick = false;
 	let areTrackPointDragHandlersReady = false;
 	let trackEditHistory = [];
 	const approachFeatures = () =>
@@ -90,10 +95,93 @@ export function useCragTrackEditor({
 		trackEditHistory.push({ type: 'point-move', pointIndex, coordinate: [...coordinate] });
 	}
 
+	function clearTrackSelection() {
+		selectedTrackPointIndexes = new Set();
+		trackSelectionAnchor = null;
+		isTouchRangePending = false;
+		skipLongPressClick = false;
+		clearTimeout(touchLongPress?.timer);
+		touchLongPress = null;
+	}
+
+	function toggleTrackPointSelection(index, { range = false } = {}) {
+		if (!Number.isInteger(index) || !currentTrackPoints[index]) return false;
+		const selected = new Set(selectedTrackPointIndexes);
+		if (
+			range &&
+			Number.isInteger(trackSelectionAnchor) &&
+			currentTrackPoints[trackSelectionAnchor]
+		) {
+			const [start, end] = [trackSelectionAnchor, index].sort((a, b) => a - b);
+			for (let pointIndex = start; pointIndex <= end; pointIndex += 1) selected.add(pointIndex);
+		} else if (selected.has(index)) {
+			selected.delete(index);
+		} else {
+			selected.add(index);
+		}
+		selectedTrackPointIndexes = selected;
+		trackSelectionAnchor = index;
+		return true;
+	}
+
+	function selectTrackPointScreenRegion(start, end, map) {
+		if (!start || !end || !map?.project) return false;
+		const left = Math.min(start.x, end.x);
+		const right = Math.max(start.x, end.x);
+		const top = Math.min(start.y, end.y);
+		const bottom = Math.max(start.y, end.y);
+		const selected = new Set(selectedTrackPointIndexes);
+		let changed = false;
+		for (const [index, coordinate] of currentTrackPoints.entries()) {
+			const point = map.project(coordinate);
+			if (point.x < left || point.x > right || point.y < top || point.y > bottom) continue;
+			selected.add(index);
+			changed = true;
+		}
+		if (!changed) return false;
+		selectedTrackPointIndexes = selected;
+		return true;
+	}
+
+	function simplifySelectedTrackCoordinates(points, selectedIndexes, tolerance) {
+		const simplified = [];
+		let index = 0;
+		while (index < points.length) {
+			if (!selectedIndexes.has(index)) {
+				simplified.push(points[index]);
+				index += 1;
+				continue;
+			}
+			const start = index;
+			while (index + 1 < points.length && selectedIndexes.has(index + 1)) index += 1;
+			const end = index;
+			const first = Math.max(0, start - 1);
+			const last = Math.min(points.length - 1, end + 1);
+			const segment = simplifyTrackCoordinates(points.slice(first, last + 1), tolerance);
+			if (first < start) segment[0] = points[first];
+			if (last > end) segment[segment.length - 1] = points[last];
+			simplified.push(...segment.slice(simplified.length ? 1 : 0));
+			index = last + 1;
+		}
+		return simplified;
+	}
+
+	function deleteSelectedTrackPoints() {
+		const selected = selectedTrackPointIndexes;
+		if (selected.size === 0 || currentTrackPoints.length - selected.size < 2) return false;
+		saveDraftHistory();
+		currentTrackPoints = $state
+			.snapshot(currentTrackPoints)
+			.filter((_, index) => !selected.has(index));
+		clearTrackSelection();
+		return true;
+	}
+
 	function restoreDraftSnapshot(snapshot) {
 		currentTrackPoints = snapshot.points;
 		routeDraftWaypoints = snapshot.waypoints;
 		trackDraftMode = snapshot.mode;
+		clearTrackSelection();
 	}
 
 	function clearDraftHistory() {
@@ -124,11 +212,12 @@ export function useCragTrackEditor({
 			: null;
 		clearDraftHistory();
 		selectedTrackPointIndex = null;
+		clearTrackSelection();
 		setActiveTool('track');
 	}
 
 	function setTrackDraftMode(mode) {
-		if (mode !== 'routing' && mode !== 'editing') return;
+		if (!['routing', 'editing', 'select', 'delete'].includes(mode)) return;
 		if (trackDraftMode === mode) return;
 
 		trackDraftMode = mode;
@@ -136,6 +225,7 @@ export function useCragTrackEditor({
 			mode === 'routing' && currentTrackPoints.length > 0
 				? [currentTrackPoints[currentTrackPoints.length - 1]]
 				: [];
+		clearTrackSelection();
 	}
 
 	function undoTrackPoint() {
@@ -169,6 +259,7 @@ export function useCragTrackEditor({
 		points.splice(index, 0, [...coordinate]);
 		currentTrackPoints = points;
 		selectedTrackPointIndex = index;
+		clearTrackSelection();
 		return true;
 	}
 
@@ -179,6 +270,7 @@ export function useCragTrackEditor({
 			.snapshot(currentTrackPoints)
 			.filter((_, pointIndex) => pointIndex !== index);
 		selectedTrackPointIndex = null;
+		clearTrackSelection();
 		return true;
 	}
 
@@ -187,6 +279,7 @@ export function useCragTrackEditor({
 		currentTrackPoints = points;
 		routeDraftWaypoints = [];
 		trackDraftMode = 'editing';
+		clearTrackSelection();
 	}
 
 	function reverseTrack() {
@@ -218,7 +311,10 @@ export function useCragTrackEditor({
 		if (points.length <= 1) return { changed: false, pointCount: points.length };
 
 		const tolerance = Math.max(1, Number(toleranceMeters) || 0);
-		const simplified = simplifyTrackCoordinates(points, tolerance);
+		const selected = selectedTrackPointIndexes;
+		const simplified = selected.size
+			? simplifySelectedTrackCoordinates(points, selected, tolerance)
+			: simplifyTrackCoordinates(points, tolerance);
 		if (simplified.length >= points.length || simplified.length < 2) {
 			return { changed: false, pointCount: points.length, tolerance };
 		}
@@ -325,6 +421,7 @@ export function useCragTrackEditor({
 			currentTrackPoints = [];
 			routeDraftWaypoints = [];
 			clearDraftHistory();
+			clearTrackSelection();
 			onPathFinished();
 			return;
 		}
@@ -348,9 +445,10 @@ export function useCragTrackEditor({
 		activeTrackTarget = target;
 		currentTrackPoints = track.geometry.coordinates.map((point) => [...point]);
 		routeDraftWaypoints = [];
-		trackDraftMode = 'editing';
+		trackDraftMode = 'select';
 		clearDraftHistory();
 		selectedTrackPointIndex = null;
+		clearTrackSelection();
 		setActiveTool('track');
 		setActiveTab('registry');
 		fitTrackBounds(track.geometry.coordinates);
@@ -363,9 +461,10 @@ export function useCragTrackEditor({
 			: null;
 		currentTrackPoints = coordinates.map((point) => [...point]);
 		routeDraftWaypoints = [];
-		trackDraftMode = 'editing';
+		trackDraftMode = 'select';
 		clearDraftHistory();
 		selectedTrackPointIndex = null;
+		clearTrackSelection();
 		setActiveTool('track');
 		if (coordinates.length > 1) fitTrackBounds(coordinates);
 	}
@@ -395,6 +494,7 @@ export function useCragTrackEditor({
 		activeTrackTarget = null;
 		clearDraftHistory();
 		selectedTrackPointIndex = null;
+		clearTrackSelection();
 	}
 
 	function fitTrackBounds(points) {
@@ -430,11 +530,19 @@ export function useCragTrackEditor({
 		const map = getMap();
 		if (!map || areTrackPointDragHandlersReady) return;
 		areTrackPointDragHandlersReady = true;
+		let selectionBoxStart = null;
+		let selectionBox = null;
 
 		initMapPointDragHandlers({
 			map,
 			layers: ['tracks-points-drawing', 'tracks-point-midpoints'],
-			canDrag: () => getActiveTool() === 'track' && trackDraftMode === 'editing',
+			canDrag: (event, layerId) => {
+				if (getActiveTool() !== 'track') return false;
+				if (trackDraftMode === 'editing') return true;
+				if (trackDraftMode !== 'select' || layerId !== 'tracks-points-drawing') return false;
+				const pointIndex = Number(event?.features?.[0]?.properties?.pointIndex);
+				return selectedTrackPointIndexes.has(pointIndex);
+			},
 			getDragState: (event, layerId) => {
 				const pointIndex = Number(event.features?.[0]?.properties?.pointIndex);
 				return Number.isInteger(pointIndex)
@@ -442,6 +550,20 @@ export function useCragTrackEditor({
 					: null;
 			},
 			onDragStart: (drag, event) => {
+				if (trackDraftMode === 'select') {
+					const points = $state.snapshot(currentTrackPoints);
+					drag.selectedIndexes = [...selectedTrackPointIndexes];
+					drag.startCoordinate = [...points[drag.pointIndex]];
+					drag.startPoints = points.map((point) => [...point]);
+					draggingTrackPoint = {
+						pointIndex: drag.pointIndex,
+						coordinate: [...drag.startCoordinate],
+						selectedIndexes: drag.selectedIndexes
+					};
+					saveDraftHistory();
+					onTrackPointDragStart();
+					return;
+				}
 				if (drag.isMidpoint) {
 					if (
 						!event.lngLat ||
@@ -458,15 +580,34 @@ export function useCragTrackEditor({
 				selectedTrackPointIndex = pointIndex;
 				onTrackPointDragStart();
 			},
-			onDragMove: ({ pointIndex }, event) => {
+			onDragMove: (drag, event) => {
+				const { pointIndex } = drag;
 				if (draggingTrackPoint?.pointIndex !== pointIndex) return;
+				if (trackDraftMode === 'select') {
+					const coordinate = [event.lngLat.lng, event.lngLat.lat];
+					const offset = [
+						coordinate[0] - drag.startCoordinate[0],
+						coordinate[1] - drag.startCoordinate[1]
+					];
+					const points = drag.startPoints.map((point, index) =>
+						drag.selectedIndexes.includes(index)
+							? [point[0] + offset[0], point[1] + offset[1]]
+							: point
+					);
+					currentTrackPoints = points;
+					draggingTrackPoint = { ...draggingTrackPoint, coordinate };
+					return;
+				}
 				draggingTrackPoint.coordinate = [event.lngLat.lng, event.lngLat.lat];
 			},
-			onDragEnd: ({ pointIndex }) => {
+			onDragEnd: (drag) => {
+				const { pointIndex } = drag;
 				if (draggingTrackPoint?.pointIndex === pointIndex) {
-					const points = $state.snapshot(currentTrackPoints);
-					points[pointIndex] = draggingTrackPoint.coordinate;
-					currentTrackPoints = points;
+					if (trackDraftMode === 'editing') {
+						const points = $state.snapshot(currentTrackPoints);
+						points[pointIndex] = draggingTrackPoint.coordinate;
+						currentTrackPoints = points;
+					}
 				}
 				draggingTrackPoint = null;
 				onTrackPointDragEnd();
@@ -475,7 +616,7 @@ export function useCragTrackEditor({
 		});
 
 		const deleteTrackPoint = (event) => {
-			if (getActiveTool() !== 'track') return;
+			if (getActiveTool() !== 'track' || trackDraftMode !== 'editing') return;
 			const pointIndex = Number(event.features?.[0]?.properties?.pointIndex);
 			if (!Number.isInteger(pointIndex) || !removeTrackPoint(pointIndex)) return;
 			event.originalEvent?.stopPropagation?.();
@@ -484,6 +625,100 @@ export function useCragTrackEditor({
 		};
 		map.on('click', 'tracks-point-delete', deleteTrackPoint);
 		map.on('touchstart', 'tracks-point-delete', deleteTrackPoint);
+
+		const selectTrackPoint = (event) => {
+			if (getActiveTool() !== 'track' || trackDraftMode !== 'select') return;
+			if (skipLongPressClick) {
+				skipLongPressClick = false;
+				event.originalEvent?.stopPropagation?.();
+				setSuppressNextMapClick(true);
+				return;
+			}
+			const pointIndex = Number(event.features?.[0]?.properties?.pointIndex);
+			const range = Boolean(event.originalEvent?.shiftKey) || isTouchRangePending;
+			if (!toggleTrackPointSelection(pointIndex, { range })) return;
+			isTouchRangePending = false;
+			event.originalEvent?.stopPropagation?.();
+			setSuppressNextMapClick(true);
+		};
+		const beginTouchRange = (event) => {
+			if (getActiveTool() !== 'track' || trackDraftMode !== 'select') return;
+			const pointIndex = Number(event.features?.[0]?.properties?.pointIndex);
+			if (!Number.isInteger(pointIndex)) return;
+			clearTimeout(touchLongPress?.timer);
+			touchLongPress = {
+				pointIndex,
+				triggered: false,
+				timer: setTimeout(() => {
+					trackSelectionAnchor = pointIndex;
+					isTouchRangePending = true;
+					touchLongPress = { pointIndex, triggered: true, timer: null };
+				}, 500)
+			};
+		};
+		const endTouchRange = () => {
+			if (touchLongPress?.triggered) skipLongPressClick = true;
+			clearTimeout(touchLongPress?.timer);
+			touchLongPress = null;
+		};
+		map.on('click', 'tracks-points-drawing', selectTrackPoint);
+		map.on('touchstart', 'tracks-points-drawing', beginTouchRange);
+		map.on('touchend', 'tracks-points-drawing', endTouchRange);
+
+		const deleteTrackPointInDeleteMode = (event) => {
+			if (getActiveTool() !== 'track' || trackDraftMode !== 'delete') return;
+			const pointIndex = Number(event.features?.[0]?.properties?.pointIndex);
+			if (!Number.isInteger(pointIndex) || !removeTrackPoint(pointIndex)) return;
+			event.originalEvent?.stopPropagation?.();
+			setSuppressNextMapClick(true);
+			onTrackPointDragEnd();
+		};
+		map.on('click', 'tracks-points-drawing', deleteTrackPointInDeleteMode);
+		map.on('touchstart', 'tracks-points-drawing', deleteTrackPointInDeleteMode);
+
+		const removeSelectionBox = () => {
+			selectionBox?.remove();
+			selectionBox = null;
+		};
+		const updateSelectionBox = (end) => {
+			if (!selectionBoxStart || !selectionBox) return;
+			const left = Math.min(selectionBoxStart.x, end.x);
+			const top = Math.min(selectionBoxStart.y, end.y);
+			selectionBox.style.left = `${left}px`;
+			selectionBox.style.top = `${top}px`;
+			selectionBox.style.width = `${Math.abs(end.x - selectionBoxStart.x)}px`;
+			selectionBox.style.height = `${Math.abs(end.y - selectionBoxStart.y)}px`;
+		};
+		map.on('mousedown', (event) => {
+			if (
+				getActiveTool() !== 'track' ||
+				trackDraftMode !== 'select' ||
+				event.originalEvent?.button !== 0 ||
+				event.originalEvent?.shiftKey ||
+				event.originalEvent?.altKey ||
+				event.originalEvent?.ctrlKey ||
+				event.originalEvent?.metaKey ||
+				map.queryRenderedFeatures(event.point, { layers: ['tracks-points-drawing'] }).length
+			)
+				return;
+			selectionBoxStart = event.point;
+			selectionBox = document.createElement('div');
+			selectionBox.style.cssText =
+				'position:absolute;pointer-events:none;border:1px dashed #2563eb;background:rgba(59,130,246,.14);z-index:2;';
+			map.getContainer().append(selectionBox);
+			map.dragPan.disable();
+		});
+		map.on('mousemove', (event) => updateSelectionBox(event.point));
+		map.on('mouseup', (event) => {
+			if (!selectionBoxStart) return;
+			const start = selectionBoxStart;
+			selectionBoxStart = null;
+			removeSelectionBox();
+			map.dragPan.enable();
+			if (Math.hypot(event.point.x - start.x, event.point.y - start.y) < 4) return;
+			selectTrackPointScreenRegion(start, event.point, map);
+			setSuppressNextMapClick(true);
+		});
 	}
 
 	return {
@@ -508,6 +743,12 @@ export function useCragTrackEditor({
 		get selectedTrackPointIndex() {
 			return selectedTrackPointIndex;
 		},
+		get selectedTrackPointIndexes() {
+			return [...selectedTrackPointIndexes];
+		},
+		get selectedTrackPointCount() {
+			return selectedTrackPointIndexes.size;
+		},
 		addTrackPoint,
 		handleTrackConfirm,
 		startRoutingDraft,
@@ -515,6 +756,10 @@ export function useCragTrackEditor({
 		undoTrackPoint,
 		insertTrackPoint,
 		removeTrackPoint,
+		clearTrackSelection,
+		toggleTrackPointSelection,
+		selectTrackPointScreenRegion,
+		deleteSelectedTrackPoints,
 		reverseTrack,
 		trimTrackStart,
 		trimTrackEnd,

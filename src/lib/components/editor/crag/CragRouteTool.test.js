@@ -75,6 +75,40 @@ test('manages route paths, access copies, and route-specific metadata', () => {
 	assert.equal(route.pathRefs.length, 2);
 });
 
+test('moves an approach track into a topo document without attaching it to a route', () => {
+	const { state, tool } = createTool();
+	tool.addRoute();
+	const document = state.routeDocuments[0];
+	state.access.features = [
+		{
+			id: 'approach-1',
+			properties: { kind: 'approach', name: 'Trailhead approach' },
+			geometry: {
+				type: 'LineString',
+				coordinates: [
+					[11, 47],
+					[11.001, 47.001]
+				]
+			}
+		}
+	];
+
+	assert.equal(tool.moveApproachTrackToTopoPaths(document.path, 'approach-1'), true);
+	assert.equal(state.access.features.length, 0);
+	assert.equal(document.data.paths.features.length, 1);
+	assert.equal(document.data.paths.features[0].properties.name, 'Trailhead approach');
+	assert.deepEqual(document.data.routes[0].pathRefs, []);
+	assert.equal(document.dirty, true);
+
+	assert.equal(state.undo(), true);
+	assert.equal(state.access.features.length, 1);
+	assert.equal(state.routeDocuments[0].data.paths.features.length, 0);
+
+	assert.equal(state.redo(), true);
+	assert.equal(state.access.features.length, 0);
+	assert.equal(state.routeDocuments[0].data.paths.features.length, 1);
+});
+
 test('deletes and restores a route path with its route references', () => {
 	const { state, tool } = createTool();
 	tool.addRoute();
