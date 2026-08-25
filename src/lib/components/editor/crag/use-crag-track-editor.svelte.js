@@ -1,6 +1,7 @@
 import { parseGpx } from '$lib/assets/js/route-path-utils.js';
 import { initMapPointDragHandlers } from '$lib/components/editor/map-point-drag-handlers.js';
 import {
+	cleanStationaryTrackCoordinates,
 	fitCoordinatesBounds,
 	reverseCoordinates,
 	simplifyTrackCoordinates,
@@ -228,6 +229,30 @@ export function useCragTrackEditor({
 			pointCount: simplified.length,
 			previousPointCount: points.length,
 			tolerance
+		};
+	}
+
+	function cleanTrackPauses(radiusMeters, minimumPoints) {
+		const points = $state.snapshot(currentTrackPoints);
+		if (points.length <= 2) return { changed: false, pointCount: points.length };
+
+		const radius = Math.max(1, Number(radiusMeters) || 0);
+		const minimum = Math.max(3, Math.round(Number(minimumPoints) || 0));
+		const cleaned = cleanStationaryTrackCoordinates(points, {
+			radiusMeters: radius,
+			minimumPoints: minimum
+		});
+		if (cleaned.length >= points.length || cleaned.length < 2) {
+			return { changed: false, pointCount: points.length, radius, minimum };
+		}
+
+		useEditedTrackPoints(cleaned);
+		return {
+			changed: true,
+			pointCount: cleaned.length,
+			previousPointCount: points.length,
+			radius,
+			minimum
 		};
 	}
 
@@ -494,6 +519,7 @@ export function useCragTrackEditor({
 		trimTrackStart,
 		trimTrackEnd,
 		simplifyTrack,
+		cleanTrackPauses,
 		removeTrack,
 		splitEditingTrack,
 		finalizeTrack,

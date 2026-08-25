@@ -19,6 +19,7 @@
 		trimTrackStart: onTrimTrackStart,
 		trimTrackEnd: onTrimTrackEnd,
 		simplifyTrack: onSimplifyTrack,
+		cleanTrackPauses: onCleanTrackPauses,
 		handleGpxUpload: onGpxUpload
 	} = trackEditor;
 	const {
@@ -60,6 +61,9 @@
 	let trimPointIndex = $state(0);
 	let simplifyToleranceMeters = $state(10);
 	let simplifySummary = $state('');
+	let pauseRadiusMeters = $state(5);
+	let pauseMinimumPoints = $state(30);
+	let pauseCleanupSummary = $state('');
 	let canEditTrack = $derived(currentTrackPoints.length > 1);
 
 	function trimStart() {
@@ -76,6 +80,14 @@
 		simplifySummary = result.changed
 			? `${result.previousPointCount} → ${result.pointCount} points at ${result.tolerance} m tolerance.`
 			: `No further simplification at ${result.tolerance} m. Increase tolerance.`;
+	}
+
+	function cleanPauses() {
+		const result = onCleanTrackPauses(pauseRadiusMeters, pauseMinimumPoints);
+		if (!result) return;
+		pauseCleanupSummary = result.changed
+			? `${result.previousPointCount} → ${result.pointCount} points after collapsing pauses within ${result.radius} m.`
+			: 'No pause clusters matched these settings.';
 	}
 
 </script>
@@ -218,6 +230,36 @@
 			<div class="text-[10px] text-warm-gray-400">Removes redundant points using the tolerance in meters.</div>
 			{#if simplifySummary}
 				<div class="text-[10px] text-warm-gray-500">{simplifySummary}</div>
+			{/if}
+			<div class="grid grid-cols-2 gap-1 items-center">
+				<input
+					bind:value={pauseRadiusMeters}
+					type="number"
+					min="1"
+					step="1"
+					class="input-studio w-full"
+					placeholder="Pause radius (m)"
+					disabled={!canEditTrack}
+				/>
+				<input
+					bind:value={pauseMinimumPoints}
+					type="number"
+					min="3"
+					step="1"
+					class="input-studio w-full"
+					placeholder="Minimum points"
+					disabled={!canEditTrack}
+				/>
+			</div>
+			<button
+				type="button"
+				class="w-full px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500 disabled:cursor-not-allowed disabled:opacity-40"
+				onclick={cleanPauses}
+				disabled={!canEditTrack}>Clean pauses</button
+			>
+			<div class="text-[10px] text-warm-gray-400">Collapses dense GPS-drift clusters; keeps each cluster's endpoints.</div>
+			{#if pauseCleanupSummary}
+				<div class="text-[10px] text-warm-gray-500">{pauseCleanupSummary}</div>
 			{/if}
 		</div>
 	</ToolOptions>

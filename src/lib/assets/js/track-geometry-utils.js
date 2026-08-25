@@ -43,3 +43,50 @@ export function simplifyTrackCoordinates(coordinates = [], toleranceMeters = 10)
 	const simplified = turf.toWgs84(simplifiedMercator)?.geometry?.coordinates || [];
 	return simplified.length >= 2 ? simplified : [...coordinates];
 }
+
+/**
+ * Collapses dense GPS-drift runs created while a recorder is stationary.
+ *
+ * A run is considered stationary when all of its points remain within the
+ * supplied radius of its first point.  Its first and last point are retained
+ * so the surrounding track remains connected.  The deliberately conservative
+ * minimum-point threshold avoids treating normal, slow walking as a pause.
+ */
+export function cleanStationaryTrackCoordinates(
+	coordinates = [],
+	{ radiusMeters = 15, minimumPoints = 20 } = {}
+) {
+	if (!Array.isArray(coordinates) || coordinates.length <= 2) return [...coordinates];
+	if (!Number.isFinite(radiusMeters) || radiusMeters <= 0) return [...coordinates];
+	if (!Number.isInteger(minimumPoints) || minimumPoints < 3) return [...coordinates];
+
+	const cleaned = [[...coordinates[0]]];
+	let index = 1;
+
+	while (index < coordinates.length) {
+		const anchor = coordinates[index - 1];
+		let end = index;
+		while (
+			end < coordinates.length &&
+			turf.distance(anchor, coordinates[end], { units: 'meters' }) <= radiusMeters
+		) {
+			end += 1;
+		}
+
+		const runLength = end - (index - 1);
+		if (runLength >= minimumPoints) {
+			const lastStationaryPoint = coordinates[end - 1];
+			const previous = cleaned[cleaned.length - 1];
+			if (previous[0] !== lastStationaryPoint[0] || previous[1] !== lastStationaryPoint[1]) {
+				cleaned.push([...lastStationaryPoint]);
+			}
+			index = end;
+			continue;
+		}
+
+		cleaned.push([...coordinates[index]]);
+		index += 1;
+	}
+
+	return cleaned;
+}
