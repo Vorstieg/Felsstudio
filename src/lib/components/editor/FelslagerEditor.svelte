@@ -14,7 +14,9 @@
 	let selectedFileType = $state(null);
 	let fileContent = $state('');
 	let saving = $state(false);
+	let uploading = $state(false);
 	let error = $state(null);
+	let uploadInput = $state(null);
 
 	let searchQuery = $state('');
 	let searchResults = $state([]);
@@ -146,6 +148,38 @@
 		}
 	}
 
+	function selectFileForUpload() {
+		uploadInput?.click();
+	}
+
+	function handleUploadSelection(event) {
+		const file = event.currentTarget.files?.[0];
+		event.currentTarget.value = '';
+		if (!file) return;
+
+		if (!authState.requireAuth(() => uploadFile(file))) return;
+		uploadFile(file);
+	}
+
+	async function uploadFile(file) {
+		const path = currentPath ? `${currentPath}/${file.name}` : file.name;
+		if (items.some((item) => item.path === path) && !confirm(`${file.name} already exists. Replace it?`)) {
+			return;
+		}
+
+		uploading = true;
+		error = null;
+		try {
+			await writeFile(path, file);
+			allFilesCache = null;
+			await loadDirectory(currentPath);
+		} catch (e) {
+			error = e.message;
+		} finally {
+			uploading = false;
+		}
+	}
+
 	function renameItem(item, e) {
 		e.stopPropagation();
 		const newName = prompt(`Enter new name for ${item.name}:`, item.name);
@@ -223,6 +257,15 @@
 			</div>
 		</div>
 		<div class="flex gap-2">
+			<input
+				bind:this={uploadInput}
+				type="file"
+				class="hidden"
+				onchange={handleUploadSelection}
+			/>
+			<button class="btn-secondary px-4" onclick={selectFileForUpload} disabled={uploading}>
+				{uploading ? 'Uploading…' : 'Add file'}
+			</button>
 			{#if selectedFile && selectedFileType !== 'image'}
 				<button class="btn-primary px-4" onclick={saveFile} disabled={saving}>
 					{saving ? $_('save.saving') : $_('save.save_to_server')}
