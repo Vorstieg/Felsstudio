@@ -451,7 +451,6 @@ export function useCragTrackEditor({
 		clearTrackSelection();
 		setActiveTool('track');
 		setActiveTab('registry');
-		fitTrackBounds(track.geometry.coordinates);
 	}
 
 	function editRoutePath(coordinates) {
@@ -466,7 +465,6 @@ export function useCragTrackEditor({
 		selectedTrackPointIndex = null;
 		clearTrackSelection();
 		setActiveTool('track');
-		if (coordinates.length > 1) fitTrackBounds(coordinates);
 	}
 
 	function cancelTrackEdit() {

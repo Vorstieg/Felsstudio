@@ -95,7 +95,7 @@
 </div>
 
 {#if isCompact}
-	<div class="mobile-toolbar fixed inset-x-0 z-50 flex justify-center pointer-events-none" style={`bottom: calc(${toolOptionsOpen ? '0px' : 'var(--info-panel-height, 0px)'} + var(--mobile-toolbar-gap, max(0.75rem, env(safe-area-inset-bottom)))); transition: var(--info-panel-transition, none); visibility: ${toolOptionsOpen ? 'visible' : 'var(--mobile-toolbar-visibility, visible)'};`}>
+	<div class="mobile-toolbar fixed inset-x-0 z-50 flex justify-center pointer-events-none" style="bottom: calc(var(--info-panel-height, 0px) + var(--mobile-toolbar-gap, max(0.75rem, env(safe-area-inset-bottom)))); transition: var(--info-panel-transition, none); visibility: var(--mobile-toolbar-visibility, visible);">
 		<div use:observeMobileDock class="mobile-tool-dock flex w-full flex-col gap-0 pointer-events-auto">
 			<div class={`panel flex w-full items-center justify-center overflow-x-auto rounded-none border-x-0 shadow-panel ${dense ? 'gap-0.5 p-1' : 'gap-1 p-1.5'}`}>
 				{#each tools.filter((tool) => !tool.hidden) as tool}

@@ -63,10 +63,10 @@
 		{#if footer}<div class="mt-2 panel p-2 bg-white shadow-sm border-black/15">{@render footer()}</div>{/if}
 	</div>
 {:else}
-	<div class="details-mobile fixed inset-0 z-40 pointer-events-none">
+	<div class="details-mobile fixed inset-0 z-[60] pointer-events-none">
 		<div
 			use:resize
-			class="fixed left-0 right-0 z-50 flex flex-col bg-white shadow-panel rounded-t-4xl border-t border-black/10 overflow-hidden pointer-events-auto {visualSuperseded ? 'invisible' : ''}"
+			class="fixed left-0 right-0 z-[60] flex flex-col bg-white shadow-panel rounded-t-4xl border-t border-black/10 overflow-hidden pointer-events-auto {visualSuperseded ? 'invisible' : ''}"
 			role="dialog"
 			aria-label={title}
 		>

@@ -42,7 +42,7 @@
 
 {#if open}
 	<div use:observeOptionsSurface bind:this={panel} role="dialog" aria-modal="false" aria-label={title} tabindex="-1"
-		class="tool-options-surface pointer-events-auto fixed left-0 right-0 z-101 mx-auto flex w-full max-w-none flex-col overflow-hidden rounded-t-lg border-x-0 border-b-0 border-black/15 bg-white p-2 shadow-panel md:bottom-auto md:left-2 md:right-auto md:top-[4.5rem] md:mx-0 md:w-80 md:max-w-md md:rounded md:border"
+		class="tool-options-surface pointer-events-auto fixed left-0 right-0 z-50 min-[1025px]:z-101 mx-auto flex w-full max-w-none flex-col overflow-hidden rounded-t-lg border-x-0 border-b-0 border-black/15 bg-white p-2 shadow-panel md:bottom-auto md:left-2 md:right-auto md:top-[4.5rem] md:mx-0 md:w-80 md:max-w-md md:rounded md:border"
 		style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom));"
 	>
 	<div class="flex shrink-0 items-center justify-between gap-2 border-b border-black/10 px-1 pb-2">
@@ -68,11 +68,13 @@
 
 <style>
 	.tool-options-surface {
-		bottom: calc(var(--mobile-tool-dock-height, 7.5rem) + max(0.75rem, env(safe-area-inset-bottom)));
+		bottom: calc(var(--info-panel-height, 0px) + var(--mobile-tool-dock-height, 7.5rem) + max(0.75rem, env(safe-area-inset-bottom)));
 		max-height: min(
 			70dvh,
-			calc(100dvh - var(--mobile-tool-dock-height, 7.5rem) - env(safe-area-inset-bottom) - 1rem)
+			max(0px, calc(100dvh - var(--info-panel-height, 0px) - var(--mobile-tool-dock-height, 7.5rem) - env(safe-area-inset-bottom) - 1rem))
 		);
+		transition: var(--info-panel-transition, none);
+		visibility: var(--mobile-toolbar-visibility, visible);
 	}
 
 	@media (min-width: 1025px) {
