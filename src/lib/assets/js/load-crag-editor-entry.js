@@ -56,7 +56,7 @@ export async function loadCragEditorEntry(entryPath) {
 		)
 	).filter(Boolean);
 
-	const state = { crag, access: null, routeDocuments };
+	const state = { crag, access: null, routeDocuments, sourceCrag: { path, id: cragId } };
 	await loadAccessCollection(topo, state);
 	return state;
 }

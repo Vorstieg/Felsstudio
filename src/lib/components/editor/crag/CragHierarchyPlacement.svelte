@@ -45,7 +45,7 @@
 	}
 
 	$effect(() => {
-		cragSlug = slugifyName(cragEditorState.crag.name);
+		cragSlug = cragEditorState.crag.id || slugifyName(cragEditorState.crag.name);
 	});
 
 	function openModal() {
@@ -63,8 +63,7 @@
 	<div class="flex items-start justify-between gap-2">
 		<div>
 			<span class="text-ui-label block">Hierarchy Placement</span>
-			<p class="text-micro-data text-warm-gray-400">Choose the parent folder. The crag folder is generated from the
-				name.</p>
+			<p class="text-micro-data text-warm-gray-400">Choose the parent folder. The crag folder/slug stays stable when the display name changes.</p>
 		</div>
 	</div>
 

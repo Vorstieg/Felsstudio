@@ -33,16 +33,8 @@
 		})
 	);
 
-	async function startNewEntry() {
-		if (workSpaceWrapper.isCragEditor()) {
-			const [{ storage }, { CRAG_SESSION_KEY }] = await Promise.all([
-				import('$lib/assets/js/storage-utils.js'),
-				import('$lib/components/editor/crag/crag-editor-options.js')
-			]);
-			cragEditorState.reset();
-			storage.remove(CRAG_SESSION_KEY);
-		}
-
+	function startNewEntry() {
+		if (workSpaceWrapper.isCragEditor()) cragEditorState.reset();
 		goto(resolve(workSpaceWrapper.path));
 	}
 

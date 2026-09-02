@@ -61,13 +61,15 @@ export function createCragEditorSession() {
 			JSON.stringify({
 				crag: session.crag,
 				access: session.access,
-				routeDocuments: session.routeDocuments
+				routeDocuments: session.routeDocuments,
+				sourceCrag: session.sourceCrag
 			})
 		);
 	const session = $state({
 		crag: createInitialCrag(),
 		access: createInitialAccess(),
 		routeDocuments: [],
+		sourceCrag: null,
 		selectedRouteKey: null,
 		history: { entries: [], index: -1 },
 		commit(label, mutator) {
@@ -87,6 +89,7 @@ export function createCragEditorSession() {
 			this.crag = value.crag;
 			this.access = value.access;
 			this.routeDocuments = value.routeDocuments;
+			this.sourceCrag = value.sourceCrag || this.sourceCrag;
 		},
 		undo() {
 			if (session.history.index < 0) return false;
@@ -112,6 +115,7 @@ export function createCragEditorSession() {
 			this.crag = createInitialCrag();
 			this.access = createInitialAccess();
 			this.routeDocuments = [];
+			this.sourceCrag = null;
 			this.selectedRouteKey = null;
 			this.history = { entries: [], index: -1 };
 		},

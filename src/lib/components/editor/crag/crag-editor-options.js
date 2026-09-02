@@ -1,5 +1,3 @@
-export const CRAG_SESSION_KEY = 'crag_editor_latest_session_v1';
-
 export const cragTypes = [
 	'sports-climbing',
 	'multi-pitch',

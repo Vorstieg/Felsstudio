@@ -16,8 +16,7 @@
 	import CragEditorMap from '$lib/components/editor/crag/CragEditorMap.svelte';
 	import CragEditorLayout from '$lib/components/editor/crag/CragEditorLayout.svelte';
 	import RouteDetailModal from '$lib/components/editor/crag/RouteDetailModal.svelte';
-	import { CRAG_SESSION_KEY } from '$lib/components/editor/crag/crag-editor-options.js';
-	import { writeFile, writeJson } from '$lib/api/felslager.js';
+	import { renameFile, writeFile, writeJson } from '$lib/api/felslager.js';
 	import { authState } from '$lib/api/auth.svelte.js';
 	import { storage } from '$lib/assets/js/storage-utils.js';
 	import { Topo } from '$lib/assets/js/topo-paths.js';
@@ -212,6 +211,26 @@
 		);
 	}
 
+	function getRouteDocumentPath(crag, sectorId = null) {
+		if (!crag?.path || !crag?.id) return '';
+		return new Topo(crag.path, crag.id, sectorId || undefined).getTopoPath();
+	}
+
+	function normalizeRouteDocumentsForCrag(routeDocuments = [], crag = cragEditorState.crag) {
+		return (routeDocuments || []).map((document) => {
+			const sectorId = document.sectorId ?? document.data?.sector_id ?? null;
+			const data = document.data ? { ...document.data } : document.data;
+			if (data && crag?.id) data.crag_id = crag.id;
+			if (data && sectorId) data.sector_id = sectorId;
+			return {
+				...document,
+				sectorId,
+				path: getRouteDocumentPath(crag, sectorId) || document.path,
+				data
+			};
+		});
+	}
+
 	function restoreCragSession(session, id = null) {
 		if (!session) return false;
 
@@ -223,7 +242,11 @@
 			version: 1,
 			features: []
 		};
-		cragEditorState.routeDocuments = session.routeDocuments || [];
+		cragEditorState.routeDocuments = normalizeRouteDocumentsForCrag(
+			session.routeDocuments || [],
+			cragEditorState.crag
+		);
+		cragEditorState.sourceCrag = session.sourceCrag || null;
 		activeCragDraftId = id;
 		return true;
 	}
@@ -249,32 +272,18 @@
 		return id ? storage.get(cragDraftSessionKey(id), null) : null;
 	}
 
-	function getLatestCragDraft() {
-		const drafts = storage.get(CRAG_DRAFTS_KEY, []);
-		const latest = [...drafts].sort((a, b) => new Date(b.updated) - new Date(a.updated))[0];
-		if (latest) {
-			const session = getCragDraftSession(latest.id);
-			if (session) return { id: latest.id, session };
-		}
-		const legacySession = storage.get(CRAG_SESSION_KEY, null);
-		return legacySession ? { id: null, session: legacySession } : null;
-	}
-
-	function restoreLatestCragSession() {
-		const latest = getLatestCragDraft();
-		if (!latest) return false;
-		restoreCragSession(latest.session, latest.id);
-		if (latest.id) setCragDraftParamInUrl(latest.id);
-		return true;
-	}
-
 	function saveLatestCragSession() {
+		if (isBlankCragSession()) return;
 		const timestamp = new Date().toISOString();
 		const id = activeCragDraftId || createCragDraftId();
 		const session = {
 			crag: $state.snapshot(cragEditorState.crag),
 			access: $state.snapshot(cragEditorState.access),
-			routeDocuments: $state.snapshot(cragEditorState.routeDocuments),
+			routeDocuments: normalizeRouteDocumentsForCrag(
+				$state.snapshot(cragEditorState.routeDocuments),
+				cragEditorState.crag
+			),
+			sourceCrag: $state.snapshot(cragEditorState.sourceCrag),
 			updated: timestamp
 		};
 		const metadata = {
@@ -282,28 +291,23 @@
 			name: session.crag?.name || 'Unnamed Crag',
 			path: session.crag?.path || '',
 			cragId: session.crag?.id || '',
+			sourceCrag: session.sourceCrag || null,
 			updated: timestamp
 		};
 		const drafts = storage.get(CRAG_DRAFTS_KEY, []).filter((draft) => draft.id !== id);
 		storage.set(CRAG_DRAFTS_KEY, [metadata, ...drafts]);
 		storage.set(cragDraftSessionKey(id), session);
-		storage.set(CRAG_SESSION_KEY, session);
 		activeCragDraftId = id;
 		setCragDraftParamInUrl(id);
 	}
 
 	function initializeCragSession(sourceSession) {
 		const draftId = getCragDraftIdFromUrl();
-		if (draftId && restoreCragSession(getCragDraftSession(draftId), draftId)) {
-			setCragDraftParamInUrl(draftId);
+		if (draftId) {
+			restoreCragSession(getCragDraftSession(draftId), draftId);
 			return;
 		}
-		if (sourceSession) {
-			restoreCragSession(sourceSession);
-			saveLatestCragSession();
-			return;
-		}
-		restoreLatestCragSession();
+		if (sourceSession) restoreCragSession(sourceSession);
 	}
 
 	function coordinatesEqual(a, b) {
@@ -659,7 +663,8 @@
 
 		const sessionString = JSON.stringify({
 			crag: cragEditorState.crag,
-			access: cragEditorState.access
+			access: cragEditorState.access,
+			routeDocuments: cragEditorState.routeDocuments
 		});
 
 		if (sessionString) {
@@ -853,6 +858,70 @@
 		syncEditorData();
 	}
 
+	function cragFolder({ path, id }) {
+		return [path, id].filter(Boolean).join('/');
+	}
+
+	async function tryRenameFile(oldPath, newPath) {
+		try {
+			await renameFile(oldPath, newPath);
+		} catch (err) {
+			console.warn(`Could not rename ${oldPath} to ${newPath}:`, err);
+		}
+	}
+
+	async function migrateCragStorage(source, target) {
+		if (!source?.path || !source?.id) return;
+		const oldFolder = cragFolder(source);
+		const newFolder = cragFolder(target);
+		if (!oldFolder || oldFolder === newFolder) return;
+
+		await renameFile(oldFolder, newFolder);
+
+		if (source.id !== target.id) {
+			await tryRenameFile(`${newFolder}/${source.id}.json`, `${newFolder}/${target.id}.json`);
+			await tryRenameFile(`${newFolder}/${source.id}-access.json`, `${newFolder}/${target.id}-access.json`);
+			await tryRenameFile(`${newFolder}/${source.id}-topo.json`, `${newFolder}/${target.id}-topo.json`);
+			await tryRenameFile(`${newFolder}/${source.id}.glb`, `${newFolder}/${target.id}.glb`);
+		}
+	}
+
+	function updateAssetPathForMove(asset, source, target) {
+		if (!asset?.path || !source?.path || !source?.id) return asset;
+		const oldPrefix = `${cragFolder(source)}/`;
+		const newPrefix = `${cragFolder(target)}/`;
+		return asset.path.startsWith(oldPrefix)
+			? { ...asset, path: `${newPrefix}${asset.path.slice(oldPrefix.length)}` }
+			: asset;
+	}
+
+	function updateAssetCollectionsForMove(assets, source, target) {
+		if (!assets) return assets;
+		return Object.fromEntries(
+			Object.entries(assets).map(([key, value]) => [
+				key,
+				Array.isArray(value) ? value.map((asset) => updateAssetPathForMove(asset, source, target)) : value
+			])
+		);
+	}
+
+	function updateRouteDocumentsForMove(source, target) {
+		if (!source?.path || !source?.id) return;
+		const oldFolder = cragFolder(source);
+		const newFolder = cragFolder(target);
+		if (oldFolder === newFolder) return;
+
+		for (const document of cragEditorState.routeDocuments) {
+			const sectorTopo = new Topo(target.path, target.id, document.sectorId || undefined);
+			document.path = sectorTopo.getTopoPath();
+			if (document.data?.crag_id) document.data.crag_id = target.id;
+			document.dirty = document.dirty || source.id !== target.id;
+		}
+		if (cragEditorState.selectedRouteKey?.startsWith(`${oldFolder}/`)) {
+			cragEditorState.selectedRouteKey = cragEditorState.selectedRouteKey.replace(oldFolder, newFolder);
+		}
+	}
+
 	async function saveToServer() {
 		if (!authState.requireAuth(() => saveToServer())) return;
 
@@ -862,9 +931,25 @@
 		saveError = '';
 
 		try {
-			cragEditorState.setCragField('id', slugifyName(cragEditorState.crag.name));
+			if (!cragEditorState.crag.id) {
+				cragEditorState.setCragField('id', slugifyName(cragEditorState.crag.name));
+			}
+			const targetCrag = { path: savePath, id: cragEditorState.crag.id };
+			const sourceCrag = cragEditorState.sourceCrag;
+			await migrateCragStorage(sourceCrag, targetCrag);
+			updateRouteDocumentsForMove(sourceCrag, targetCrag);
+
 			const topo = new Topo(savePath, cragEditorState.crag.id);
 			ensureCragAssets();
+			cragEditorState.crag.assets = updateAssetCollectionsForMove(
+				cragEditorState.crag.assets,
+				sourceCrag,
+				targetCrag
+			);
+			cragEditorState.crag.sectors = (cragEditorState.crag.sectors || []).map((sector) => ({
+				...sector,
+				assets: updateAssetCollectionsForMove(sector.assets, sourceCrag, targetCrag)
+			}));
 			const sectors = $state.snapshot(cragEditorState.crag.sectors) || [];
 
 			const uploadedImages = [];
@@ -925,6 +1010,8 @@
 				document.dirty = false;
 			}
 
+			cragEditorState.sourceCrag = targetCrag;
+			saveLatestCragSession();
 			saveStatus = 'success';
 			setTimeout(() => {
 				if (saveStatus === 'success') saveStatus = 'idle';
