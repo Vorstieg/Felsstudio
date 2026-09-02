@@ -14,6 +14,7 @@
 		assignExistingRoutePath: onAssignExistingRoutePath,
 		createRoutePathFromAccess: onCreateRoutePathFromAccess,
 		editRoutePath: onEditRoutePath,
+		duplicateRoutePath: onDuplicateRoutePath,
 		updateRoutePath: onUpdateRoutePath,
 		removeRoutePath: onRemoveRoutePath,
 		deleteRoutePath: onDeleteRoutePath
@@ -188,7 +189,7 @@
 						<p class="text-micro-data text-warm-gray-500">No paths attached.</p>
 					{:else}
 						{#each paths() as pathAsset}
-							<div class="grid grid-cols-[7rem_1fr_7rem_1.5rem_1.5rem] gap-1 rounded-sm border border-black/10 bg-white p-1">
+							<div class="grid grid-cols-[7rem_1fr_7rem_1.5rem_1.5rem_1.5rem] gap-1 rounded-sm border border-black/10 bg-white p-1">
 								<select class="input-studio min-w-0" value={pathAsset.role || 'main'} onchange={(event) => onUpdateRoutePath(document.path, route.id, pathAsset.pathId, 'role', event.currentTarget.value)}>
 									<option value="approach">Approach</option>
 									<option value="main">Main</option>
@@ -198,6 +199,7 @@
 								<input class="input-studio min-w-0" value={pathAsset.label || ''} placeholder="Label" onchange={(event) => onUpdateRoutePath(document.path, route.id, pathAsset.pathId, 'label', event.currentTarget.value)} />
 								<span class="px-1 text-micro-data text-warm-gray-500">{pathAsset.feature?.properties?.name || pathAsset.pathId}</span>
 								<button type="button" class="text-warm-gray-400 hover:text-creator-blue" title="Edit path" onclick={() => onEditRoutePath(document.path, route.id, pathAsset.pathId)}><i class="fa-solid fa-pencil text-[10px]"></i></button>
+								<button type="button" class="text-warm-gray-400 hover:text-creator-blue" title="Duplicate path" onclick={() => onDuplicateRoutePath(document.path, route.id, pathAsset.pathId)}><i class="fa-solid fa-copy text-[10px]"></i></button>
 								<button type="button" class="text-warm-gray-300 hover:text-rose-600" title="Unassign path" onclick={() => onRemoveRoutePath(document.path, route.id, pathAsset.pathId)}><i class="fa-solid fa-xmark text-[10px]"></i></button>
 								<button type="button" class="text-warm-gray-300 hover:text-rose-600" title="Delete shared path" onclick={() => onDeleteRoutePath(document.path, pathAsset.pathId)}><i class="fa-solid fa-trash text-[10px]"></i></button>
 							</div>

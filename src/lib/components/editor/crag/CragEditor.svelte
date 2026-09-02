@@ -427,12 +427,7 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 
 	function confirmTrackCut() {
 		if (!pendingTrackCut) return;
-		let splitMode = 'shared';
-		if (routeEditDraft && typeof window !== 'undefined') {
-			const choice = window.prompt('Split shared path for all routes or only this route? Enter "shared" or "route".', 'shared');
-			if (choice === null) return;
-			splitMode = choice.trim().toLowerCase().startsWith('route') ? 'route-specific' : 'shared';
-		}
+		const splitMode = 'shared';
 		const wasSplit = routeEditDraft
 			? routeTool.splitRoutePath(
 				routeEditDraft,
@@ -974,18 +969,10 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 	onClose={() => selectObject(null)}
 />
 
-{#if activeTool === 'cut'}
+{#if activeTool === 'cut' && cutLineEnd && !pendingTrackCut}
 	<div
 		class="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-sm border border-black/10 bg-near-black px-3 py-2 text-sm text-white shadow-lg"
 	>
-		{#if pendingTrackCut}
-			The cut intersects the track. Use the toolbar tick to split it, or X to discard the cut line.
-		{:else if cutLineEnd}
-			No intersection found. Click again to start a new cut line.
-		{:else if cutLineStart}
-			Click the second point of a line across the track.
-		{:else}
-			Click the first point of a line across the track.
-		{/if}
+		No intersection found. Click again to start a new cut line.
 	</div>
 {/if}

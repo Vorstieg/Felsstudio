@@ -7,6 +7,7 @@
 	const {
 		addRoutePath: onAddRoutePath,
 		editRoutePath: onEditRoutePath,
+		duplicateRoutePath: onDuplicateRoutePath,
 		deleteRoutePath: onDeleteRoutePath,
 		moveApproachTrackToTopoPaths: onMoveApproachTrackToTopoPaths
 	} = routeTool;
@@ -49,6 +50,10 @@
 	function editPath(document, feature) {
 		const route = assignedRoutes(document, feature.id)[0];
 		if (route) onEditRoutePath(document.path, route.id, feature.id);
+	}
+
+	function duplicatePath(document, feature) {
+		onDuplicateRoutePath(document.path, null, feature.id);
 	}
 
 	function moveApproachTrack(event, track) {
@@ -311,6 +316,14 @@
 								aria-label="Edit path"
 								onclick={() => editPath(document, feature)}>
 								<i class="fa-solid fa-pen text-[10px]"></i>
+							</button>
+							<button
+								type="button"
+								class="action-button text-warm-gray-500 hover:text-creator-blue"
+								title="Duplicate path"
+								aria-label="Duplicate path"
+								onclick={() => duplicatePath(document, feature)}>
+								<i class="fa-solid fa-copy text-[10px]"></i>
 							</button>
 							<button
 								type="button"

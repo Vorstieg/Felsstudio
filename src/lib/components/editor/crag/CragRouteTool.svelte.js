@@ -215,6 +215,29 @@ export function createCragRouteTool({
 		editRoutePathTrack(coordinates);
 	}
 
+	function duplicateRoutePath(path, _routeId, pathId) {
+		const document = state.routeDocuments.find((entry) => entry.path === path);
+		const feature = document ? findTopoPath(document.data, pathId) : null;
+		if (!document || !feature) return false;
+		let duplicatePathId;
+		do {
+			duplicatePathId = generateId('path');
+		} while (document.data.paths?.features?.some((item) => String(item.id) === duplicatePathId));
+		const duplicateFeature = JSON.parse(JSON.stringify(feature));
+		duplicateFeature.id = duplicatePathId;
+		duplicateFeature.properties = {
+			...(duplicateFeature.properties || {}),
+			name: duplicateFeature.properties?.name
+				? `${duplicateFeature.properties.name} copy`
+				: 'Route path copy'
+		};
+		state.updateRouteDocument(path, (data) => {
+			data.paths = data.paths || { type: 'FeatureCollection', features: [] };
+			data.paths.features = [...data.paths.features, duplicateFeature];
+		});
+		return true;
+	}
+
 	function splitRoutePath(
 		{ documentPath, pathId, routeId },
 		startCoordinates,
@@ -294,6 +317,7 @@ export function createCragRouteTool({
 		moveApproachTrackToTopoPaths,
 		saveRoutePathCoordinates,
 		editRoutePath,
+		duplicateRoutePath,
 		splitRoutePath,
 		updateRoutePath,
 		removeRoutePath,
