@@ -2,7 +2,7 @@
 	"name": "felsstudio",
 	"version": "0.0.1",
 	"scripts": {
-		"dev": "vite dev --host",
+		"dev": "svelte-kit sync && vite dev --host",
 		"build": "vite build",
 		"preview": "vite preview",
 		"test": "vitest run",
@@ -22,7 +22,6 @@
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-static": "^3.0.0",
-		"@sveltejs/enhanced-img": "^0.4.4",
 		"@sveltejs/kit": "^2.5.27",
 		"@sveltejs/vite-plugin-svelte": "^4.0.0",
 		"@tailwindcss/postcss": "^4.0.12",
@@ -30,6 +29,7 @@
 		"@testing-library/jest-dom": "^6.9.1",
 		"@testing-library/svelte": "^5.4.2",
 		"@testing-library/user-event": "^14.6.3",
+		"eruda": "^3.4.3",
 		"eslint": "^8.56.0",
 		"eslint-config-prettier": "^9.1.0",
 		"eslint-plugin-svelte": "^2.45.1",

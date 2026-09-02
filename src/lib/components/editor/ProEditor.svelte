@@ -30,8 +30,12 @@
 	import ToolPalette3D from '$lib/components/editor/3d/ToolPalette3D.svelte';
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
 	import { fixpointSymbols } from '@vorstieg/topo-renderer';
+	import { page } from '$app/state';
+	import { loadTopoEditorEntry, persistTopoSessionImmediately } from '$lib/assets/js/open-topo-editor-entry.js';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
-	let { workspace = '3d-create', children } = $props();
+	let { workspace = '3d-create', entryPath = null, children } = $props();
 	const topoSession = provideTopo2DEditorState(createTopo2DEditorState());
 	let saveStatus = $state('idle');
 	let saveError = $state('');
@@ -154,6 +158,20 @@
 	});
 
 	onMount(async () => {
+		if (entryPath) {
+			const { loadedTopo } = await loadTopoEditorEntry({
+				entryPath,
+				sectorId: page.url.searchParams.get('sector'),
+				workspace: '/topos/3d/editor',
+				topoSession: topoSession
+			});
+			if (!loadedTopo) {
+				const draftId = await persistTopoSessionImmediately(topoSession, $state.snapshot);
+				goto(`${resolve('/topos/3d/upload')}?draft=${encodeURIComponent(draftId)}`);
+				return;
+			}
+		}
+
 		initializeIdCounters(topoSession.topo);
 
 		// Initialize mobile detection (client-side only)
@@ -202,12 +220,13 @@
 		editorMode: '3d',
 		getWorkspace: () => workspace,
 		shouldRestore: () =>
-			workspace.endsWith('edit') ||
+			!entryPath &&
+			(workspace.endsWith('edit') ||
 			isBlankTopoSession({
 				topo: topoSession.topo,
 				clustering: topoSession.clustering,
 				glbBlob: topoSession.transient.glbBlob
-			}),
+			})),
 		restoreSession: (session, id) => {
 			restoreSession(session, id);
 			activeTool = getInitialActiveTool();

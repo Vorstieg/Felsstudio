@@ -3,6 +3,8 @@
 	import { resolve } from '$app/paths';
 	import { _ } from 'svelte-i18n';
 	import JSZip from 'jszip';
+	import { onMount } from 'svelte';
+	import { page } from '$app/state';
 	import { loadGlbIntoEditorState } from '$lib/assets/js/gltf-loader.js';
 	import { draftsState } from '$lib/state/drafts.svelte.js';
 	import { createTopo2DEditorState, provideTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
@@ -14,6 +16,14 @@
 	let glbFile = $state(null);
 	let projectFile = $state(null);
 	let cropFolderFiles = $state([]);
+
+	onMount(async () => {
+		const draftId = page.url.searchParams.get('draft');
+		if (!draftId) return;
+		draftsState.load();
+		const session = await draftsState.getById(draftId);
+		if (session) topoSession.loadSession(session, draftId);
+	});
 
 	async function processFiles() {
 		isLoading = true;

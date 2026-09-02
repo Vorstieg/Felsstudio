@@ -2,40 +2,15 @@
 	import { _ } from 'svelte-i18n';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { onMount } from 'svelte';
-	import { fileUrl, listDir, readJson } from '$lib/api/felslager.js';
-	import { loadAccessCollection } from '$lib/assets/js/fetchCrags.js';
-	import { draftsState } from '$lib/state/drafts.svelte.js';
-	import { createTopo2DEditorState, provideTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
-	import { Topo } from '$lib/assets/js/topo-paths.js';
-	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
-	import { loadGlbIntoEditorState } from '$lib/assets/js/gltf-loader.js';
 	import EntryPicker from '$lib/components/editor/wizard/EntryPicker.svelte';
-	import { normalizeTopoPaths } from '$lib/assets/js/topo-document-paths.js';
 	import { createCragEditorSession } from '$lib/state/crag-session.svelte.js';
+	import { getCragEditorPath, getTopoEditorPath } from '$lib/assets/js/editor-entry-paths.js';
 
 	let { workspace, titleKey, actionLabelKey, locations = [] } = $props();
-	const topoSession = provideTopo2DEditorState(createTopo2DEditorState());
 	const cragEditorState = createCragEditorSession();
 
-	let isLoading = $state(false);
 	let searchQuery = $state('');
 	let workSpaceWrapper = $derived(new WorkSpace(workspace));
-
-	let glbFiles = $state(new Set());
-
-	onMount(async () => {
-		try {
-			const allFiles = await listDir('', { recursive: true });
-			glbFiles = new Set(
-				allFiles
-					.filter((f) => f.type === 'file' && f.name.toLowerCase().endsWith('.glb'))
-					.map((f) => f.path)
-			);
-		} catch (err) {
-			console.error('Failed to load file listing from Felslager:', err);
-		}
-	});
 
 	const filteredLocations = $derived(
 		locations.filter((l) => {
@@ -57,16 +32,6 @@
 			);
 		})
 	);
-
-
-	async function persistTopoSessionImmediately() {
-		draftsState.load();
-		topoSession.ui.activeDraftId = await draftsState.save(topoSession.topo, topoSession.ui.activeDraftId, {
-			clustering: $state.snapshot(topoSession.clustering),
-			glbBlob: topoSession.transient.glbBlob
-		});
-		topoSession.ui.lastSaved = new Date().toISOString();
-	}
 
 	async function startNewEntry() {
 		if (workSpaceWrapper.isCragEditor()) {
@@ -103,139 +68,11 @@
 		}
 	}
 
-	async function loadFromEntry(crag, sector = null) {
-		isLoading = true;
-		topoSession.reset();
-		try {
-			const topo = new Topo(crag.properties.path, crag.properties.id, sector?.id);
-			const name = crag.properties.name;
-
-			let loadedTopo = workSpaceWrapper.is3DEditor() && glbFiles.has(topo.getGlbPath());
-
-			if (workSpaceWrapper.isCragEditor()) {
-				cragEditorState.reset();
-				try {
-					const cragData = await readJson(topo.getCragPath());
-					Object.assign(cragEditorState.crag, cragData.properties);
-					cragEditorState.crag.geometry = cragData.geometry;
-					cragEditorState.crag.sectors = await Promise.all(
-						(cragData.properties.sectors || []).map(async (sector) => {
-							try {
-								const sectorData = await readJson(
-									new Topo(topo.path, topo.cragId, sector.id).getSectorPath()
-								);
-								return {
-									...sector,
-									...sectorData.properties,
-									id: sector.id,
-									name: sectorData.properties.name || sector.name,
-									geometry: sectorData.geometry
-								};
-							} catch {
-								return sector;
-							}
-						})
-					);
-					const topoDocuments = [
-						{ sectorId: null, sectorTopo: topo },
-						...cragEditorState.crag.sectors.map((sector) => ({
-							sectorId: sector.id,
-							sectorTopo: new Topo(topo.path, topo.cragId, sector.id)
-						}))
-					];
-					cragEditorState.routeDocuments = (
-						await Promise.all(
-							topoDocuments.map(async ({ sectorId, sectorTopo }) => {
-								try {
-									const path = sectorTopo.getTopoPath();
-									const normalized = normalizeTopoPaths(await readJson(path));
-									return { path, sectorId, data: normalized.data, dirty: normalized.migrated };
-								} catch {
-									return null;
-								}
-							})
-						)
-					).filter(Boolean);
-				} catch {
-					/* crag file may not exist */
-				}
-				await loadAccessCollection(topo, cragEditorState);
-
-			} else if (workSpaceWrapper.is2DEditor()) {
-				try {
-					topoSession.topo = { ...topoSession.topo, ...normalizeTopoPaths(await readJson(topo.getTopoPath())).data };
-				} catch {
-					/* no topo yet */
-				}
-				topoSession.topo.editorMode = '2d';
-			} else {
-				try {
-					const topoData = normalizeTopoPaths(await readJson(topo.getTopoPath())).data;
-					topoSession.topo = { ...topoSession.topo, ...topoData };
-					loadedTopo = workspace === 'topos/3d/editor' ? loadedTopo : true;
-					initializeIdCounters(topoSession.topo);
-				} catch {
-					/* no topo yet */
-				}
-				if (workspace.includes('/3d/')) {
-					topoSession.topo.editorMode = '3d';
-					const glbUrl = fileUrl(topo.getGlbPath());
-					try {
-						const res = await fetch(glbUrl);
-						if (res.ok) {
-							loadedTopo = workspace === 'topos/3d/editor' ? true : loadedTopo;
-							const blob = await res.blob();
-							await loadGlbIntoEditorState(new File([blob], `${topo.getBaseName()}.glb`), topoSession);
-						}
-					} catch {
-						/* GLB may not exist */
-					}
-				} else {
-					topoSession.topo.editorMode = '2d';
-					// Try to load 2D image from Felslager
-					const imgNames = [`${name}.jpg`, `${name}.png`, 'topo.jpg'];
-					for (const imgName of imgNames) {
-						try {
-							const res = await fetch(fileUrl(`${topo.path}/${imgName}`));
-							if (res.ok) {
-								topoSession.topo.image2D = fileUrl(`${topo.path}/${imgName}`);
-								break;
-							}
-						} catch {
-							/* try next */
-						}
-					}
-				}
-			}
-
-			// Store the entry path for saving later
-			topoSession.topo._entryPath = topo._getPath();
-			topoSession.topo._topoFileName = topo.getTopoPath();
-
-			if (workSpaceWrapper.is3DEditor() && !loadedTopo) {
-				goto(resolve('/topos/3d/upload'));
-				return;
-			}
-
-			await persistTopoSessionImmediately();
-			if (workSpaceWrapper.isCragEditor()) {
-				const [{ storage }, { CRAG_SESSION_KEY }] = await Promise.all([
-					import('$lib/assets/js/storage-utils.js'),
-					import('$lib/components/editor/crag/crag-editor-options.js')
-				]);
-				storage.set(CRAG_SESSION_KEY, {
-					crag: $state.snapshot(cragEditorState.crag),
-					access: $state.snapshot(cragEditorState.access),
-					routeDocuments: $state.snapshot(cragEditorState.routeDocuments),
-					updated: new Date().toISOString()
-				});
-			}
-			goto(`${resolve(workSpaceWrapper.path)}?draft=${encodeURIComponent(topoSession.ui.activeDraftId)}`);
-		} catch (err) {
-			console.error(err);
-		} finally {
-			isLoading = false;
-		}
+	function loadFromEntry(crag, sector = null) {
+		const path = workSpaceWrapper.isCragEditor()
+			? getCragEditorPath(crag)
+			: getTopoEditorPath(workSpaceWrapper.path, crag, sector);
+		goto(resolve(path));
 	}
 </script>
 
@@ -264,7 +101,6 @@
 				<EntryPicker
 					{workSpaceWrapper}
 					{filteredLocations}
-					{isLoading}
 					bind:searchQuery
 					{startNewEntry}
 					{loadFromEntry}

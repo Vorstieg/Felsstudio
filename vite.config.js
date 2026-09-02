@@ -1,11 +1,10 @@
 import { defineConfig } from 'vitest/config';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
-import { enhancedImages } from '@sveltejs/enhanced-img';
 import { svelteTesting } from '@testing-library/svelte/vite';
 
 const config = defineConfig({
-	plugins: [tailwindcss(), enhancedImages(), sveltekit(), svelteTesting()],
+	plugins: [tailwindcss(), sveltekit(), svelteTesting()],
 	assetsInclude: ['**/*.glb'],
 	server: {
 		fs: {

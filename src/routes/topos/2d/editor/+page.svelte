@@ -24,7 +24,11 @@
 	import { topoSymbols } from '@vorstieg/topo-renderer';
 	import { _ } from 'svelte-i18n';
 	import { browser } from '$app/environment';
+	import { page } from '$app/state';
+	import { onMount } from 'svelte';
+	import { loadTopoEditorEntry } from '$lib/assets/js/open-topo-editor-entry.js';
 
+	let { entryPath = null } = $props();
 	const editorState = provideTopo2DEditorState(createTopo2DEditorState());
 	let toolOptionsOpen = $state(false);
 	let showMapModal = $state(false);
@@ -91,18 +95,30 @@
 		)
 	);
 
+	onMount(async () => {
+		if (!entryPath) return;
+		await loadTopoEditorEntry({
+			entryPath,
+			sectorId: page.url.searchParams.get('sector'),
+			workspace: '/topos/2d/editor',
+			topoSession: editorState
+		});
+		initializeIdCounters(editorState.topo);
+	});
+
 	useTopoDraftAutosave({
 		session: editorState,
 		draftId: browser ? new URL(window.location.href).searchParams.get('draft') : null,
 		editorMode: '2d',
-		getWorkspace: () => 'topos/2d/editor',
+		getWorkspace: () => '/topos/2d/editor',
 		getSaveSession: () => ({ ...editorState.getSaveSession(), topo: editorState.getSaveSnapshot() }),
 		onPersisted: () => editorState.markSaved(),
 		restoreSession: (session, id) => {
 			editorState.loadSession(session, id);
 			initializeIdCounters(editorState.topo);
 		},
-		getSaveSignature: () => JSON.stringify(editorState.getSaveSnapshot())
+		getSaveSignature: () => JSON.stringify(editorState.getSaveSnapshot()),
+		shouldRestore: () => !entryPath
 	});
 
 	async function saveTopo() {

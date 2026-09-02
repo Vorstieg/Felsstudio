@@ -38,7 +38,7 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 	import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.js';
 	import { createRouteEditController } from './route-editing.js';
 
-	let { inspectorShadow = true } = $props();
+	let { inspectorShadow = true, initialSession = null } = $props();
 	const cragEditorState = provideCragEditorSession(createCragEditorSession());
 
 	// Layout flags
@@ -207,8 +207,7 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 		);
 	}
 
-	function restoreLatestCragSession() {
-		const session = storage.get(CRAG_SESSION_KEY, null);
+	function restoreCragSession(session) {
 		if (!session) return;
 
 		cragEditorState.crag = session.crag
@@ -216,6 +215,10 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 			: cragEditorState.crag;
 		cragEditorState.access = session.access || { type: 'FeatureCollection', version: 1, features: [] };
 		cragEditorState.routeDocuments = session.routeDocuments || [];
+	}
+
+	function restoreLatestCragSession() {
+		restoreCragSession(storage.get(CRAG_SESSION_KEY, null));
 	}
 
 	function saveLatestCragSession() {
@@ -491,7 +494,7 @@ import { createCragEditorSession, normalizeCragSector, provideCragEditorSession 
 
 	// Restore before child components initialize. Hierarchy placement reads the
 	// crag path during initialization and must not start with a blank path.
-	if (isBlankCragSession()) restoreLatestCragSession();
+	if (isBlankCragSession()) restoreCragSession(untrack(() => initialSession) || storage.get(CRAG_SESSION_KEY, null));
 
 	async function handleMapClick(e) {
 		if (suppressNextMapClick) {

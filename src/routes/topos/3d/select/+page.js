@@ -1,7 +1,7 @@
-import fetchCrags from '$lib/assets/js/fetchCrags.js';
+import { fetchCragsFromManifest } from '$lib/assets/js/fetchCrags.js';
 
 /** @type {import('./$types').PageServerLoad} */
 export const load = async () => {
-	const locations = await fetchCrags({ limit: -1 });
+	const locations = await fetchCragsFromManifest({ limit: -1 });
 	return { locations };
 };

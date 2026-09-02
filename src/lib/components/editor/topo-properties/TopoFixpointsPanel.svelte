@@ -1,5 +1,8 @@
 <script>
+	import { _ } from 'svelte-i18n';
+	import { topoSymbols } from '@vorstieg/topo-renderer';
 	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+	import { createAiFixpoint } from './topo-properties-utils.js';
 	const editorState = getTopo2DEditorState();
 	let topo = $derived(editorState.topo);
 	const ui = editorState.ui;
