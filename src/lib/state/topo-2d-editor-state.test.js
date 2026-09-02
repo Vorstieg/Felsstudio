@@ -128,6 +128,29 @@ describe('createTopo2DEditorState', () => {
 		expect(editor.commitOutlineDraft()).toMatchObject({ mode: 'polyline' });
 	});
 
+	it('renumbers remaining pitches after deletion', () => {
+		const editor = createTopo2DEditorState({
+			topo: {
+				routes: [
+					{
+						id: 'route-1',
+						pitches: [
+							{ id: 'pitch-1', pitchNumber: 1 },
+							{ id: 'pitch-2', pitchNumber: 2 },
+							{ id: 'pitch-3', pitchNumber: 3 }
+						]
+					}
+				],
+				fixPoints: [],
+				outlines: []
+			}
+		});
+
+		editor.removePitch('route-1', 'pitch-2');
+		expect(editor.topo.routes[0].pitches.map((pitch) => pitch.pitchNumber)).toEqual([1, 2]);
+		expect(editor.topo.routes[0].pitches.map((pitch) => pitch.id)).toEqual(['pitch-1', 'pitch-3']);
+	});
+
 	it('clears deleted nested selections and drawing targets', () => {
 		const editor = createTopo2DEditorState({
 			topo: {

@@ -49,6 +49,11 @@ export function getTopo2DEditorState() {
 }
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
+const renumberPitches = (route) => {
+	(route?.pitches || []).forEach((pitch, index) => {
+		pitch.pitchNumber = index + 1;
+	});
+};
 
 export function createInitialTopo() {
 	return {
@@ -746,6 +751,7 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 				const route = readTopo().routes.find((r) => r.id === routeId);
 				if (!route?.pitches?.some((p) => p.id === id)) return false;
 				route.pitches = route.pitches.filter((p) => p.id !== id);
+				renumberPitches(route);
 				reconcileSelection();
 				return true;
 			}),
