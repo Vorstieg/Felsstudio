@@ -122,7 +122,7 @@ export class OutlineTool {
 					get: () => draft.brushOutlinePoints,
 					set: (value) => {
 						draft.brushOutlinePoints = value;
-						state.refreshPendingChanges?.();
+						editor.refreshPendingChanges?.();
 					}
 				},
 				mode: {

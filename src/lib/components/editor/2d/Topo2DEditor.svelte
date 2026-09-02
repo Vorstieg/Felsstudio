@@ -264,6 +264,7 @@
 			outlinePreview: {
 				baseWidth: editor.viewport.baseWidth,
 				baseHeight: editor.viewport.baseHeight,
+				mode: currentTool === tools.outline ? currentTool.mode : null,
 				fillColor: currentTool === tools.outline ? currentTool.fillColor : null,
 				fillOpacity: currentTool === tools.outline ? currentTool.fillOpacity : null
 			},

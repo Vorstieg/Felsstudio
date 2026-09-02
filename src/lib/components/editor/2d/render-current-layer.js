@@ -93,9 +93,11 @@ export function renderCurrentLayer({
 		.attr('stroke-width', outlineStyle.width)
 		.attr('stroke-dasharray', outlineStyle.dash);
 
+	const outlineControlPoints = outlinePreview.mode === 'freehand' ? [] : currentOutlinePoints;
+
 	layer
 		.selectAll('circle.current-outline-point')
-		.data(currentOutlinePoints)
+		.data(outlineControlPoints)
 		.join(
 			(enter) =>
 				enter.append('circle').attr('class', 'current-outline-point').attr('fill', '#f59e0b'),
