@@ -18,7 +18,9 @@ export async function loadCragEditorEntry(entryPath) {
 		sectors: await Promise.all(
 			(cragData.properties.sectors || []).map(async (sector) => {
 				try {
-					const sectorData = await readJson(new Topo(topo.path, topo.cragId, sector.id).getSectorPath());
+					const sectorData = await readJson(
+						new Topo(topo.path, topo.cragId, sector.id).getSectorPath()
+					);
 					return {
 						...sector,
 						...sectorData.properties,

@@ -3,7 +3,7 @@
 	import { OrbitControls } from '@threlte/extras';
 	import { Vector3, WebGLRenderer } from 'three';
 	import { createGltfLoader } from '$lib/assets/js/gltf-loader.js';
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import { browser } from '$app/environment';
 	import { tweened } from 'svelte/motion';
@@ -31,11 +31,16 @@
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
 	import { fixpointSymbols } from '@vorstieg/topo-renderer';
 	import { page } from '$app/state';
-	import { loadTopoEditorEntry, persistTopoSessionImmediately } from '$lib/assets/js/open-topo-editor-entry.js';
+	import {
+		loadTopoEditorEntry,
+		persistTopoSessionImmediately
+	} from '$lib/assets/js/open-topo-editor-entry.js';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 
 	let { workspace = '3d-create', entryPath = null, children } = $props();
+	const initialEntryPath = untrack(() => entryPath);
+	const initialSectorId = untrack(() => page.url.searchParams.get('sector'));
 	const topoSession = provideTopo2DEditorState(createTopo2DEditorState());
 	let saveStatus = $state('idle');
 	let saveError = $state('');
@@ -158,35 +163,12 @@
 	});
 
 	onMount(async () => {
-		if (entryPath) {
-			const { loadedTopo } = await loadTopoEditorEntry({
-				entryPath,
-				sectorId: page.url.searchParams.get('sector'),
-				workspace: '/topos/3d/editor',
-				topoSession: topoSession
-			});
-			if (!loadedTopo) {
-				const draftId = await persistTopoSessionImmediately(topoSession, $state.snapshot);
-				goto(`${resolve('/topos/3d/upload')}?draft=${encodeURIComponent(draftId)}`);
-				return;
-			}
-		}
-
-		initializeIdCounters(topoSession.topo);
-
 		// Initialize mobile detection (client-side only)
 		isMobile = isMobileViewport();
 		const handleResize = () => {
 			isMobile = isMobileViewport();
 		};
 		window.addEventListener('resize', handleResize);
-
-		// Force model offset from state
-		modelPositionOffset = topoSession.topo.modelOffset;
-
-		if (topoSession.transient.modelUrl) {
-			loadGlbFromUrl(topoSession.transient.modelUrl);
-		}
 
 		const handleKeyDown = (e) => {
 			if (activeTool === 'crop') {
@@ -217,20 +199,40 @@
 	useTopoDraftAutosave({
 		session: topoSession,
 		draftId: browser ? new URL(window.location.href).searchParams.get('draft') : null,
+		entryPath: initialEntryPath,
+		loadEntrySession: async () => {
+			const { loadedTopo } = await loadTopoEditorEntry({
+				entryPath: initialEntryPath,
+				sectorId: initialSectorId,
+				workspace: '/topos/3d/editor',
+				topoSession: topoSession
+			});
+			if (!loadedTopo) {
+				const draftId = await persistTopoSessionImmediately(topoSession, $state.snapshot);
+				goto(`${resolve('/topos/3d/upload')}?draft=${encodeURIComponent(draftId)}`);
+				return false;
+			}
+		},
 		editorMode: '3d',
 		getWorkspace: () => workspace,
 		shouldRestore: () =>
-			!entryPath &&
+			!initialEntryPath &&
 			(workspace.endsWith('edit') ||
-			isBlankTopoSession({
-				topo: topoSession.topo,
-				clustering: topoSession.clustering,
-				glbBlob: topoSession.transient.glbBlob
-			})),
+				isBlankTopoSession({
+					topo: topoSession.topo,
+					clustering: topoSession.clustering,
+					glbBlob: topoSession.transient.glbBlob
+				})),
 		restoreSession: (session, id) => {
 			restoreSession(session, id);
 			activeTool = getInitialActiveTool();
 			initializeIdCounters(topoSession.topo);
+		},
+		onInitialized: () => {
+			initializeIdCounters(topoSession.topo);
+			activeTool = getInitialActiveTool();
+			modelPositionOffset = topoSession.topo.modelOffset;
+			if (topoSession.transient.modelUrl) loadGlbFromUrl(topoSession.transient.modelUrl);
 		},
 		getSaveSignature: () =>
 			JSON.stringify({
@@ -327,7 +329,6 @@
 		lassoPoints = [];
 		modelComponent?.clearLassoSelection();
 	}
-
 
 	function estimateGpsOrigin() {
 		const pairs = [];

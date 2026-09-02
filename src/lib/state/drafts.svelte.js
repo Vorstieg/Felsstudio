@@ -4,6 +4,14 @@ import { restoreDraftSession, serializeDraftExtras } from './draft-serialization
 
 const STORAGE_KEY = 'topo_drafts_v1';
 
+function normalizeSourceEntryPath(path) {
+	return path ? String(path).replace(/^\/+|\/+$/g, '') : null;
+}
+
+function getSourceEntryPath(topo) {
+	return normalizeSourceEntryPath(topo?._entryPath || topo?.entryPath || null);
+}
+
 export function isBlankTopoSession(session) {
 	const topo = session?.topo || session;
 	return (
@@ -42,7 +50,9 @@ export const draftsState = $state({
 			id: draftId,
 			name: topo.name || 'Unnamed Topo',
 			editorMode,
-			updated: timestamp
+			updated: timestamp,
+			sourceEntryPath: getSourceEntryPath(topo),
+			sourceTopoFileName: topo._topoFileName || null
 		};
 
 		if (draftIndex >= 0) {
@@ -87,7 +97,41 @@ export const draftsState = $state({
 			const session = await this.getById(draft.id);
 			const sessionMode = session?.topo?.editorMode || session?.editorMode || draft.editorMode;
 			if (session && !isBlankTopoSession(session) && (!editorMode || sessionMode === editorMode)) {
-				return { id: draft.id, session };
+				return { id: draft.id, session, metadata: draft };
+			}
+		}
+
+		return null;
+	},
+
+	async getLatestForSource(editorMode, sourceEntryPath) {
+		const normalizedSource = normalizeSourceEntryPath(sourceEntryPath);
+		if (!normalizedSource) return null;
+
+		const sortedDrafts = [...this.drafts]
+			.filter((draft) => {
+				const metadataSource = normalizeSourceEntryPath(draft.sourceEntryPath);
+				return (
+					(!editorMode || !draft.editorMode || draft.editorMode === editorMode) &&
+					(!metadataSource || metadataSource === normalizedSource)
+				);
+			})
+			.sort((a, b) => new Date(b.updated) - new Date(a.updated));
+
+		for (const draft of sortedDrafts) {
+			const session = await this.getById(draft.id);
+			const sessionMode = session?.topo?.editorMode || session?.editorMode || draft.editorMode;
+			const metadataSource = normalizeSourceEntryPath(draft.sourceEntryPath);
+			const sessionSource = getSourceEntryPath(session?.topo || session);
+			const sourceMatches =
+				metadataSource === normalizedSource || sessionSource === normalizedSource;
+			if (
+				session &&
+				!isBlankTopoSession(session) &&
+				(!editorMode || sessionMode === editorMode) &&
+				sourceMatches
+			) {
+				return { id: draft.id, session, metadata: draft };
 			}
 		}
 

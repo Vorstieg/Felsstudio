@@ -10,10 +10,14 @@ import { getTopoEditorPath, splitEntryPath } from '$lib/assets/js/editor-entry-p
 
 export async function persistTopoSessionImmediately(topoSession, snapshot = (value) => value) {
 	draftsState.load();
-	topoSession.ui.activeDraftId = await draftsState.save(topoSession.topo, topoSession.ui.activeDraftId, {
-		clustering: snapshot(topoSession.clustering),
-		glbBlob: topoSession.transient.glbBlob
-	});
+	topoSession.ui.activeDraftId = await draftsState.save(
+		topoSession.topo,
+		topoSession.ui.activeDraftId,
+		{
+			clustering: snapshot(topoSession.clustering),
+			glbBlob: topoSession.transient.glbBlob
+		}
+	);
 	topoSession.ui.lastSaved = new Date().toISOString();
 	return topoSession.ui.activeDraftId;
 }
@@ -24,7 +28,19 @@ function getCragDirectory(topo) {
 
 export { getTopoEditorPath };
 
-export async function loadTopoEditorEntry({ crag, entryPath, sector = null, sectorId = null, workspace, topoSession }) {
+export function getTopoSourceEntryPath(entryPath, sectorId = null) {
+	const splitPath = splitEntryPath(entryPath);
+	return new Topo(splitPath.path, splitPath.id, sectorId)._getPath();
+}
+
+export async function loadTopoEditorEntry({
+	crag,
+	entryPath,
+	sector = null,
+	sectorId = null,
+	workspace,
+	topoSession
+}) {
 	topoSession.reset();
 	const splitPath = splitEntryPath(crag?.properties?.path || entryPath);
 	const topo = new Topo(splitPath.path, splitPath.id, sector?.id || sectorId);
@@ -47,7 +63,10 @@ export async function loadTopoEditorEntry({ crag, entryPath, sector = null, sect
 
 	if (workspace.startsWith('/topos/2d')) {
 		try {
-			topoSession.topo = { ...topoSession.topo, ...normalizeTopoPaths(await readJson(topo.getTopoPath())).data };
+			topoSession.topo = {
+				...topoSession.topo,
+				...normalizeTopoPaths(await readJson(topo.getTopoPath())).data
+			};
 		} catch {
 			/* no topo yet */
 		}
@@ -95,7 +114,13 @@ export async function loadTopoEditorEntry({ crag, entryPath, sector = null, sect
 	return { loadedTopo, topo };
 }
 
-export async function openTopoEditorEntry({ crag, sector = null, workspace, topoSession, snapshot }) {
+export async function openTopoEditorEntry({
+	crag,
+	sector = null,
+	workspace,
+	topoSession,
+	snapshot
+}) {
 	const { loadedTopo } = await loadTopoEditorEntry({ crag, sector, workspace, topoSession });
 
 	if (workspace.startsWith('/topos/3d') && !loadedTopo) {

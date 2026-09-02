@@ -25,10 +25,12 @@
 	import { _ } from 'svelte-i18n';
 	import { browser } from '$app/environment';
 	import { page } from '$app/state';
-	import { onMount } from 'svelte';
+	import { untrack } from 'svelte';
 	import { loadTopoEditorEntry } from '$lib/assets/js/open-topo-editor-entry.js';
 
 	let { entryPath = null } = $props();
+	const initialEntryPath = untrack(() => entryPath);
+	const initialSectorId = untrack(() => page.url.searchParams.get('sector'));
 	const editorState = provideTopo2DEditorState(createTopo2DEditorState());
 	let toolOptionsOpen = $state(false);
 	let showMapModal = $state(false);
@@ -44,7 +46,8 @@
 
 		const { selectedOutlineId, selectedRouteId, selectedPitchId, selectedVariantId } =
 			editorState.ui;
-		if (selectedOutlineId != null) return selectedRouteId == null && editorState.selectedItems.size === 1;
+		if (selectedOutlineId != null)
+			return selectedRouteId == null && editorState.selectedItems.size === 1;
 		if (selectedRouteId == null) return false;
 
 		const hasNestedPath = (selectedPitchId != null) !== (selectedVariantId != null);
@@ -57,9 +60,15 @@
 		maxGridSize: 0.25
 	});
 	let selectedOutline = $derived(
-		editorState.topo.outlines.find((outline) => String(outline.id) === String(editorState.ui.selectedOutlineId)) || null
+		editorState.topo.outlines.find(
+			(outline) => String(outline.id) === String(editorState.ui.selectedOutlineId)
+		) || null
 	);
-	let selectedRoute = $derived(editorState.topo.routes.find((route) => String(route.id) === String(editorState.ui.selectedRouteId)) || null);
+	let selectedRoute = $derived(
+		editorState.topo.routes.find(
+			(route) => String(route.id) === String(editorState.ui.selectedRouteId)
+		) || null
+	);
 	let routeEditTool = $derived(editor2D?.getRouteEditTool?.() || null);
 	const outlineCurveActions = createSelectedOutlineCurveLogic(
 		() => outlineEditTool,
@@ -95,30 +104,38 @@
 		)
 	);
 
-	onMount(async () => {
-		if (!entryPath) return;
-		await loadTopoEditorEntry({
-			entryPath,
-			sectorId: page.url.searchParams.get('sector'),
-			workspace: '/topos/2d/editor',
-			topoSession: editorState
-		});
-		initializeIdCounters(editorState.topo);
-	});
-
 	useTopoDraftAutosave({
 		session: editorState,
 		draftId: browser ? new URL(window.location.href).searchParams.get('draft') : null,
+		entryPath: initialEntryPath,
+		loadEntrySession: async () => {
+			await loadTopoEditorEntry({
+				entryPath: initialEntryPath,
+				sectorId: initialSectorId,
+				workspace: '/topos/2d/editor',
+				topoSession: editorState
+			});
+			initializeIdCounters(editorState.topo);
+		},
 		editorMode: '2d',
 		getWorkspace: () => '/topos/2d/editor',
-		getSaveSession: () => ({ ...editorState.getSaveSession(), topo: editorState.getSaveSnapshot() }),
+		getSaveSession: () => ({
+			...editorState.getSaveSession(),
+			topo: editorState.getSaveSnapshot()
+		}),
 		onPersisted: () => editorState.markSaved(),
 		restoreSession: (session, id) => {
 			editorState.loadSession(session, id);
 			initializeIdCounters(editorState.topo);
 		},
-		getSaveSignature: () => JSON.stringify(editorState.getSaveSnapshot()),
-		shouldRestore: () => !entryPath
+		getSaveSignature: () =>
+			JSON.stringify({
+				document: editorState.getSaveSnapshot(),
+				historyIndex: editorState.history.index,
+				historyLength: editorState.history.entries.length
+			}),
+		onInitialized: () => initializeIdCounters(editorState.topo),
+		shouldRestore: () => !initialEntryPath
 	});
 
 	async function saveTopo() {
@@ -138,7 +155,7 @@
 			delete topoToSave._topoFileName;
 			delete topoToSave.name;
 
-		await writeJson(editorState.topo._topoFileName, topoToSave);
+			await writeJson(editorState.topo._topoFileName, topoToSave);
 			editorState.markSaved();
 
 			saveStatus = 'success';
@@ -237,11 +254,19 @@
 	{:else if editorState.ui.activeTool === 'select'}
 		<SelectToolOptions
 			selectedOutlineId={isEditingSelectedPath ? editorState.ui.selectedOutlineId : null}
-			selectedRoute={isEditingSelectedPath && selectedRoute && { ...selectedRoute, routeEditTool, onCurveChange: (changes) => editorState.updateRoute(selectedRoute.id, { curve: { enabled: false, tension: 0.45, ...(selectedRoute.curve || {}), ...changes } }) }}
+			selectedRoute={isEditingSelectedPath &&
+				selectedRoute && {
+					...selectedRoute,
+					routeEditTool,
+					onCurveChange: (changes) =>
+						editorState.updateRoute(selectedRoute.id, {
+							curve: { enabled: false, tension: 0.45, ...(selectedRoute.curve || {}), ...changes }
+						})
+				}}
 			{selectedOutline}
 			{outlineEditTool}
 			outlineGridActions={outlineEditGridActions}
-			outlineCurveActions={outlineCurveActions}
+			{outlineCurveActions}
 			{outlineStyleActions}
 			bind:simplifyTolerancePx={outlineSimplifyTolerancePx}
 			simplifySummary={outlineSimplifySummary}

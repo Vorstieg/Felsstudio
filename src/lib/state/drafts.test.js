@@ -12,6 +12,20 @@ vi.mock('$lib/assets/js/db.js', () => ({ topoStore: mocks.topoStore }));
 
 import { draftsState, isBlankTopoSession } from './drafts.svelte.js';
 
+if (!globalThis.localStorage) {
+	let values = new Map();
+	globalThis.localStorage = {
+		clear: () => values.clear(),
+		getItem: (key) => values.get(key) ?? null,
+		setItem: (key, value) => values.set(key, String(value)),
+		removeItem: (key) => values.delete(key),
+		key: (index) => [...values.keys()][index] ?? null,
+		get length() {
+			return values.size;
+		}
+	};
+}
+
 describe('draft persistence', () => {
 	beforeEach(() => {
 		localStorage.clear();
@@ -26,6 +40,8 @@ describe('draft persistence', () => {
 			id: 'topo-1',
 			editorMode: '2d',
 			name: 'Rote Wand',
+			_entryPath: '/lower-austria/rote-wand/rote-wand/',
+			_topoFileName: 'lower-austria/rote-wand/rote-wand-topo.json',
 			routes: [{ id: 'route-1', name: 'Direkter Einstieg' }]
 		};
 
@@ -44,7 +60,9 @@ describe('draft persistence', () => {
 			expect.objectContaining({
 				id: '2d-topo-1',
 				name: 'Rote Wand',
-				editorMode: '2d'
+				editorMode: '2d',
+				sourceEntryPath: 'lower-austria/rote-wand/rote-wand',
+				sourceTopoFileName: 'lower-austria/rote-wand/rote-wand-topo.json'
 			})
 		]);
 		expect(
@@ -82,7 +100,62 @@ describe('draft persistence', () => {
 
 		const result = await draftsState.getLatest('2d');
 
-		expect(result).toEqual({ id: 'two-d', session: sessions['two-d'] });
+		expect(result).toEqual({
+			id: 'two-d',
+			session: sessions['two-d'],
+			metadata: draftsState.drafts[2]
+		});
+		draftsState.getById.mockRestore();
+	});
+
+	it('finds the latest matching non-blank draft for a source entry path', async () => {
+		draftsState.drafts = [
+			{
+				id: 'matching-newer',
+				editorMode: '2d',
+				updated: '2026-01-03T00:00:00.000Z',
+				sourceEntryPath: 'lower-austria/rote-wand/rote-wand'
+			},
+			{
+				id: 'other-source',
+				editorMode: '2d',
+				updated: '2026-01-04T00:00:00.000Z',
+				sourceEntryPath: 'lower-austria/other/other'
+			},
+			{
+				id: 'matching-blank',
+				editorMode: '2d',
+				updated: '2026-01-05T00:00:00.000Z',
+				sourceEntryPath: 'lower-austria/rote-wand/rote-wand'
+			}
+		];
+		const sessions = {
+			'matching-newer': {
+				topo: {
+					editorMode: '2d',
+					name: 'Rote Wand draft',
+					_entryPath: 'lower-austria/rote-wand/rote-wand'
+				}
+			},
+			'other-source': {
+				topo: { editorMode: '2d', name: 'Other', _entryPath: 'lower-austria/other/other' }
+			},
+			'matching-blank': {
+				topo: { editorMode: '2d', _entryPath: 'lower-austria/rote-wand/rote-wand', routes: [] }
+			}
+		};
+		vi.spyOn(draftsState, 'getById').mockImplementation(async (id) => sessions[id] || null);
+
+		const result = await draftsState.getLatestForSource(
+			'2d',
+			'/lower-austria/rote-wand/rote-wand/'
+		);
+
+		expect(result).toEqual({
+			id: 'matching-newer',
+			session: sessions['matching-newer'],
+			metadata: draftsState.drafts[0]
+		});
 		draftsState.getById.mockRestore();
 	});
 

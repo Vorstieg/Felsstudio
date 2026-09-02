@@ -120,7 +120,9 @@ const fetchCrags = async ({ offset = 0, limit = cragsPerPage, search = '' } = {}
 		)
 	).filter(Boolean);
 
-	const sortedCrags = crags.sort((a, b) => new Date(b.properties.date) - new Date(a.properties.date));
+	const sortedCrags = crags.sort(
+		(a, b) => new Date(b.properties.date) - new Date(a.properties.date)
+	);
 	return filterAndPaginateCrags(sortedCrags, { offset, limit, search });
 };
 
