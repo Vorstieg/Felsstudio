@@ -10,7 +10,8 @@
 		duplicateRoutePath: onDuplicateRoutePath,
 		concatRoutePaths: onConcatRoutePaths,
 		deleteRoutePath: onDeleteRoutePath,
-		moveApproachTrackToTopoPaths: onMoveApproachTrackToTopoPaths
+		moveApproachTrackToTopoPaths: onMoveApproachTrackToTopoPaths,
+		updateRoutePathFeature: onUpdateRoutePathFeature
 	} = routeTool;
 	const { setHoverHighlight: onSetHoverHighlight, clearDetectedAssets: onClearDetectedAssets, addDetectedAsset: onAddDetectedAsset, removeAccessFeature: onRemoveAccessFeature } = accessEditor;
 	const { editTrack: onEditTrack, removeTrack: onRemoveTrack, finalizeTrack: onFinalizeTrack, cancelTrackEdit: onCancelTrackEdit } = trackEditor;
@@ -35,6 +36,9 @@
 	);
 	let approachFeatures = $derived(
 		accessFeatures.filter((feature) => feature.properties?.kind === 'approach')
+	);
+	let assignableAccessFeatures = $derived(
+		accessFeatures.filter((feature) => feature.properties?.kind !== 'approach')
 	);
 	let topoPathCount = $derived(
 		routeDocuments.reduce(
@@ -95,6 +99,11 @@
 
 	function pathLabel(feature, index) {
 		return feature.properties?.name || `Path ${index + 1}`;
+	}
+
+	function accessFeatureLabel(feature) {
+		const kindLabel = { parking: 'Parking', hut: 'Hut', transit: 'Transit' }[feature?.properties?.kind] || 'Access';
+		return feature?.properties?.name ? `${feature.properties.name} (${kindLabel})` : `${kindLabel} ${feature?.id || ''}`;
 	}
 
 	function moveApproachTrack(event, track) {
@@ -411,6 +420,31 @@
 							</button>
 							</span>
 						</div>
+						<div class="space-y-1" onclick={(event) => event.stopPropagation()} role="presentation">
+							<label class="text-micro-data font-bold uppercase tracking-wide text-warm-gray-400" for={`path-description-${document.path}-${feature.id}`}>Path text</label>
+							<textarea
+								id={`path-description-${document.path}-${feature.id}`}
+								class="input-studio w-full resize-none"
+								rows="3"
+								value={feature.properties?.description || ''}
+								placeholder="e.g. Approach path, not marked. Hohe Trittsicherheit erforderlich…"
+								oninput={(event) => onUpdateRoutePathFeature(document.path, feature.id, 'description', event.currentTarget.value)}
+							></textarea>
+						</div>
+						{#if assignableAccessFeatures.length > 0}
+							<select
+								class="input-studio w-full"
+								aria-label="Assign access feature"
+								value={feature.properties?.accessFeatureId || ''}
+								onclick={(event) => event.stopPropagation()}
+								onchange={(event) => onUpdateRoutePathFeature(document.path, feature.id, 'accessFeatureId', event.currentTarget.value)}
+							>
+								<option value="">No access feature</option>
+								{#each assignableAccessFeatures as accessFeature}
+									<option value={accessFeature.id}>{accessFeatureLabel(accessFeature)}</option>
+								{/each}
+							</select>
+						{/if}
 						{#if (document.data?.paths?.features || []).length > 1}
 							<select
 								class="input-studio w-full"

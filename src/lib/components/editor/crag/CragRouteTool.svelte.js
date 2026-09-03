@@ -348,6 +348,18 @@ export function createCragRouteTool({
 		);
 	}
 
+	function updateRoutePathFeature(path, pathId, field, value) {
+		const document = state.routeDocuments.find((entry) => entry.path === path);
+		const feature = document ? findTopoPath(document.data, pathId) : null;
+		if (!document || !feature) return false;
+		state.updateRouteDocument(path, () => {
+			feature.properties = { ...(feature.properties || {}) };
+			if (value == null || value === '') delete feature.properties[field];
+			else feature.properties[field] = value;
+		});
+		return true;
+	}
+
 	function removeRoutePath(path, routeId, pathId) {
 		updateRoutePaths(path, routeId, (paths) =>
 			paths.filter((ref) => String(ref.pathId) !== String(pathId))
@@ -423,6 +435,7 @@ export function createCragRouteTool({
 		concatRoutePaths,
 		splitRoutePath,
 		updateRoutePath,
+		updateRoutePathFeature,
 		removeRoutePath,
 		deleteRoutePath,
 		undoDeleteRoutePath

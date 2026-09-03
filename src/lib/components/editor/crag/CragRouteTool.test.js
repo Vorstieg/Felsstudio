@@ -57,6 +57,13 @@ test('manages route paths, access copies, and route-specific metadata', () => {
 	tool.updateRoutePath(document.path, route.id, createdPath.id, 'label', 'Main line');
 	assert.equal(route.pathRefs[0].label, 'Main line');
 
+	assert.equal(tool.updateRoutePathFeature(document.path, createdPath.id, 'description', 'Approach path, not marked. Hohe Trittsicherheit erforderlich.'), true);
+	assert.equal(createdPath.properties.description, 'Approach path, not marked. Hohe Trittsicherheit erforderlich.');
+	assert.equal(tool.updateRoutePathFeature(document.path, createdPath.id, 'accessFeatureId', 'hut-1'), true);
+	assert.equal(createdPath.properties.accessFeatureId, 'hut-1');
+	assert.equal(tool.updateRoutePathFeature(document.path, createdPath.id, 'accessFeatureId', ''), true);
+	assert.equal(createdPath.properties.accessFeatureId, undefined);
+
 	state.access.features = [
 		{
 			id: 'approach-1',
