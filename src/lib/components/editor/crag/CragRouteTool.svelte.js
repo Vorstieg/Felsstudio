@@ -3,7 +3,6 @@ import { Topo } from '$lib/assets/js/topo-paths.js';
 import {
 	assignTopoPath,
 	createPathFeature,
-	deleteTopoPath,
 	findTopoPath,
 	splitTopoPath
 } from '$lib/assets/js/topo-document-paths.js';
@@ -109,6 +108,7 @@ export function createCragRouteTool({
 		do {
 			pathId = generateId('path');
 		} while (document.data.paths.features.some((feature) => String(feature.id) === pathId));
+		const pathIndex = document.data.paths.features.length;
 		state.updateRouteDocument(path, (data) => {
 			data.paths = data.paths || { type: 'FeatureCollection', features: [] };
 			data.paths.features = [
@@ -122,7 +122,7 @@ export function createCragRouteTool({
 			];
 		});
 		updateRoutePaths(path, routeId, (refs) => [...refs, { pathId, role: 'main' }]);
-		startRouteDraft({ documentPath: path, routeId, pathId });
+		startRouteDraft({ documentPath: path, routeId, pathId, pathIndex });
 		startRoutingDraft();
 	}
 
@@ -190,14 +190,23 @@ export function createCragRouteTool({
 				features: state.access.features.filter((feature) => feature.id !== accessFeatureId)
 			};
 		});
+		const selection = getSelection();
+		if (selection?.type === 'approach' && selection.id === accessFeatureId) {
+			selectObject({ type: 'route-path', documentPath, pathId: String(pathId) });
+		}
 		return true;
 	}
 
-	function saveRoutePathCoordinates({ documentPath, pathId }, coordinates) {
+	function findPathFeature(document, pathId, pathIndex = null) {
+		const features = document?.data.paths?.features || [];
+		if (Number.isInteger(pathIndex) && String(features[pathIndex]?.id) === String(pathId))
+			return features[pathIndex];
+		return features.find((item) => String(item.id) === String(pathId));
+	}
+
+	function saveRoutePathCoordinates({ documentPath, pathId, pathIndex }, coordinates) {
 		const document = state.routeDocuments.find((entry) => entry.path === documentPath);
-		const feature = document?.data.paths?.features?.find(
-			(item) => String(item.id) === String(pathId)
-		);
+		const feature = findPathFeature(document, pathId, pathIndex);
 		if (!feature) return false;
 		state.updateRouteDocument(documentPath, () => {
 			feature.geometry = { type: 'LineString', coordinates };
@@ -205,13 +214,13 @@ export function createCragRouteTool({
 		return true;
 	}
 
-	function editRoutePath(path, routeId, pathId) {
+	function editRoutePath(path, routeId, pathId, pathIndex = null) {
 		const document = state.routeDocuments.find((entry) => entry.path === path);
-		const coordinates = document?.data.paths?.features?.find(
-			(feature) => String(feature.id) === String(pathId)
-		)?.geometry?.coordinates;
+		const feature = findPathFeature(document, pathId, Number.isInteger(pathIndex) ? pathIndex : null);
+		const coordinates = feature?.geometry?.coordinates;
 		if (!Array.isArray(coordinates)) return;
-		startRouteDraft({ documentPath: path, routeId, pathId });
+		const resolvedPathIndex = (document?.data.paths?.features || []).indexOf(feature);
+		startRouteDraft({ documentPath: path, routeId, pathId, pathIndex: resolvedPathIndex });
 		editRoutePathTrack(coordinates);
 	}
 
@@ -258,6 +267,79 @@ export function createCragRouteTool({
 		return true;
 	}
 
+	function pointDistance(a, b) {
+		if (!a || !b) return Infinity;
+		return Math.hypot(Number(a[0]) - Number(b[0]), Number(a[1]) - Number(b[1]));
+	}
+
+	function orientConcatCoordinates(firstCoordinates, secondCoordinates) {
+		const first = firstCoordinates.map((point) => [...point]);
+		const second = secondCoordinates.map((point) => [...point]);
+		const reversedSecond = [...second].reverse();
+		const options = [
+			{ distance: pointDistance(first.at(-1), second[0]), coordinates: [...first, ...second.slice(1)] },
+			{
+				distance: pointDistance(first.at(-1), second.at(-1)),
+				coordinates: [...first, ...reversedSecond.slice(1)]
+			},
+			{
+				distance: pointDistance(first[0], second.at(-1)),
+				coordinates: [...second, ...first.slice(1)]
+			},
+			{
+				distance: pointDistance(first[0], second[0]),
+				coordinates: [...reversedSecond, ...first.slice(1)]
+			}
+		];
+		return options.sort((a, b) => a.distance - b.distance)[0].coordinates;
+	}
+
+	function concatRoutePaths(path, basePathId, appendPathId, basePathIndex = null, appendPathIndex = null) {
+		const document = state.routeDocuments.find((entry) => entry.path === path);
+		const features = document?.data.paths?.features || [];
+		const baseIndex = Number.isInteger(basePathIndex)
+			? basePathIndex
+			: features.findIndex((feature) => String(feature.id) === String(basePathId));
+		const appendIndex = Number.isInteger(appendPathIndex)
+			? appendPathIndex
+			: features.findIndex((feature, index) => index !== baseIndex && String(feature.id) === String(appendPathId));
+		const base = features[baseIndex];
+		const append = features[appendIndex];
+		if (
+			!base ||
+			!append ||
+			baseIndex === appendIndex ||
+			base.geometry?.type !== 'LineString' ||
+			append.geometry?.type !== 'LineString' ||
+			base.geometry.coordinates?.length < 2 ||
+			append.geometry.coordinates?.length < 2
+		)
+			return false;
+
+		state.updateRouteDocument(path, (data) => {
+			base.geometry = {
+				type: 'LineString',
+				coordinates: orientConcatCoordinates(base.geometry.coordinates, append.geometry.coordinates)
+			};
+			base.properties = {
+				...(append.properties || {}),
+				...(base.properties || {}),
+				name: base.properties?.name || append.properties?.name || 'Route path'
+			};
+			data.paths.features.splice(appendIndex, 1);
+			for (const route of data.routes || []) {
+				const refs = route.pathRefs || [];
+				const hasBaseRef = refs.some((ref) => String(ref.pathId) === String(base.id));
+				route.pathRefs = refs.flatMap((ref) => {
+					if (String(ref.pathId) !== String(append.id)) return [ref];
+					return hasBaseRef ? [] : [{ ...ref, pathId: String(base.id) }];
+				});
+			}
+		});
+		selectObject({ type: 'route-path', documentPath: path, pathId: String(base.id), pathIndex: baseIndex });
+		return true;
+	}
+
 	function updateRoutePath(path, routeId, pathId, field, value) {
 		updateRoutePaths(path, routeId, (paths) =>
 			paths.map((pathRef) =>
@@ -272,21 +354,41 @@ export function createCragRouteTool({
 		);
 	}
 
-	function deleteRoutePath(path, pathId) {
+	function deleteRoutePath(path, pathId, pathIndex = null) {
 		const document = state.routeDocuments.find((entry) => entry.path === path);
-		if (!document || !findTopoPath(document.data, pathId)) return false;
-		const feature = findTopoPath(document.data, pathId);
+		const features = document?.data.paths?.features || [];
+		const resolvedIndex = Number.isInteger(pathIndex)
+			? pathIndex
+			: features.findIndex((item) => String(item.id) === String(pathId));
+		const feature = features[resolvedIndex];
+		if (!document || !feature || String(feature.id) !== String(pathId)) return false;
 		const routeRefs = (document.data.routes || [])
 			.filter((route) =>
 				(route.pathRefs || []).some((ref) => String(ref.pathId) === String(pathId))
 			)
 			.map((route) => ({ id: route.id, pathRefs: JSON.parse(JSON.stringify(route.pathRefs)) }));
-		const deleted = deleteTopoPath(document.data, pathId);
+		features.splice(resolvedIndex, 1);
+		const hasSameId = features.some((item) => String(item.id) === String(pathId));
+		if (!hasSameId) {
+			for (const route of document.data.routes || [])
+				route.pathRefs = (route.pathRefs || []).filter(
+					(ref) => String(ref.pathId) !== String(pathId)
+				);
+		}
+		const deleted = true;
 		if (deleted) {
 			deletedRoutePathUndo = { path, feature: JSON.parse(JSON.stringify(feature)), routeRefs };
 			document.dirty = true;
 			const draft = getRouteDraft();
+			const selection = getSelection();
 			if (draft?.pathId === pathId && draft?.documentPath === path) cancelTrackEdit();
+			if (
+				selection?.type === 'route-path' &&
+				selection.documentPath === path &&
+				String(selection.pathId) === String(pathId) &&
+				(selection.pathIndex == null || Number(selection.pathIndex) === resolvedIndex)
+			)
+				selectObject(null);
 		}
 		return deleted;
 	}
@@ -318,6 +420,7 @@ export function createCragRouteTool({
 		saveRoutePathCoordinates,
 		editRoutePath,
 		duplicateRoutePath,
+		concatRoutePaths,
 		splitRoutePath,
 		updateRoutePath,
 		removeRoutePath,

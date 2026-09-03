@@ -36,7 +36,7 @@
 	{#if activeTab === 'info'}
 		<CragEditorInfoTab {saveStatus} />
 	{:else if activeTab === 'registry'}
-		<CragEditorRegistryTab {detectedAssets} {isDetectionLoading} {isDetectionZoomLimited} {activeTrackTarget} />
+		<CragEditorRegistryTab {detectedAssets} {isDetectionLoading} {isDetectionZoomLimited} {activeTrackTarget} bind:selectedObject />
 	{:else}
 		<CragEditorSectorsTab {map} bind:selectedObject />
 	{/if}

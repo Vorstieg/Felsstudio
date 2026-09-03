@@ -860,7 +860,7 @@ export function buildEditorFeatureCollection({
 				}
 			});
 		});
-	routePaths.forEach(({ documentPath, feature, assignedRouteIds = [] }) => {
+	routePaths.forEach(({ documentPath, pathIndex, feature, assignedRouteIds = [] }) => {
 		if (
 			editingRoutePath?.documentPath === documentPath &&
 			editingRoutePath?.pathId === String(feature.id)
@@ -879,12 +879,14 @@ export function buildEditorFeatureCollection({
 				feature: 'route-path',
 				documentPath,
 				pathId: String(feature.id),
+				pathIndex,
 				assignedRouteIds,
 				name: feature.properties?.name || 'Route path',
 				selected:
 					selectedObject?.type === 'route-path' &&
 					selectedObject.documentPath === documentPath &&
-					String(selectedObject.pathId) === String(feature.id)
+					String(selectedObject.pathId) === String(feature.id) &&
+					(selectedObject.pathIndex == null || Number(selectedObject.pathIndex) === pathIndex)
 			}
 		});
 	});

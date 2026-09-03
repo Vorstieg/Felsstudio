@@ -127,11 +127,11 @@
 	const undoTrackPoint = (...args) => trackEditor.undoTrackPoint(...args);
 	const splitEditingTrack = (...args) => trackEditor.splitEditingTrack(...args);
 	const editTrack = (...args) => {
-		toolOptionsOpen = true;
+		toolOptionsOpen = false;
 		return trackEditor.editTrack(...args);
 	};
 	const editRoutePathTrack = (...args) => {
-		toolOptionsOpen = true;
+		toolOptionsOpen = false;
 		return trackEditor.editRoutePath(...args);
 	};
 	const cancelTrackEdit = (...args) => trackEditor.cancelTrackEdit(...args);
@@ -583,39 +583,16 @@
 			selectTool.handleMapClick(e);
 			return;
 		}
-		if (activeTool === 'track' && ['select', 'delete'].includes(trackDraftMode)) {
+
+		if (activeTool === 'track' && ['select', 'delete'].includes(trackDraftMode) && currentTrackPoints.length > 0) {
 			if (trackDraftMode === 'select') trackEditor.clearTrackSelection();
 			return;
 		}
 
-		if (activeTool === 'track' && !routeEditDraft && currentTrackPoints.length === 0) {
-			if (map.getLayer('route-paths-line')) {
-				const routePathFeature = map.queryRenderedFeatures(e.point, {
-					layers: ['route-paths-line']
-				})[0];
-				const path = routePathFeature?.properties?.documentPath;
-				const pathId = routePathFeature?.properties?.pathId;
-				if (path && pathId) {
-					const route = cragEditorState.routeDocuments
-						.find((entry) => entry.path === path)
-						?.data?.routes?.find((item) =>
-							(item.pathRefs || []).some((ref) => String(ref.pathId) === String(pathId))
-						);
-					routeTool.editRoutePath(path, route?.id, pathId);
-					return;
-				}
-			}
-
-			if (map.getLayer('tracks-line-saved')) {
-				const trackFeature = map.queryRenderedFeatures(e.point, {
-					layers: ['tracks-line-saved']
-				})[0];
-				const accessFeatureId = trackFeature?.properties?.accessFeatureId;
-				if (accessFeatureId) {
-					editTrack(accessFeatureId);
-					return;
-				}
-			}
+		const canSelectPathFromTool = activeTool !== 'track' || (!routeEditDraft && currentTrackPoints.length === 0);
+		if (canSelectPathFromTool) {
+			const selectedPath = selectTool.handlePathMapClick(e, { editPath: activeTool === 'track' });
+			if (selectedPath) return;
 		}
 
 		if (map.getLayer('detection-points')) {
@@ -828,8 +805,9 @@
 					}))
 				),
 				routePaths: (cragEditorState.routeDocuments || []).flatMap((document) =>
-					(document.data?.paths?.features || []).map((feature) => ({
+					(document.data?.paths?.features || []).map((feature, pathIndex) => ({
 						documentPath: document.path,
+						pathIndex,
 						feature,
 						assignedRouteIds: (document.data?.routes || [])
 							.filter((route) =>

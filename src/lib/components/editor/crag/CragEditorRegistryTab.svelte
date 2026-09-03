@@ -8,6 +8,7 @@
 		addRoutePath: onAddRoutePath,
 		editRoutePath: onEditRoutePath,
 		duplicateRoutePath: onDuplicateRoutePath,
+		concatRoutePaths: onConcatRoutePaths,
 		deleteRoutePath: onDeleteRoutePath,
 		moveApproachTrackToTopoPaths: onMoveApproachTrackToTopoPaths
 	} = routeTool;
@@ -19,7 +20,8 @@
 		detectedAssets = [],
 		isDetectionLoading = false,
 		isDetectionZoomLimited = false,
-		activeTrackTarget = null
+		activeTrackTarget = null,
+		selectedObject = $bindable(null)
 	} = $props();
 	let accessFeatures = $derived(cragEditorState.access?.features || []);
 	let transitFeatures = $derived(
@@ -47,19 +49,59 @@
 		);
 	}
 
-	function editPath(document, feature) {
+	function isSelectedApproach(track) {
+		return selectedObject?.type === 'approach' && selectedObject.id === track.id;
+	}
+
+	function isSelectedPath(document, feature, pathIndex) {
+		return (
+			selectedObject?.type === 'route-path' &&
+			selectedObject.documentPath === document.path &&
+			String(selectedObject.pathId) === String(feature.id) &&
+			(selectedObject.pathIndex == null || Number(selectedObject.pathIndex) === pathIndex)
+		);
+	}
+
+	function selectApproach(track) {
+		selectedObject = { type: 'approach', id: track.id };
+	}
+
+	function selectPath(document, feature, pathIndex) {
+		selectedObject = {
+			type: 'route-path',
+			documentPath: document.path,
+			pathId: String(feature.id),
+			pathIndex
+		};
+	}
+
+	function editPath(document, feature, pathIndex) {
+		selectPath(document, feature, pathIndex);
 		const route = assignedRoutes(document, feature.id)[0];
-		if (route) onEditRoutePath(document.path, route.id, feature.id);
+		onEditRoutePath(document.path, route?.id, feature.id, pathIndex);
 	}
 
 	function duplicatePath(document, feature) {
 		onDuplicateRoutePath(document.path, null, feature.id);
 	}
 
+	function concatPath(event, document, feature, pathIndex) {
+		const appendPathIndex = Number(event.currentTarget.value);
+		if (!Number.isInteger(appendPathIndex)) return;
+		const append = document.data?.paths?.features?.[appendPathIndex];
+		if (append) onConcatRoutePaths(document.path, feature.id, append.id, pathIndex, appendPathIndex);
+		event.currentTarget.value = '';
+	}
+
+	function pathLabel(feature, index) {
+		return feature.properties?.name || `Path ${index + 1}`;
+	}
+
 	function moveApproachTrack(event, track) {
 		const documentPath = event.currentTarget.value;
 		if (!documentPath) return;
 		onMoveApproachTrackToTopoPaths(documentPath, track.id);
+		if (isSelectedApproach(track)) selectedObject = null;
 		event.currentTarget.value = '';
 	}
 </script>
@@ -206,7 +248,15 @@
 		</div>
 	{/each}
 	{#each approachFeatures as track}
-		<div class="panel-inner p-2 flex flex-col gap-2 border-black/10 hover:border-creator-blue">
+		<div
+			class="panel-inner p-2 flex flex-col gap-2 hover:border-creator-blue {isSelectedApproach(track) ? 'border-creator-blue bg-creator-blue/5 ring-1 ring-creator-blue/20' : 'border-black/10'}"
+			onclick={() => selectApproach(track)}
+			role="button"
+			tabindex="0"
+			onkeydown={(event) => {
+				if (event.key === 'Enter' || event.key === ' ') selectApproach(track);
+			}}
+		>
 			<div class="flex justify-between items-center">
 				<div class="flex items-center gap-2">
 					<div
@@ -218,14 +268,22 @@
 				</div>
 				<div class="flex items-center gap-1">
 					<button
-						onclick={() => onEditTrack(track.id)}
+						onclick={(event) => {
+							event.stopPropagation();
+							selectApproach(track);
+							onEditTrack(track.id);
+						}}
 						class="w-6 h-6 text-warm-gray-400"
 						title="Edit approach track"
 					>
 						<i class="fa-solid fa-pen text-[10px]"></i></button
 					>
 					<button
-						onclick={() => onRemoveTrack(track.id)}
+						onclick={(event) => {
+							event.stopPropagation();
+							onRemoveTrack(track.id);
+							if (isSelectedApproach(track)) selectedObject = null;
+						}}
 						class="w-6 h-6 text-warm-gray-300 hover:text-rose-600"
 						title="Delete approach track"><i class="fa-solid fa-trash-can text-[10px]"></i></button
 					>
@@ -281,9 +339,17 @@
 						</button>
 					{/if}
 				</div>
-				{#each document.data?.paths?.features || [] as feature}
+				{#each document.data?.paths?.features || [] as feature, pathIndex}
 					{@const routes = assignedRoutes(document, feature.id)}
-					<div class="space-y-2 rounded-sm border border-black/10 bg-warm-white/40 p-2">
+					<div
+						class="space-y-2 rounded-sm border p-2 {isSelectedPath(document, feature, pathIndex) ? 'border-creator-blue bg-creator-blue/5 ring-1 ring-creator-blue/20' : 'border-black/10 bg-warm-white/40'}"
+						onclick={() => selectPath(document, feature, pathIndex)}
+						role="button"
+						tabindex="0"
+						onkeydown={(event) => {
+							if (event.key === 'Enter' || event.key === ' ') selectPath(document, feature, pathIndex);
+						}}
+					>
 						<div class="flex items-start justify-between gap-2">
 							<input
 								class="path-name-input input-studio min-w-0 flex-1 !border-0 !bg-transparent !px-0 !py-0 text-body-text font-bold text-near-black focus:!ring-0"
@@ -314,7 +380,10 @@
 								class="action-button text-creator-blue"
 								title="Edit path"
 								aria-label="Edit path"
-								onclick={() => editPath(document, feature)}>
+								onclick={(event) => {
+									event.stopPropagation();
+									editPath(document, feature, pathIndex);
+								}}>
 								<i class="fa-solid fa-pen text-[10px]"></i>
 							</button>
 							<button
@@ -322,7 +391,10 @@
 								class="action-button text-warm-gray-500 hover:text-creator-blue"
 								title="Duplicate path"
 								aria-label="Duplicate path"
-								onclick={() => duplicatePath(document, feature)}>
+								onclick={(event) => {
+									event.stopPropagation();
+									duplicatePath(document, feature);
+								}}>
 								<i class="fa-solid fa-copy text-[10px]"></i>
 							</button>
 							<button
@@ -330,11 +402,30 @@
 								class="action-button text-rose-600"
 								title="Delete path"
 								aria-label="Delete path"
-								onclick={() => onDeleteRoutePath(document.path, feature.id)}>
+								onclick={(event) => {
+									event.stopPropagation();
+									onDeleteRoutePath(document.path, feature.id, pathIndex);
+									if (isSelectedPath(document, feature, pathIndex)) selectedObject = null;
+								}}>
 								<i class="fa-solid fa-trash-can text-[10px]"></i>
 							</button>
 							</span>
 						</div>
+						{#if (document.data?.paths?.features || []).length > 1}
+							<select
+								class="input-studio w-full"
+								aria-label="Concatenate with another path"
+								onclick={(event) => event.stopPropagation()}
+								onchange={(event) => concatPath(event, document, feature, pathIndex)}
+							>
+								<option value="" selected>Concat with…</option>
+								{#each document.data?.paths?.features || [] as otherFeature, otherIndex}
+									{#if otherIndex !== pathIndex}
+										<option value={otherIndex}>{pathLabel(otherFeature, otherIndex)}</option>
+									{/if}
+								{/each}
+							</select>
+						{/if}
 					</div>
 				{/each}
 			</div>
