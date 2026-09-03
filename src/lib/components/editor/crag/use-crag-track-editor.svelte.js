@@ -64,6 +64,7 @@ export function useCragTrackEditor({
 	let touchLongPress = null;
 	let isTouchRangePending = false;
 	let skipLongPressClick = false;
+	let lastTouchPointDeleteAt = 0;
 	let areTrackPointDragHandlersReady = false;
 	let trackEditHistory = [];
 	const approachFeatures = () =>
@@ -271,6 +272,29 @@ export function useCragTrackEditor({
 			.filter((_, pointIndex) => pointIndex !== index);
 		selectedTrackPointIndex = null;
 		clearTrackSelection();
+		return true;
+	}
+
+	function removeTrackPointFromMapEvent(event) {
+		// Touch browsers commonly emit a synthetic click after touchstart. Because
+		// points are addressed by array index, handling both events would delete the
+		// touched point and then the next point after indexes shift.
+		const originalEvent = event.originalEvent;
+		if (originalEvent?.type === 'click' && Date.now() - lastTouchPointDeleteAt < 700) {
+			originalEvent?.stopPropagation?.();
+			setSuppressNextMapClick(true);
+			return false;
+		}
+
+		const pointIndex = Number(event.features?.[0]?.properties?.pointIndex);
+		if (!Number.isInteger(pointIndex) || !removeTrackPoint(pointIndex)) return false;
+		if (originalEvent?.type === 'touchstart') {
+			lastTouchPointDeleteAt = Date.now();
+			originalEvent?.preventDefault?.();
+		}
+		originalEvent?.stopPropagation?.();
+		setSuppressNextMapClick(true);
+		onTrackPointDragEnd();
 		return true;
 	}
 
@@ -615,11 +639,7 @@ export function useCragTrackEditor({
 
 		const deleteTrackPoint = (event) => {
 			if (getActiveTool() !== 'track' || trackDraftMode !== 'editing') return;
-			const pointIndex = Number(event.features?.[0]?.properties?.pointIndex);
-			if (!Number.isInteger(pointIndex) || !removeTrackPoint(pointIndex)) return;
-			event.originalEvent?.stopPropagation?.();
-			setSuppressNextMapClick(true);
-			onTrackPointDragEnd();
+			removeTrackPointFromMapEvent(event);
 		};
 		map.on('click', 'tracks-point-delete', deleteTrackPoint);
 		map.on('touchstart', 'tracks-point-delete', deleteTrackPoint);
@@ -665,11 +685,7 @@ export function useCragTrackEditor({
 
 		const deleteTrackPointInDeleteMode = (event) => {
 			if (getActiveTool() !== 'track' || trackDraftMode !== 'delete') return;
-			const pointIndex = Number(event.features?.[0]?.properties?.pointIndex);
-			if (!Number.isInteger(pointIndex) || !removeTrackPoint(pointIndex)) return;
-			event.originalEvent?.stopPropagation?.();
-			setSuppressNextMapClick(true);
-			onTrackPointDragEnd();
+			removeTrackPointFromMapEvent(event);
 		};
 		map.on('click', 'tracks-points-drawing', deleteTrackPointInDeleteMode);
 		map.on('touchstart', 'tracks-points-drawing', deleteTrackPointInDeleteMode);
