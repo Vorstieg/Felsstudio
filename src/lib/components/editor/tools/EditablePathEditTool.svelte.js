@@ -118,7 +118,8 @@ export class EditablePathEditTool {
 		midpointTarget,
 		canvasInput,
 		baseWidth,
-		baseHeight
+		baseHeight,
+		hideControlPoints = false
 	}) {
 		const handlesLayer = layers.handles
 			.selectAll(`g.${this.id}-controls`)
@@ -144,7 +145,7 @@ export class EditablePathEditTool {
 
 		handlesLayer
 			.selectAll('circle.editable-path-point-handle')
-			.data(pointHandles, pointKey)
+			.data(hideControlPoints ? [] : pointHandles, pointKey)
 			.join('circle')
 			.attr('class', 'editable-path-point-handle')
 			.attr('cx', (item) => item.point[0] * baseWidth)
@@ -173,7 +174,7 @@ export class EditablePathEditTool {
 
 		handlesLayer
 			.selectAll('circle.editable-path-midpoint')
-			.data(midpoints, midpointKey)
+			.data(hideControlPoints ? [] : midpoints, midpointKey)
 			.join('circle')
 			.attr('class', 'editable-path-midpoint')
 			.attr('cx', (item) => item.midX * baseWidth)

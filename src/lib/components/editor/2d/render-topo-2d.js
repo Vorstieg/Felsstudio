@@ -68,7 +68,10 @@ export function renderTopo2D({
 		basePath,
 		onObjectMouseDown,
 		onObjectClick,
-		onTextMouseDown
+		onTextMouseDown,
+		hideControlPoints: ['move-point', 'move-points', 'transform-preset-outline'].includes(
+			editor.interaction?.kind
+		)
 	};
 
 	renderBackgroundLayer(renderContext);

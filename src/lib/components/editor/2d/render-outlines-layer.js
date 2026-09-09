@@ -17,6 +17,7 @@ export function renderOutlinesLayer({
 	baseHeight,
 	canvasInput,
 	editTools,
+	hideControlPoints,
 	isSelected,
 	onObjectMouseDown: handleObjectMouseDown,
 	onObjectClick: handleObjectClick
@@ -130,5 +131,13 @@ export function renderOutlinesLayer({
 		.attr('stroke', 'none')
 		.style('pointer-events', 'none');
 
-	outlineEditTool?.render({ layers, renderModel, activeTool, baseWidth, baseHeight, canvasInput });
+	outlineEditTool?.render({
+		layers,
+		renderModel,
+		activeTool,
+		baseWidth,
+		baseHeight,
+		canvasInput,
+		hideControlPoints
+	});
 }

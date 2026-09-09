@@ -27,6 +27,7 @@
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import { loadTopoEditorEntry } from '$lib/assets/js/open-topo-editor-entry.js';
+	import { isMobileViewport } from '$lib/assets/js/mobile-utils.js';
 
 	let { entryPath = null } = $props();
 	const initialEntryPath = untrack(() => entryPath);
@@ -90,6 +91,10 @@
 	$effect(() => {
 		const selectionId = editorState.ui.selectedOutlineId || editorState.ui.selectedRouteId;
 		if (!isEditingSelectedPath) {
+			lastOpenedOutlineEditId = null;
+			return;
+		}
+		if (editorState.ui.selectedOutlineId != null && browser && isMobileViewport()) {
 			lastOpenedOutlineEditId = null;
 			return;
 		}

@@ -146,7 +146,7 @@ export class OutlineEditTool extends EditablePathEditTool {
 		});
 	}
 
-	render({ layers, renderModel, baseWidth, baseHeight, canvasInput }) {
+	render({ layers, renderModel, baseWidth, baseHeight, canvasInput, hideControlPoints }) {
 		this.renderControls({
 			layers,
 			pointHandles: renderModel.outlines.handles,
@@ -157,18 +157,20 @@ export class OutlineEditTool extends EditablePathEditTool {
 			midpointTarget: (item) => item,
 			canvasInput,
 			baseWidth,
-			baseHeight
+			baseHeight,
+			hideControlPoints
 		});
 		this.renderSemanticHandles({
 			layers,
 			handles: renderModel.outlines.semanticHandles,
 			baseWidth,
 			baseHeight,
-			canvasInput
+			canvasInput,
+			hideControlPoints
 		});
 	}
 
-	renderSemanticHandles({ layers, handles, baseWidth, baseHeight, canvasInput }) {
+	renderSemanticHandles({ layers, handles, baseWidth, baseHeight, canvasInput, hideControlPoints }) {
 		const layer = layers.handles
 			.selectAll('g.outline-semantic-controls')
 			.data([null])
@@ -198,7 +200,7 @@ export class OutlineEditTool extends EditablePathEditTool {
 
 		layer
 			.selectAll('circle.outline-semantic-handle')
-			.data(handles, (item) => `${item.outlineId}-${item.id}`)
+			.data(hideControlPoints ? [] : handles, (item) => `${item.outlineId}-${item.id}`)
 			.join('circle')
 			.attr('class', (item) => `outline-semantic-handle ${item.kind}`)
 			.attr('cx', (item) => displayPoint(item)[0] * baseWidth)

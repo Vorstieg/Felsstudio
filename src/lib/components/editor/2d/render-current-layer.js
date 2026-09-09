@@ -1,5 +1,4 @@
 import { getOutlineLineStyle } from '@vorstieg/topo-renderer';
-import { getTouchTargetSize } from '$lib/assets/js/mobile-utils.js';
 
 /** Renders in-progress route and outline previews. */
 export function renderCurrentLayer({
@@ -93,20 +92,8 @@ export function renderCurrentLayer({
 		.attr('stroke-width', outlineStyle.width)
 		.attr('stroke-dasharray', outlineStyle.dash);
 
-	const outlineControlPoints = outlinePreview.mode === 'freehand' ? [] : currentOutlinePoints;
-
-	layer
-		.selectAll('circle.current-outline-point')
-		.data(outlineControlPoints)
-		.join(
-			(enter) =>
-				enter.append('circle').attr('class', 'current-outline-point').attr('fill', '#f59e0b'),
-			(update) => update,
-			(exit) => exit.remove()
-		)
-		.attr('r', getTouchTargetSize(3))
-		.attr('cx', (point) => point[0] * outlinePreview.baseWidth)
-		.attr('cy', (point) => point[1] * outlinePreview.baseHeight);
+	// Creation previews should show only the path/fill, not editable-looking handles.
+	layer.selectAll('circle.current-outline-point').remove();
 
 	layer
 		.selectAll('polygon.current-outline-fill')

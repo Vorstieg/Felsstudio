@@ -1,6 +1,6 @@
 import { getRouteLineStyle } from '@vorstieg/topo-renderer';
 import { pointsToSmoothSvgPath } from '$lib/assets/js/outline-geometry.js';
-import { getHitAreaSize } from '$lib/assets/js/mobile-utils.js';
+import { getHitAreaSize, isTouchDevice } from '$lib/assets/js/mobile-utils.js';
 
 /** Renders persisted route paths and delegates their edit controls to RouteEditTool. */
 export function renderRoutesLayer({
@@ -11,6 +11,7 @@ export function renderRoutesLayer({
 	baseHeight,
 	canvasInput,
 	editTools,
+	hideControlPoints,
 	onObjectMouseDown: handleObjectMouseDown,
 	onObjectClick: handleObjectClick
 }) {
@@ -23,6 +24,8 @@ export function renderRoutesLayer({
 					baseHeight
 				})
 			: `M ${route.pointsStr.replaceAll(' ', ' L ')}`;
+	const routeHitAreaSize = (route) =>
+		isTouchDevice() && (route.isPitch || route.isVariant) ? 10 : getHitAreaSize(7);
 	const routesLayer = layers.routes;
 	const canInteract =
 		activeTool === 'select' || activeTool === 'eraser' || activeTool === routeEditTool?.id;
@@ -73,7 +76,7 @@ export function renderRoutesLayer({
 		.attr('fill', 'none')
 		.attr('stroke', 'transparent')
 		.attr('d', routePath)
-		.attr('stroke-width', getHitAreaSize(7))
+		.attr('stroke-width', routeHitAreaSize)
 		.style('pointer-events', canInteract ? 'auto' : 'none')
 		.on('mousedown', handleRouteDown)
 		.on('touchstart', handleRouteTouch)
@@ -120,6 +123,7 @@ export function renderRoutesLayer({
 		activeTool,
 		baseWidth,
 		baseHeight,
-		canvasInput
+		canvasInput,
+		hideControlPoints
 	});
 }

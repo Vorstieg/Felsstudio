@@ -16,6 +16,15 @@
 
 	function selectRoute(route) {
 		if (editorState.ui.selectedRouteId === route.id) {
+			if (
+				editorState.ui.selectedPitchId != null ||
+				editorState.ui.selectedVariantId != null ||
+				editorState.ui.selectedPathId != null
+			) {
+				editorState.selectObject('route', route.id);
+				drawingTarget = null;
+				return;
+			}
 			editorState.clearSelection();
 			drawingTarget = null;
 			return;

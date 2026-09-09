@@ -17,6 +17,8 @@ function createEditor(overrides = {}) {
 		isSelected: () => false,
 		selectObject: vi.fn(),
 		selectPath: vi.fn(),
+		selectItems: vi.fn(),
+		removeItems: vi.fn(),
 		setDrawingTarget: vi.fn(),
 		getSelectedRoutePoints: () => [],
 		isRoutePointSelected: () => false,
@@ -104,5 +106,40 @@ describe('persisted path edit tools', () => {
 			routeId: 'route-1',
 			pitchId: 'pitch-1'
 		});
+	});
+
+	it('deselects an already selected multipitch pitch without clearing the route', () => {
+		const editor = createEditor({
+			isSelected: (type, id) => type === 'pitch' && id === 'pitch-1'
+		});
+		const tool = new RouteEditTool(editor);
+
+		tool.handleRouteDown(
+			{ stopPropagation: vi.fn() },
+			{ id: 'route-1', pitchId: 'pitch-1' },
+			canvasInput
+		);
+
+		expect(editor.selectObject).toHaveBeenCalledWith('route', 'route-1', false);
+		expect(editor.setDrawingTarget).toHaveBeenCalledWith(null);
+		expect(editor.selectPath).not.toHaveBeenCalled();
+	});
+
+	it('toggles only the nested pitch during mobile multi-selection', () => {
+		const editor = createEditor({
+			ui: { activeTool: 'select', isShiftPressed: false, mobileSelectionMode: true },
+			isSelected: (type, id) => type === 'pitch' && id === 'pitch-1'
+		});
+		const tool = new RouteEditTool(editor);
+
+		tool.handleRouteDown(
+			{ identifier: 1, stopPropagation: vi.fn() },
+			{ id: 'route-1', pitchId: 'pitch-1' },
+			canvasInput
+		);
+
+		expect(editor.removeItems).toHaveBeenCalledWith([{ type: 'pitch', id: 'pitch-1' }]);
+		expect(editor.selectObject).not.toHaveBeenCalled();
+		expect(editor.setDrawingTarget).toHaveBeenCalledWith(null);
 	});
 });

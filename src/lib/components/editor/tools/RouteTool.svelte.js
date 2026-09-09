@@ -1,4 +1,3 @@
-import { getTouchTargetSize } from '$lib/assets/js/mobile-utils.js';
 import { generateId, generateRouteId } from '$lib/assets/js/id-utils.js';
 import { snapPointToGrid } from './path-drawing-logic.js';
 
@@ -242,6 +241,7 @@ export class RouteTool {
 		const layer = layers.current;
 		const previewClass = `current-${this.mode}-path`;
 		const pointClass = `current-${this.mode}-point`;
+		layer.selectAll(`circle.${pointClass}`).remove();
 		layer
 			.selectAll(`polyline.${previewClass}`)
 			.data(points.length > 1 ? [points] : [])
@@ -255,15 +255,5 @@ export class RouteTool {
 			.attr('points', (path) =>
 				path.map(([x, y]) => `${x * baseWidth},${y * baseHeight}`).join(' ')
 			);
-
-		layer
-			.selectAll(`circle.${pointClass}`)
-			.data(points)
-			.join('circle')
-			.attr('class', pointClass)
-			.attr('fill', '#ff00ff')
-			.attr('r', getTouchTargetSize(3))
-			.attr('cx', ([x]) => x * baseWidth)
-			.attr('cy', ([, y]) => y * baseHeight);
 	}
 }

@@ -20,6 +20,8 @@ export class RouteEditTool extends EditablePathEditTool {
 		});
 		this.getTopo = () => editor.topo;
 		this.selectPath = (...args) => editor.selectPath(...args);
+		this.selectItems = (...args) => editor.selectItems?.(...args);
+		this.removeItems = (...args) => editor.removeItems?.(...args);
 		this.setDrawingTarget = (target) => editor.setDrawingTarget(target);
 		this.deleteRoutes = (...args) => editor.deleteRoutes(...args);
 		this.getSelectedRoutePoints = () => editor.getSelectedRoutePoints();
@@ -45,6 +47,25 @@ export class RouteEditTool extends EditablePathEditTool {
 	}
 
 	handleRouteDown(event, routeTarget, canvasInput) {
+		if (
+			event?.identifier != null &&
+			this.getMobileSelectionMode() &&
+			(routeTarget?.pitchId || routeTarget?.variantId)
+		) {
+			const kind = routeTarget.pitchId ? 'pitch' : 'variant';
+			const pathId = routeTarget.pitchId || routeTarget.variantId;
+			if (this.isSelected(kind, pathId)) this.removeItems([{ type: kind, id: pathId }]);
+			else
+				this.selectItems(
+					[
+						{ type: 'route', id: routeTarget.id },
+						{ type: kind, id: pathId }
+					],
+					'add'
+				);
+			this.setDrawingTarget(null);
+			return true;
+		}
 		return this.handleItemDown(event, routeTarget, canvasInput, this.routeItemOptions());
 	}
 
@@ -58,7 +79,14 @@ export class RouteEditTool extends EditablePathEditTool {
 			remove: (ids) => this.delete(ids),
 			beforeMove: ({ id, pitchId = null, variantId = null }) => {
 				if (this.selectPath && (pitchId || variantId)) {
-					this.selectPath(pitchId ? 'pitch' : 'variant', id, pitchId || variantId);
+					const kind = pitchId ? 'pitch' : 'variant';
+					const pathId = pitchId || variantId;
+					if (this.isSelected(kind, pathId)) {
+						this.selectObject('route', id, false);
+						this.setDrawingTarget(null);
+						return false;
+					}
+					this.selectPath(kind, id, pathId);
 					this.setDrawingTarget(
 						pitchId
 							? { type: 'pitch', routeId: id, pitchId }
@@ -99,7 +127,7 @@ export class RouteEditTool extends EditablePathEditTool {
 	onActivate() {}
 	onDeactivate() {}
 
-	render({ layers, renderModel, activeTool, baseWidth, baseHeight, canvasInput }) {
+	render({ layers, renderModel, activeTool, baseWidth, baseHeight, canvasInput, hideControlPoints }) {
 		const tool = this;
 		const canEdit = this.isEditMode(activeTool);
 		const routesLayer = layers.routes;
@@ -146,7 +174,8 @@ export class RouteEditTool extends EditablePathEditTool {
 			midpointTarget: (item) => item,
 			canvasInput,
 			baseWidth,
-			baseHeight
+			baseHeight,
+			hideControlPoints
 		});
 	}
 }
