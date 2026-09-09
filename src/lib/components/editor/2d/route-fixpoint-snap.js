@@ -1,4 +1,4 @@
-const ROUTE_ANCHOR_TYPES = new Set(['belay', 'abseil']);
+const ROUTE_ANCHOR_TYPES = new Set(['belay', 'abseil', 'abseil-left', 'abseil-right']);
 
 /** Finds the closest placed belay or abseil anchor within the route snapping radius. */
 export function snapRoutePointToAnchor(

@@ -2,6 +2,8 @@
 // `import.meta.glob` when it occurs in an installed dependency, but it does
 // process explicit `?url` asset imports from dependencies.
 import abseil from '../assets/topo-symbols/abseil.svg?url';
+import abseilLeft from '../assets/topo-symbols/abseil-left.svg?url';
+import abseilRight from '../assets/topo-symbols/abseil-right.svg?url';
 import arete from '../assets/topo-symbols/arete.svg?url';
 import band from '../assets/topo-symbols/band.svg?url';
 import belay from '../assets/topo-symbols/belay.svg?url';
@@ -38,6 +40,8 @@ import waterStreak from '../assets/topo-symbols/water-streak.svg?url';
 
 const iconUrls = {
 	abseil,
+	'abseil-left': abseilLeft,
+	'abseil-right': abseilRight,
 	arete,
 	band,
 	belay,
@@ -73,7 +77,7 @@ const iconUrls = {
 	'water-streak': waterStreak
 };
 
-const fixpoints = ['bolt', 'piton', 'hourglass', 'belay', 'abseil'];
+const fixpoints = ['bolt', 'piton', 'hourglass', 'belay', 'abseil', 'abseil-left', 'abseil-right'];
 const features = [
 	'arete',
 	'band',
@@ -108,6 +112,8 @@ const features = [
 
 const labels = {
 	abseil: 'Abseil station',
+	'abseil-left': 'Abseil station left',
+	'abseil-right': 'Abseil station right',
 	arete: 'Arête',
 	cave: 'Cave / niche',
 	ledge: 'Ledge / band',
@@ -130,8 +136,8 @@ export const topoSymbols = [
 		name: labels[id] || titleCase(id),
 		icon: iconFor(id),
 		type: 'fixpoint',
-		width: 16,
-		height: 16
+		width: ['abseil-left', 'abseil-right'].includes(id) ? 26 : 16,
+		height: id === 'abseil' ? 26 : ['abseil-left', 'abseil-right'].includes(id) ? 24 : 16
 	})),
 	...features.map((id) => ({
 		id,
