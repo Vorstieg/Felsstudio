@@ -21,12 +21,13 @@ export const OUTLINE_PRESETS = [
 		id: 'slab',
 		labelKey: 'ui.outline_preset_slab',
 		icon: 'fa-mountain',
+		// A slab is a simple parallelogram with horizontal top/bottom edges.
 		points: [
-			[0.08, 0.05],
-			[0.9, 0],
-			[1, 0.92],
-			[0.02, 1],
-			[0.08, 0.05]
+			[0.16, 0.06],
+			[0.92, 0.06],
+			[0.76, 0.96],
+			[0, 0.96],
+			[0.16, 0.06]
 		]
 	},
 	{
@@ -36,84 +37,75 @@ export const OUTLINE_PRESETS = [
 		// A pillar continues beyond the lower edge of the topo, so leave its
 		// base open rather than connecting the two bottom points.
 		points: [
-			[0.12, 1],
-			[0.28, 0],
-			[0.75, 0.04],
-			[0.92, 1]
+			[0.88, 1],
+			[0.82, 0.68],
+			[0.76, 0.34],
+			[0.69, 0.02],
+			[0.32, 0],
+			[0.22, 0.35],
+			[0.16, 0.7],
+			[0.08, 1]
+		]
+	},
+	{
+		id: 'wall',
+		labelKey: 'ui.outline_preset_wall',
+		icon: 'fa-vector-square',
+		points: [
+			[0.04, 0.96],
+			[0, 0.62],
+			[0.06, 0.28],
+			[0.18, 0.02],
+			[0.86, 0],
+			[0.98, 0.25],
+			[1, 0.64],
+			[0.93, 1],
+			[0.04, 0.96]
+		]
+	},
+	{
+		id: 'ramp',
+		labelKey: 'ui.outline_preset_ramp',
+		icon: 'fa-arrow-trend-up',
+		// A ramp reads as a right-angled triangular wedge.  The lower side is
+		// horizontal but left open; the right angle sits on one lower corner and
+		// moves to the other lower corner when the preset is mirrored.
+		points: [
+			[0, 1],
+			[1, 0.24],
+			[1, 1]
 		]
 	},
 	{
 		id: 'arete',
 		labelKey: 'ui.outline_preset_arete',
-		icon: 'fa-diamond',
+		icon: 'fa-slash',
+		// An arête reads better as an open ridge/edge than as a closed diamond.
 		points: [
-			[0.5, 0],
-			[1, 0.55],
-			[0.48, 1],
-			[0, 0.58],
-			[0.5, 0]
-		]
-	},
-	{
-		id: 'overhang',
-		labelKey: 'ui.outline_preset_overhang',
-		icon: 'fa-arrow-down-wide-short',
-		points: [
-			[0, 0.08],
-			[1, 0],
-			[0.92, 0.42],
-			[0.65, 0.43],
-			[0.56, 0.72],
-			[0.2, 1],
-			[0, 0.08]
-		]
-	},
-	{
-		id: 'boulder',
-		labelKey: 'ui.outline_preset_boulder',
-		icon: 'fa-circle',
-		points: [
-			[0.22, 0.08],
-			[0.62, 0],
-			[0.9, 0.2],
-			[1, 0.62],
-			[0.76, 0.94],
-			[0.31, 1],
-			[0.03, 0.72],
-			[0, 0.31],
-			[0.22, 0.08]
-		]
-	},
-	{
-		id: 'cave',
-		labelKey: 'ui.outline_preset_cave',
-		icon: 'fa-door-open',
-		points: [
-			[0.05, 1],
-			[0, 0.23],
-			[0.24, 0],
-			[0.76, 0],
-			[1, 0.23],
-			[0.95, 1],
-			[0.68, 0.7],
-			[0.5, 0.5],
-			[0.32, 0.7],
-			[0.05, 1]
-		]
-	},
-	{
-		id: 'ledge',
-		labelKey: 'ui.outline_preset_ledge',
-		icon: 'fa-grip-lines',
-		points: [
-			[0, 0.25],
-			[0.72, 0],
-			[1, 0.22],
-			[0.78, 0.48],
-			[0.95, 0.72],
 			[0.28, 1],
-			[0, 0.78],
-			[0, 0.25]
+			[0.38, 0.74],
+			[0.5, 0.5],
+			[0.6, 0.25],
+			[0.72, 0]
+		]
+	},
+	{
+		id: 'corner',
+		labelKey: 'ui.outline_preset_corner',
+		icon: 'fa-v',
+		// Match the topo symbol more closely: two steep wall cheeks and a central
+		// crease. The left cheek is explicitly closed so its lower-left edge is
+		// visible, then the path continues across the right cheek.
+		points: [
+			[0.1, 0.06],
+			[0.1, 0.82],
+			[0.5, 0.98],
+			[0.5, 0.2],
+			[0.1, 0.06],
+			[0.5, 0.2],
+			[0.9, 0.06],
+			[0.9, 0.82],
+			[0.5, 0.98]
 		]
 	}
 ];
@@ -124,17 +116,13 @@ export function getOutlinePreset(presetId) {
 	return OUTLINE_PRESETS.find((preset) => preset.id === presetId) || null;
 }
 
-/** Maps a unit-template to the bounds of a drag gesture. */
+/** Maps a unit-template to a drag gesture, preserving drag direction for mirrored formations. */
 export function createPresetPoints(presetId, start2D, end2D) {
 	const preset = getOutlinePreset(presetId);
 	if (!preset || !start2D || !end2D) return [];
-	const minX = Math.min(start2D[0], end2D[0]);
-	const maxX = Math.max(start2D[0], end2D[0]);
-	const minY = Math.min(start2D[1], end2D[1]);
-	const maxY = Math.max(start2D[1], end2D[1]);
-	const width = maxX - minX;
-	const height = maxY - minY;
-	return preset.points.map(([x, y]) => [minX + x * width, minY + y * height]);
+	const width = end2D[0] - start2D[0];
+	const height = end2D[1] - start2D[1];
+	return preset.points.map(([x, y]) => [start2D[0] + x * width, start2D[1] + y * height]);
 }
 
 export function createPresetShape(presetId, start2D, end2D, { semantic = {} } = {}) {
@@ -176,13 +164,13 @@ export function getPresetSemanticHandles(outline, canvasSize = {}) {
 		{ id: 'width', kind: 'scale-width', point: [maxX, centerY] },
 		{ id: 'height', kind: 'scale-height', point: [centerX, minY] }
 	];
-	if (['pillar', 'slab'].includes(outline.shape.preset)) {
+	if (['pillar', 'slab', 'wall', 'ramp', 'corner'].includes(outline.shape.preset)) {
 		handles.push({ id: 'lean', kind: 'lean', point: [centerX, minY] });
 	}
-	if (outline.shape.preset === 'pillar') {
+	if (['pillar', 'wall'].includes(outline.shape.preset)) {
 		handles.push({ id: 'taper', kind: 'taper', point: [centerX, maxY] });
 	}
-	if (['overhang', 'cave'].includes(outline.shape.preset)) {
+	if (outline.shape.preset === 'roof') {
 		handles.push({ id: 'notch', kind: 'notch-depth', point: [centerX, centerY] });
 	}
 	return handles;
@@ -213,15 +201,14 @@ function cloneOutline(outline) {
 }
 
 function getPresetNotchIndex(preset) {
-	if (preset === 'overhang') return 4;
-	if (preset === 'cave') return 7;
+	if (preset === 'roof') return 6;
 	return null;
 }
 
 function presetSupportsSemantic(preset, key) {
-	if (key === 'lean') return ['pillar', 'slab'].includes(preset);
-	if (key === 'taper') return preset === 'pillar';
-	if (key === 'notchDepth') return ['overhang', 'cave'].includes(preset);
+	if (key === 'lean') return ['pillar', 'slab', 'wall', 'ramp', 'corner'].includes(preset);
+	if (key === 'taper') return ['pillar', 'wall'].includes(preset);
+	if (key === 'notchDepth') return preset === 'roof';
 	return true;
 }
 
@@ -311,6 +298,32 @@ export function applyPresetSemanticHandle(outline, handleId, point, canvasSize =
 		patch = { taper: (point[0] - bounds.centerX) / (bounds.width / 2) };
 	else if (handleId === 'notch')
 		patch = { notchDepth: (point[1] - bounds.centerY) / bounds.height };
+	else return outline;
+	return updatePresetOutline(outline, patch, canvasSize);
+}
+
+export function applyPresetSemanticHandleDrag(
+	outline,
+	handleId,
+	startPoint,
+	point,
+	canvasSize = {}
+) {
+	if (!isPresetOutline(outline) || !Array.isArray(startPoint) || !Array.isArray(point))
+		return outline;
+	const bounds = getPresetBounds(getOutlinePoints(outline, canvasSize));
+	if (!bounds) return outline;
+	const semantic = outline.shape.semantic || {};
+	const dx = point[0] - startPoint[0];
+	const dy = point[1] - startPoint[1];
+	let patch;
+	if (handleId === 'width') patch = { width: Math.max(bounds.width + dx, Number.EPSILON) };
+	else if (handleId === 'height') patch = { height: Math.max(bounds.height - dy, Number.EPSILON) };
+	else if (handleId === 'lean') patch = { lean: (Number(semantic.lean) || 0) + dx / bounds.width };
+	else if (handleId === 'taper')
+		patch = { taper: (Number(semantic.taper) || 0) + dx / (bounds.width / 2) };
+	else if (handleId === 'notch')
+		patch = { notchDepth: (Number(semantic.notchDepth) || 0) + dy / bounds.height };
 	else return outline;
 	return updatePresetOutline(outline, patch, canvasSize);
 }

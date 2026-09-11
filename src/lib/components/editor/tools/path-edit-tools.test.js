@@ -61,6 +61,41 @@ describe('persisted path edit tools', () => {
 		expect(editor.saveHistory).toHaveBeenCalledOnce();
 	});
 
+	it('starts preset semantic drags from a stable plain-object snapshot', () => {
+		const outline = {
+			id: 'corner-1',
+			shape: {
+				type: 'polyline',
+				preset: 'corner',
+				semantic: { version: 1 },
+				points2D: [
+					[0.1, 0.1],
+					[0.9, 0.1],
+					[0.5, 0.9]
+				]
+			},
+			points2D: [
+				[0.1, 0.1],
+				[0.9, 0.1],
+				[0.5, 0.9]
+			]
+		};
+		const editor = createEditor({ topo: { routes: [], outlines: [outline], fixPoints: [] } });
+		const tool = new OutlineEditTool(editor);
+		const interaction = tool.createSemanticInteraction(
+			{ outlineId: 'corner-1', id: 'lean' },
+			{ x: 0.5, y: 0.1 }
+		);
+
+		expect(interaction.outlineSnapshot).not.toBe(outline);
+		tool.applySemanticTransform(interaction, { x: 0.58, y: 0.1 });
+		const changes = editor.updateOutline.mock.calls[0][1];
+		expect(editor.updateOutline).toHaveBeenCalledWith('corner-1', changes, {
+			recordHistory: false
+		});
+		expect(changes.shape.semantic.lean).toBeCloseTo(0.1);
+	});
+
 	it('returns no grid snap for route vertices when its grid is disabled', () => {
 		expect(new RouteEditTool(createEditor()).snapPoint({ x: 0.16, y: 0.24 })).toBeNull();
 	});

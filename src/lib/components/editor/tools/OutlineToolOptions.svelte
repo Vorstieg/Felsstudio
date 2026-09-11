@@ -43,7 +43,7 @@
 		{#if selectedOutlineStyle === 'rock'}
 			<div class="flex flex-col gap-2">
 				<p class="text-xs font-medium text-warm-gray-600">{$_('ui.rock_presets')}</p>
-				<div class="grid grid-cols-5 gap-1">
+				<div class="grid grid-cols-4 gap-1">
 					{#each OUTLINE_PRESETS as preset}
 						<button
 							type="button"

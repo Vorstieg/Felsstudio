@@ -107,6 +107,14 @@ export class EditablePathEditTool {
 		return handler.call(this, event.touches[0], item, canvasInput);
 	}
 
+	handlePointerControl(event, handler, item, canvasInput) {
+		if (event.pointerType !== 'pen') return false;
+		event.preventDefault();
+		event.stopPropagation();
+		canvasInput.trackPointer?.(event);
+		return handler.call(this, event, item, canvasInput);
+	}
+
 	/** Renders compact editable vertices and insertion midpoints with touch hit areas. */
 	renderControls({
 		layers,
@@ -141,6 +149,9 @@ export class EditablePathEditTool {
 			.on('touchstart', (event, item) =>
 				this.handleTouchControl(event, this.handlePointDown, pointTarget(item), canvasInput)
 			)
+			.on('pointerdown', (event, item) =>
+				this.handlePointerControl(event, this.handlePointDown, pointTarget(item), canvasInput)
+			)
 			.on('click', (event) => event.stopPropagation());
 
 		handlesLayer
@@ -170,6 +181,9 @@ export class EditablePathEditTool {
 			)
 			.on('touchstart', (event, item) =>
 				this.handleTouchControl(event, this.handleMidpointDown, midpointTarget(item), canvasInput)
+			)
+			.on('pointerdown', (event, item) =>
+				this.handlePointerControl(event, this.handleMidpointDown, midpointTarget(item), canvasInput)
 			);
 
 		handlesLayer

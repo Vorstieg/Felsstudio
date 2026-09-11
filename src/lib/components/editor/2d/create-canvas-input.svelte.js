@@ -14,6 +14,7 @@ export function createCanvasInput({ getAspectRatio, getGesturePolicy, onInput })
 	let baseWidth = $state(1000);
 	let baseHeight = $state(667);
 	let activeTouchId = $state(null);
+	let activePointerId = $state(null);
 	let emptyTouch = null;
 	let zoomBehavior = null;
 	let removeListeners = null;
@@ -96,11 +97,35 @@ export function createCanvasInput({ getAspectRatio, getGesturePolicy, onInput })
 		const captureOptions = { passive: false, capture: true };
 		const startedOnEditControl = (event) =>
 			event.target?.closest?.(
-				'.symbol-group, .text-label-group, .text-composer, .route-container, .route-label, .route-point-hit-area, .route-point-handle, .route-midpoint-hit-area, .route-midpoint, .editable-path-point-hit-area, .editable-path-point-handle, .editable-path-midpoint-hit-area, .editable-path-midpoint, .outline-hit-area, .gizmo'
+				'.symbol-group, .text-label-group, .text-composer, .route-container, .route-label, .route-point-hit-area, .route-point-handle, .route-midpoint-hit-area, .route-midpoint, .editable-path-point-hit-area, .editable-path-point-handle, .editable-path-midpoint-hit-area, .editable-path-midpoint, .outline-hit-area, .outline-semantic-hit-area, .gizmo'
 			);
 		const handleMouseDown = (event) => onInput?.down?.(normalizeEvent(event));
 		const handleMouseMove = (event) => onInput?.move?.(normalizeEvent(event));
 		const handleMouseUp = (event) => onInput?.up?.(normalizeEvent(event));
+		const isDirectPointer = (event) => event.pointerType === 'pen' || event.pointerType === 'touch';
+		const handlePointerDown = (event) => {
+			// Pens often do not emit a full mousemove compatibility stream while dragging.
+			// Touch edit controls also route through Pointer Events on some browsers.
+			if (!isDirectPointer(event)) return;
+			if (startedOnEditControl(event)) return;
+			if (event.pointerType === 'touch') return;
+			event.preventDefault();
+			activePointerId = event.pointerId;
+			svgElement.setPointerCapture?.(event.pointerId);
+			onInput?.down?.(normalizeEvent(event));
+		};
+		const handlePointerMove = (event) => {
+			if (!isDirectPointer(event) || event.pointerId !== activePointerId) return;
+			event.preventDefault();
+			onInput?.move?.(normalizeEvent(event));
+		};
+		const handlePointerUp = (event) => {
+			if (!isDirectPointer(event) || event.pointerId !== activePointerId) return;
+			event.preventDefault();
+			onInput?.up?.(normalizeEvent(event));
+			svgElement.releasePointerCapture?.(event.pointerId);
+			activePointerId = null;
+		};
 		const handleTouchStart = (event) => {
 			const policy = getGesturePolicy?.() || {};
 			if (event.touches.length >= 2) {
@@ -174,6 +199,10 @@ export function createCanvasInput({ getAspectRatio, getGesturePolicy, onInput })
 		svgElement.addEventListener('mousemove', handleMouseMove);
 		svgElement.addEventListener('mouseup', handleMouseUp);
 		svgElement.addEventListener('mouseleave', handleMouseUp);
+		svgElement.addEventListener('pointerdown', handlePointerDown);
+		svgElement.addEventListener('pointermove', handlePointerMove);
+		svgElement.addEventListener('pointerup', handlePointerUp);
+		svgElement.addEventListener('pointercancel', handlePointerUp);
 		// Capture these before D3 zoom so empty taps survive D3's touch-end handling.
 		svgElement.addEventListener('touchstart', handleTouchStart, captureOptions);
 		svgElement.addEventListener('touchmove', handleTouchMove, captureOptions);
@@ -186,6 +215,10 @@ export function createCanvasInput({ getAspectRatio, getGesturePolicy, onInput })
 			svgElement.removeEventListener('mousemove', handleMouseMove);
 			svgElement.removeEventListener('mouseup', handleMouseUp);
 			svgElement.removeEventListener('mouseleave', handleMouseUp);
+			svgElement.removeEventListener('pointerdown', handlePointerDown);
+			svgElement.removeEventListener('pointermove', handlePointerMove);
+			svgElement.removeEventListener('pointerup', handlePointerUp);
+			svgElement.removeEventListener('pointercancel', handlePointerUp);
 			svgElement.removeEventListener('touchstart', handleTouchStart, captureOptions);
 			svgElement.removeEventListener('touchmove', handleTouchMove, captureOptions);
 			svgElement.removeEventListener('touchend', handleTouchEnd, captureOptions);
@@ -202,6 +235,11 @@ export function createCanvasInput({ getAspectRatio, getGesturePolicy, onInput })
 
 	function trackTouch(touch) {
 		activeTouchId = touch?.identifier ?? null;
+	}
+
+	function trackPointer(event) {
+		activePointerId = event?.pointerId ?? null;
+		if (activePointerId != null) svgElement?.setPointerCapture?.(activePointerId);
 	}
 
 	function refreshDimensions() {
@@ -228,6 +266,7 @@ export function createCanvasInput({ getAspectRatio, getGesturePolicy, onInput })
 		},
 		setElements,
 		trackTouch,
+		trackPointer,
 		normalizeEvent,
 		refreshDimensions,
 		destroy

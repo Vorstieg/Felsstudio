@@ -127,7 +127,15 @@ export class RouteEditTool extends EditablePathEditTool {
 	onActivate() {}
 	onDeactivate() {}
 
-	render({ layers, renderModel, activeTool, baseWidth, baseHeight, canvasInput, hideControlPoints }) {
+	render({
+		layers,
+		renderModel,
+		activeTool,
+		baseWidth,
+		baseHeight,
+		canvasInput,
+		hideControlPoints
+	}) {
 		const tool = this;
 		const canEdit = this.isEditMode(activeTool);
 		const routesLayer = layers.routes;

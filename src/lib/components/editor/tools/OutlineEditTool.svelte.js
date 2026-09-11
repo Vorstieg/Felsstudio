@@ -1,6 +1,6 @@
 import { EditablePathEditTool } from './EditablePathEditTool.svelte.js';
 import {
-	applyPresetSemanticHandle,
+	applyPresetSemanticHandleDrag,
 	DEFAULT_OUTLINE_CURVE_TENSION,
 	getOutlinePoints,
 	isClosedShape,
@@ -93,13 +93,17 @@ export class OutlineEditTool extends EditablePathEditTool {
 		};
 	}
 
-	createSemanticInteraction(handle) {
+	createSemanticInteraction(handle, mouse) {
 		const outline = this.getOutline(handle.outlineId);
 		if (!outline?.shape?.preset) return null;
 		return {
 			kind: 'transform-preset-outline',
 			outlineId: outline.id,
-			handleId: handle.id
+			handleId: handle.id,
+			startMouse: [mouse.x, mouse.y],
+			// Svelte state objects may be proxies; JSON cloning produces a plain
+			// snapshot that can safely be reused for every drag frame.
+			outlineSnapshot: JSON.parse(JSON.stringify(outline))
 		};
 	}
 
@@ -109,7 +113,7 @@ export class OutlineEditTool extends EditablePathEditTool {
 		if (!mouse) return false;
 		event.preventDefault?.();
 		event.stopPropagation?.();
-		const interaction = this.createSemanticInteraction(handle);
+		const interaction = this.createSemanticInteraction(handle, mouse);
 		if (!interaction) return false;
 		this.startInteraction(interaction.kind, interaction);
 		return true;
@@ -119,12 +123,21 @@ export class OutlineEditTool extends EditablePathEditTool {
 		return this.handleTouchControl(event, this.handleSemanticHandleDown, handle, canvasInput);
 	}
 
+	handleSemanticHandlePointer(event, handle, canvasInput) {
+		if (event.pointerType !== 'pen' && event.pointerType !== 'touch') return false;
+		event.preventDefault();
+		event.stopPropagation();
+		canvasInput.trackPointer?.(event);
+		return this.handleSemanticHandleDown(event, handle, canvasInput);
+	}
+
 	applySemanticTransform(interaction, mouse) {
 		const outline = this.getOutline(interaction.outlineId);
 		if (!outline) return false;
-		const changes = applyPresetSemanticHandle(
-			outline,
+		const changes = applyPresetSemanticHandleDrag(
+			interaction.outlineSnapshot || outline,
 			interaction.handleId,
+			interaction.startMouse,
 			[mouse.x, mouse.y],
 			this.getCanvasSize()
 		);
@@ -170,7 +183,14 @@ export class OutlineEditTool extends EditablePathEditTool {
 		});
 	}
 
-	renderSemanticHandles({ layers, handles, baseWidth, baseHeight, canvasInput, hideControlPoints }) {
+	renderSemanticHandles({
+		layers,
+		handles,
+		baseWidth,
+		baseHeight,
+		canvasInput,
+		hideControlPoints
+	}) {
 		const layer = layers.handles
 			.selectAll('g.outline-semantic-controls')
 			.data([null])
@@ -194,9 +214,13 @@ export class OutlineEditTool extends EditablePathEditTool {
 			.attr('cy', (item) => displayPoint(item)[1] * baseHeight)
 			.attr('r', (item) => item.hitSize)
 			.attr('fill', 'transparent')
-			.style('pointer-events', active ? 'auto' : 'none')
+			.style('pointer-events', active ? 'all' : 'none')
+			.style('touch-action', 'none')
 			.on('mousedown', (event, item) => this.handleSemanticHandleDown(event, item, canvasInput))
-			.on('touchstart', (event, item) => this.handleSemanticHandleTouch(event, item, canvasInput));
+			.on('touchstart', (event, item) => this.handleSemanticHandleTouch(event, item, canvasInput))
+			.on('pointerdown', (event, item) =>
+				this.handleSemanticHandlePointer(event, item, canvasInput)
+			);
 
 		layer
 			.selectAll('circle.outline-semantic-handle')

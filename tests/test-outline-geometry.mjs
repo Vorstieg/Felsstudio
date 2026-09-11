@@ -26,6 +26,7 @@ test('supports outline and path geometry workflows', async () => {
 		OUTLINE_PRESETS,
 		OUTLINE_SHAPE_TYPES,
 		applyPresetSemanticHandle,
+		applyPresetSemanticHandleDrag,
 		convertPresetToPolyline,
 		createOutlineRecord,
 		createPresetPoints,
@@ -185,12 +186,13 @@ test('supports outline and path geometry workflows', async () => {
 		start: [0.1, 0.2],
 		end: [0.7, 0.8]
 	};
+	const openPresetIds = new Set(['pillar', 'ramp', 'arete', 'corner']);
 	for (const preset of OUTLINE_PRESETS) {
 		const points = createPresetPoints(preset.id, presetBounds.start, presetBounds.end);
-		assert.ok(points.length >= 4, `${preset.id} has enough points`);
+		assert.ok(points.length >= (preset.id === 'ramp' ? 3 : 4), `${preset.id} has enough points`);
 		assert.equal(
 			isClosedPath(points),
-			preset.id !== 'pillar',
+			!openPresetIds.has(preset.id),
 			`${preset.id} has the expected open or closed path`
 		);
 		for (const [x, y] of points) {
@@ -198,6 +200,8 @@ test('supports outline and path geometry workflows', async () => {
 			assert.ok(y >= 0.2 && y <= 0.8, `${preset.id} y stays in drag bounds`);
 		}
 	}
+	const mirroredRamp = createPresetPoints('ramp', presetBounds.end, presetBounds.start);
+	assert.ok(mirroredRamp[0][0] > mirroredRamp.at(-1)[0], 'reverse dragging mirrors ramp direction');
 
 	const presetShape = createPresetShape('pillar', presetBounds.start, presetBounds.end, {
 		semantic: { taper: 0.2 }
@@ -237,7 +241,7 @@ test('supports outline and path geometry workflows', async () => {
 	const translatedPreset = structuredClone(presetOutline);
 	translateOutline(translatedPreset, 0.1, -0.1);
 	assert.equal(isPresetOutline(translatedPreset), true, 'translation keeps preset provenance');
-	assert.ok(Math.abs(translatedPreset.points2D[0][0] - 0.272) < 1e-10);
+	assert.ok(Math.abs(translatedPreset.points2D[0][0] - 0.728) < 1e-10);
 	assert.ok(Math.abs(translatedPreset.points2D[0][1] - 0.7) < 1e-10);
 
 	const convertedPreset = structuredClone(presetOutline);
@@ -284,27 +288,21 @@ test('supports outline and path geometry workflows', async () => {
 	assert.equal(leanedPillar.shape.semantic.taper, -0.2);
 	assert.notDeepEqual(leanedPillar.points2D, presetOutline.points2D);
 
-	const caveShape = createPresetShape('cave', presetBounds.start, presetBounds.end);
-	const caveOutline = createOutlineRecord({
-		id: 'outline-cave',
-		shape: caveShape,
-		points2D: caveShape.points2D
-	});
-	const deeperCave = updatePresetOutline(caveOutline, { notchDepth: 0.2 });
-	assert.equal(deeperCave.shape.semantic.notchDepth, 0.2);
-	assert.notEqual(deeperCave.points2D[7][1], caveOutline.points2D[7][1]);
-
 	const widenedByHandle = applyPresetSemanticHandle(presetOutline, 'width', [1, 0.5]);
-	assert.ok(Math.abs(widenedByHandle.shape.semantic.width - 0.828) < 1e-10);
-	const unchangedUnsupportedParameter = updatePresetOutline(
-		createOutlineRecord({
-			id: 'outline-boulder',
-			shape: createPresetShape('boulder', presetBounds.start, presetBounds.end),
-			points2D: createPresetPoints('boulder', presetBounds.start, presetBounds.end)
-		}),
-		{ taper: 0.3 }
+	assert.ok(Math.abs(widenedByHandle.shape.semantic.width - 0.852) < 1e-10);
+	const dragLeaned = applyPresetSemanticHandleDrag(presetOutline, 'lean', [0.4, 0.2], [0.46, 0.2]);
+	const dragLeanedAgainFromSnapshot = applyPresetSemanticHandleDrag(
+		presetOutline,
+		'lean',
+		[0.4, 0.2],
+		[0.46, 0.2]
 	);
-	assert.equal(unchangedUnsupportedParameter.shape.semantic.taper, undefined);
+	assert.equal(dragLeaned.shape.semantic.lean, 0.125);
+	assert.deepEqual(
+		dragLeanedAgainFromSnapshot.points2D,
+		dragLeaned.points2D,
+		'drag transforms are stable when recalculated from the interaction snapshot'
+	);
 
 	const brushCanvas = { baseWidth: 1000, baseHeight: 500 };
 	const brushOutline = createBrushOutline(

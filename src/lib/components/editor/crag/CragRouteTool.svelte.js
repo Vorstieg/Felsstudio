@@ -216,7 +216,11 @@ export function createCragRouteTool({
 
 	function editRoutePath(path, routeId, pathId, pathIndex = null) {
 		const document = state.routeDocuments.find((entry) => entry.path === path);
-		const feature = findPathFeature(document, pathId, Number.isInteger(pathIndex) ? pathIndex : null);
+		const feature = findPathFeature(
+			document,
+			pathId,
+			Number.isInteger(pathIndex) ? pathIndex : null
+		);
 		const coordinates = feature?.geometry?.coordinates;
 		if (!Array.isArray(coordinates)) return;
 		const resolvedPathIndex = (document?.data.paths?.features || []).indexOf(feature);
@@ -277,7 +281,10 @@ export function createCragRouteTool({
 		const second = secondCoordinates.map((point) => [...point]);
 		const reversedSecond = [...second].reverse();
 		const options = [
-			{ distance: pointDistance(first.at(-1), second[0]), coordinates: [...first, ...second.slice(1)] },
+			{
+				distance: pointDistance(first.at(-1), second[0]),
+				coordinates: [...first, ...second.slice(1)]
+			},
 			{
 				distance: pointDistance(first.at(-1), second.at(-1)),
 				coordinates: [...first, ...reversedSecond.slice(1)]
@@ -294,7 +301,13 @@ export function createCragRouteTool({
 		return options.sort((a, b) => a.distance - b.distance)[0].coordinates;
 	}
 
-	function concatRoutePaths(path, basePathId, appendPathId, basePathIndex = null, appendPathIndex = null) {
+	function concatRoutePaths(
+		path,
+		basePathId,
+		appendPathId,
+		basePathIndex = null,
+		appendPathIndex = null
+	) {
 		const document = state.routeDocuments.find((entry) => entry.path === path);
 		const features = document?.data.paths?.features || [];
 		const baseIndex = Number.isInteger(basePathIndex)
@@ -302,7 +315,9 @@ export function createCragRouteTool({
 			: features.findIndex((feature) => String(feature.id) === String(basePathId));
 		const appendIndex = Number.isInteger(appendPathIndex)
 			? appendPathIndex
-			: features.findIndex((feature, index) => index !== baseIndex && String(feature.id) === String(appendPathId));
+			: features.findIndex(
+					(feature, index) => index !== baseIndex && String(feature.id) === String(appendPathId)
+				);
 		const base = features[baseIndex];
 		const append = features[appendIndex];
 		if (
@@ -336,7 +351,12 @@ export function createCragRouteTool({
 				});
 			}
 		});
-		selectObject({ type: 'route-path', documentPath: path, pathId: String(base.id), pathIndex: baseIndex });
+		selectObject({
+			type: 'route-path',
+			documentPath: path,
+			pathId: String(base.id),
+			pathIndex: baseIndex
+		});
 		return true;
 	}
 
