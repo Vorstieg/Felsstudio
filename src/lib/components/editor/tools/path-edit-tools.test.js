@@ -111,6 +111,29 @@ describe('persisted path edit tools', () => {
 		expect(editor.saveHistory).toHaveBeenCalledOnce();
 	});
 
+	it('ignores emulated mouse deletion after a touch route deletion', () => {
+		const editor = createEditor({ ui: { activeTool: 'eraser' } });
+		const tool = new RouteEditTool(editor);
+		const input = { ...canvasInput, trackTouch: vi.fn() };
+		const touch = { identifier: 1, clientX: 10, clientY: 20 };
+
+		expect(
+			tool.handleTouchRouteDown(
+				{ touches: [touch], preventDefault: vi.fn(), stopPropagation: vi.fn() },
+				{ id: 'route-1' },
+				input
+			)
+		).toBe(true);
+		expect(
+			tool.handleRouteDown(
+				{ type: 'mousedown', clientX: 10, clientY: 20, preventDefault: vi.fn(), stopPropagation: vi.fn() },
+				{ id: 'route-2' },
+				input
+			)
+		).toBe(true);
+		expect(editor.deleteRoutes).toHaveBeenCalledOnce();
+	});
+
 	it('uses the shared item interaction to select and drag an outline', () => {
 		const editor = createEditor();
 		const tool = new OutlineEditTool(editor, {
@@ -169,6 +192,24 @@ describe('persisted path edit tools', () => {
 
 		tool.handleRouteDown(
 			{ identifier: 1, stopPropagation: vi.fn() },
+			{ id: 'route-1', pitchId: 'pitch-1' },
+			canvasInput
+		);
+
+		expect(editor.removeItems).toHaveBeenCalledWith([{ type: 'pitch', id: 'pitch-1' }]);
+		expect(editor.selectObject).not.toHaveBeenCalled();
+		expect(editor.setDrawingTarget).toHaveBeenCalledWith(null);
+	});
+
+	it('toggles only the nested pitch during desktop shift multi-selection', () => {
+		const editor = createEditor({
+			ui: { activeTool: 'select', isShiftPressed: true, mobileSelectionMode: false },
+			isSelected: (type, id) => type === 'pitch' && id === 'pitch-1'
+		});
+		const tool = new RouteEditTool(editor);
+
+		tool.handleRouteDown(
+			{ stopPropagation: vi.fn() },
 			{ id: 'route-1', pitchId: 'pitch-1' },
 			canvasInput
 		);

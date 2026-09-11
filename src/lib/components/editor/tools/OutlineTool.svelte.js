@@ -21,6 +21,7 @@ import { snapPointToGrid } from './path-drawing-logic.js';
 
 export const OUTLINE_STYLES = [
 	{ id: 'rock', labelKey: 'ui.outline_style_rock' },
+	{ id: 'route', labelKey: 'ui.outline_style_route' },
 	{ id: 'approach', labelKey: 'ui.outline_style_approach' },
 	{ id: 'descent', labelKey: 'ui.outline_style_descent' },
 	{ id: 'variant', labelKey: 'ui.outline_style_variant' },

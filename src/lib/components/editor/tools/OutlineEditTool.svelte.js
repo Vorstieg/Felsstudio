@@ -108,6 +108,11 @@ export class OutlineEditTool extends EditablePathEditTool {
 	}
 
 	handleSemanticHandleDown(event, handle, canvasInput) {
+		if (this.shouldIgnoreCompatibilityMouseEvent(event)) {
+			event.preventDefault?.();
+			event.stopPropagation?.();
+			return true;
+		}
 		if (!this.isSemanticEditMode()) return false;
 		const mouse = canvasInput.normalizeEvent(event)?.point;
 		if (!mouse) return false;
@@ -128,7 +133,9 @@ export class OutlineEditTool extends EditablePathEditTool {
 		event.preventDefault();
 		event.stopPropagation();
 		canvasInput.trackPointer?.(event);
-		return this.handleSemanticHandleDown(event, handle, canvasInput);
+		const handled = this.handleSemanticHandleDown(event, handle, canvasInput);
+		if (handled) this.markPointerCompatibilityEvent(event);
+		return handled;
 	}
 
 	applySemanticTransform(interaction, mouse) {

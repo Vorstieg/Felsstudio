@@ -323,6 +323,7 @@
 		"outline_preset_ledge": "Band",
 		"outline_preset": "Form",
 		"outline_style_rock": "Fels",
+		"outline_style_route": "Kletterroute",
 		"outline_style_approach": "Zustieg",
 		"outline_style_descent": "Abstieg",
 		"outline_style_variant": "Variante",

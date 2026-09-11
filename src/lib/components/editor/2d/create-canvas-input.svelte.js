@@ -2,6 +2,9 @@ import { select } from 'd3-selection';
 import { zoom as d3Zoom } from 'd3-zoom';
 import { vibrateOnAction } from '$lib/assets/js/mobile-utils.js';
 
+const COMPAT_MOUSE_SUPPRESSION_MS = 1500;
+const COMPAT_MOUSE_SUPPRESSION_PX = 30;
+
 /**
  * Owns the browser-facing part of the 2D canvas: D3 zoom, viewport-to-topo
  * conversion, and the mouse/touch event lifecycle. Consumers only receive
@@ -16,6 +19,7 @@ export function createCanvasInput({ getAspectRatio, getGesturePolicy, onInput })
 	let activeTouchId = $state(null);
 	let activePointerId = $state(null);
 	let emptyTouch = null;
+	let lastPointerInputEvent = null;
 	let zoomBehavior = null;
 	let removeListeners = null;
 
@@ -99,15 +103,51 @@ export function createCanvasInput({ getAspectRatio, getGesturePolicy, onInput })
 			event.target?.closest?.(
 				'.symbol-group, .text-label-group, .text-composer, .route-container, .route-label, .route-point-hit-area, .route-point-handle, .route-midpoint-hit-area, .route-midpoint, .editable-path-point-hit-area, .editable-path-point-handle, .editable-path-midpoint-hit-area, .editable-path-midpoint, .outline-hit-area, .outline-semantic-hit-area, .gizmo'
 			);
-		const handleMouseDown = (event) => onInput?.down?.(normalizeEvent(event));
-		const handleMouseMove = (event) => onInput?.move?.(normalizeEvent(event));
-		const handleMouseUp = (event) => onInput?.up?.(normalizeEvent(event));
+		const markPointerInput = (event) => {
+			lastPointerInputEvent = { time: Date.now(), x: event.clientX, y: event.clientY };
+		};
+		const isCompatibilityMouseEvent = (event) => {
+			const last = lastPointerInputEvent;
+			if (!last || Date.now() - last.time > COMPAT_MOUSE_SUPPRESSION_MS) return false;
+			const dx = Number(event.clientX) - Number(last.x);
+			const dy = Number(event.clientY) - Number(last.y);
+			return (
+				Number.isFinite(dx) &&
+				Number.isFinite(dy) &&
+				Math.hypot(dx, dy) < COMPAT_MOUSE_SUPPRESSION_PX
+			);
+		};
+		const suppressCompatibilityMouseDown = (event) => {
+			if (!isCompatibilityMouseEvent(event)) return;
+			// Compatibility mouse events are dispatched after touch/pen events and would
+			// otherwise reach SVG child handlers first (e.g. midpoint insertion) before
+			// bubbling to this canvas listener. Capture and stop them at the canvas edge.
+			event.preventDefault();
+			event.stopPropagation();
+			event.stopImmediatePropagation?.();
+		};
+		const handleMouseDown = (event) => {
+			if (isCompatibilityMouseEvent(event)) {
+				event.preventDefault();
+				return;
+			}
+			onInput?.down?.(normalizeEvent(event));
+		};
+		const handleMouseMove = (event) => {
+			if (isCompatibilityMouseEvent(event)) return;
+			onInput?.move?.(normalizeEvent(event));
+		};
+		const handleMouseUp = (event) => {
+			if (isCompatibilityMouseEvent(event)) return;
+			onInput?.up?.(normalizeEvent(event));
+		};
 		const isDirectPointer = (event) => event.pointerType === 'pen' || event.pointerType === 'touch';
 		const handlePointerDown = (event) => {
 			// Pens often do not emit a full mousemove compatibility stream while dragging.
 			// Touch edit controls also route through Pointer Events on some browsers.
 			if (!isDirectPointer(event)) return;
 			if (startedOnEditControl(event)) return;
+			markPointerInput(event);
 			if (event.pointerType === 'touch') return;
 			event.preventDefault();
 			activePointerId = event.pointerId;
@@ -144,6 +184,7 @@ export function createCanvasInput({ getAspectRatio, getGesturePolicy, onInput })
 			}
 			event.preventDefault();
 			activeTouchId = event.touches[0].identifier;
+			markPointerInput(event.touches[0]);
 			onInput?.down?.(normalizeEvent(event, event.touches[0]));
 			vibrateOnAction('selection');
 		};
@@ -195,6 +236,7 @@ export function createCanvasInput({ getAspectRatio, getGesturePolicy, onInput })
 			activeTouchId = null;
 		};
 
+		svgElement.addEventListener('mousedown', suppressCompatibilityMouseDown, true);
 		svgElement.addEventListener('mousedown', handleMouseDown);
 		svgElement.addEventListener('mousemove', handleMouseMove);
 		svgElement.addEventListener('mouseup', handleMouseUp);
@@ -211,6 +253,7 @@ export function createCanvasInput({ getAspectRatio, getGesturePolicy, onInput })
 
 		removeListeners = () => {
 			select(svgElement).on('.zoom', null);
+			svgElement.removeEventListener('mousedown', suppressCompatibilityMouseDown, true);
 			svgElement.removeEventListener('mousedown', handleMouseDown);
 			svgElement.removeEventListener('mousemove', handleMouseMove);
 			svgElement.removeEventListener('mouseup', handleMouseUp);
@@ -235,10 +278,16 @@ export function createCanvasInput({ getAspectRatio, getGesturePolicy, onInput })
 
 	function trackTouch(touch) {
 		activeTouchId = touch?.identifier ?? null;
+		if (touch?.clientX != null && touch?.clientY != null) {
+			lastPointerInputEvent = { time: Date.now(), x: touch.clientX, y: touch.clientY };
+		}
 	}
 
 	function trackPointer(event) {
 		activePointerId = event?.pointerId ?? null;
+		if (event?.clientX != null && event?.clientY != null) {
+			lastPointerInputEvent = { time: Date.now(), x: event.clientX, y: event.clientY };
+		}
 		if (activePointerId != null) svgElement?.setPointerCapture?.(activePointerId);
 	}
 

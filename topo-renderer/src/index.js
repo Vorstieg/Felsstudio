@@ -44,6 +44,7 @@ export const ROUTE_LINE_STYLES = {
 
 export const OUTLINE_LINE_STYLES = {
 	rock: { stroke: '#000000', width: 1, dash: null },
+	route: { ...ROUTE_LINE_STYLES.red },
 	approach: { stroke: '#eab308', width: 2, dash: null },
 	descent: { stroke: '#6b7280', width: 2, dash: '10 10' },
 	variant: { stroke: '#8f8a84', width: 2, dash: '8 8' },

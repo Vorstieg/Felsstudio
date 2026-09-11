@@ -86,7 +86,10 @@ export function buildTopo2DRenderModel({
 				outlineId: outline.id,
 				...handle,
 				handleSize: 5,
-				hitSize: getTouchTargetSize(5)
+				// Preset controls are intentionally close together (for example width,
+				// height, and lean). Keep the click radius tight so neighboring controls
+				// and outline vertices do not steal each other's pointer events.
+				hitSize: 7
 			});
 		});
 	});
@@ -95,6 +98,9 @@ export function buildTopo2DRenderModel({
 	const routeLabels = [];
 	const routeMidpoints = [];
 	topo.routes.forEach((route, index) => {
+		const hasSelectedNestedPath =
+			(route.pitches || []).some((pitch) => isSelected('pitch', pitch.id)) ||
+			(route.variants || []).some((variant) => isSelected('variant', variant.id));
 		const addRouteLine = ({
 			points,
 			id: _id,
@@ -105,8 +111,11 @@ export function buildTopo2DRenderModel({
 			labelOnly = false
 		}) => {
 			if (!points?.length) return;
+			const nestedSelected =
+				(pitchId != null && isSelected('pitch', pitchId)) ||
+				(variantId != null && isSelected('variant', variantId));
 			const selected =
-				isSelected('route', route.id) ||
+				(nestedSelected || (!hasSelectedNestedPath && isSelected('route', route.id))) ||
 				(drawingTarget?.type === 'newPitch' &&
 					drawingTarget.routeId === route.id &&
 					Boolean(pitchId)) ||

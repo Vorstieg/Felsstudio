@@ -5,6 +5,8 @@ import {
 } from './selection-geometry.js';
 
 const EDIT_TOOLS = new Set(['symbolEdit', 'routeEdit', 'outlineEdit']);
+const DUPLICATE_DOWN_MS = 700;
+const DUPLICATE_DOWN_TOPO_DISTANCE = 0.003;
 
 /** Owns the normalized pointer lifecycle and editing interactions for the 2D editor. */
 export function createTopoInputController({
@@ -17,9 +19,31 @@ export function createTopoInputController({
 	referenceFixpoint,
 	editTools
 } = {}) {
+	let lastCanvasDown = null;
+
+	function isRapidDuplicateDown(input) {
+		const activeTool = editor.ui.activeTool;
+		const last = lastCanvasDown;
+		const now = Date.now();
+		if (!last || now - last.time > DUPLICATE_DOWN_MS || last.activeTool !== activeTool) return false;
+		const dx = input.point.x - last.point.x;
+		const dy = input.point.y - last.point.y;
+		return Math.hypot(dx, dy) < DUPLICATE_DOWN_TOPO_DISTANCE;
+	}
+
+	function markCanvasDown(input) {
+		lastCanvasDown = { time: Date.now(), activeTool: editor.ui.activeTool, point: input.point };
+	}
+
 	function down(input) {
 		if (!input || (input.button !== 0 && !input.isTouch)) return;
 		const { point, sourceEvent: event } = input;
+		if (isRapidDuplicateDown(input)) {
+			event.preventDefault?.();
+			event.stopPropagation?.();
+			return;
+		}
+		markCanvasDown(input);
 		if (textTool?.editingPosition) {
 			textTool.commitEdit();
 			event.stopPropagation?.();
@@ -167,10 +191,11 @@ export function createTopoInputController({
 	}
 
 	function emptyTouchTap() {
-		if (!EDIT_TOOLS.has(editor.ui.activeTool)) return;
+		const activeTool = editor.ui.activeTool;
+		if (activeTool !== 'select' && !EDIT_TOOLS.has(activeTool)) return;
 		editor.clearSelection();
 		editor.setDrawingTarget(null);
-		editor.setActiveTool('select');
+		if (activeTool !== 'select') editor.setActiveTool('select');
 	}
 
 	function getGesturePolicy() {
@@ -180,7 +205,7 @@ export function createTopoInputController({
 		return {
 			panSingleTouch: isEditTool || (activeTool === 'select' && !isMobileSelection),
 			routeSingleTouchToInput: activeTool !== 'select' || isMobileSelection,
-			trackEmptyTouch: isEditTool
+			trackEmptyTouch: isEditTool || (activeTool === 'select' && !isMobileSelection)
 		};
 	}
 

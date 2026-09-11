@@ -41,6 +41,20 @@ describe('createTopoInputController', () => {
 		expect(onMouseDown).not.toHaveBeenCalled();
 	});
 
+	it('ignores rapid duplicate drawing presses at the same position', () => {
+		const onMouseDown = vi.fn();
+		const controller = createTopoInputController({
+			editor: { ui: { activeTool: 'outline' } },
+			getCurrentTool: () => ({ onMouseDown })
+		});
+		const point = { x: 0.4, y: 0.5 };
+
+		controller.down({ point, sourceEvent: {}, button: 0 });
+		controller.down({ point, sourceEvent: { preventDefault: vi.fn(), stopPropagation: vi.fn() }, button: 0 });
+
+		expect(onMouseDown).toHaveBeenCalledOnce();
+	});
+
 	it('moves a marquee-selected group of route points together', () => {
 		const paths = new Map([
 			['0', [[0.1, 0.2]]],
@@ -128,6 +142,22 @@ describe('createTopoInputController', () => {
 		expect(referenceFixpoint).toHaveBeenCalledWith({ id: 'route-1' }, 'belay-1');
 	});
 
+	it('clears selection when the select tool receives an empty touch tap', () => {
+		const editor = {
+			ui: { activeTool: 'select' },
+			clearSelection: vi.fn(),
+			setDrawingTarget: vi.fn(),
+			setActiveTool: vi.fn()
+		};
+		const controller = createTopoInputController({ editor });
+
+		controller.emptyTouchTap();
+
+		expect(editor.clearSelection).toHaveBeenCalledOnce();
+		expect(editor.setDrawingTarget).toHaveBeenCalledWith(null);
+		expect(editor.setActiveTool).not.toHaveBeenCalled();
+	});
+
 	it('publishes editor-owned touch gesture rules', () => {
 		const editor = { ui: { activeTool: 'select', mobileSelectionMode: false } };
 		const controller = createTopoInputController({ editor });
@@ -135,10 +165,14 @@ describe('createTopoInputController', () => {
 		expect(controller.getGesturePolicy()).toEqual({
 			panSingleTouch: true,
 			routeSingleTouchToInput: false,
-			trackEmptyTouch: false
+			trackEmptyTouch: true
 		});
 
 		editor.ui.mobileSelectionMode = true;
-		expect(controller.getGesturePolicy().routeSingleTouchToInput).toBe(true);
+		expect(controller.getGesturePolicy()).toEqual({
+			panSingleTouch: false,
+			routeSingleTouchToInput: true,
+			trackEmptyTouch: false
+		});
 	});
 });

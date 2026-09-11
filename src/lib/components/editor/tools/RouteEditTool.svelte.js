@@ -29,6 +29,11 @@ export class RouteEditTool extends EditablePathEditTool {
 	}
 
 	handlePointDown(event, point, canvasInput) {
+		if (this.shouldIgnoreCompatibilityMouseEvent(event)) {
+			event.preventDefault?.();
+			event.stopPropagation?.();
+			return true;
+		}
 		const target = this.targetFromPoint(point);
 		const selected = this.getSelectedRoutePoints();
 		if (selected.length > 1 && this.isRoutePointSelected({ ...target, index: point.index })) {
@@ -48,9 +53,8 @@ export class RouteEditTool extends EditablePathEditTool {
 
 	handleRouteDown(event, routeTarget, canvasInput) {
 		if (
-			event?.identifier != null &&
-			this.getMobileSelectionMode() &&
-			(routeTarget?.pitchId || routeTarget?.variantId)
+			(routeTarget?.pitchId || routeTarget?.variantId) &&
+			((event?.identifier != null && this.getMobileSelectionMode()) || this.getIsShiftPressed())
 		) {
 			const kind = routeTarget.pitchId ? 'pitch' : 'variant';
 			const pathId = routeTarget.pitchId || routeTarget.variantId;

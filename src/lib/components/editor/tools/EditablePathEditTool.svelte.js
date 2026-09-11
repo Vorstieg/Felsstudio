@@ -1,3 +1,8 @@
+const DUPLICATE_PRESS_MS = 700;
+const DUPLICATE_PRESS_TOPO_DISTANCE = 0.003;
+const COMPAT_MOUSE_MS = 800;
+const COMPAT_MOUSE_PX = 8;
+
 /** Shared point and midpoint editing behavior for persisted editable paths. */
 export class EditablePathEditTool {
 	constructor(
@@ -18,6 +23,48 @@ export class EditablePathEditTool {
 		this.beginSelectionMove = beginSelectionMove || (() => null);
 		this.targetFromPoint = targetFromPoint || (() => null);
 		this.targetFromMidpoint = targetFromMidpoint || (() => null);
+		this.lastPointerControlEvent = null;
+		this.lastEditPress = null;
+	}
+
+	markPointerCompatibilityEvent(event) {
+		this.lastPointerControlEvent = {
+			time: Date.now(),
+			x: event?.clientX,
+			y: event?.clientY
+		};
+	}
+
+	shouldIgnoreCompatibilityMouseEvent(event) {
+		if (event?.type !== 'mousedown') return false;
+		const last = this.lastPointerControlEvent;
+		if (!last || Date.now() - last.time > COMPAT_MOUSE_MS) return false;
+		const dx = Number(event.clientX) - Number(last.x);
+		const dy = Number(event.clientY) - Number(last.y);
+		return Number.isFinite(dx) && Number.isFinite(dy) && Math.hypot(dx, dy) < COMPAT_MOUSE_PX;
+	}
+
+	getEventPoint(event, canvasInput) {
+		return canvasInput?.normalizeEvent?.(event)?.point || null;
+	}
+
+	shouldIgnoreRapidRepeat(event, canvasInput, scope = 'edit', point = null) {
+		const eventPoint = point || this.getEventPoint(event, canvasInput);
+		if (!eventPoint) return { ignore: false, point: eventPoint };
+		const last = this.lastEditPress;
+		if (!last || Date.now() - last.time > DUPLICATE_PRESS_MS || last.scope !== scope) {
+			return { ignore: false, point: eventPoint };
+		}
+		return {
+			ignore:
+				Math.hypot(eventPoint.x - last.point.x, eventPoint.y - last.point.y) <
+				DUPLICATE_PRESS_TOPO_DISTANCE,
+			point: eventPoint
+		};
+	}
+
+	markEditPress(scope, point) {
+		if (point) this.lastEditPress = { scope, point, time: Date.now() };
 	}
 
 	isEditMode(activeTool = this.getActiveTool()) {
@@ -25,33 +72,58 @@ export class EditablePathEditTool {
 	}
 
 	handlePointDown(event, point, _canvasInput) {
+		if (this.shouldIgnoreCompatibilityMouseEvent(event)) {
+			event.preventDefault?.();
+			event.stopPropagation?.();
+			return true;
+		}
 		if (!this.isEditMode()) return false;
 		const target = this.targetFromPoint(point);
 		const path = target && this.getEditablePath(target);
 		if (!path) return false;
+		const repeat = this.shouldIgnoreRapidRepeat(event, _canvasInput, 'path-control');
+		if (repeat.ignore) {
+			event.preventDefault?.();
+			event.stopPropagation?.();
+			return true;
+		}
 		event.stopPropagation?.();
 
 		if (event.altKey || this.getActiveTool() === 'eraser') {
 			if (!path.canRemovePoint()) return false;
 			this.mutateDocument(() => path.removePoint(point.index));
+			this.markEditPress('path-control', repeat.point);
 			this.saveHistory();
 			return true;
 		}
 
 		this.startInteraction('move-point', { ...target, pointIndex: point.index });
+		this.markEditPress('path-control', repeat.point);
 		return true;
 	}
 
 	handleMidpointDown(event, midpoint, _canvasInput) {
+		if (this.shouldIgnoreCompatibilityMouseEvent(event)) {
+			event.preventDefault?.();
+			event.stopPropagation?.();
+			return true;
+		}
 		if (!this.isEditMode()) return false;
 		const target = this.targetFromMidpoint(midpoint);
 		const path = target && this.getEditablePath(target);
 		if (!path) return false;
+		const repeat = this.shouldIgnoreRapidRepeat(event, _canvasInput, 'path-control');
+		if (repeat.ignore) {
+			event.preventDefault?.();
+			event.stopPropagation?.();
+			return true;
+		}
 		event.stopPropagation?.();
 		this.mutateDocument(() =>
 			path.insertPoint(midpoint.insertIndex, [midpoint.midX, midpoint.midY])
 		);
 		this.startInteraction('move-point', { ...target, pointIndex: midpoint.insertIndex });
+		this.markEditPress('path-control', repeat.point);
 		return true;
 	}
 
@@ -62,23 +134,37 @@ export class EditablePathEditTool {
 		canvasInput,
 		{ type, getId = (value) => value?.id, remove, beforeMove } = {}
 	) {
+		if (this.shouldIgnoreCompatibilityMouseEvent(event)) {
+			event.preventDefault?.();
+			event.stopPropagation?.();
+			return true;
+		}
 		if (!this.isEditMode()) return false;
 		const mouse = canvasInput.normalizeEvent(event)?.point;
 		if (!mouse) return false;
+		const repeat = this.shouldIgnoreRapidRepeat(event, canvasInput, 'item', mouse);
+		if (repeat.ignore) {
+			event.preventDefault?.();
+			event.stopPropagation?.();
+			return true;
+		}
 		event.stopPropagation?.();
 
 		const id = getId(item);
 		if (id == null) return false;
 		if (this.getActiveTool() === 'eraser') {
 			if (remove?.([id])) this.saveHistory();
+			this.markEditPress('item', mouse);
 			return true;
 		}
 		if (event?.identifier != null && this.getMobileSelectionMode()) {
 			this.selectObject(type, id, true);
+			this.markEditPress('item', mouse);
 			return true;
 		}
 		if (this.getIsShiftPressed()) {
 			this.selectObject(type, id, true);
+			this.markEditPress('item', mouse);
 			return true;
 		}
 
@@ -87,6 +173,7 @@ export class EditablePathEditTool {
 			this.selectObject(type, id, false);
 		}
 		this.startInteraction('move-selection', this.beginSelectionMove(mouse));
+		this.markEditPress('item', mouse);
 		return true;
 	}
 
@@ -103,8 +190,11 @@ export class EditablePathEditTool {
 		if (event.touches.length !== 1) return false;
 		event.preventDefault();
 		event.stopPropagation();
-		canvasInput.trackTouch(event.touches[0]);
-		return handler.call(this, event.touches[0], item, canvasInput);
+		const touch = event.touches[0];
+		canvasInput.trackTouch(touch);
+		const handled = handler.call(this, touch, item, canvasInput);
+		if (handled) this.markPointerCompatibilityEvent(touch);
+		return handled;
 	}
 
 	handlePointerControl(event, handler, item, canvasInput) {
@@ -112,7 +202,9 @@ export class EditablePathEditTool {
 		event.preventDefault();
 		event.stopPropagation();
 		canvasInput.trackPointer?.(event);
-		return handler.call(this, event, item, canvasInput);
+		const handled = handler.call(this, event, item, canvasInput);
+		if (handled) this.markPointerCompatibilityEvent(event);
+		return handled;
 	}
 
 	/** Renders compact editable vertices and insertion midpoints with touch hit areas. */

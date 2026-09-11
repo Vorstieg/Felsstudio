@@ -74,6 +74,17 @@ describe('buildTopo2DRenderModel', () => {
 		expect(model.routeMidpoints).toHaveLength(1);
 	});
 
+	it('highlights only selected nested multipitch paths when their parent route is selected', () => {
+		const selected = new Set(['route:route-multi', 'pitch:pitch-1']);
+		const model = renderModel({
+			isSelected: (type, id) => selected.has(`${type}:${id}`),
+			selectionSize: 2
+		});
+
+		expect(model.routes.find((route) => route.pitchId === 'pitch-1')?.lineSelected).toBe(true);
+		expect(model.routes.find((route) => route.variantId === 'variant-1')?.lineSelected).toBe(false);
+	});
+
 	it('keeps single-pitch route handles scoped to the selected route', () => {
 		const model = renderModel({
 			ui: { selectedRouteId: 'route-1' },
