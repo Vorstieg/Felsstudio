@@ -94,6 +94,9 @@
 			lastOpenedOutlineEditId = null;
 			return;
 		}
+		// Selecting a route should keep the inspector open and must not replace it
+		// with the route tool-options sheet. Route options remain available via the toolbar.
+		if (editorState.ui.selectedRouteId != null) return;
 		if (editorState.ui.selectedOutlineId != null && browser && isMobileViewport()) {
 			lastOpenedOutlineEditId = null;
 			return;
@@ -101,6 +104,13 @@
 		if (selectionId === lastOpenedOutlineEditId) return;
 		toolOptionsOpen = true;
 		lastOpenedOutlineEditId = selectionId;
+	});
+	let hasVisibleToolOptions = $derived.by(() => {
+		if (!toolOptionsOpen) return false;
+		if (editorState.ui.activeTool === 'select') return isEditingSelectedPath;
+		return ['outline', 'text', 'route', 'multipitch', 'symbol', 'fixpoint'].includes(
+			editorState.ui.activeTool
+		);
 	});
 	let activeSymbols = $derived(
 		topoSymbols.filter(
@@ -199,7 +209,7 @@
 	status={saveStatus}
 	errorMessage={saveError}
 />
-{#if toolOptionsOpen}
+{#if hasVisibleToolOptions}
 	{#if editorState.ui.activeTool === 'outline'}
 		<OutlineToolOptions
 			outlineTool={editor2D?.getCurrentTool?.()}

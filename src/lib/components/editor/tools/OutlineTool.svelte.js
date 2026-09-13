@@ -42,12 +42,11 @@ export const OUTLINE_MODES = [
 export { OUTLINE_PRESETS };
 
 export const OUTLINE_FILL_COLORS = [
-	{ value: null, labelKey: 'ui.fill_none' },
-	{ value: 'rgba(255, 165, 0, 0.3)', labelKey: 'ui.fill_orange' },
-	{ value: 'rgba(139, 69, 19, 0.3)', labelKey: 'ui.fill_brown' },
-	{ value: 'rgba(169, 169, 169, 0.3)', labelKey: 'ui.fill_gray' },
-	{ value: 'rgba(210, 180, 140, 0.3)', labelKey: 'ui.fill_tan' },
-	{ value: 'rgba(105, 105, 105, 0.3)', labelKey: 'ui.fill_dark_gray' }
+	{ value: null, opacity: null, labelKey: 'ui.fill_none' },
+	{ value: '#ffffff', opacity: 1, labelKey: 'ui.fill_white' },
+	{ value: 'rgba(229, 231, 235, 0.3)', opacity: 0.3, labelKey: 'ui.fill_light_gray' },
+	{ value: 'rgba(34, 197, 94, 0.3)', opacity: 0.3, labelKey: 'ui.fill_green' },
+	{ value: 'rgba(139, 69, 19, 0.3)', opacity: 0.3, labelKey: 'ui.fill_brown' }
 ];
 
 const MIN_POINTS = 2;

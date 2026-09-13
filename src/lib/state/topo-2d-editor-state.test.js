@@ -128,6 +128,76 @@ describe('createTopo2DEditorState', () => {
 		expect(editor.commitOutlineDraft()).toMatchObject({ mode: 'polyline' });
 	});
 
+	it('duplicates a pitch to another route and selects the copy', () => {
+		const editor = createTopo2DEditorState({
+			topo: {
+				routes: [
+					{
+						id: 'route-1',
+						type: ['multi-pitch'],
+						pitches: [
+							{
+								id: 'pitch-1',
+								pitchNumber: 1,
+								grade: '6a',
+								points2D: [[0.1, 0.2], [0.3, 0.4]]
+							}
+						]
+					},
+					{ id: 'route-2', type: 'sport', pitches: [{ id: 'pitch-2', pitchNumber: 1 }] }
+				],
+				fixPoints: [],
+				outlines: []
+			}
+		});
+
+		const duplicatedId = editor.duplicatePitch('route-1', 'pitch-1', 'route-2');
+		const targetRoute = editor.topo.routes[1];
+
+		expect(duplicatedId).toMatch(/^pitch-/);
+		expect(duplicatedId).not.toBe('pitch-1');
+		expect(duplicatedId).not.toBe('pitch-2');
+		expect(targetRoute.type).toContain('multi-pitch');
+		expect(targetRoute.pitches).toHaveLength(2);
+		expect(targetRoute.pitches[1]).toMatchObject({
+			id: duplicatedId,
+			pitchNumber: 2,
+			grade: '6a',
+			points2D: [[0.1, 0.2], [0.3, 0.4]]
+		});
+		expect(editor.ui.selectedRouteId).toBe('route-2');
+		expect(editor.ui.selectedPitchId).toBe(duplicatedId);
+	});
+
+	it('moves pitches within a route and renumbers them', () => {
+		const editor = createTopo2DEditorState({
+			topo: {
+				routes: [
+					{
+						id: 'route-1',
+						pitches: [
+							{ id: 'pitch-1', pitchNumber: 1 },
+							{ id: 'pitch-2', pitchNumber: 2 },
+							{ id: 'pitch-3', pitchNumber: 3 }
+						]
+					}
+				],
+				fixPoints: [],
+				outlines: []
+			}
+		});
+
+		expect(editor.movePitch('route-1', 'pitch-2', -1)).toBe(true);
+		expect(editor.topo.routes[0].pitches.map((pitch) => pitch.id)).toEqual([
+			'pitch-2',
+			'pitch-1',
+			'pitch-3'
+		]);
+		expect(editor.topo.routes[0].pitches.map((pitch) => pitch.pitchNumber)).toEqual([1, 2, 3]);
+		expect(editor.ui.selectedPitchId).toBe('pitch-2');
+		expect(editor.movePitch('route-1', 'pitch-2', -1)).toBe(false);
+	});
+
 	it('renumbers remaining pitches after deletion', () => {
 		const editor = createTopo2DEditorState({
 			topo: {

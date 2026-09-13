@@ -24,6 +24,13 @@
 		getCurveTarget: () => selectedRoute,
 		updateCurve: (route, changes) => route.onCurveChange?.(changes)
 	});
+
+	function fillSwatchStyle(color) {
+		if (color.value == null) {
+			return 'background-color: #fff; background-image: linear-gradient(45deg, #d1d5db 25%, transparent 25%), linear-gradient(-45deg, #d1d5db 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d1d5db 75%), linear-gradient(-45deg, transparent 75%, #d1d5db 75%); background-size: 8px 8px; background-position: 0 0, 0 4px, 4px -4px, -4px 0; border: 1px solid #9ca3af;';
+		}
+		return `background-color: ${color.value}; border: 1px solid #9ca3af;`;
+	}
 </script>
 
 {#if selectedOutlineId != null}
@@ -45,18 +52,20 @@
 		</div>
 		<div class="flex flex-col gap-2">
 			<p class="text-xs font-medium text-warm-gray-600">{$_('ui.fill_color')}</p>
-			<div class="grid grid-cols-6 gap-1">
+			<div class="grid grid-cols-5 gap-1">
 				{#each OUTLINE_FILL_COLORS as color}
 					<button
 						type="button"
-						class="h-6 w-6 rounded-sm transition-none {selectedOutline?.fillColor === color.value
+						class="relative h-6 w-6 overflow-hidden rounded-sm transition-none {selectedOutline?.fillColor === color.value
 							? 'shadow-[inset_0_0_0_2px_var(--color-creator-blue)]'
 							: ''}"
-						style="background-color: {color.value || 'transparent'}; border: 1px solid #e5e7eb;"
-						onclick={() => outlineStyleActions?.setFillColor(color.value)}
+						style={fillSwatchStyle(color)}
+						onclick={() => outlineStyleActions?.setFillColor(color.value, color.opacity)}
 						title={$_(color.labelKey)}
 						aria-label={$_(color.labelKey)}
-					></button>
+					>
+						{#if color.value == null}<span class="absolute left-1/2 top-0 h-full w-0.5 -rotate-45 bg-red-500"></span>{/if}
+					</button>
 				{/each}
 			</div>
 		</div>

@@ -31,6 +31,7 @@ describe('createOutlineToolOptionsLogic', () => {
 		actions.setMode('freehand');
 		actions.setPreset('slab');
 		actions.setFill('rgba(1, 2, 3, 0.3)');
+		actions.setFill('#ffffff', 1);
 		actions.setFill(null);
 		actions.setCurveEnabled(true);
 		actions.toggleSnapToGrid();
@@ -42,7 +43,8 @@ describe('createOutlineToolOptionsLogic', () => {
 
 		expect(tool.setMode).toHaveBeenCalledWith('freehand');
 		expect(tool.setPreset).toHaveBeenCalledWith('slab');
-		expect(tool.setFill).toHaveBeenCalledWith('rgba(1, 2, 3, 0.3)');
+		expect(tool.setFill).toHaveBeenNthCalledWith(1, 'rgba(1, 2, 3, 0.3)');
+		expect(tool.setFill).toHaveBeenNthCalledWith(2, '#ffffff', 1);
 		expect(tool.clearFill).toHaveBeenCalledOnce();
 		expect(tool.setCurveEnabled).toHaveBeenCalledWith(true);
 		expect(tool).toMatchObject({
@@ -103,12 +105,17 @@ describe('createOutlineToolOptionsLogic', () => {
 
 		actions.setLineStyle('fixedRope');
 		actions.setFillColor('rgba(255, 165, 0, 0.3)');
+		actions.setFillColor('#ffffff', 1);
 
 		expect(updateProperties).toHaveBeenNthCalledWith(1, 'outline-1', {
 			lineStyle: 'fixedRope'
 		});
 		expect(updateProperties).toHaveBeenNthCalledWith(2, 'outline-1', {
 			fillColor: 'rgba(255, 165, 0, 0.3)'
+		});
+		expect(updateProperties).toHaveBeenNthCalledWith(3, 'outline-1', {
+			fillColor: '#ffffff',
+			fillOpacity: 1
 		});
 	});
 });

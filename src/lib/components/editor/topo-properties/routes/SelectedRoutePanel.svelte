@@ -91,6 +91,18 @@
 		if (mobile) snapToSmallestHeight?.();
 	}
 
+	function duplicatePitch(route, pitch, targetRouteId) {
+		editorState.duplicatePitch(route.id, pitch.id, targetRouteId);
+	}
+
+	function duplicatePitchTargets(route) {
+		return (editorState.topo.routes || []).filter((target) => String(target.id) !== String(route.id));
+	}
+
+	function movePitch(route, pitch, direction) {
+		editorState.movePitch(route.id, pitch.id, direction);
+	}
+
 	function removePitch(route, pitch) {
 		editorState.removePitch(route.id, pitch.id);
 		if (editorState.ui.drawingTarget?.pitchId === pitch.id) editorState.ui.drawingTarget = null;
@@ -247,6 +259,11 @@
 					kind="pitch"
 					topoScale={editorState.scale} fixPoints={editorState.fixPoints}
 					onDraw={(pitch) => drawPitch(route, pitch)}
+					onDuplicate={(pitch, targetRouteId) => duplicatePitch(route, pitch, targetRouteId)}
+					duplicateTargets={duplicatePitchTargets(route)}
+					onMove={(pitch, direction) => movePitch(route, pitch, direction)}
+					canMoveUp={idx > 0}
+					canMoveDown={idx < (route.pitches || []).length - 1}
 					onRemove={(pitch) => removePitch(route, pitch)}
 					onFieldChange={(field, value) => updatePitch(pitch.id,{ [field]: value })}
 				/>

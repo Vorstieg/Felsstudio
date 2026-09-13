@@ -16,7 +16,14 @@ export function createOutlineToolOptionsLogic(getOutlineTool) {
 	return {
 		setMode: (mode) => withOutlineTool((tool) => tool.setMode(mode)),
 		setPreset: (preset) => withOutlineTool((tool) => tool.setPreset(preset)),
-		setFill: (color) => withOutlineTool((tool) => (color ? tool.setFill(color) : tool.clearFill())),
+		setFill: (color, opacity) =>
+			withOutlineTool((tool) => {
+				if (!color) {
+					tool.clearFill();
+					return;
+				}
+				opacity === undefined ? tool.setFill(color) : tool.setFill(color, opacity);
+			}),
 		setCurveEnabled: (enabled) => withOutlineTool((tool) => tool.setCurveEnabled(Boolean(enabled))),
 		setCurveTension: (value) => {
 			const tension = numericValue(value, { min: 0, max: 1 });
@@ -66,6 +73,7 @@ export function createSelectedOutlineStyleLogic(getOutlineEditTool, getSelectedO
 	};
 	return {
 		setLineStyle: (lineStyle) => update({ lineStyle }),
-		setFillColor: (fillColor) => update({ fillColor })
+		setFillColor: (fillColor, fillOpacity) =>
+			update(fillOpacity === undefined ? { fillColor } : { fillColor, fillOpacity })
 	};
 }

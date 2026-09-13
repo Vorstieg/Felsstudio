@@ -14,6 +14,27 @@ describe('createTopoKeyboardController', () => {
 		expect(deleteSelection).toHaveBeenCalledWith(new Set(['text:a']));
 	});
 
+	it('ignores editing keys from form fields', () => {
+		const deleteSelection = vi.fn();
+		const finalize = vi.fn();
+		const cancel = vi.fn();
+		const controller = createTopoKeyboardController({
+			getSelectedItems: () => new Set(['route:r1']),
+			deleteSelection,
+			finalize,
+			cancel
+		});
+		const target = { closest: vi.fn(() => true) };
+
+		controller.handleKeyDown({ key: 'Backspace', target });
+		controller.handleKeyDown({ key: 'Enter', target });
+		controller.handleKeyDown({ key: 'Escape', target });
+
+		expect(deleteSelection).not.toHaveBeenCalled();
+		expect(finalize).not.toHaveBeenCalled();
+		expect(cancel).not.toHaveBeenCalled();
+	});
+
 	it('routes Enter and Escape through the shared editor actions', () => {
 		const finalize = vi.fn();
 		const cancel = vi.fn();

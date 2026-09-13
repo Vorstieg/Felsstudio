@@ -26,14 +26,16 @@ export function createTopoKeyboardController({
 			'input, textarea, select, [contenteditable="true"]'
 		);
 
-		if (isShortcut && !isTextInput && event.key.toLowerCase() === 'c') {
+		if (isTextInput) return;
+
+		if (isShortcut && event.key.toLowerCase() === 'c') {
 			if (clipboard?.copy({ topo: getTopo(), selectedItems: getSelectedItems() })) {
 				event.preventDefault();
 			}
 			return;
 		}
 
-		if (isShortcut && !isTextInput && event.key.toLowerCase() === 'v') {
+		if (isShortcut && event.key.toLowerCase() === 'v') {
 			const pasted = clipboard?.paste({ topo: getTopo(), canvasSize: getCanvasSize() });
 			if (pasted?.length) {
 				event.preventDefault();

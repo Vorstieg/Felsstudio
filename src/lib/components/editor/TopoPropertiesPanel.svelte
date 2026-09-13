@@ -185,7 +185,7 @@
 	bind:activeTab
 	onTabChange={switchTab}
 	width="20rem"
-	visualSuperseded={toolOptionsOpen}
+	visualSuperseded={false}
 >
 	{#snippet headerActions()}
 		<button

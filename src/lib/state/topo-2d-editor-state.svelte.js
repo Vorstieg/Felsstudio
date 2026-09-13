@@ -1,6 +1,6 @@
 import { Vector3 } from 'three';
 import { getContext, setContext } from 'svelte';
-import { generateOutlineId, generateSymbolId, generateTextId } from '$lib/assets/js/id-utils.js';
+import { generateId, generateOutlineId, generateSymbolId, generateTextId } from '$lib/assets/js/id-utils.js';
 import { translateOutline } from '$lib/assets/js/outline-geometry.js';
 
 const HISTORY_LIMIT = 50;
@@ -49,6 +49,12 @@ export function getTopo2DEditorState() {
 }
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
+const nextPitchId = (topo) => {
+	let id;
+	do id = generateId('pitch');
+	while ((topo.routes || []).some((route) => (route.pitches || []).some((pitch) => sameId(pitch.id, id))));
+	return id;
+};
 const renumberPitches = (route) => {
 	(route?.pitches || []).forEach((pitch, index) => {
 		pitch.pitchNumber = index + 1;
@@ -607,7 +613,7 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 			type,
 			position2D: [point.x, point.y],
 			rotation2D: 0,
-			scale2D: 1,
+			scale2D: ['bolt', 'piton'].includes(type) ? 0.5 : 1,
 			scaleX2D: 1,
 			scaleY2D: 1,
 			...values
@@ -746,6 +752,47 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 				Object.assign(item, clone(changes));
 				return true;
 			}),
+		duplicatePitch: (sourceRouteId, pitchId, targetRouteId) => {
+			let duplicatedId = null;
+			const result = commit('Duplicate pitch', () => {
+				const topo = readTopo();
+				const sourceRoute = topo.routes.find((route) => sameId(route.id, sourceRouteId));
+				const targetRoute = topo.routes.find((route) => sameId(route.id, targetRouteId));
+				const sourcePitch = sourceRoute?.pitches?.find((pitch) => sameId(pitch.id, pitchId));
+				if (!sourcePitch || !targetRoute) return false;
+
+				const duplicate = clone(sourcePitch);
+				duplicatedId = nextPitchId(topo);
+				duplicate.id = duplicatedId;
+				duplicate.type = 'pitch';
+				const targetTypes = Array.isArray(targetRoute.type)
+					? targetRoute.type
+					: targetRoute.type
+						? [targetRoute.type]
+						: [];
+				if (!targetTypes.includes('multi-pitch')) targetRoute.type = [...targetTypes, 'multi-pitch'];
+				targetRoute.pitches = [...(targetRoute.pitches || []), duplicate];
+				renumberPitches(targetRoute);
+				return true;
+			});
+			if (result && duplicatedId) selectPath('pitch', targetRouteId, duplicatedId);
+			return result ? duplicatedId : null;
+		},
+		movePitch: (routeId, pitchId, direction) => {
+			const result = commit('Move pitch', () => {
+				const route = readTopo().routes.find((entry) => sameId(entry.id, routeId));
+				if (!route?.pitches?.length) return false;
+				const from = route.pitches.findIndex((pitch) => sameId(pitch.id, pitchId));
+				const to = from + Number(direction);
+				if (from < 0 || to < 0 || to >= route.pitches.length) return false;
+				const [pitch] = route.pitches.splice(from, 1);
+				route.pitches.splice(to, 0, pitch);
+				renumberPitches(route);
+				return true;
+			});
+			if (result) selectPath('pitch', routeId, pitchId);
+			return result;
+		},
 		removePitch: (routeId, id) =>
 			commit('Remove pitch', () => {
 				const route = readTopo().routes.find((r) => r.id === routeId);
