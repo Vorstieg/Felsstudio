@@ -1,4 +1,4 @@
-import { vibrateOnAction } from '$lib/assets/js/mobile-utils.js';
+import { vibrateOnAction } from '$lib/assets/js/mobile-utils.ts';
 
 /**
  * Shared toolbar interaction policy for all editors.

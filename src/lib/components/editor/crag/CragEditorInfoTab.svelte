@@ -1,13 +1,13 @@
 <script>
-	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
+	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
 	import { availableTags, commonEquipment, cragTypes, securityOptions } from './crag-editor-options.js';
-	import { rockTypes } from '$lib/config.js';
+	import { rockTypes } from '$lib/config.ts';
 	const cragEditorState = getCragEditorSession();
 	const { actions } = getCragEditorTools();
 	const { addEquipmentItem: onAddEquipmentItem, removeEquipmentItem: onRemoveEquipmentItem, addCragImages: onAddCragImages, removeCragImage: onRemoveCragImage } = actions;
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
-	import { fileUrl } from '$lib/api/felslager.js';
+	import { fileUrl } from '$lib/api/felslager.ts';
 	import CragHierarchyPlacement from './CragHierarchyPlacement.svelte';
 
 	let {

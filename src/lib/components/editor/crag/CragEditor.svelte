@@ -7,7 +7,7 @@
 		createCragEditorSession,
 		normalizeCragSector,
 		provideCragEditorSession
-	} from '$lib/state/crag-session.svelte.js';
+	} from '$lib/state/crag-session.svelte.ts';
 	import { provideCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
 	import { viewport } from '$lib/state/viewport.svelte.js';
 	import { base } from '$app/paths';
@@ -16,15 +16,15 @@
 	import CragEditorMap from '$lib/components/editor/crag/CragEditorMap.svelte';
 	import CragEditorLayout from '$lib/components/editor/crag/CragEditorLayout.svelte';
 	import RouteDetailModal from '$lib/components/editor/crag/RouteDetailModal.svelte';
-	import { renameFile, writeFile, writeJson } from '$lib/api/felslager.js';
+	import { renameFile, writeFile, writeJson } from '$lib/api/felslager.ts';
 	import { authState } from '$lib/api/auth.svelte.js';
-	import { storage } from '$lib/assets/js/storage-utils.js';
+	import { storage } from '$lib/assets/js/storage-utils.ts';
 	import { Topo } from '$lib/assets/js/topo-paths.js';
 	import { slugifyName } from '$lib/components/editor/crag/crag-editor-paths.js';
 	import {
 		addEquipment,
 		removeEquipment
-	} from '$lib/components/editor/crag/crag-editor-sectors.js';
+	} from '$lib/components/editor/crag/crag-editor-sectors.ts';
 	import { useCragTrackEditor } from '$lib/components/editor/crag/use-crag-track-editor.svelte.js';
 	import { createCragRouteTool } from '$lib/components/editor/crag/CragRouteTool.svelte.js';
 	import { createCragSelectTool } from '$lib/components/editor/crag/CragSelectTool.svelte.js';
@@ -38,7 +38,7 @@
 		ensureCragEditorLayers,
 		syncFlightPlanPreview
 	} from '$lib/components/editor/crag/crag-editor-map.js';
-	import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.js';
+	import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.ts';
 	import { createRouteEditController } from './route-editing.js';
 
 	let { inspectorShadow = true, initialSession = null } = $props();

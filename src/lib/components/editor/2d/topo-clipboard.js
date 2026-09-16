@@ -1,4 +1,4 @@
-import { generateOutlineId, generateSymbolId, generateTextId } from '$lib/assets/js/id-utils.js';
+import { generateOutlineId, generateSymbolId, generateTextId } from '$lib/assets/js/id-utils.ts';
 import { translateOutline } from '$lib/assets/js/outline-geometry.js';
 
 const PASTE_OFFSET_PX = 16;

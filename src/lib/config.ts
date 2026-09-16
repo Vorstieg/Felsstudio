@@ -1,8 +1,5 @@
-// Controls how many posts are shown per page on the main blog index pages
 export const cragsPerPage = 50;
 
-// Browser keys are public, but are supplied by each deployment so their
-// allowed origins and quotas can be managed outside the source tree.
 export const maptilerApiKey = (import.meta.env.VITE_MAPTILER_API_KEY || '').trim();
 
 export const types = [
@@ -12,7 +9,7 @@ export const types = [
 	'trad',
 	'alpine-tour',
 	'via-ferrata'
-];
+] as const;
 
 export const rockTypes = [
 	'granite',
@@ -27,4 +24,7 @@ export const rockTypes = [
 	'conglomerate',
 	'schist',
 	'slate'
-];
+] as const;
+
+export type CragType = (typeof types)[number];
+export type RockType = (typeof rockTypes)[number];

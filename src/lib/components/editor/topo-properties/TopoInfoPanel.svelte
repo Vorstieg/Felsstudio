@@ -9,7 +9,7 @@
 	import { _ } from 'svelte-i18n';
 	import { availableTopoTags } from '$lib/assets/js/topo-utils.js';
 	import TopoJsonEditor from './TopoJsonEditor.svelte';
-	import { rockTypes } from '$lib/config.js';
+	import { rockTypes } from '$lib/config.ts';
 	import WallDirectionPicker from '$lib/components/ui/WallDirectionPicker.svelte';
 	import { wallDirectionForAzimuth } from '$lib/assets/js/wall-directions.js';
 

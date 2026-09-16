@@ -1,6 +1,6 @@
 import { select } from 'd3-selection';
 import { zoom as d3Zoom } from 'd3-zoom';
-import { vibrateOnAction } from '$lib/assets/js/mobile-utils.js';
+import { vibrateOnAction } from '$lib/assets/js/mobile-utils.ts';
 
 const COMPAT_MOUSE_SUPPRESSION_MS = 1500;
 const COMPAT_MOUSE_SUPPRESSION_PX = 30;

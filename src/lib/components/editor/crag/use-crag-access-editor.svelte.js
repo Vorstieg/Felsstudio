@@ -3,7 +3,7 @@ import * as turf from '@turf/turf';
 import { base } from '$app/paths';
 import { createAccessFeature, createAccessId } from '$lib/assets/js/access-geojson.js';
 import { createIconMarkerElement } from '$lib/components/editor/crag/crag-editor-map.js';
-import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.js';
+import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.ts';
 
 export function useCragAccessEditor({ state, getMap, getIsMapLoaded, getActiveTool }) {
 	let detectedAssets = $state([]);

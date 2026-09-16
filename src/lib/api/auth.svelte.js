@@ -2,7 +2,7 @@
  * Reactive auth state for lazy authentication.
  * The auth prompt only appears when a write operation is attempted without stored credentials.
  */
-import { hasCredentials, setCredentials, clearCredentials } from '$lib/api/felslager.js';
+import { hasCredentials, setCredentials, clearCredentials } from '$lib/api/felslager.ts';
 
 export const authState = $state({
 	showPrompt: false,

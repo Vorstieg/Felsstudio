@@ -5,7 +5,7 @@ import {
 	pointsToSmoothSvgPath,
 	pointsToSvg
 } from '$lib/assets/js/outline-geometry.js';
-import { getHitAreaSize } from '$lib/assets/js/mobile-utils.js';
+import { getHitAreaSize } from '$lib/assets/js/mobile-utils.ts';
 
 /** Renders persisted outlines and their editable vertices. */
 export function renderOutlinesLayer({

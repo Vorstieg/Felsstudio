@@ -2,7 +2,7 @@
 	import { onMount, untrack } from 'svelte';
 	import maplibregl from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
-	import { loadMapStyle } from '$lib/map-style.js';
+	import { loadMapStyle } from '$lib/map-style.ts';
 
 	let {
 		map = $bindable(),

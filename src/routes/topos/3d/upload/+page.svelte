@@ -5,7 +5,7 @@
 	import JSZip from 'jszip';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import { loadGlbIntoEditorState } from '$lib/assets/js/gltf-loader.js';
+	import { loadGlbIntoEditorState } from '$lib/assets/js/gltf-loader.ts';
 	import { draftsState } from '$lib/state/drafts.svelte.js';
 	import { createTopo2DEditorState, provideTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
 	import Topo3DUploadForm from '$lib/components/editor/wizard/Topo3DUploadForm.svelte';

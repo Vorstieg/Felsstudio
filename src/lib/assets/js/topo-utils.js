@@ -1,5 +1,5 @@
 import { Vector3 } from 'three';
-import { generateId } from './id-utils.js';
+import { generateId } from './id-utils.ts';
 
 export { fixpointSymbols, topoSymbols } from '@vorstieg/topo-renderer';
 

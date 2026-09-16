@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({ listDir: vi.fn(), readJson: vi.fn() }));
-vi.mock('$lib/api/felslager.js', () => api);
+vi.mock('$lib/api/felslager.ts', () => api);
 
 import fetchCrags, { loadAccessCollection } from './fetchCrags.js';
 

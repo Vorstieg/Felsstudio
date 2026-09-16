@@ -1,6 +1,6 @@
 <script>
 	import { _ } from 'svelte-i18n';
-	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
+	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
 	const cragEditorState = getCragEditorSession();
 	const { accessEditor, trackEditor, routeTool } = getCragEditorTools();

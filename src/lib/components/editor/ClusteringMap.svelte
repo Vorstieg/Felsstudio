@@ -3,7 +3,7 @@
 	import maplibregl from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
-	import { loadMapStyle } from '$lib/map-style.js';
+	import { loadMapStyle } from '$lib/map-style.ts';
 	const topoSession = getTopo2DEditorState();
 
 	let mapContainer = $state();

@@ -1,4 +1,4 @@
-import { generateId, generateRouteId } from '$lib/assets/js/id-utils.js';
+import { generateId, generateRouteId } from '$lib/assets/js/id-utils.ts';
 import { Topo } from '$lib/assets/js/topo-paths.js';
 import {
 	assignTopoPath,

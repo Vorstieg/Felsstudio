@@ -1,4 +1,4 @@
-import { generateId, generateRouteId } from '$lib/assets/js/id-utils.js';
+import { generateId, generateRouteId } from '$lib/assets/js/id-utils.ts';
 import { createGrade } from '$lib/assets/js/topo-utils.js';
 import { snapPointToGrid } from './path-drawing-logic.js';
 

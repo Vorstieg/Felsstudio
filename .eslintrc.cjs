@@ -26,6 +26,20 @@ module.exports = {
 	},
 	overrides: [
 		{
+			files: ['*.ts', '*.svelte.ts'],
+			parser: '@typescript-eslint/parser',
+			parserOptions: {
+				sourceType: 'module',
+				ecmaVersion: 2022
+			},
+			plugins: ['@typescript-eslint'],
+			extends: ['plugin:@typescript-eslint/recommended'],
+			rules: {
+				'@typescript-eslint/no-unused-vars': 'off',
+				'@typescript-eslint/no-explicit-any': 'off'
+			}
+		},
+		{
 			files: ['*.svelte.js'],
 			parser: 'espree',
 			parserOptions: {

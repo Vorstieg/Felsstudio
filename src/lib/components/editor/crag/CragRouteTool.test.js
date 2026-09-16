@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { createCragEditorSession } from '$lib/state/crag-session.svelte.js';
+import { createCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 import { createCragRouteTool } from './CragRouteTool.svelte.js';
 
 function createTool() {

@@ -6,7 +6,7 @@
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { untrack } from 'svelte';
-	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
+	import { initializeIdCounters } from '$lib/assets/js/id-utils.ts';
 	import { createEditablePathResolver } from './editable-path.js';
 	import { createCanvasInput } from './create-canvas-input.svelte.js';
 	import { referenceFixpoint, snapRoutePointToAnchor } from './route-fixpoint-snap.js';

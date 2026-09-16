@@ -9,7 +9,7 @@ import {
 	setCredentials,
 	writeFile,
 	writeJson
-} from './felslager.js';
+} from './felslager.ts';
 
 describe('Felslager API client', () => {
 	beforeEach(() => {

@@ -3,7 +3,7 @@
 	import { base } from '$app/paths';
 	import { page } from '$app/stores';
 	import { _ } from 'svelte-i18n';
-	import { listDir, readFile, writeFile, deleteFile, fileUrl, renameFile } from '$lib/api/felslager.js';
+	import { listDir, readFile, writeFile, deleteFile, fileUrl, renameFile } from '$lib/api/felslager.ts';
 	import { authState } from '$lib/api/auth.svelte.js';
 
 	let currentPath = $derived($page.url.searchParams.get('path') || '');

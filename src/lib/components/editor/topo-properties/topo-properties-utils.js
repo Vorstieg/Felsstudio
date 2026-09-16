@@ -1,4 +1,4 @@
-import { generateId, generateSymbolId } from '$lib/assets/js/id-utils.js';
+import { generateId, generateSymbolId } from '$lib/assets/js/id-utils.ts';
 
 export const routeLineStyles = [
 	{ id: 'red', label: 'Red' },

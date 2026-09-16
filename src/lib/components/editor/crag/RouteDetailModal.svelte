@@ -2,8 +2,8 @@
 	import PitchComponent from '$lib/components/editor/topo-properties/routes/PitchComponent.svelte';
 	import { createVariant } from '$lib/components/editor/topo-properties/topo-properties-utils.js';
 	import { convertRouteType } from '$lib/assets/js/topo-utils.js';
-	import { generateId } from '$lib/assets/js/id-utils.js';
-	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
+	import { generateId } from '$lib/assets/js/id-utils.ts';
+	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
 
 	const cragEditorState = getCragEditorSession();

@@ -1,5 +1,5 @@
-import { getMapHitRadius, getTouchTargetSize } from '$lib/assets/js/mobile-utils.js';
-import { maptilerTilesUrl } from '$lib/map-style.js';
+import { getMapHitRadius, getTouchTargetSize } from '$lib/assets/js/mobile-utils.ts';
+import { maptilerTilesUrl } from '$lib/map-style.ts';
 import { PathLayer, ScatterplotLayer } from '@deck.gl/layers';
 import { MapboxOverlay } from '@deck.gl/mapbox';
 

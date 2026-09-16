@@ -5,7 +5,7 @@ import {
 	generateOutlineId,
 	generateSymbolId,
 	generateTextId
-} from '$lib/assets/js/id-utils.js';
+} from '$lib/assets/js/id-utils.ts';
 import { translateOutline } from '$lib/assets/js/outline-geometry.js';
 
 const HISTORY_LIMIT = 50;

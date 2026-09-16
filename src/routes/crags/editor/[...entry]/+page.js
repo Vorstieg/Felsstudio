@@ -1,4 +1,4 @@
-import { loadCragEditorEntry } from '$lib/assets/js/load-crag-editor-entry.js';
+import { loadCragEditorEntry } from '$lib/assets/js/load-crag-editor-entry.ts';
 
 /** @type {import('./$types').PageLoad} */
 export const load = async ({ params, url }) => {

@@ -1,4 +1,4 @@
-import { storage } from '$lib/assets/js/storage-utils.js';
+import { storage } from '$lib/assets/js/storage-utils.ts';
 import { topoStore } from '$lib/assets/js/db.js';
 import { restoreDraftSession, serializeDraftExtras } from './draft-serialization.js';
 

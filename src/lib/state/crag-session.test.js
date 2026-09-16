@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it } from 'vitest';
-import { createCragEditorSession, normalizeCragSector } from './crag-session.svelte.js';
+import { createCragEditorSession, normalizeCragSector } from './crag-session.svelte.ts';
 
 describe('createCragEditorSession', () => {
 	it('keeps crag sessions independent', () => {

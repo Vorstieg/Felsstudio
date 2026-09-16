@@ -2,7 +2,7 @@
 	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
 	const editorState = getTopo2DEditorState();
 	let topo = $derived(editorState.topo);
-	import { isTouchDevice } from '$lib/assets/js/mobile-utils.js';
+	import { isTouchDevice } from '$lib/assets/js/mobile-utils.ts';
 	import { _ } from 'svelte-i18n';
 
 	let fileInput = $state(null);

@@ -1,4 +1,4 @@
-import { generateOutlineId } from '$lib/assets/js/id-utils.js';
+import { generateOutlineId } from '$lib/assets/js/id-utils.ts';
 import { createBrushOutline } from '$lib/assets/js/brush-outline-geometry.js';
 import { findBrushImageEdge } from '$lib/assets/js/brush-edge-assist.js';
 import {

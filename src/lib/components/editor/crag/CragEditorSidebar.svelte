@@ -1,5 +1,5 @@
 <script>
-	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
+	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 	const cragEditorState = getCragEditorSession();
 	import DetailsComponent from '../DetailsComponent.svelte';
 	import CragEditorPanelContent from './CragEditorPanelContent.svelte';

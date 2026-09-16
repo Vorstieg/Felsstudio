@@ -1,12 +1,32 @@
-export function addEquipment(equipment = [], item = { name: 'Expressschlingen', amount: 12 }) {
+import type { GeoJSONGeometry } from '@vorstieg/fels-data/types';
+import type { CragSector } from '$lib/types/crag';
+
+type EquipmentItem = {
+	name: string;
+	amount: number;
+	[key: string]: unknown;
+};
+
+type CreateDefaultSectorOptions = {
+	sectors?: CragSector[];
+	cragCoordinates?: number[];
+};
+
+export function addEquipment(
+	equipment: EquipmentItem[] = [],
+	item: EquipmentItem = { name: 'Expressschlingen', amount: 12 }
+): EquipmentItem[] {
 	return [...equipment, item];
 }
 
-export function removeEquipment(equipment = [], index) {
+export function removeEquipment<T>(equipment: T[] = [], index: number): T[] {
 	return equipment.filter((_, i) => i !== index);
 }
 
-export function createDefaultSector({ sectors = [], cragCoordinates = [] } = {}) {
+export function createDefaultSector({
+	sectors = [],
+	cragCoordinates = []
+}: CreateDefaultSectorOptions = {}): CragSector {
 	const nextNumber = sectors.length + 1;
 	return {
 		id: `sector-${nextNumber}`,
@@ -24,17 +44,20 @@ export function createDefaultSector({ sectors = [], cragCoordinates = [] } = {})
 		geometry: {
 			type: 'Point',
 			coordinates: [...cragCoordinates]
-		},
+		} as GeoJSONGeometry,
 		topo: { site: '', link: '' },
 		assets: { topos: [], images: [], models: [], approaches: [] }
 	};
 }
 
-export function addSector(sectors = [], sector) {
+export function addSector(sectors: CragSector[] = [], sector: CragSector): CragSector[] {
 	return [...sectors, sector];
 }
 
-export function duplicateSectorById(sectors = [], id) {
+export function duplicateSectorById(
+	sectors: CragSector[] = [],
+	id: string
+): { sectors: CragSector[]; duplicatedId: string | null } {
 	const source = sectors.find((sector) => sector.id === id);
 	if (!source) return { sectors, duplicatedId: null };
 
@@ -48,7 +71,7 @@ export function duplicateSectorById(sectors = [], id) {
 		sectors: [
 			...sectors,
 			{
-				...JSON.parse(JSON.stringify(source)),
+				...(JSON.parse(JSON.stringify(source)) as CragSector),
 				id: uniqueId,
 				name: `${source.name || source.id} Copy`,
 				sort: (Number(source.sort) || sectors.length * 10) + 1
@@ -57,11 +80,15 @@ export function duplicateSectorById(sectors = [], id) {
 	};
 }
 
-export function removeSectorById(sectors = [], id) {
+export function removeSectorById(sectors: CragSector[] = [], id: string): CragSector[] {
 	return sectors.filter((sector) => sector.id !== id);
 }
 
-export function moveSectorById(sectors = [], id, direction) {
+export function moveSectorById(
+	sectors: CragSector[] = [],
+	id: string,
+	direction: number
+): CragSector[] {
 	const reordered = [...sectors];
 	const index = reordered.findIndex((sector) => sector.id === id);
 	const nextIndex = index + direction;

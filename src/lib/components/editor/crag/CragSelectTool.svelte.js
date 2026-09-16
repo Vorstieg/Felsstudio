@@ -1,4 +1,4 @@
-import { getMapHitRadius } from '$lib/assets/js/mobile-utils.js';
+import { getMapHitRadius } from '$lib/assets/js/mobile-utils.ts';
 
 /** Owns crag-object hit testing and selection changes. */
 export function createCragSelectTool({

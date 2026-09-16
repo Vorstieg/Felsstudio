@@ -1,6 +1,6 @@
 import { getRouteLineStyle } from '@vorstieg/topo-renderer';
 import { pointsToSmoothSvgPath } from '$lib/assets/js/outline-geometry.js';
-import { getHitAreaSize, isTouchDevice } from '$lib/assets/js/mobile-utils.js';
+import { getHitAreaSize, isTouchDevice } from '$lib/assets/js/mobile-utils.ts';
 
 /** Renders persisted route paths and delegates their edit controls to RouteEditTool. */
 export function renderRoutesLayer({

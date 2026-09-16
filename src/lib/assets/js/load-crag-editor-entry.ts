@@ -1,4 +1,6 @@
-import { readJson } from '$lib/api/felslager.js';
+import type { CragFeature, SectorFeature } from '@vorstieg/fels-data/types';
+import type { CragSector, LoadedCragEditorEntry, RouteDocument } from '$lib/types/crag';
+import { readJson } from '$lib/api/felslager.ts';
 import { loadAccessCollection } from '$lib/assets/js/fetchCrags.js';
 import { getCragEditorPath, splitEntryPath } from '$lib/assets/js/editor-entry-paths.js';
 import { Topo } from '$lib/assets/js/topo-paths.js';
@@ -6,19 +8,21 @@ import { normalizeTopoPaths } from '$lib/assets/js/topo-document-paths.js';
 
 export { getCragEditorPath };
 
-export async function loadCragEditorEntry(entryPath) {
+export async function loadCragEditorEntry(
+	entryPath: string
+): Promise<LoadedCragEditorEntry | null> {
 	const { path, id: cragId } = splitEntryPath(entryPath);
 	if (!cragId) return null;
 
 	const topo = new Topo(path, cragId);
-	const cragData = await readJson(topo.getCragPath());
+	const cragData = await readJson<CragFeature>(topo.getCragPath());
 	const crag = {
 		...cragData.properties,
 		geometry: cragData.geometry,
 		sectors: await Promise.all(
-			(cragData.properties.sectors || []).map(async (sector) => {
+			(cragData.properties.sectors || []).map(async (sector): Promise<CragSector> => {
 				try {
-					const sectorData = await readJson(
+					const sectorData = await readJson<SectorFeature>(
 						new Topo(topo.path, topo.cragId, sector.id).getSectorPath()
 					);
 					return {
@@ -29,7 +33,7 @@ export async function loadCragEditorEntry(entryPath) {
 						geometry: sectorData.geometry
 					};
 				} catch {
-					return sector;
+					return sector as CragSector;
 				}
 			})
 		)
@@ -44,7 +48,7 @@ export async function loadCragEditorEntry(entryPath) {
 	];
 	const routeDocuments = (
 		await Promise.all(
-			topoDocuments.map(async ({ sectorId, sectorTopo }) => {
+			topoDocuments.map(async ({ sectorId, sectorTopo }): Promise<RouteDocument | null> => {
 				try {
 					const path = sectorTopo.getTopoPath();
 					const normalized = normalizeTopoPaths(await readJson(path));
@@ -54,9 +58,9 @@ export async function loadCragEditorEntry(entryPath) {
 				}
 			})
 		)
-	).filter(Boolean);
+	).filter((entry): entry is RouteDocument => Boolean(entry));
 
-	const state = { crag, access: null, routeDocuments, sourceCrag: { path, id: cragId } };
+	const state: LoadedCragEditorEntry = { crag, access: null as never, routeDocuments, sourceCrag: { path, id: cragId } };
 	await loadAccessCollection(topo, state);
 	return state;
 }

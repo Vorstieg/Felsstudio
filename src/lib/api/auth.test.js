@@ -6,7 +6,7 @@ const credentials = vi.hoisted(() => ({
 	clear: vi.fn()
 }));
 
-vi.mock('$lib/api/felslager.js', () => ({
+vi.mock('$lib/api/felslager.ts', () => ({
 	hasCredentials: credentials.has,
 	setCredentials: credentials.set,
 	clearCredentials: credentials.clear

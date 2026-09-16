@@ -4,7 +4,7 @@ import {
 	getOutlinePoints,
 	getPresetSemanticHandles
 } from '$lib/assets/js/outline-geometry.js';
-import { getTouchTargetSize } from '$lib/assets/js/mobile-utils.js';
+import { getTouchTargetSize } from '$lib/assets/js/mobile-utils.ts';
 
 function toSvgPoints(points, { baseWidth, baseHeight }) {
 	return points.map((point) => `${point[0] * baseWidth},${point[1] * baseHeight}`).join(' ');

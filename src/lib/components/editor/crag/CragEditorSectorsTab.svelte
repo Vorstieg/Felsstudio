@@ -1,8 +1,8 @@
 <script>
-	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
+	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
 	import { availableTags, cragTypes, securityOptions } from './crag-editor-options.js';
-	import { rockTypes } from '$lib/config.js';
+	import { rockTypes } from '$lib/config.ts';
 	const cragEditorState = getCragEditorSession();
 	const { sectorTool, routeTool, actions } = getCragEditorTools();
 	const {

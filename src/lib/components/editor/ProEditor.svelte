@@ -2,7 +2,7 @@
 	import { Canvas, T } from '@threlte/core';
 	import { OrbitControls } from '@threlte/extras';
 	import { Vector3, WebGLRenderer } from 'three';
-	import { createGltfLoader } from '$lib/assets/js/gltf-loader.js';
+	import { createGltfLoader } from '$lib/assets/js/gltf-loader.ts';
 	import { onMount, untrack } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import { browser } from '$app/environment';
@@ -20,12 +20,12 @@
 	} from '$lib/state/topo-2d-editor-state.svelte.js';
 	import { isBlankTopoSession } from '$lib/state/drafts.svelte.js';
 	import { useTopoDraftAutosave } from '$lib/components/editor/use-topo-draft-autosave.svelte.js';
-	import { isMobileViewport } from '$lib/assets/js/mobile-utils.js';
+	import { isMobileViewport } from '$lib/assets/js/mobile-utils.ts';
 
 	// 2D Editor imports
 
-	import { generateSymbolId, initializeIdCounters } from '$lib/assets/js/id-utils.js';
-	import { writeFile, writeJson } from '$lib/api/felslager.js';
+	import { generateSymbolId, initializeIdCounters } from '$lib/assets/js/id-utils.ts';
+	import { writeFile, writeJson } from '$lib/api/felslager.ts';
 	import { authState } from '$lib/api/auth.svelte.js';
 	import ToolPalette3D from '$lib/components/editor/3d/ToolPalette3D.svelte';
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';

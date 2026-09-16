@@ -1,4 +1,4 @@
-import { generateId } from './id-utils.js';
+import { generateId } from './id-utils.ts';
 
 function clone(value) {
 	return value == null ? value : JSON.parse(JSON.stringify(value));

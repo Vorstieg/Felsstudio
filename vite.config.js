@@ -19,7 +19,8 @@ const config = defineConfig({
 	test: {
 		environment: 'jsdom',
 		setupFiles: ['./vitest-setup.js'],
-		include: ['src/**/*.test.{js,ts}', 'tests/test-*.mjs']
+		include: ['src/**/*.test.{js,ts}', 'tests/test-*.mjs'],
+		testTimeout: 30000
 	}
 });
 

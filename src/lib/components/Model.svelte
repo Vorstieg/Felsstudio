@@ -74,7 +74,7 @@
 <script>
 	import { T, useThrelte } from '@threlte/core';
 	import { interactivity, Text } from '@threlte/extras';
-	import { createGltfLoader } from '$lib/assets/js/gltf-loader.js';
+	import { createGltfLoader } from '$lib/assets/js/gltf-loader.ts';
 
 	interactivity();
 

@@ -1,5 +1,5 @@
 import { cragsPerPage } from '$lib/config';
-import { listDir, readJson } from '$lib/api/felslager.js';
+import { listDir, readJson } from '$lib/api/felslager.ts';
 import { normalizeAccessCollection } from '$lib/assets/js/access-geojson.js';
 
 /** @typedef {import('@vorstieg/fels-data/types').CragFeature} CragFeature */

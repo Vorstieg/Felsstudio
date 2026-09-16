@@ -1,15 +1,5 @@
-/**
- * Safe localStorage utilities
- */
-
 export const storage = {
-	/**
-	 * Save data to localStorage
-	 * @param {string} key
-	 * @param {any} value
-	 * @returns {boolean} Success
-	 */
-	set(key, value) {
+	set(key: string, value: unknown): boolean {
 		try {
 			if (typeof window === 'undefined') return false;
 			const data = JSON.stringify(value);
@@ -21,29 +11,19 @@ export const storage = {
 		}
 	},
 
-	/**
-	 * Get data from localStorage
-	 * @param {string} key
-	 * @param {any} defaultValue
-	 * @returns {any}
-	 */
-	get(key, defaultValue = null) {
+	get<T = unknown>(key: string, defaultValue: T | null = null): T | null {
 		try {
 			if (typeof window === 'undefined') return defaultValue;
 			const data = window.localStorage.getItem(key);
 			if (!data) return defaultValue;
-			return JSON.parse(data);
+			return JSON.parse(data) as T;
 		} catch (e) {
 			console.error('Storage Error (get):', e);
 			return defaultValue;
 		}
 	},
 
-	/**
-	 * Remove data from localStorage
-	 * @param {string} key
-	 */
-	remove(key) {
+	remove(key: string): void {
 		try {
 			if (typeof window === 'undefined') return;
 			window.localStorage.removeItem(key);

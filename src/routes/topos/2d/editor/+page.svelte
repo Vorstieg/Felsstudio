@@ -5,7 +5,7 @@
 		provideTopo2DEditorState
 	} from '$lib/state/topo-2d-editor-state.svelte.js';
 	import { useTopoDraftAutosave } from '$lib/components/editor/use-topo-draft-autosave.svelte.js';
-	import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
+	import { initializeIdCounters } from '$lib/assets/js/id-utils.ts';
 	import Topo2DEditor from '$lib/components/editor/2d/Topo2DEditor.svelte';
 	import OutlineToolOptions from '$lib/components/editor/tools/OutlineToolOptions.svelte';
 	import SelectToolOptions from '$lib/components/editor/tools/SelectToolOptions.svelte';
@@ -20,14 +20,14 @@
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
 	import TopoPropertiesPanel from '$lib/components/editor/TopoPropertiesPanel.svelte';
 	import { authState } from '$lib/api/auth.svelte.js';
-	import { writeJson } from '$lib/api/felslager.js';
+	import { writeJson } from '$lib/api/felslager.ts';
 	import { topoSymbols } from '@vorstieg/topo-renderer';
 	import { _ } from 'svelte-i18n';
 	import { browser } from '$app/environment';
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import { loadTopoEditorEntry } from '$lib/assets/js/open-topo-editor-entry.js';
-	import { isMobileViewport } from '$lib/assets/js/mobile-utils.js';
+	import { isMobileViewport } from '$lib/assets/js/mobile-utils.ts';
 
 	let { entryPath = null } = $props();
 	const initialEntryPath = untrack(() => entryPath);

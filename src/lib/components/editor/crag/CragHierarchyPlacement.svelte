@@ -1,8 +1,8 @@
 <script>
 	import { onMount } from 'svelte';
-	import { getCragEditorSession } from '$lib/state/crag-session.svelte.js';
+	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 	const cragEditorState = getCragEditorSession();
-	import { listDir } from '$lib/api/felslager.js';
+	import { listDir } from '$lib/api/felslager.ts';
 	import CragHierarchyModal from './CragHierarchyModal.svelte';
 	import { slugifyName, normalizePath } from '$lib/components/editor/crag/crag-editor-paths.js';
 

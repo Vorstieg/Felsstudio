@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it } from 'vitest';
-import { createCragEditorSession } from '$lib/state/crag-session.svelte.js';
+import { createCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 import { createCragSectorTool } from './CragSectorTool.svelte.js';
 
 function createTool() {

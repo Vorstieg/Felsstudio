@@ -2,7 +2,7 @@
 	import { onDestroy, onMount } from 'svelte';
 	import maplibregl from 'maplibre-gl';
 	import * as THREE from 'three';
-	import { loadMapStyle } from '$lib/map-style.js';
+	import { loadMapStyle } from '$lib/map-style.ts';
 
 	let {
 		coordinates = $bindable([0, 0]),

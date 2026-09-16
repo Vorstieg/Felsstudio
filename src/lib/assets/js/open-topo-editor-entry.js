@@ -1,10 +1,10 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
-import { fileUrl, readJson } from '$lib/api/felslager.js';
+import { fileUrl, readJson } from '$lib/api/felslager.ts';
 import { draftsState } from '$lib/state/drafts.svelte.js';
 import { Topo } from '$lib/assets/js/topo-paths.js';
-import { initializeIdCounters } from '$lib/assets/js/id-utils.js';
-import { loadGlbIntoEditorState } from '$lib/assets/js/gltf-loader.js';
+import { initializeIdCounters } from '$lib/assets/js/id-utils.ts';
+import { loadGlbIntoEditorState } from '$lib/assets/js/gltf-loader.ts';
 import { normalizeTopoPaths } from '$lib/assets/js/topo-document-paths.js';
 import { getTopoEditorPath, splitEntryPath } from '$lib/assets/js/editor-entry-paths.js';
 

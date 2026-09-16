@@ -1,3 +1,5 @@
+import type { ApiListEntry, ApiListOptions } from '$lib/types/api';
+
 /**
  * Felslager API Client
  * Wraps all interactions with the Felslager file-system API.
@@ -8,12 +10,7 @@ const CRED_KEY = 'felslager_auth';
 
 // --- Credential Management (sessionStorage) ---
 
-/**
- * Store credentials in sessionStorage
- * @param {string} user
- * @param {string} pass
- */
-export function setCredentials(user, pass) {
+export function setCredentials(user: string, pass: string): void {
 	try {
 		if (typeof window === 'undefined') return;
 		const encoded = btoa(`${user}:${pass}`);
@@ -23,11 +20,7 @@ export function setCredentials(user, pass) {
 	}
 }
 
-/**
- * Read the Base64-encoded credentials from sessionStorage
- * @returns {string|null}
- */
-export function getCredentials() {
+export function getCredentials(): string | null {
 	try {
 		if (typeof window === 'undefined') return null;
 		return window.sessionStorage.getItem(CRED_KEY);
@@ -36,18 +29,11 @@ export function getCredentials() {
 	}
 }
 
-/**
- * Check if credentials are currently stored
- * @returns {boolean}
- */
-export function hasCredentials() {
+export function hasCredentials(): boolean {
 	return !!getCredentials();
 }
 
-/**
- * Remove stored credentials
- */
-export function clearCredentials() {
+export function clearCredentials(): void {
 	try {
 		if (typeof window === 'undefined') return;
 		window.sessionStorage.removeItem(CRED_KEY);
@@ -58,79 +44,53 @@ export function clearCredentials() {
 
 // --- Internal Helpers ---
 
-/**
- * Build the Authorization header if credentials exist
- * @returns {Record<string, string>}
- */
-function authHeaders() {
+function authHeaders(): Record<string, string> {
 	const cred = getCredentials();
 	if (!cred) return {};
 	return { Authorization: `Basic ${cred}` };
 }
 
-function isAuthRejected(res) {
+function isAuthRejected(res: Response): boolean {
 	return res.status === 401 || res.status === 403;
 }
 
-/**
- * Normalize a path (strip leading slash, ensure no double slashes)
- * @param {string} path
- * @returns {string}
- */
-function normalizePath(path) {
+function normalizePath(path: string): string {
 	return path.replace(/^\/+/, '').replace(/\/+/g, '/');
 }
 
 // --- Public API ---
 
-/**
- * List directory contents.
- * @param {string} path - Directory path relative to the API root (e.g. 'entries')
- * @param {{ recursive?: boolean }} [options]
- * @returns {Promise<Array<{ name: string, path: string, type: 'file' | 'dir' }>>}
- */
-export async function listDir(path, { recursive = false } = {}) {
+export async function listDir(
+	path: string,
+	{ recursive = false }: ApiListOptions = {}
+): Promise<ApiListEntry[]> {
 	const url = `${BASE_URL}/${normalizePath(path)}${recursive ? '?recursive=true' : ''}`;
 	const res = await fetch(url);
 	if (!res.ok) throw new Error(`Failed to list ${path}: ${res.status} ${res.statusText}`);
-	return res.json();
+	return res.json() as Promise<ApiListEntry[]>;
 }
 
-/**
- * Read a file and return the raw Response (for binary files, images, etc.)
- * @param {string} path - File path relative to the API root
- * @returns {Promise<Response>}
- */
-export async function readFile(path) {
+export async function readFile(path: string): Promise<Response> {
 	const url = `${BASE_URL}/${normalizePath(path)}`;
 	const res = await fetch(url);
 	if (!res.ok) throw new Error(`Failed to read ${path}: ${res.status} ${res.statusText}`);
 	return res;
 }
 
-/**
- * Read a JSON file and return the parsed object.
- * @param {string} path
- * @template T
- * @returns {Promise<T>}
- */
-export async function readJson(path) {
+export async function readJson<T = unknown>(path: string): Promise<T> {
 	const res = await readFile(path);
-	return res.json();
+	return res.json() as Promise<T>;
 }
 
-/**
- * Write (upload/overwrite) a file. Requires authentication.
- * @param {string} path - Destination path relative to the API root
- * @param {Blob|ArrayBuffer|string} body - File content
- * @param {string} [contentType] - MIME type (auto-detected for Blobs)
- * @returns {Promise<Response>}
- */
-export async function writeFile(path, body, contentType) {
+export async function writeFile(
+	path: string,
+	body: Blob | ArrayBuffer | string,
+	contentType?: string
+): Promise<Response> {
 	const headers = { ...authHeaders() };
 	if (contentType) headers['Content-Type'] = contentType;
 	const url = `${BASE_URL}/${normalizePath(path)}`;
-	let res;
+	let res: Response;
 	try {
 		res = await fetch(url, { method: 'PUT', headers, body });
 	} catch (err) {
@@ -147,23 +107,12 @@ export async function writeFile(path, body, contentType) {
 	return res;
 }
 
-/**
- * Write a JSON object to a file. Requires authentication.
- * @param {string} path
- * @param {unknown} data
- * @returns {Promise<Response>}
- */
-export async function writeJson(path, data) {
+export async function writeJson(path: string, data: unknown): Promise<Response> {
 	const jsonString = JSON.stringify(data, undefined, 4);
 	return writeFile(path, jsonString, 'application/json');
 }
 
-/**
- * Delete a file or directory. Requires authentication.
- * @param {string} path
- * @returns {Promise<Response>}
- */
-export async function deleteFile(path) {
+export async function deleteFile(path: string): Promise<Response> {
 	const url = `${BASE_URL}/${normalizePath(path)}`;
 	const res = await fetch(url, { method: 'DELETE', headers: authHeaders() });
 	if (!res.ok) {
@@ -173,13 +122,7 @@ export async function deleteFile(path) {
 	return res;
 }
 
-/**
- * Rename/Move a file or directory. Requires authentication.
- * @param {string} oldPath
- * @param {string} newPath
- * @returns {Promise<Response>}
- */
-export async function renameFile(oldPath, newPath) {
+export async function renameFile(oldPath: string, newPath: string): Promise<Response> {
 	const url = `${BASE_URL}/${normalizePath(oldPath)}`;
 	const headers = {
 		...authHeaders(),
@@ -193,11 +136,6 @@ export async function renameFile(oldPath, newPath) {
 	return res;
 }
 
-/**
- * Build the full public URL for a file (for use in <img src>, model loaders, etc.)
- * @param {string} path - Path relative to the API root
- * @returns {string}
- */
-export function fileUrl(path) {
+export function fileUrl(path: string): string {
 	return `${BASE_URL}/${normalizePath(path)}`;
 }

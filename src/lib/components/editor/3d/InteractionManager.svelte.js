@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Vector3, Raycaster } from 'three';
-import { generateRouteId, generateSymbolId, generateId } from '$lib/assets/js/id-utils.js';
+import { generateRouteId, generateSymbolId, generateId } from '$lib/assets/js/id-utils.ts';
 
 export class Topo3DInteractionManager {
 	// State
