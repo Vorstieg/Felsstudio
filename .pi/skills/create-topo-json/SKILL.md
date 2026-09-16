@@ -52,7 +52,7 @@ Use this skill when the Felsstudio AI import endpoint asks you to convert a clim
 - Route and pitch `lineStyle` should only be `red` or `redDashed`.
 - Use `fixPoints` for icon symbols only. Align bolts and belays to the route/pitch line when the source implies they are on-route.
 - Use `textLabels` for short movable labels. Keep long explanations in route `description` or metadata.
-- UIAA grades may be written with Arabic numerals (5, 6+, 7-) or Roman numerals (V, VI+, VII-). Store them under `_gradeScale: "uiaa"`; the backend/editor will canonicalize them to Roman numerals.
+- Store route and pitch grades as `grade: { "scale": "uiaa", "value": "6+", "standardizedValue": "6a+" }`. `standardizedValue` is always the French grade used for normalization. Always convert UIAA grades to a French `standardizedValue`; for other grade scales do not convert unless a French value is explicitly known.
 - Use structured per-route metadata when useful: guidebook stars, conflict notes, pitch count, access notes, gear notes, or seasonal restrictions.
 - When source precision is low or the drawing is redrawn from a scanned guide, state that geometry is a manually normalized interpretation in metadata.
 - Record geometry provenance in metadata, for example `geometrySource` (`"vector-trace"`, `"raster-scan"`, `"manual-normalized"`, or `"mixed"`), `geometryConfidence` (`"high"`, `"medium"`, or `"low"`), and `geometryNotes` for uncertain or manually adjusted routes/outlines.
@@ -89,11 +89,11 @@ Use these rules whenever source imagery, a preview SVG, or a scanned topo contai
 
 Top level fields: `name`, `description`, `rock`, `tags`, `editorMode` (`"2d"`), `image2D` (`null`), `imageAspectRatio`, `metadata`, `routes`, `fixPoints`, `outlines`, `textLabels`.
 
-Route object fields: `id`, `name`, `type` (`"sports-climbing"` for single-pitch sport routes, `"multi-pitch"` for multi-pitch routes, or another configured route type such as `"bouldering"`/`"trad"` when explicitly indicated), `_gradeScale`, `grade`, `lineStyle`, `points2D`, optional `pitches`.
+Route object fields: `id`, `name`, `type` (`"sports-climbing"` for single-pitch sport routes, `"multi-pitch"` for multi-pitch routes, or another configured route type such as `"bouldering"`/`"trad"` when explicitly indicated), `grade` (`{ "scale": string, "value": string, "standardizedValue": string }`), `lineStyle`, `points2D`, optional `pitches`.
 
 Important: Do not use `"single-pitch"` as a route `type`; encode ordinary single-pitch climbing routes as `"sports-climbing"`.
 
-Pitch object fields: `id`, `type` (`"pitch"`), `pitchNumber`, `grade`, `lineStyle` (`""`, `"red"`, or `"redDashed"`), `points2D`.
+Pitch object fields: `id`, `type` (`"pitch"`), `pitchNumber`, `grade` (`{ "scale": string, "value": string, "standardizedValue": string }`), `lineStyle` (`""`, `"red"`, or `"redDashed"`), `points2D`.
 
 Fix point object fields: `id`, `type`, `position2D`, optional `rotation2D` and `scale2D`.
 

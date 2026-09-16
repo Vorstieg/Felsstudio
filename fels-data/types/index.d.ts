@@ -90,11 +90,17 @@ export interface SectorFeature {
 	[key: string]: unknown;
 }
 
+export interface Grade {
+	scale: string;
+	value: string;
+	standardizedValue: string;
+}
+
 export interface Pitch {
 	id: string | number;
 	type: 'pitch';
 	pitchNumber: number;
-	grade?: string | number | null;
+	grade?: Grade | null;
 	lineStyle?: string;
 	points2D: Path2D;
 	[key: string]: unknown;
@@ -104,8 +110,7 @@ export interface Route {
 	id: string | number;
 	name?: string;
 	type?: string;
-	grade?: string | number | null;
-	_gradeScale?: string;
+	grade?: Grade | null;
 	lineStyle?: string;
 	description?: string;
 	tags?: string[];

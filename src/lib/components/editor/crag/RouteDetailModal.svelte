@@ -44,7 +44,7 @@
 				pitchNumber: (route.pitches?.length || 0) + 1,
 				points2D: [],
 				points: [],
-				grade: '',
+				grade: null,
 				length: 0,
 				lineStyle: '',
 				type: 'pitch'

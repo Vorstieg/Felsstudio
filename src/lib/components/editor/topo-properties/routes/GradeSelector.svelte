@@ -3,16 +3,17 @@
 		gradeSystems,
 		getAvailableGradeSystems
 	} from '$lib/components/editor/topo-properties/routes/grades.js';
+	import { createGrade } from '$lib/assets/js/topo-utils.js';
 	import { _ } from 'svelte-i18n';
 
 	let {
 		route,
 		grade = $bindable(),
-		scale = $bindable(),
 		onFieldChange = null
 	} = $props();
 	let availableGradeSystems = $derived(getAvailableGradeSystems(route?.type));
-	let effectiveScale = $derived(scale || availableGradeSystems[0] || '');
+	let effectiveScale = $derived(grade?.scale || availableGradeSystems[0] || '');
+	let effectiveGrade = $derived(grade?.value || '');
 </script>
 
 <div>
@@ -21,8 +22,7 @@
 		<select
 			value={effectiveScale}
 			onchange={(event) => {
-				scale = event.currentTarget.value;
-				onFieldChange?.('_gradeScale', scale);
+				if (effectiveGrade) onFieldChange?.('grade', createGrade(effectiveGrade, event.currentTarget.value));
 			}}
 			id="gradeSystem"
 			class='input-studio w-24 font-bold'
@@ -33,9 +33,9 @@
 		</select>
 
 		<select
-			value={grade}
+			value={effectiveGrade}
 			onchange={(event) => {
-				grade = event.currentTarget.value;
+				grade = createGrade(event.currentTarget.value, effectiveScale);
 				onFieldChange?.('grade', grade);
 			}}
 			class="input-studio min-w-0 flex-1"

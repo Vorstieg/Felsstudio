@@ -1,5 +1,6 @@
 <script>
 	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+	import { getGradeValue } from '$lib/assets/js/topo-utils.js';
 
 	const editorState = getTopo2DEditorState();
 	import { _ } from 'svelte-i18n';
@@ -98,7 +99,7 @@
 					</h3>
 					{#if mobile}
 						<div class="text-[10px] text-warm-gray-400 font-bold uppercase tracking-wider">
-							{#if route.grade}{route.grade} ·{/if}
+							{#if getGradeValue(route)}{getGradeValue(route)} ·{/if}
 							{#if route.length}{route.length}m ·{/if}{$_(`types.${route.type}`)}
 						</div>
 					{/if}

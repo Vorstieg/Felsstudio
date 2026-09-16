@@ -121,7 +121,6 @@
 	<GradeSelector
 		route={pitch}
 		grade={pitch.grade}
-		scale={pitch._gradeScale}
 		onFieldChange={onFieldChange}
 	/>
 	<div class='grid grid-cols-2 gap-2 mt-1'>

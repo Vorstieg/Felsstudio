@@ -8,7 +8,7 @@ init({ initialLocale: 'en' });
 
 function createPitch() {
 	return {
-		grade: '',
+		grade: null,
 		length: 12,
 		boltAmount: 4,
 		lineStyle: 'red',
@@ -33,8 +33,14 @@ describe('PitchComponent', () => {
 		await user.type(textboxes[1], '6');
 		await user.selectOptions(selects[2], selects[2].options[1].value);
 
-		expect(onFieldChange).toHaveBeenCalledWith('grade', expect.any(String));
-		expect(onFieldChange).toHaveBeenCalledWith('_gradeScale', expect.any(String));
+		expect(onFieldChange).toHaveBeenCalledWith(
+			'grade',
+			expect.objectContaining({
+				scale: expect.any(String),
+				value: expect.any(String),
+				standardizedValue: expect.any(String)
+			})
+		);
 		expect(onFieldChange).toHaveBeenCalledWith('length', '18');
 		expect(onFieldChange).toHaveBeenCalledWith('boltAmount', '6');
 		expect(onFieldChange).toHaveBeenCalledWith('lineStyle', expect.any(String));

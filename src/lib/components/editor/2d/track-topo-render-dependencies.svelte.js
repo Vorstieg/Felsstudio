@@ -15,11 +15,17 @@ export function trackTopoRenderDependencies({
 }) {
 	for (const route of topo.routes) {
 		route.lineStyle;
+		route.grade?.scale;
+		route.grade?.value;
+		route.grade?.standardizedValue;
 		if (route.labelOffset2D) (route.labelOffset2D[0], route.labelOffset2D[1]);
 		for (const point of route.points2D || []) (point[0], point[1]);
 		for (const pitch of route.pitches || []) {
 			pitch.lineStyle;
 			pitch.grade;
+			pitch.grade?.scale;
+			pitch.grade?.value;
+			pitch.grade?.standardizedValue;
 			pitch.length;
 			pitch.pitchNumber;
 			if (pitch.labelOffset2D) (pitch.labelOffset2D[0], pitch.labelOffset2D[1]);

@@ -9,8 +9,11 @@
 		{
 			"id": "1",
 			"name": "Der Galgen",
-			"grade": "5a",
-			"_gradeScale": "french",
+			"grade": {
+				"scale": "french",
+				"value": "5a",
+				"standardizedValue": "5a"
+			},
 			"points": [
 				[0, 0, 0],
 				[0.02, 1, 0.01]

@@ -5,6 +5,7 @@ import {
 	calculateBoltAmount,
 	calculateRouteLength,
 	convertRouteType,
+	createGrade,
 	getDefaultGeometryMode
 } from './topo-utils.js';
 
@@ -15,6 +16,19 @@ describe('topo utilities', () => {
 		['sport', 'topo']
 	])('chooses the default geometry mode for %s', (type, expected) => {
 		expect(getDefaultGeometryMode(type)).toBe(expected);
+	});
+
+	it('normalizes UIAA grades to French standardized values', () => {
+		expect(createGrade('5+', 'uiaa')).toEqual({
+			scale: 'uiaa',
+			value: '5+',
+			standardizedValue: '5b'
+		});
+		expect(createGrade('6a', 'french')).toEqual({
+			scale: 'french',
+			value: '6a',
+			standardizedValue: '6a'
+		});
 	});
 
 	it('calculates route length using the supplied scale', () => {
@@ -46,8 +60,7 @@ describe('topo utilities', () => {
 	it('converts a single-pitch route to multi-pitch and back', () => {
 		const route = {
 			type: 'sport',
-			grade: '6a',
-			_gradeScale: 'french',
+			grade: { scale: 'french', value: '6a', standardizedValue: '6a' },
 			length: 24,
 			description: 'A sustained wall',
 			points2D: [
@@ -66,7 +79,7 @@ describe('topo utilities', () => {
 		expect(route.pitches).toHaveLength(1);
 		expect(route.pitches[0]).toMatchObject({
 			pitchNumber: 1,
-			grade: '6a',
+			grade: { scale: 'french', value: '6a', standardizedValue: '6a' },
 			length: 24,
 			points2D: [
 				[0.1, 0.2],
@@ -84,8 +97,7 @@ describe('topo utilities', () => {
 
 		expect(route.type).toEqual(['sport']);
 		expect(route).toMatchObject({
-			grade: '6a',
-			_gradeScale: 'french',
+			grade: { scale: 'french', value: '6a', standardizedValue: '6a' },
 			length: 24,
 			description: 'A sustained wall',
 			points2D: [

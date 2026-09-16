@@ -1,4 +1,5 @@
 import { generateId, generateRouteId } from '$lib/assets/js/id-utils.js';
+import { createGrade } from '$lib/assets/js/topo-utils.js';
 import { snapPointToGrid } from './path-drawing-logic.js';
 
 export class RouteTool {
@@ -167,7 +168,7 @@ export class RouteTool {
 			pitchNumber,
 			points2D,
 			points: [],
-			grade: pitchNumber === 1 ? '5a' : '',
+			grade: pitchNumber === 1 ? createGrade('5a') : null,
 			length: 0,
 			lineStyle: '',
 			type: 'pitch'
@@ -189,14 +190,13 @@ export class RouteTool {
 				...baseRoute,
 				fixPoints: [],
 				type: 'multi-pitch',
-				_gradeScale: 'french',
 				pitches: [this.createPitch(1, points2D)]
 			};
 		if (mode === 'alpine-tour')
 			return { ...baseRoute, points2D, hochtourGrade: 'PD', type: 'alpine-tour' };
 		if (mode === 'via-ferrata')
 			return { ...baseRoute, points2D, viaFerrataGrade: 'K3', type: 'via-ferrata' };
-		return { ...baseRoute, points2D, grade: '5a', _gradeScale: 'french', type: 'sports-climbing' };
+		return { ...baseRoute, points2D, grade: createGrade('5a'), type: 'sports-climbing' };
 	}
 
 	onMouseDown(event, point) {

@@ -26,7 +26,7 @@ describe('RouteTool', () => {
 		expect(state.topo.routes).toHaveLength(1);
 		expect(state.topo.routes[0]).toMatchObject({
 			type: 'sports-climbing',
-			grade: '5a',
+			grade: { scale: 'french', value: '5a', standardizedValue: '5a' },
 			points2D: [
 				[0.1, 0.2],
 				[0.8, 0.9]
@@ -151,7 +151,7 @@ describe('RouteTool', () => {
 		const route = state.topo.routes[0];
 		expect(route).toMatchObject({
 			type: 'multi-pitch',
-			pitches: [{ pitchNumber: 1, grade: '5a' }]
+			pitches: [{ pitchNumber: 1, grade: { scale: 'french', value: '5a', standardizedValue: '5a' } }]
 		});
 		expect(target()).toEqual({ type: 'newPitch', routeId: route.id });
 

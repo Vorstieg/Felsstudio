@@ -40,7 +40,7 @@ export function createVariant(route) {
 		name: `Variant ${(route.variants?.length ?? 0) + 1}`,
 		points2D: [],
 		points: [],
-		grade: '',
+		grade: null,
 		length: 0,
 		lineStyle: 'variant',
 		type: 'variant'

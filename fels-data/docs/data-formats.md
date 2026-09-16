@@ -148,8 +148,11 @@ This is a custom JSON document. It contains a `routes` array and an optional doc
 			"name": "First Route",
 			"pathRefs": [{ "pathId": "path-approach", "role": "approach", "label": "Common approach" }],
 			"type": "sports-climbing",
-			"grade": "5+",
-			"_gradeScale": "uiaa",
+			"grade": {
+				"scale": "uiaa",
+				"value": "5+",
+				"standardizedValue": "5b"
+			},
 			"points2D": [
 				[0.25, 0.9],
 				[0.28, 0.55],

@@ -139,7 +139,7 @@ describe('createTopo2DEditorState', () => {
 							{
 								id: 'pitch-1',
 								pitchNumber: 1,
-								grade: '6a',
+								grade: { scale: 'french', value: '6a', standardizedValue: '6a' },
 								points2D: [[0.1, 0.2], [0.3, 0.4]]
 							}
 						]
@@ -162,7 +162,7 @@ describe('createTopo2DEditorState', () => {
 		expect(targetRoute.pitches[1]).toMatchObject({
 			id: duplicatedId,
 			pitchNumber: 2,
-			grade: '6a',
+			grade: { scale: 'french', value: '6a', standardizedValue: '6a' },
 			points2D: [[0.1, 0.2], [0.3, 0.4]]
 		});
 		expect(editor.ui.selectedRouteId).toBe('route-2');
