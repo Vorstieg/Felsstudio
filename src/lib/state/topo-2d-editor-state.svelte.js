@@ -1,6 +1,11 @@
 import { Vector3 } from 'three';
 import { getContext, setContext } from 'svelte';
-import { generateId, generateOutlineId, generateSymbolId, generateTextId } from '$lib/assets/js/id-utils.js';
+import {
+	generateId,
+	generateOutlineId,
+	generateSymbolId,
+	generateTextId
+} from '$lib/assets/js/id-utils.js';
 import { translateOutline } from '$lib/assets/js/outline-geometry.js';
 
 const HISTORY_LIMIT = 50;
@@ -52,7 +57,9 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 const nextPitchId = (topo) => {
 	let id;
 	do id = generateId('pitch');
-	while ((topo.routes || []).some((route) => (route.pitches || []).some((pitch) => sameId(pitch.id, id))));
+	while (
+		(topo.routes || []).some((route) => (route.pitches || []).some((pitch) => sameId(pitch.id, id)))
+	);
 	return id;
 };
 const renumberPitches = (route) => {
@@ -770,7 +777,8 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 					: targetRoute.type
 						? [targetRoute.type]
 						: [];
-				if (!targetTypes.includes('multi-pitch')) targetRoute.type = [...targetTypes, 'multi-pitch'];
+				if (!targetTypes.includes('multi-pitch'))
+					targetRoute.type = [...targetTypes, 'multi-pitch'];
 				targetRoute.pitches = [...(targetRoute.pitches || []), duplicate];
 				renumberPitches(targetRoute);
 				return true;

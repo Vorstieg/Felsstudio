@@ -151,7 +151,9 @@ describe('RouteTool', () => {
 		const route = state.topo.routes[0];
 		expect(route).toMatchObject({
 			type: 'multi-pitch',
-			pitches: [{ pitchNumber: 1, grade: { scale: 'french', value: '5a', standardizedValue: '5a' } }]
+			pitches: [
+				{ pitchNumber: 1, grade: { scale: 'french', value: '5a', standardizedValue: '5a' } }
+			]
 		});
 		expect(target()).toEqual({ type: 'newPitch', routeId: route.id });
 

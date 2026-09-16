@@ -140,7 +140,10 @@ describe('createTopo2DEditorState', () => {
 								id: 'pitch-1',
 								pitchNumber: 1,
 								grade: { scale: 'french', value: '6a', standardizedValue: '6a' },
-								points2D: [[0.1, 0.2], [0.3, 0.4]]
+								points2D: [
+									[0.1, 0.2],
+									[0.3, 0.4]
+								]
 							}
 						]
 					},
@@ -163,7 +166,10 @@ describe('createTopo2DEditorState', () => {
 			id: duplicatedId,
 			pitchNumber: 2,
 			grade: { scale: 'french', value: '6a', standardizedValue: '6a' },
-			points2D: [[0.1, 0.2], [0.3, 0.4]]
+			points2D: [
+				[0.1, 0.2],
+				[0.3, 0.4]
+			]
 		});
 		expect(editor.ui.selectedRouteId).toBe('route-2');
 		expect(editor.ui.selectedPitchId).toBe(duplicatedId);

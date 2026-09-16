@@ -126,7 +126,13 @@ describe('persisted path edit tools', () => {
 		).toBe(true);
 		expect(
 			tool.handleRouteDown(
-				{ type: 'mousedown', clientX: 10, clientY: 20, preventDefault: vi.fn(), stopPropagation: vi.fn() },
+				{
+					type: 'mousedown',
+					clientX: 10,
+					clientY: 20,
+					preventDefault: vi.fn(),
+					stopPropagation: vi.fn()
+				},
 				{ id: 'route-2' },
 				input
 			)

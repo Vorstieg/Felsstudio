@@ -115,7 +115,8 @@ export function buildTopo2DRenderModel({
 				(pitchId != null && isSelected('pitch', pitchId)) ||
 				(variantId != null && isSelected('variant', variantId));
 			const selected =
-				(nestedSelected || (!hasSelectedNestedPath && isSelected('route', route.id))) ||
+				nestedSelected ||
+				(!hasSelectedNestedPath && isSelected('route', route.id)) ||
 				(drawingTarget?.type === 'newPitch' &&
 					drawingTarget.routeId === route.id &&
 					Boolean(pitchId)) ||

@@ -50,7 +50,11 @@ describe('createTopoInputController', () => {
 		const point = { x: 0.4, y: 0.5 };
 
 		controller.down({ point, sourceEvent: {}, button: 0 });
-		controller.down({ point, sourceEvent: { preventDefault: vi.fn(), stopPropagation: vi.fn() }, button: 0 });
+		controller.down({
+			point,
+			sourceEvent: { preventDefault: vi.fn(), stopPropagation: vi.fn() },
+			button: 0
+		});
 
 		expect(onMouseDown).toHaveBeenCalledOnce();
 	});

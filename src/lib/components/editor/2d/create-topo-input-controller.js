@@ -25,7 +25,8 @@ export function createTopoInputController({
 		const activeTool = editor.ui.activeTool;
 		const last = lastCanvasDown;
 		const now = Date.now();
-		if (!last || now - last.time > DUPLICATE_DOWN_MS || last.activeTool !== activeTool) return false;
+		if (!last || now - last.time > DUPLICATE_DOWN_MS || last.activeTool !== activeTool)
+			return false;
 		const dx = input.point.x - last.point.x;
 		const dy = input.point.y - last.point.y;
 		return Math.hypot(dx, dy) < DUPLICATE_DOWN_TOPO_DISTANCE;
