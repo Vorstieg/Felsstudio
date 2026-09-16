@@ -78,10 +78,9 @@ file discovery. The geometry may be a point or an area polygon.
 
 Sector properties include:
 
-- `id`, `name`, and numeric `sort` order.
+- `id` and `name`.
 - `type`, `tags`, `security`, and `rock_type`.
-- `wallAzimuth`: compass direction faced by the wall, in degrees from north (`0`–`359`).
-- German and English descriptions and approach information.
+- German and English descriptions.
 - `topo` for an optional external topo reference.
 - `assets.images`,
 - `path`, `equipment`, `date`, and `updated`.
