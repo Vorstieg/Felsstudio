@@ -60,7 +60,12 @@ export async function loadCragEditorEntry(
 		)
 	).filter((entry): entry is RouteDocument => Boolean(entry));
 
-	const state: LoadedCragEditorEntry = { crag, access: null as never, routeDocuments, sourceCrag: { path, id: cragId } };
+	const state: LoadedCragEditorEntry = {
+		crag,
+		access: null as never,
+		routeDocuments,
+		sourceCrag: { path, id: cragId }
+	};
 	await loadAccessCollection(topo, state);
 	return state;
 }

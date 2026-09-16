@@ -61,17 +61,12 @@ export interface CragFeature {
 export interface SectorProperties {
 	id: string;
 	name: string;
-	sort: number;
 	type: string[];
 	tags: string[];
 	security?: string;
 	rock_type?: string;
-	/** Compass direction faced by the sector wall, in degrees from north. */
-	wallAzimuth?: number;
 	description_de?: string;
 	description_en?: string;
-	approach_de?: string;
-	approach_en?: string;
 	topo?: Record<string, unknown>;
 	assets: Record<string, unknown>;
 	path?: string;

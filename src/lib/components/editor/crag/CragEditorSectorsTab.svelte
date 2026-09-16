@@ -7,7 +7,7 @@
 	const { sectorTool, routeTool, actions } = getCragEditorTools();
 	const {
 		createSector: onAddSector, duplicateSector: onDuplicateSector, removeSector: onRemoveSector,
-		moveSector: onMoveSector, focusSector: onFocusSector,
+		focusSector: onFocusSector,
 		setSectorGeometryType: onSetSectorGeometryType
 	} = sectorTool;
 	const { addRoute: onAddSectorRoute, selectRoute: onSelectRoute, deleteRoute: onDeleteRoute } = routeTool;
@@ -15,7 +15,6 @@
 	const onPlanGenerated = actions.handleFlightPlanGenerated;
 	let routeDocuments = $derived(cragEditorState.routeDocuments);
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
-	import WallDirectionPicker from '$lib/components/ui/WallDirectionPicker.svelte';
 	import { getGeometryCenter } from '$lib/assets/js/sector-utils.js';
 	import CragFlightPlanPanel from './CragFlightPlanPanel.svelte';
 	import CragEditorRouteTable from './CragEditorRouteTable.svelte';
@@ -80,7 +79,7 @@
 			<p class="text-ui-label text-warm-gray-500">No Sectors</p></div>
 	{/if}
 	<div class="space-y-1">
-		{#each cragEditorState.crag.sectors || [] as sector, i}{@const
+		{#each cragEditorState.crag.sectors || [] as sector}{@const
 			isSelected = selectedObject?.type === 'sector' && selectedObject.id === sector.id}{@const
 			routes = sectorRoutes(sector.id)}
 			<div
@@ -98,13 +97,7 @@
 						        onclick={(e) => { e.stopPropagation(); onAddSectorRoute(sector.id); }}><i
 							class="fa-solid fa-route mr-1"></i>+ Route
 						</button>
-						<button class="w-6 h-6 text-warm-gray-400" title="Move up"
-						        onclick={(e) => { e.stopPropagation(); onMoveSector(sector.id, -1); }} disabled={i === 0}><i
-							class="fa-solid fa-arrow-up text-[10px]"></i></button>
-						<button class="w-6 h-6 text-warm-gray-400" title="Move down"
-						        onclick={(e) => { e.stopPropagation(); onMoveSector(sector.id, 1); }}
-						        disabled={i === (cragEditorState.crag.sectors || []).length - 1}><i
-							class="fa-solid fa-arrow-down text-[10px]"></i></button>
+
 					</div>
 				</div>
 				{#if routes.length > 0}
@@ -136,14 +129,6 @@
 				                                                                             oninput={(e) => updateSelectedSectorId(sector, e.currentTarget.value)}
 				                                                                             class="input-studio w-full font-mono"
 				                                                                             placeholder="sector-id" /></div>
-			</div>
-			<div class="space-y-0.5">
-				<label for="sector-wall-azimuth" class="text-ui-label block">Wall compass direction</label>
-				<WallDirectionPicker
-					id="sector-wall-azimuth"
-					azimuth={sector.wallAzimuth}
-					onChange={(azimuth) => cragEditorState.updateSector(sector.id, 'wallAzimuth', azimuth)}
-				/>
 			</div>
 			<div class="space-y-0.5"><p class="text-ui-label block">Geometry</p>
 				<div class="grid grid-cols-2 gap-1 bg-black/5 rounded-sm p-0.5 border border-black/10">
@@ -180,10 +165,6 @@
 				value={sector.description_de} oninput={(event) => cragEditorState.updateSector(sector.id, 'description_de', event.currentTarget.value)} rows="2" class="input-studio w-full resize-none"></textarea></div>
 			<div class="space-y-0.5"><label for={'sector-description-en-' + sector.id} class="text-ui-label block">Description (EN)</label><textarea id={'sector-description-en-' + sector.id}
 				value={sector.description_en} oninput={(event) => cragEditorState.updateSector(sector.id, 'description_en', event.currentTarget.value)} rows="2" class="input-studio w-full resize-none"></textarea></div>
-			<div class="space-y-0.5"><label for={'sector-approach-de-' + sector.id} class="text-ui-label block">Approach (DE)</label><textarea id={'sector-approach-de-' + sector.id}
-				value={sector.approach_de} oninput={(event) => cragEditorState.updateSector(sector.id, 'approach_de', event.currentTarget.value)} rows="2" class="input-studio w-full resize-none"></textarea></div>
-			<div class="space-y-0.5"><label for={'sector-approach-en-' + sector.id} class="text-ui-label block">Approach (EN)</label><textarea id={'sector-approach-en-' + sector.id}
-				value={sector.approach_en} oninput={(event) => cragEditorState.updateSector(sector.id, 'approach_en', event.currentTarget.value)} rows="2" class="input-studio w-full resize-none"></textarea></div>
 			<div class="flex items-center justify-between bg-white rounded-sm border border-black/15 p-2"><span
 				class="text-ui-label text-warm-gray-500 !m-0">{sector.geometry?.type === 'Polygon' ? 'Center' : 'Position'}</span>
 				{#if formatGeometryCenter(sector.geometry)}<span

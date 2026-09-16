@@ -53,7 +53,6 @@ export function normalizeCragSector(sector: Partial<CragSector> = {}): CragSecto
 	return {
 		id: sector.id ?? '',
 		name: sector.name ?? '',
-		sort: sector.sort ?? 0,
 		...sector,
 		type: Array.isArray(sector.type) ? sector.type : [],
 		tags: Array.isArray(sector.tags) ? sector.tags : [],
@@ -188,7 +187,10 @@ export function createCragEditorSession(): CragEditorSession {
 			});
 			return document;
 		},
-		updateRouteDocument(path: string, updater: (data: RouteDocument['data'], document: RouteDocument) => void) {
+		updateRouteDocument(
+			path: string,
+			updater: (data: RouteDocument['data'], document: RouteDocument) => void
+		) {
 			const document = this.routeDocuments.find((entry) => entry.path === path);
 			if (!document) return null;
 			this.commit('Update route document', () => {
@@ -197,7 +199,11 @@ export function createCragEditorSession(): CragEditorSession {
 			});
 			return document;
 		},
-		updateRoute(path: string, routeId: string | number, updater: (route: RouteDocument['data']['routes'][number]) => void) {
+		updateRoute(
+			path: string,
+			routeId: string | number,
+			updater: (route: RouteDocument['data']['routes'][number]) => void
+		) {
 			return this.updateRouteDocument(path, (data) => {
 				const route = (data.routes || []).find((entry) => String(entry.id) === String(routeId));
 				if (route) updater(route);

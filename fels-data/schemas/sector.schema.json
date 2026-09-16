@@ -18,20 +18,16 @@
 	"$defs": {
 		"sectorProperties": {
 			"type": "object",
-			"required": ["id", "name", "sort", "type", "tags", "assets"],
+			"required": ["id", "name", "type", "tags", "assets"],
 			"properties": {
 				"id": { "type": "string", "minLength": 1 },
 				"name": { "type": "string", "minLength": 1 },
-				"sort": { "type": "number" },
 				"type": { "type": "array", "items": { "type": "string" } },
 				"tags": { "type": "array", "items": { "type": "string" } },
 				"security": { "type": "string" },
 				"rock_type": { "type": "string" },
-				"wallAzimuth": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
 				"description_de": { "type": "string" },
 				"description_en": { "type": "string" },
-				"approach_de": { "type": "string" },
-				"approach_en": { "type": "string" },
 				"topo": { "type": "object" },
 				"assets": { "type": "object" },
 				"path": { "type": "string" },

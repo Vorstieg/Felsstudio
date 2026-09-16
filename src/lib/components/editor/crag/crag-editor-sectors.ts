@@ -31,16 +31,12 @@ export function createDefaultSector({
 	return {
 		id: `sector-${nextNumber}`,
 		name: `Sector ${nextNumber}`,
-		sort: nextNumber * 10,
 		type: [],
 		tags: [],
 		security: '',
 		rock_type: '',
-		wallAzimuth: 0,
 		description_de: '',
 		description_en: '',
-		approach_de: '',
-		approach_en: '',
 		geometry: {
 			type: 'Point',
 			coordinates: [...cragCoordinates]
@@ -73,8 +69,7 @@ export function duplicateSectorById(
 			{
 				...(JSON.parse(JSON.stringify(source)) as CragSector),
 				id: uniqueId,
-				name: `${source.name || source.id} Copy`,
-				sort: (Number(source.sort) || sectors.length * 10) + 1
+				name: `${source.name || source.id} Copy`
 			}
 		]
 	};
@@ -84,16 +79,3 @@ export function removeSectorById(sectors: CragSector[] = [], id: string): CragSe
 	return sectors.filter((sector) => sector.id !== id);
 }
 
-export function moveSectorById(
-	sectors: CragSector[] = [],
-	id: string,
-	direction: number
-): CragSector[] {
-	const reordered = [...sectors];
-	const index = reordered.findIndex((sector) => sector.id === id);
-	const nextIndex = index + direction;
-	if (index < 0 || nextIndex < 0 || nextIndex >= reordered.length) return sectors;
-
-	[reordered[index], reordered[nextIndex]] = [reordered[nextIndex], reordered[index]];
-	return reordered.map((sector, i) => ({ ...sector, sort: (i + 1) * 10 }));
-}
