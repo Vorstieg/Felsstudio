@@ -6,7 +6,12 @@ import {
 import { getGeometryPath } from '$lib/assets/js/geometry-path-adapters.js';
 import { getEditablePath, getPathMidpoints } from '$lib/assets/js/path-geometry.js';
 import { getTouchTargetSize } from '$lib/assets/js/mobile-utils.ts';
-import { addSector, createDefaultSector, duplicateSectorById, removeSectorById } from './crag-editor-sectors.ts';
+import {
+	addSector,
+	createDefaultSector,
+	duplicateSectorById,
+	removeSectorById
+} from './crag-editor-sectors.ts';
 
 /** Core sector mutations and selection/focus workflows for the crag editor. */
 export function createCragSectorTool({

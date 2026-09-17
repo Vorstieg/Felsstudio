@@ -961,7 +961,8 @@
 				type: 'Feature',
 				properties: {
 					...$state.snapshot(cragEditorState.crag),
-					sectors: sectors.map(({ id, name }) => ({ id, name })),
+					kind: 'crag',
+					sectors: sectors.map(({ id, name }) => ({ id, name, kind: 'sector' })),
 					id: cragEditorState.crag.id,
 					updated: new Date().toISOString().split('T')[0]
 				},
@@ -974,9 +975,7 @@
 				const { geometry, ...properties } = sector;
 				await writeJson(sectorTopo.getSectorPath(), {
 					type: 'Feature',
-					crag_id: cragEditorState.crag.id,
-					sector_id: sector.id,
-					properties,
+					properties: { ...properties, kind: 'sector' },
 					geometry
 				});
 			}

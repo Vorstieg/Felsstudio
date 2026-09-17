@@ -14,13 +14,18 @@ describe('fetchCrags', () => {
 	it('filters entry files, excludes sectors and auxiliary files, and sorts newest first', async () => {
 		api.listDir.mockResolvedValue([
 			{ type: 'file', name: 'old.json', path: 'old.json' },
-			{ type: 'file', name: 'new.json', path: 'new.json' },
-			{ type: 'file', name: 'new-topo.json', path: 'new-topo.json' },
-			{ type: 'file', name: 'new-parking.json', path: 'new-parking.json' },
+			{ type: 'file', name: 'new.json', path: 'new/new.json' },
+			{ type: 'file', name: 'sector-1.json', path: 'new/sector-1/sector-1.json' },
+			{ type: 'file', name: 'new-topo.json', path: 'new/new-topo.json' },
+			{ type: 'file', name: 'new-parking.json', path: 'new/new-parking.json' },
 			{ type: 'dir', name: 'ignored', path: 'ignored' }
 		]);
 		api.readJson.mockImplementation(async (path) => ({
-			properties: { name: path, date: path === 'new.json' ? '2026-01-02' : '2025-01-01' },
+			properties: {
+				name: path,
+				kind: path.includes('sector-1') ? 'sector' : 'crag',
+				date: path === 'new/new.json' ? '2026-01-02' : '2025-01-01'
+			},
 			...(path === 'old.json' ? {} : {})
 		}));
 

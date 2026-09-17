@@ -53,18 +53,26 @@
 				}
 			]
 		},
+		"entryKind": {
+			"enum": ["country", "region", "area", "crag", "sector"]
+		},
 		"sectorSummary": {
 			"type": "object",
 			"required": ["id", "name"],
-			"properties": { "id": { "type": "string", "minLength": 1 }, "name": { "type": "string" } },
+			"properties": {
+				"id": { "type": "string", "minLength": 1 },
+				"name": { "type": "string" },
+				"kind": { "$ref": "#/$defs/entryKind" }
+			},
 			"additionalProperties": true
 		},
 		"cragProperties": {
 			"type": "object",
-			"required": ["id", "name", "sectors"],
+			"required": ["id", "name", "kind", "sectors"],
 			"properties": {
 				"id": { "type": "string", "minLength": 1 },
 				"name": { "type": "string", "minLength": 1 },
+				"kind": { "$ref": "#/$defs/entryKind" },
 				"path": { "type": "string" },
 				"type": { "type": "array", "items": { "type": "string" } },
 				"security": { "type": "string" },

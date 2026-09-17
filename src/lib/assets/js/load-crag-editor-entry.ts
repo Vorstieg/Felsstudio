@@ -18,6 +18,7 @@ export async function loadCragEditorEntry(
 	const cragData = await readJson<CragFeature>(topo.getCragPath());
 	const crag = {
 		...cragData.properties,
+		kind: cragData.properties.kind || 'crag',
 		geometry: cragData.geometry,
 		sectors: await Promise.all(
 			(cragData.properties.sectors || []).map(async (sector): Promise<CragSector> => {
@@ -28,6 +29,7 @@ export async function loadCragEditorEntry(
 					return {
 						...sector,
 						...sectorData.properties,
+						kind: sectorData.properties.kind || 'sector',
 						id: sector.id,
 						name: sectorData.properties.name || sector.name,
 						geometry: sectorData.geometry

@@ -28,6 +28,7 @@ This is a GeoJSON `Feature`. Its top-level `geometry` is normally a `Point` cont
 
 - `id`: stable slug used in filenames and URLs.
 - `name`: display name.
+- `kind`: catalog entry classification (`country`, `region`, `area`, `crag`, or `sector`).
 - `path`: hierarchical catalog path, using slash-separated location segments.
 - `type`: climbing disciplines available at the crag, such as `sports-climbing`, `bouldering`,
   and `trad`.
@@ -45,6 +46,7 @@ This is a GeoJSON `Feature`. Its top-level `geometry` is normally a `Point` cont
 	"properties": {
 		"id": "lausbubenwande",
 		"name": "Lausbubenwände",
+		"kind": "crag",
 		"path": "europe/austria/lower-austria/mödling/",
 		"type": ["sports-climbing", "bouldering", "trad"],
 		"tags": [],
@@ -55,8 +57,8 @@ This is a GeoJSON `Feature`. Its top-level `geometry` is normally a `Point` cont
 		"equipment": [],
 		"assets": { "images": [] },
 		"sectors": [
-			{ "id": "untere-lausbubenwand", "name": "Untere Lausbubenwand" },
-			{ "id": "obere-lausbubenwand", "name": "Obere Lausbubenwand" }
+			{ "id": "untere-lausbubenwand", "name": "Untere Lausbubenwand", "kind": "sector" },
+			{ "id": "obere-lausbubenwand", "name": "Obere Lausbubenwand", "kind": "sector" }
 		],
 		"topo": { "site": "", "link": "" },
 		"date": "2026-07-10",
@@ -72,13 +74,11 @@ This is a GeoJSON `Feature`. Its top-level `geometry` is normally a `Point` cont
 ## `sector.json`
 
 This is also a GeoJSON `Feature`. The sector is identified by its directory and filename.
-Persisted files may additionally include the optional top-level `crag_id` and `sector_id`
-relationship fields. They are useful context for consumers but are not required for path-based
-file discovery. The geometry may be a point or an area polygon.
+The geometry may be a point or an area polygon.
 
 Sector properties include:
 
-- `id` and `name`.
+- `id`, `name`, and `kind` (`sector`).
 - `type`, `tags`, `security`, and `rock_type`.
 - German and English descriptions.
 - `topo` for an optional external topo reference.

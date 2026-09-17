@@ -28,6 +28,7 @@ export function createInitialCrag(): EditableCrag {
 	return {
 		id: '',
 		name: '',
+		kind: 'crag',
 		path: '',
 		type: ['sports-climbing'],
 		tags: [],
@@ -53,6 +54,7 @@ export function normalizeCragSector(sector: Partial<CragSector> = {}): CragSecto
 	return {
 		id: sector.id ?? '',
 		name: sector.name ?? '',
+		kind: 'sector',
 		...sector,
 		type: Array.isArray(sector.type) ? sector.type : [],
 		tags: Array.isArray(sector.tags) ? sector.tags : [],

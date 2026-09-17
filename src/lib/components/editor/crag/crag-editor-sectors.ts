@@ -31,6 +31,7 @@ export function createDefaultSector({
 	return {
 		id: `sector-${nextNumber}`,
 		name: `Sector ${nextNumber}`,
+		kind: 'sector',
 		type: [],
 		tags: [],
 		security: '',
@@ -78,4 +79,3 @@ export function duplicateSectorById(
 export function removeSectorById(sectors: CragSector[] = [], id: string): CragSector[] {
 	return sectors.filter((sector) => sector.id !== id);
 }
-
