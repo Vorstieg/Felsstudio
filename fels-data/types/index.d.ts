@@ -25,15 +25,19 @@ export interface GeoJSONGeometry {
 	coordinates: unknown;
 }
 
+export type EntryKind = 'country' | 'region' | 'area' | 'crag' | 'sector';
+
 export interface SectorSummary {
 	id: string;
 	name: string;
+	kind?: EntryKind;
 	[key: string]: unknown;
 }
 
 export interface CragProperties {
 	id: string;
 	name: string;
+	kind: EntryKind;
 	path?: string;
 	type?: string[];
 	tags?: string[];
@@ -61,6 +65,7 @@ export interface CragFeature {
 export interface SectorProperties {
 	id: string;
 	name: string;
+	kind: EntryKind;
 	type: string[];
 	tags: string[];
 	security?: string;
@@ -78,8 +83,6 @@ export interface SectorProperties {
 
 export interface SectorFeature {
 	type: 'Feature';
-	crag_id?: string;
-	sector_id?: string;
 	properties: SectorProperties;
 	geometry: GeoJSONGeometry;
 	[key: string]: unknown;

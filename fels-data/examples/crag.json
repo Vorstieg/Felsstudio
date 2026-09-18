@@ -3,6 +3,7 @@
 	"properties": {
 		"id": "lausbubenwande",
 		"name": "Lausbubenwände",
+		"kind": "crag",
 		"path": "europe/austria/lower-austria/mödling/",
 		"type": ["sports-climbing", "bouldering", "trad"],
 		"tags": [],
@@ -13,8 +14,8 @@
 		"equipment": [],
 		"assets": { "images": [] },
 		"sectors": [
-			{ "id": "untere-lausbubenwand", "name": "Untere Lausbubenwand" },
-			{ "id": "obere-lausbubenwand", "name": "Obere Lausbubenwand" }
+			{ "id": "untere-lausbubenwand", "name": "Untere Lausbubenwand", "kind": "sector" },
+			{ "id": "obere-lausbubenwand", "name": "Obere Lausbubenwand", "kind": "sector" }
 		],
 		"topo": { "site": "", "link": "" },
 		"geometry": {

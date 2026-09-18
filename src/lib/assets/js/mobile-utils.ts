@@ -6,7 +6,9 @@ type NavigatorWithLegacyTouch = Navigator & {
 
 export function isTouchDevice(): boolean {
 	const nav = navigator as NavigatorWithLegacyTouch;
-	return 'ontouchstart' in window || navigator.maxTouchPoints > 0 || (nav.msMaxTouchPoints ?? 0) > 0;
+	return (
+		'ontouchstart' in window || navigator.maxTouchPoints > 0 || (nav.msMaxTouchPoints ?? 0) > 0
+	);
 }
 
 export function getTouchTargetSize(baseSize: number): number {

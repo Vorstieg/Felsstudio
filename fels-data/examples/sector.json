@@ -1,10 +1,9 @@
 {
 	"type": "Feature",
-	"crag_id": "lausbubenwande",
-	"sector_id": "obere-lausbubenwand",
 	"properties": {
 		"id": "obere-lausbubenwand",
 		"name": "Obere Lausbubenwand",
+		"kind": "sector",
 		"type": ["sports-climbing", "trad", "bouldering"],
 		"tags": [],
 		"security": "Gut",

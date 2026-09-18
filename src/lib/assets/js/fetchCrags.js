@@ -46,33 +46,18 @@ function filterAndPaginateCrags(crags, { offset = 0, limit = cragsPerPage, searc
 	return filteredCrags;
 }
 
-function getParentPath(path) {
-	const index = path.lastIndexOf('/');
-	return index === -1 ? '' : path.slice(0, index);
-}
-
-function manifestEntryToSector(entry) {
-	return {
-		id: entry.id,
-		name: entry.name,
-		path: entry.path,
-		type: entry.type || [],
-		geometry: entry.geometry,
-		hash: entry.hash
-	};
-}
-
-function manifestEntryToCragFeature(entry, sectors) {
+function manifestEntryToCragFeature(entry) {
 	return {
 		type: 'Feature',
 		geometry: entry.geometry,
 		properties: {
 			id: entry.id,
 			name: entry.name,
+			kind: entry.kind,
 			path: entry.path,
 			type: entry.type || [],
 			hash: entry.hash,
-			sectors
+			sectors: entry.sectors || []
 		}
 	};
 }
@@ -80,20 +65,9 @@ function manifestEntryToCragFeature(entry, sectors) {
 export const fetchCragsFromManifest = async (options = {}) => {
 	const manifest = await readJson('manifest.json');
 	const entries = Array.isArray(manifest) ? manifest : [];
-	const paths = new Set(entries.map((entry) => entry.path).filter(Boolean));
-	const sectorEntriesByParent = new Map();
-
-	for (const entry of entries) {
-		const parentPath = getParentPath(entry.path || '');
-		if (!paths.has(parentPath)) continue;
-		const sectors = sectorEntriesByParent.get(parentPath) || [];
-		sectors.push(manifestEntryToSector(entry));
-		sectorEntriesByParent.set(parentPath, sectors);
-	}
-
 	const crags = entries
-		.filter((entry) => !paths.has(getParentPath(entry.path || '')))
-		.map((entry) => manifestEntryToCragFeature(entry, sectorEntriesByParent.get(entry.path) || []));
+		.filter((entry) => entry.kind !== 'sector')
+		.map((entry) => manifestEntryToCragFeature(entry));
 
 	return filterAndPaginateCrags(crags, options);
 };
@@ -107,9 +81,9 @@ const fetchCrags = async ({ offset = 0, limit = cragsPerPage, search = '' } = {}
 			entryFiles.map(async (file) => {
 				try {
 					const data = await /** @type {Promise<CragFeature>} */ (readJson(file.path));
-					if (data.sector_id) return null;
-
 					data.properties = data.properties || {};
+					if (data.properties.kind === 'sector') return null;
+
 					data.properties.id = file.name.slice(0, -'.json'.length);
 					return data;
 				} catch (err) {

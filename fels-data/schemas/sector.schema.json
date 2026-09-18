@@ -7,8 +7,6 @@
 	"required": ["type", "properties", "geometry"],
 	"properties": {
 		"type": { "const": "Feature" },
-		"crag_id": { "type": "string", "minLength": 1 },
-		"sector_id": { "type": "string", "minLength": 1 },
 		"properties": { "$ref": "#/$defs/sectorProperties" },
 		"geometry": {
 			"$ref": "https://schemas.vorstieg.com/fels-data/crag.schema.json#/$defs/pointOrAreaGeometry"
@@ -16,12 +14,16 @@
 	},
 	"additionalProperties": true,
 	"$defs": {
+		"entryKind": {
+			"enum": ["country", "region", "area", "crag", "sector"]
+		},
 		"sectorProperties": {
 			"type": "object",
-			"required": ["id", "name", "type", "tags", "assets"],
+			"required": ["id", "name", "kind", "type", "tags", "assets"],
 			"properties": {
 				"id": { "type": "string", "minLength": 1 },
 				"name": { "type": "string", "minLength": 1 },
+				"kind": { "$ref": "#/$defs/entryKind" },
 				"type": { "type": "array", "items": { "type": "string" } },
 				"tags": { "type": "array", "items": { "type": "string" } },
 				"security": { "type": "string" },
