@@ -73,7 +73,6 @@
 				"id": { "type": "string", "minLength": 1 },
 				"name": { "type": "string", "minLength": 1 },
 				"kind": { "$ref": "#/$defs/entryKind" },
-				"path": { "type": "string" },
 				"type": { "type": "array", "items": { "type": "string" } },
 				"security": { "type": "string" },
 				"rock_type": { "type": "string" },

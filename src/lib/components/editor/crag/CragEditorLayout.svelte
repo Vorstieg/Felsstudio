@@ -3,6 +3,7 @@
 	import MapStyleControl from '$lib/components/editor/MapStyleControl.svelte';
 	import CragEditorToolbar from '$lib/components/editor/crag/CragEditorToolbar.svelte';
 	import CragEditorSidebar from '$lib/components/editor/crag/CragEditorSidebar.svelte';
+	import CragGeometryToolOptions from '$lib/components/editor/crag/CragGeometryToolOptions.svelte';
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
 	import { _ } from 'svelte-i18n';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
@@ -54,7 +55,6 @@
 		isRoutePathDrawing = false,
 		saveStatus = 'idle',
 		saveError = '',
-		vertexDeleteUndo = null,
 	} = $props();
 
 	let canUndo = $derived(cragEditorState.canUndo);
@@ -136,6 +136,10 @@
 >
 	<i class="fa-solid fa-location-crosshairs text-sm"></i>
 </button>
+
+{#if toolOptionsOpen && activeTool === 'geometry'}
+	<CragGeometryToolOptions open={toolOptionsOpen} onClose={() => (toolOptionsOpen = false)} />
+{/if}
 
 {#if toolOptionsOpen && activeTool === 'track'}
 	<ToolOptions title={$_('ui.track_tool_options')} open={toolOptionsOpen} onClose={() => (toolOptionsOpen = false)}>
@@ -315,18 +319,3 @@
 		bind:selectedObject
 		{saveStatus}
 	/>
-
-{#if vertexDeleteUndo}
-	<div
-		class="fixed bottom-5 left-1/2 z-[70] flex -translate-x-1/2 items-center gap-3 rounded-sm border border-black/10 bg-near-black px-3 py-2 text-sm text-white shadow-lg"
-	>
-		<span>Vertex deleted</span>
-		<button
-			type="button"
-			class="rounded-sm bg-white/10 px-2 py-1 text-ui-label font-bold uppercase text-white hover:bg-white/20"
-			onclick={onUndoSectorVertexDelete}
-		>
-			Undo
-		</button>
-	</div>
-{/if}

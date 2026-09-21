@@ -6,7 +6,7 @@ import { Topo } from '$lib/assets/js/topo-paths.js';
 import { initializeIdCounters } from '$lib/assets/js/id-utils.ts';
 import { loadGlbIntoEditorState } from '$lib/assets/js/gltf-loader.ts';
 import { normalizeTopoPaths } from '$lib/assets/js/topo-document-paths.js';
-import { getTopoEditorPath, splitEntryPath } from '$lib/assets/js/editor-entry-paths.js';
+import { getCragEntryPath, getTopoEditorPath, splitEntryPath } from '$lib/assets/js/editor-entry-paths.js';
 
 export async function persistTopoSessionImmediately(topoSession, snapshot = (value) => value) {
 	draftsState.load();
@@ -42,7 +42,7 @@ export async function loadTopoEditorEntry({
 	topoSession
 }) {
 	topoSession.reset();
-	const splitPath = splitEntryPath(crag?.properties?.path || entryPath);
+	const splitPath = splitEntryPath(entryPath || getCragEntryPath(crag));
 	const topo = new Topo(splitPath.path, splitPath.id, sector?.id || sectorId);
 	let entry = crag || {
 		properties: {

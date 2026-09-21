@@ -1,4 +1,4 @@
-import type { GeoJSONGeometry } from '@vorstieg/fels-data/types';
+import type { EntryKind, GeoJSONGeometry } from '@vorstieg/fels-data/types';
 import type {
 	AccessCollection,
 	CragEditorSession,
@@ -6,7 +6,11 @@ import type {
 	CragHistoryEntry,
 	CragSector,
 	EditableCrag,
-	RouteDocument
+	HierarchyEntry,
+	HierarchyValidationError,
+	MetadataTarget,
+	RouteDocument,
+	SectorStorageMove
 } from '$lib/types/crag';
 import { getContext, setContext } from 'svelte';
 
@@ -73,20 +77,72 @@ function cloneSnapshot(value: CragEditorSnapshot): CragEditorSnapshot {
 	return JSON.parse(JSON.stringify(value)) as CragEditorSnapshot;
 }
 
+export const HIERARCHY_KINDS = ['country', 'region', 'area', 'crag', 'sector'] as const;
+
+const hierarchyRank = (kind: unknown) => HIERARCHY_KINDS.indexOf(kind as never);
+
+export function validateHierarchy(entries: HierarchyEntry[]): HierarchyValidationError[] {
+	const errors: HierarchyValidationError[] = [];
+	const byKey = new Map(entries.map((entry) => [entry.key, entry]));
+	for (const entry of entries) {
+		const kind = entry.feature.kind as EntryKind;
+		const rank = hierarchyRank(kind);
+		if (rank < 0) {
+			errors.push({ key: entry.key, kind, message: `Unknown kind “${kind}”.` });
+			continue;
+		}
+		const parent = entry.parentKey ? byKey.get(entry.parentKey) : null;
+		if (parent && hierarchyRank(parent.feature.kind) > rank) {
+			errors.push({
+				key: entry.key,
+				kind,
+				message: `${entry.feature.name || entry.feature.id} must be at least as specific as its parent (${parent.feature.kind}).`
+			});
+		}
+		for (const childKey of entry.childKeys) {
+			const child = byKey.get(childKey);
+			if (child && hierarchyRank(child.feature.kind) < rank) {
+				errors.push({
+					key: entry.key,
+					kind,
+					message: `${entry.feature.name || entry.feature.id} cannot be more specific than its child (${child.feature.kind}).`
+				});
+			}
+		}
+		for (const child of entry.feature.sectors || []) {
+			const childRank = hierarchyRank(child.kind || 'sector');
+			if (childRank >= 0 && childRank < rank) {
+				errors.push({
+					key: entry.key,
+					kind,
+					message: `${entry.feature.name || entry.feature.id} cannot be more specific than its child (${child.kind}).`
+				});
+			}
+		}
+	}
+	return errors;
+}
+
 export function createCragEditorSession(): CragEditorSession {
 	const snapshot = (session: CragEditorSession): CragEditorSnapshot =>
 		cloneSnapshot({
 			crag: session.crag,
 			access: session.access,
 			routeDocuments: session.routeDocuments,
-			sourceCrag: session.sourceCrag
+			sectorStorageMoves: session.sectorStorageMoves,
+			sourceCrag: session.sourceCrag,
+			hierarchyEntries: session.hierarchyEntries,
+			activeMetadataTarget: session.activeMetadataTarget
 		});
 
 	const session = $state({
 		crag: createInitialCrag(),
 		access: createInitialAccess(),
 		routeDocuments: [] as RouteDocument[],
+		sectorStorageMoves: [] as SectorStorageMove[],
 		sourceCrag: null as CragEditorSession['sourceCrag'],
+		hierarchyEntries: [] as HierarchyEntry[],
+		activeMetadataTarget: null as MetadataTarget | null,
 		selectedRouteKey: null as string | null,
 		history: { entries: [] as CragHistoryEntry[], index: -1 },
 		commit(label: string, mutator: () => void) {
@@ -106,7 +162,12 @@ export function createCragEditorSession(): CragEditorSession {
 			this.crag = value.crag;
 			this.access = value.access;
 			this.routeDocuments = value.routeDocuments;
+			this.sectorStorageMoves = value.sectorStorageMoves || [];
 			this.sourceCrag = value.sourceCrag || this.sourceCrag;
+			this.hierarchyEntries = value.hierarchyEntries || [];
+			this.activeMetadataTarget = value.activeMetadataTarget || null;
+			const current = this.hierarchyEntries.find((entry) => entry.isCurrent);
+			if (current) current.feature = this.crag;
 		},
 		undo() {
 			if (session.history.index < 0) return false;
@@ -132,7 +193,10 @@ export function createCragEditorSession(): CragEditorSession {
 			this.crag = createInitialCrag();
 			this.access = createInitialAccess();
 			this.routeDocuments = [];
+			this.sectorStorageMoves = [];
 			this.sourceCrag = null;
+			this.hierarchyEntries = [];
+			this.activeMetadataTarget = null;
 			this.selectedRouteKey = null;
 			this.history = { entries: [], index: -1 };
 		},
@@ -142,45 +206,189 @@ export function createCragEditorSession(): CragEditorSession {
 			return document;
 		},
 		setCragGeometry(geometry: GeoJSONGeometry) {
-			this.commit('Move crag', () => {
-				this.crag.geometry = geometry;
+			const current = this.hierarchyEntries.find((entry) => entry.isCurrent);
+			this.commitGeometry(
+				current ? { type: 'entry', key: current.key } : null,
+				geometry,
+				'Move crag'
+			);
+		},
+		commitGeometry(target: MetadataTarget | null, geometry: GeoJSONGeometry, label: string) {
+			return this.commit(label, () => {
+				const metadata = target ? this.getMetadataTarget(target) : this.crag;
+				if (!metadata) return;
+				metadata.geometry = geometry;
+				const owner =
+					target?.type === 'entry'
+						? this.hierarchyEntries.find((entry) => entry.key === target.key)
+						: this.hierarchyEntries.find((entry) => entry.isCurrent);
+				if (owner) owner.dirty = true;
 			});
+		},
+		getMetadataTarget(target?: MetadataTarget | null) {
+			target = target ?? this.activeMetadataTarget;
+			if (!target) return this.crag;
+			if (target.type === 'sector')
+				return this.crag.sectors.find((item) => item.id === target.id) || null;
+			return this.hierarchyEntries.find((entry) => entry.key === target.key)?.feature || null;
+		},
+		setActiveMetadataTarget(target: MetadataTarget | null) {
+			this.activeMetadataTarget = target;
+		},
+		setMetadataField(field: string, value: unknown, target?: MetadataTarget | null) {
+			target = target ?? this.activeMetadataTarget;
+			this.commit(`Update metadata ${field}`, () => {
+				const metadata = this.getMetadataTarget(target);
+				if (!metadata) return;
+				const oldId = metadata.id;
+				metadata[field] = value;
+				if (target?.type === 'sector' && field === 'id' && oldId !== String(value)) {
+					const oldPrefix = `${this.crag.path}/${this.crag.id}/${oldId}/${oldId}`.replace(/^\/+/, '');
+					const newPrefix = `${this.crag.path}/${this.crag.id}/${value}/${value}`.replace(/^\/+/, '');
+					metadata.assets = Object.fromEntries(
+						Object.entries(metadata.assets || {}).map(([key, assets]) => [
+							key,
+							Array.isArray(assets)
+								? assets.map((asset) =>
+										asset?.path?.startsWith(oldPrefix)
+											? { ...asset, path: `${newPrefix}${asset.path.slice(oldPrefix.length)}` }
+											: asset
+									)
+								: assets
+						])
+					);
+					const previousMove = this.sectorStorageMoves.find((move) => move.to === oldId);
+					if (previousMove) previousMove.to = String(value);
+					else this.sectorStorageMoves.push({ from: String(oldId), to: String(value) });
+					for (const document of this.routeDocuments)
+						if (document.sectorId === oldId) {
+							document.sectorId = String(value);
+							document.path =
+								`${this.crag.path}/${this.crag.id}/${value}/${value}-topo.json`.replace(/^\/+/, '');
+							if (document.data) document.data.sector_id = String(value);
+							document.dirty = true;
+						}
+					this.activeMetadataTarget = { type: 'sector', id: String(value) };
+				}
+				const entry =
+					target?.type === 'entry'
+						? this.hierarchyEntries.find((item) => item.key === target.key)
+						: this.hierarchyEntries.find((item) => item.isCurrent);
+				if (entry) entry.dirty = true;
+				if (entry && ['id', 'name', 'kind'].includes(field)) {
+					const parent = entry.parentKey
+						? this.hierarchyEntries.find((item) => item.key === entry.parentKey)
+						: null;
+					const summary = parent?.feature.sectors?.find((item) => item.id === oldId);
+					if (summary) {
+						summary.id = String(metadata.id || '');
+						summary.name = String(metadata.name || '');
+						summary.kind = metadata.kind as EntryKind;
+						parent!.dirty = true;
+					}
+				}
+			});
+		},
+		setMetadataEquipment(equipment: unknown[], target?: MetadataTarget | null) {
+			target = target ?? this.activeMetadataTarget;
+			this.commit('Update metadata equipment', () => {
+				const metadata = this.getMetadataTarget(target);
+				if (metadata) metadata.equipment = equipment;
+				const entry =
+					target?.type === 'entry'
+						? this.hierarchyEntries.find((item) => item.key === target.key)
+						: this.hierarchyEntries.find((item) => item.isCurrent);
+				if (entry) entry.dirty = true;
+			});
+		},
+		setMetadataImages(images: unknown[], target?: MetadataTarget | null) {
+			target = target ?? this.activeMetadataTarget;
+			this.commit('Update metadata images', () => {
+				const metadata = this.getMetadataTarget(target);
+				if (metadata) metadata.assets = { ...(metadata.assets || {}), images };
+				const entry =
+					target?.type === 'entry'
+						? this.hierarchyEntries.find((item) => item.key === target.key)
+						: this.hierarchyEntries.find((item) => item.isCurrent);
+				if (entry) entry.dirty = true;
+			});
+		},
+		updateMetadataEquipmentItem(
+			index: number,
+			field: string,
+			value: unknown,
+			target?: MetadataTarget | null
+		) {
+			target = target ?? this.activeMetadataTarget;
+			const equipment = [
+				...((this.getMetadataTarget(target)?.equipment || []) as Record<string, unknown>[])
+			];
+			if (!equipment[index]) return;
+			equipment[index] = { ...equipment[index], [field]: value };
+			this.setMetadataEquipment(equipment, target);
+		},
+		markHierarchyEntryClean(key: string) {
+			const entry = this.hierarchyEntries.find((item) => item.key === key);
+			if (entry) entry.dirty = false;
+		},
+		get hierarchyErrors() {
+			return validateHierarchy(this.hierarchyEntries);
 		},
 		setCragField(field: string, value: unknown) {
-			this.commit(`Update crag ${field}`, () => {
-				this.crag[field] = value;
-			});
+			this.setMetadataField(
+				field,
+				value,
+				this.hierarchyEntries.find((entry) => entry.isCurrent)
+					? { type: 'entry', key: this.hierarchyEntries.find((entry) => entry.isCurrent)!.key }
+					: null
+			);
 		},
 		setEquipment(equipment: unknown[]) {
-			this.commit('Update equipment', () => {
-				this.crag.equipment = equipment;
-			});
+			this.setMetadataEquipment(
+				equipment,
+				this.hierarchyEntries.find((entry) => entry.isCurrent)
+					? { type: 'entry', key: this.hierarchyEntries.find((entry) => entry.isCurrent)!.key }
+					: null
+			);
 		},
 		setCragImages(images: unknown[]) {
-			this.commit('Update crag images', () => {
-				this.crag.assets = { ...(this.crag.assets || {}), images };
-			});
+			this.setMetadataImages(
+				images,
+				this.hierarchyEntries.find((entry) => entry.isCurrent)
+					? { type: 'entry', key: this.hierarchyEntries.find((entry) => entry.isCurrent)!.key }
+					: null
+			);
 		},
 		setSectors(sectors: CragSector[]) {
 			this.commit('Update sectors', () => {
 				this.crag.sectors = (sectors || []).map((sector) => normalizeCragSector(sector));
+				const current = this.hierarchyEntries.find((entry) => entry.isCurrent);
+				if (current) current.dirty = true;
 			});
 		},
 		updateSector(id: string, field: string, value: unknown) {
 			this.commit(`Update sector ${field}`, () => {
 				const sector = this.crag.sectors.find((item) => item.id === id);
 				if (sector) sector[field] = value;
+				const current = this.hierarchyEntries.find((entry) => entry.isCurrent);
+				if (current) current.dirty = true;
 			});
 		},
 		updateEquipmentItem(index: number, field: string, value: unknown) {
-			this.commit(`Update equipment ${field}`, () => {
-				const item = this.crag.equipment?.[index] as Record<string, unknown> | undefined;
-				if (item) item[field] = value;
-			});
+			this.updateMetadataEquipmentItem(
+				index,
+				field,
+				value,
+				this.hierarchyEntries.find((entry) => entry.isCurrent)
+					? { type: 'entry', key: this.hierarchyEntries.find((entry) => entry.isCurrent)!.key }
+					: null
+			);
 		},
 		replaceAccessFeatures(features: unknown[]) {
 			this.commit('Update access features', () => {
 				this.access = { ...this.access, features };
+				const current = this.hierarchyEntries.find((entry) => entry.isCurrent);
+				if (current) current.dirty = true;
 			});
 		},
 		addRouteDocument(document: RouteDocument) {
@@ -217,7 +425,12 @@ export function createCragEditorSession(): CragEditorSession {
 			return document;
 		},
 		getSaveSession() {
-			return { crag: this.crag, access: this.access };
+			return {
+				crag: this.crag,
+				access: this.access,
+				hierarchyEntries: this.hierarchyEntries,
+				activeMetadataTarget: this.activeMetadataTarget
+			};
 		}
 	}) as CragEditorSession;
 	return session;

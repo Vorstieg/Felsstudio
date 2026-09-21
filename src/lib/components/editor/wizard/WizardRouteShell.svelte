@@ -4,7 +4,7 @@
 	import { resolve } from '$app/paths';
 	import EntryPicker from '$lib/components/editor/wizard/EntryPicker.svelte';
 	import { createCragEditorSession } from '$lib/state/crag-session.svelte.ts';
-	import { getCragEditorPath, getTopoEditorPath } from '$lib/assets/js/editor-entry-paths.js';
+	import { getCragEditorPath, getCragEntryPath, getTopoEditorPath } from '$lib/assets/js/editor-entry-paths.js';
 
 	let { workspace, titleKey, actionLabelKey, locations = [] } = $props();
 	const cragEditorState = createCragEditorSession();
@@ -27,7 +27,7 @@
 
 			return (
 				(l.properties?.name ?? '').toLowerCase().includes(query) ||
-				(l.properties?.path ?? '').toLowerCase().includes(query) ||
+				getCragEntryPath(l).toLowerCase().includes(query) ||
 				sectorMatch
 			);
 		})

@@ -40,7 +40,7 @@
 		getActiveTool: () => activeTool,
 		setActiveTool: (value) => (activeTool = value),
 		setOptionsOpen: (value) => (toolOptionsOpen = value),
-		shouldOpenOptionsOnSelect: () => !isCompact,
+		shouldOpenOptionsOnSelect: (tool) => !isCompact || tool.openOptionsOnSelect,
 		getNeutralTool: () => neutralTool
 	});
 </script>

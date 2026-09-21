@@ -31,6 +31,8 @@ describe('fetchCrags', () => {
 
 		const result = await fetchCrags({ limit: -1 });
 		expect(result.map((crag) => crag.properties.id)).toEqual(['new', 'old']);
+		expect(result.map((crag) => crag.entryPath)).toEqual(['new', 'old']);
+		expect(result.every((crag) => crag.properties.path === undefined)).toBe(true);
 		expect(api.listDir).toHaveBeenCalledWith('', { recursive: true });
 	});
 
@@ -53,6 +55,7 @@ describe('fetchCrags', () => {
 		);
 
 		await expect(fetchCrags({ search: 'north', limit: -1 })).resolves.toHaveLength(1);
+		await expect(fetchCrags({ search: 'south', limit: -1 })).resolves.toHaveLength(1);
 		await expect(fetchCrags({ search: 'face', limit: -1 })).resolves.toHaveLength(1);
 		await expect(fetchCrags({ offset: 1, limit: 1 })).resolves.toHaveLength(1);
 	});

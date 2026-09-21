@@ -418,7 +418,7 @@ export function useCragTrackEditor({
 		]);
 		resetDraft();
 		setActiveTab('registry');
-		setActiveTool('position');
+		setActiveTool('geometry');
 		return true;
 	}
 
@@ -429,7 +429,7 @@ export function useCragTrackEditor({
 		const routePathTarget = getRoutePathTarget();
 		if (routePathTarget) {
 			onSaveRoutePath(routePathTarget, coordinates);
-			setActiveTool('position');
+			setActiveTool('geometry');
 			resetDraft();
 			onRoutePathDrawingEnd();
 			onPathFinished();
@@ -504,7 +504,7 @@ export function useCragTrackEditor({
 		if (currentTrackPoints.length > 1) {
 			onSaveRoutePath(routePathTarget, $state.snapshot(currentTrackPoints));
 		}
-		setActiveTool('position');
+		setActiveTool('geometry');
 		resetDraft();
 		onRoutePathDrawingEnd();
 		return true;
@@ -531,7 +531,7 @@ export function useCragTrackEditor({
 			const routePathTarget = getRoutePathTarget();
 			if (routePathTarget) {
 				onSaveRoutePath(routePathTarget, points);
-				setActiveTool('position');
+				setActiveTool('geometry');
 				resetDraft();
 				onRoutePathDrawingEnd();
 				onPathFinished();

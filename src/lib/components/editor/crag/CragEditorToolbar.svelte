@@ -28,7 +28,13 @@
 
 	let tools = $derived([
 		{ id: 'select', icon: 'fa-arrow-pointer', label: 'Select' },
-		{ id: 'position', icon: 'fa-location-crosshairs', label: 'Crag Position' },
+		{
+			id: 'geometry',
+			icon: 'fa-draw-polygon',
+			label: 'Edit Geometry',
+			hasOptions: true,
+			openOptionsOnSelect: true
+		},
 		{ id: 'parking', icon: 'fa-square-parking', label: 'Parking Spot' },
 		{ id: 'hut', icon: 'fa-house', label: 'Mountain Hut' },
 		{ id: 'transit', icon: 'fa-bus', label: 'Transit Station' },

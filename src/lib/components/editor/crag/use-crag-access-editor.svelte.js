@@ -1,5 +1,6 @@
 import maplibregl from 'maplibre-gl';
 import * as turf from '@turf/turf';
+import { getGeometryCenter } from '$lib/assets/js/sector-utils.js';
 import { base } from '$app/paths';
 import { createAccessFeature, createAccessId } from '$lib/assets/js/access-geojson.js';
 import { createIconMarkerElement } from '$lib/components/editor/crag/crag-editor-map.js';
@@ -40,7 +41,7 @@ export function useCragAccessEditor({ state, getMap, getIsMapLoaded, getActiveTo
 		const map = getMap();
 		if (!map || !getIsMapLoaded()) return;
 		isDetectionLoading = !map.isSourceLoaded('maptiler_planet');
-		const coords = $state.snapshot(state.crag.geometry.coordinates);
+		const coords = $state.snapshot(getGeometryCenter(state.crag.geometry) || [0, 0]);
 		const features = map.querySourceFeatures('maptiler_planet', { sourceLayer: 'poi' });
 		isDetectionZoomLimited = !isDetectionLoading && map.getZoom() <= 16 && features.length === 0;
 		const suggestions = [];

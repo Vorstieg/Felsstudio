@@ -5,12 +5,16 @@ export function initMapPointDragHandlers({
 	getDragState = () => null,
 	onDragStart = () => {},
 	onDragMove = () => {},
-	onDragEnd = () => {}
+	onDragEnd = () => {},
+	onDragCancel = () => {}
 }) {
 	if (!map) return () => {};
 	let draggingState = null;
 	let pendingMoveEvent = null;
 	let moveFrame = null;
+	let dragPanWasEnabled = true;
+	let touchZoomWasEnabled = true;
+	let draggingWithTouch = false;
 	const cleanups = [];
 
 	function scheduleMove(event) {
@@ -44,12 +48,24 @@ export function initMapPointDragHandlers({
 			draggingState = null;
 			return;
 		}
-		map.dragPan.disable();
+		dragPanWasEnabled = map.dragPan?.isEnabled?.() ?? true;
+		touchZoomWasEnabled = map.touchZoomRotate?.isEnabled?.() ?? true;
+		draggingWithTouch = touch;
+		map.dragPan?.disable();
 		if (touch) map.touchZoomRotate?.disable();
 		map.getCanvas().style.cursor = 'move';
 	}
 
-	function finishDrag(event, { touch = false } = {}) {
+	function restoreMapGestures(touch) {
+		if (dragPanWasEnabled) map.dragPan?.enable();
+		else map.dragPan?.disable();
+		if (touch) {
+			if (touchZoomWasEnabled) map.touchZoomRotate?.enable();
+			else map.touchZoomRotate?.disable();
+		}
+	}
+
+	function finishDrag(event, { touch = false, cancelled = false } = {}) {
 		if (!draggingState) return;
 		if (moveFrame !== null) {
 			cancelAnimationFrame(moveFrame);
@@ -62,10 +78,14 @@ export function initMapPointDragHandlers({
 		}
 		const finishedState = draggingState;
 		draggingState = null;
-		onDragEnd(finishedState, event);
-		map.dragPan.enable();
-		if (touch) map.touchZoomRotate?.enable();
-		map.getCanvas().style.cursor = '';
+		try {
+			if (cancelled) onDragCancel(finishedState, event);
+			else onDragEnd(finishedState, event);
+		} finally {
+			restoreMapGestures(touch);
+			draggingWithTouch = false;
+			map.getCanvas().style.cursor = '';
+		}
 	}
 
 	for (const layerId of layers) {
@@ -92,9 +112,15 @@ export function initMapPointDragHandlers({
 
 	addMapHandler('mouseup', (event) => finishDrag(event));
 	addMapHandler('touchend', (event) => finishDrag(event, { touch: true }));
-	addMapHandler('touchcancel', (event) => finishDrag(event, { touch: true }));
+	addMapHandler('touchcancel', (event) => finishDrag(event, { touch: true, cancelled: true }));
 
 	return () => {
+		if (draggingState) {
+			onDragCancel(draggingState);
+			draggingState = null;
+			restoreMapGestures(draggingWithTouch);
+			draggingWithTouch = false;
+		}
 		if (moveFrame !== null) cancelAnimationFrame(moveFrame);
 		pendingMoveEvent = null;
 		for (const cleanup of cleanups) cleanup();

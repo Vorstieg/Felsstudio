@@ -3,17 +3,56 @@
 	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
 	import { availableTags, commonEquipment, cragTypes, securityOptions } from './crag-editor-options.js';
 	import { rockTypes } from '$lib/config.ts';
+
 	const cragEditorState = getCragEditorSession();
 	const { actions } = getCragEditorTools();
-	const { addEquipmentItem: onAddEquipmentItem, removeEquipmentItem: onRemoveEquipmentItem, addCragImages: onAddCragImages, removeCragImage: onRemoveCragImage } = actions;
+	const {
+		addEquipmentItem: onAddEquipmentItem,
+		removeEquipmentItem: onRemoveEquipmentItem,
+		addCragImages: onAddCragImages,
+		removeCragImage: onRemoveCragImage,
+		setActiveMetadataId,
+		selectMetadataTarget
+	} = actions;
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
 	import { fileUrl } from '$lib/api/felslager.ts';
 	import CragHierarchyPlacement from './CragHierarchyPlacement.svelte';
+	import { HIERARCHY_KINDS } from '$lib/state/crag-session.svelte.ts';
+	import { getHierarchySourceRefs } from '$lib/assets/js/load-crag-editor-entry.ts';
 
 	let {
 		saveStatus = 'idle'
 	} = $props();
-	let pendingCragImageCount = $derived((cragEditorState.crag.assets?.images || []).filter((image) => image?._file).length);
+	let metadata = $derived(cragEditorState.getMetadataTarget() || cragEditorState.crag);
+	let activeEntry = $derived(cragEditorState.activeMetadataTarget?.type === 'entry'
+		? cragEditorState.hierarchyEntries.find((entry) => entry.key === cragEditorState.activeMetadataTarget.key)
+		: null);
+	let isCurrentEntry = $derived(activeEntry?.isCurrent === true || cragEditorState.hierarchyEntries.length === 0);
+	let isSector = $derived(cragEditorState.activeMetadataTarget?.type === 'sector');
+	let validationEntry = $derived(activeEntry || (isSector ? cragEditorState.hierarchyEntries.find((entry) => entry.isCurrent) : null));
+	let hierarchyError = $derived(validationEntry
+		? cragEditorState.hierarchyErrors.find((error) => error.key === validationEntry.key)
+		: null);
+	// Build crumbs from the complete current folder path. The loader supplies a
+	// clean editable entry for folders that do not yet have a crag.json.
+	let breadcrumbs = $derived.by(() => {
+		const entryPath = [cragEditorState.crag.path, cragEditorState.crag.id]
+			.filter(Boolean)
+			.join('/');
+		return getHierarchySourceRefs(entryPath).map((source) => {
+			const key = [source.path, source.id].filter(Boolean).join('/');
+			return {
+				key,
+				source,
+				entry: cragEditorState.hierarchyEntries.find((entry) => entry.key === key) || null
+			};
+		});
+	});
+	let pendingCragImageCount = $derived((metadata.assets?.images || []).filter((image) => image?._file).length);
+
+	function selectEntry(entry) {
+		selectMetadataTarget({ type: 'entry', key: entry.key });
+	}
 
 	function handleCragImageInput(event) {
 		onAddCragImages(Array.from(event.currentTarget.files || []));
@@ -42,28 +81,70 @@
 </script>
 
 <div class="space-y-4">
-	<h3 class="text-ui-label text-near-black flex items-center gap-2">
-		<div class="w-1.5 h-1.5 rounded-sm bg-creator-blue"></div>
-		Base Information
-	</h3>
+	<nav class="flex flex-wrap items-center gap-1 rounded-sm border border-black/10 bg-black/[0.03] p-2" aria-label="Metadata hierarchy">
+		{#each breadcrumbs as breadcrumb, i}
+			{#if i > 0}<i class="fa-solid fa-chevron-right text-[9px] text-warm-gray-300"></i>{/if}
+			{#if breadcrumb.entry}
+				<button type="button" onclick={() => selectEntry(breadcrumb.entry)}
+					class="rounded-sm px-1.5 py-1 text-micro-data {activeEntry?.key === breadcrumb.entry.key ? 'bg-white font-bold text-creator-blue shadow-sm' : 'text-warm-gray-500 hover:bg-white'}">
+					{breadcrumb.entry.feature.name || breadcrumb.entry.feature.id} <span class="opacity-60">({breadcrumb.entry.feature.kind})</span>
+				</button>
+			{:else}
+				<span class="rounded-sm px-1.5 py-1 text-micro-data text-warm-gray-400">
+					{breadcrumb.source.id}
+				</span>
+			{/if}
+		{/each}
+		{#if isSector}
+			{#if breadcrumbs.length}<i class="fa-solid fa-chevron-right text-[9px] text-warm-gray-300"></i>{/if}
+			<span class="rounded-sm bg-white px-1.5 py-1 text-micro-data font-bold text-creator-blue shadow-sm">{metadata.name || metadata.id} ({metadata.kind})</span>
+		{/if}
+	</nav>
 	<div class="space-y-3">
-		<div class="space-y-0.5"><label for="crag-name" class="text-ui-label block">Crag Name</label><input id="crag-name" type="text"
-		                                                                    value={cragEditorState.crag.name}
-					                                                                    oninput={(event) => cragEditorState.setCragField('name', event.currentTarget.value)}
-		                                                                                    class="input-studio w-full"
-		                                                                                    placeholder="e.g. Efeugrat" />
+		<div class="space-y-0.5">
+			<label for="metadata-name" class="text-ui-label block">Name</label>
+			<input id="metadata-name"
+			       type="text"
+			       value={metadata.name}
+			       oninput={(event) => cragEditorState.setMetadataField('name', event.currentTarget.value)}
+			       class="input-studio w-full"
+			       placeholder="e.g. Efeugrat" />
 		</div>
-		<CragHierarchyPlacement />
 		<div class="grid grid-cols-2 gap-2">
-			<div class="space-y-0.5"><label for="crag-security" class="text-ui-label block">Security</label><select id="crag-security"
-				value={cragEditorState.crag.security} onchange={(event) => cragEditorState.setCragField('security', event.currentTarget.value)} class="input-studio w-full appearance-none">
-				<option value="">Select...</option>
-				{#each securityOptions as opt}
-					<option value={opt}>{opt}</option>
-				{/each}
-			</select></div>
-			<div class="space-y-0.5"><label for="crag-rock-type" class="text-ui-label block">Rock Type</label><select id="crag-rock-type"
-					value={cragEditorState.crag.rock_type} onchange={(event) => cragEditorState.setCragField('rock_type', event.currentTarget.value)} class="input-studio w-full appearance-none">
+			<div class="space-y-0.5"><label for="metadata-kind" class="text-ui-label block">Kind</label>
+				<select id="metadata-kind" value={metadata.kind} onchange={(event) => cragEditorState.setMetadataField('kind', event.currentTarget.value)} class="input-studio w-full appearance-none">
+					{#each HIERARCHY_KINDS as kind}<option value={kind}>{kind}</option>{/each}
+				</select>
+			</div>
+			<div class="space-y-0.5"><label for="metadata-id" class="text-ui-label block">ID</label>
+				<input id="metadata-id" value={metadata.id} readonly={!isCurrentEntry && !isSector}
+					oninput={(event) => setActiveMetadataId(event.currentTarget.value)}
+					class="input-studio w-full font-mono read-only:bg-black/5 read-only:text-warm-gray-400" />
+			</div>
+		</div>
+		{#if hierarchyError}<p class="rounded-sm border border-rose-200 bg-rose-50 p-2 text-micro-data font-bold text-rose-700">{hierarchyError.message}</p>{/if}
+		{#if isCurrentEntry}<CragHierarchyPlacement />{:else if activeEntry}
+			<div class="rounded-sm border border-black/10 bg-black/[0.03] p-2 text-micro-data text-warm-gray-500">Source: <span class="font-mono">{activeEntry.source.path}/{activeEntry.source.id}</span> (read-only)</div>
+		{/if}
+		<div class="grid grid-cols-2 gap-2">
+			<div class="space-y-0.5">
+				<label for="crag-security" class="text-ui-label block">Security</label>
+				<select
+					id="crag-security"
+					value={metadata.security || ''}
+					onchange={(event) => cragEditorState.setMetadataField('security', event.currentTarget.value)}
+					class="input-studio w-full appearance-none">
+					<option value="">Select...</option>
+					{#each securityOptions as opt}
+						<option value={opt}>{opt}</option>
+					{/each}
+				</select>
+			</div>
+			<div class="space-y-0.5"><label for="crag-rock-type" class="text-ui-label block">Rock Type</label><select
+				id="crag-rock-type"
+				value={metadata.rock_type || ''}
+				onchange={(event) => cragEditorState.setMetadataField('rock_type', event.currentTarget.value)}
+				class="input-studio w-full appearance-none">
 				<option value="">Select...</option>
 				{#each rockTypes as opt}
 					<option value={opt}>{opt}</option>
@@ -71,10 +152,12 @@
 			</select></div>
 		</div>
 		<div class="space-y-0.5"><p class="text-ui-label block">Crag Type</p>
-			<TagSelector selectedTags={cragEditorState.crag.type} availableTags={cragTypes} onChange={(value) => cragEditorState.setCragField('type', value)} />
+			<TagSelector selectedTags={metadata.type || []} availableTags={cragTypes}
+			             onChange={(value) => cragEditorState.setMetadataField('type', value)} />
 		</div>
 		<div class="space-y-0.5"><p class="text-ui-label block">Tags</p>
-			<TagSelector selectedTags={cragEditorState.crag.tags} availableTags={availableTags} onChange={(value) => cragEditorState.setCragField('tags', value)} />
+			<TagSelector selectedTags={metadata.tags || []} availableTags={availableTags}
+			             onChange={(value) => cragEditorState.setMetadataField('tags', value)} />
 		</div>
 		<div class="space-y-1 pt-2 border-t border-black/15">
 			<div class="flex justify-between items-center"><p class="text-ui-label !m-0">Equipment</p>
@@ -83,15 +166,20 @@
 				</button>
 			</div>
 			<div class="space-y-1">
-				{#each cragEditorState.crag.equipment as item, i}
+				{#each metadata.equipment || [] as item, i}
 					<div class="flex gap-1 items-center bg-white p-1 rounded-sm border border-black/15 shadow-sm"><select
-						value={item.name} onchange={(event) => cragEditorState.updateEquipmentItem(i, 'name', event.currentTarget.value)} class="flex-1 bg-transparent px-1 py-1 text-body-text outline-none border-none">
+						value={item.name}
+						onchange={(event) => cragEditorState.updateMetadataEquipmentItem(i, 'name', event.currentTarget.value)}
+						class="flex-1 bg-transparent px-1 py-1 text-body-text outline-none border-none">
 						{#each commonEquipment as name}
 							<option value={name}>{name}</option>
 						{/each}
 					</select><input type="number"
-					                value={item.amount} oninput={(event) => cragEditorState.updateEquipmentItem(i, 'amount', Number(event.currentTarget.value))} class="w-10 bg-black/5 px-1 py-1 rounded-sm text-body-text outline-none text-center" />
-						<button onclick={() => onRemoveEquipmentItem(i)} aria-label="Remove equipment item" class="text-warm-gray-300 hover:text-rose-600 px-1.5"><i
+					                value={item.amount}
+					                oninput={(event) => cragEditorState.updateMetadataEquipmentItem(i, 'amount', Number(event.currentTarget.value))}
+					                class="w-10 bg-black/5 px-1 py-1 rounded-sm text-body-text outline-none text-center" />
+						<button onclick={() => onRemoveEquipmentItem(i)} aria-label="Remove equipment item"
+						        class="text-warm-gray-300 hover:text-rose-600 px-1.5"><i
 							class="fa-solid fa-trash-can text-[10px]"></i></button>
 					</div>
 				{/each}
@@ -105,10 +193,10 @@
 				</div>
 				<label class="text-ui-label text-creator-blue hover:text-creator-blue-active cursor-pointer">+ Add<input
 					type="file" accept="image/*" multiple class="hidden" onchange={handleCragImageInput} /></label></div>
-			{#if (cragEditorState.crag.assets?.images || []).length === 0}<p class="text-micro-data text-warm-gray-400">No
+			{#if (metadata.assets?.images || []).length === 0}<p class="text-micro-data text-warm-gray-400">No
 				pictures added.</p>{:else}
 				<div class="grid grid-cols-2 gap-2">
-					{#each cragEditorState.crag.assets?.images || [] as image, i}{@const imageStatus = getImageStatus(image)}
+					{#each metadata.assets?.images || [] as image, i}{@const imageStatus = getImageStatus(image)}
 						<div class="relative rounded-sm border border-black/15 bg-white p-1 shadow-sm">
 							{#if getImageSrc(image)}<img src={getImageSrc(image)} alt={image.name || 'Crag picture'}
 							                             class="h-20 w-full rounded-sm object-cover" />{/if}
@@ -126,9 +214,14 @@
 		</div>
 		<div class="space-y-0.5 pt-2 border-t border-black/15"><label for="crag-description-de" class="text-ui-label block">Description
 			(DE)</label><textarea id="crag-description-de" rows="2"
-			                        oninput={(event) => cragEditorState.setCragField('description_de', event.currentTarget.value)} value={cragEditorState.crag.description_de} class="input-studio w-full resize-none"></textarea></div>
-		<div class="space-y-0.5"><label for="crag-description-en" class="text-ui-label block">Description (EN)</label><textarea id="crag-description-en"
-			value={cragEditorState.crag.description_en} oninput={(event) => cragEditorState.setCragField('description_en', event.currentTarget.value)} rows="2" class="input-studio w-full resize-none"></textarea>
+		                        oninput={(event) => cragEditorState.setMetadataField('description_de', event.currentTarget.value)}
+		                        value={metadata.description_de || ''}
+		                        class="input-studio w-full resize-none"></textarea></div>
+		<div class="space-y-0.5"><label for="crag-description-en" class="text-ui-label block">Description
+			(EN)</label><textarea id="crag-description-en"
+		                        value={metadata.description_en || ''}
+		                        oninput={(event) => cragEditorState.setMetadataField('description_en', event.currentTarget.value)}
+		                        rows="2" class="input-studio w-full resize-none"></textarea>
 		</div>
 	</div>
 </div>

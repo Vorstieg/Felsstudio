@@ -267,7 +267,7 @@ export function createCragRouteTool({
 			return false;
 		state.markDocumentDirty(documentPath);
 		cancelTrackEdit();
-		setActiveTool('position');
+		setActiveTool('geometry');
 		return true;
 	}
 

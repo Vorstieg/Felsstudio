@@ -14,6 +14,14 @@ function isEntryJsonFile(file) {
 	return !name.includes('-topo');
 }
 
+function getEntryPathFromFile(filePath) {
+	const parts = String(filePath || '').split('/').filter(Boolean);
+	const filename = parts.pop() || '';
+	const id = filename.replace(/\.json$/i, '');
+	if (!id) return '';
+	return parts.at(-1) === id ? parts.join('/') : [...parts, id].join('/');
+}
+
 function filterAndPaginateCrags(crags, { offset = 0, limit = cragsPerPage, search = '' } = {}) {
 	let filteredCrags = crags;
 
@@ -24,7 +32,7 @@ function filterAndPaginateCrags(crags, { offset = 0, limit = cragsPerPage, searc
 			return (
 				(crag.properties?.name ?? '').toLowerCase().includes(query) ||
 				(crag.properties?.type?.includes(search) ?? false) ||
-				(crag.properties?.path ?? '').toLowerCase().includes(query) ||
+				(crag.entryPath ?? '').toLowerCase().includes(query) ||
 				sectors.some(
 					(sector) =>
 						(sector.name || '').toLowerCase().includes(query) ||
@@ -49,12 +57,12 @@ function filterAndPaginateCrags(crags, { offset = 0, limit = cragsPerPage, searc
 function manifestEntryToCragFeature(entry) {
 	return {
 		type: 'Feature',
+		entryPath: entry.path,
 		geometry: entry.geometry,
 		properties: {
 			id: entry.id,
 			name: entry.name,
 			kind: entry.kind,
-			path: entry.path,
 			type: entry.type || [],
 			hash: entry.hash,
 			sectors: entry.sectors || []
@@ -85,6 +93,7 @@ const fetchCrags = async ({ offset = 0, limit = cragsPerPage, search = '' } = {}
 					if (data.properties.kind === 'sector') return null;
 
 					data.properties.id = file.name.slice(0, -'.json'.length);
+					data.entryPath = getEntryPathFromFile(file.path);
 					return data;
 				} catch (err) {
 					console.warn('Failed to load crag entry:', file.path, err);

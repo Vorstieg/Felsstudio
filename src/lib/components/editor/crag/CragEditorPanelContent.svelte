@@ -16,6 +16,7 @@
 		selectedObject = $bindable(null),
 		saveStatus = 'idle'
 	} = $props();
+
 </script>
 
 {#if showTabs}

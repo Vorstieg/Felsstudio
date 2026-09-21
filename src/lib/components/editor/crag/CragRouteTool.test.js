@@ -180,5 +180,5 @@ test('splits a route path and exits track cutting mode', () => {
 		true
 	);
 	assert.equal(document.data.paths.features.length, 2);
-	assert.equal(activeTools.at(-1), 'position');
+	assert.equal(activeTools.at(-1), 'geometry');
 });

@@ -42,8 +42,8 @@ describe('createCragSectorTool', () => {
 
 		expect(state.crag.sectors[0]).toMatchObject({ id: 'sector-1', name: 'Sector 1' });
 		expect(selection()).toEqual({ type: 'sector', id: 'sector-1' });
-		expect(activeTab()).toBe('sectors');
-		expect(activeTool()).toBe('position');
+		expect(activeTab()).toBe('info');
+		expect(activeTool()).toBe('geometry');
 
 		tool.focusSector(state.crag.sectors[0]);
 		expect(map.lastEase).toMatchObject({ center: [16, 48], zoom: 15 });
@@ -59,6 +59,43 @@ describe('createCragSectorTool', () => {
 		tool.setSectorGeometryType('sector-1', 'Polygon');
 		expect(state.crag.sectors[0].geometry.type).toBe('Polygon');
 		expect(state.canUndo).toBe(true);
+	});
+
+	it('syncs polygon sectors into their dedicated map source', () => {
+		const { state, tool, map } = createTool();
+		const sources = new Map();
+		const layers = new Map();
+		map.getSource = (id) => sources.get(id);
+		map.addSource = (id, definition) =>
+			sources.set(id, { ...definition, setData: (data) => (sources.get(id).data = data) });
+		map.getLayer = (id) => layers.get(id);
+		map.addLayer = (layer) => layers.set(layer.id, layer);
+		state.setSectors([
+			{
+				id: 'sector-1',
+				name: 'Wall',
+				geometry: {
+					type: 'Polygon',
+					coordinates: [
+						[
+							[16, 48],
+							[16.1, 48],
+							[16.1, 48.1],
+							[16, 48]
+						]
+					]
+				}
+			}
+		]);
+
+		tool.syncDrawing();
+
+		expect(sources.get('sector-editor-data').data.features).toEqual([
+			expect.objectContaining({
+				geometry: state.crag.sectors[0].geometry,
+				properties: expect.objectContaining({ feature: 'sector', id: 'sector-1' })
+			})
+		]);
 	});
 
 	it('duplicates and removes sectors', () => {

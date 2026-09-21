@@ -1,5 +1,6 @@
 import type {
 	CragProperties,
+	EntryKind,
 	GeoJSONGeometry,
 	SectorProperties,
 	TopoDocument
@@ -14,6 +15,8 @@ export type CragSector = SectorProperties & {
 };
 
 export type EditableCrag = Omit<CragProperties, 'sectors'> & {
+	/** Runtime storage parent; derived from the opened entry path and never persisted in feature metadata. */
+	path: string;
 	geometry: GeoJSONGeometry;
 	sectors: CragSector[];
 };
@@ -32,16 +35,44 @@ export type RouteDocument = {
 	dirty: boolean;
 };
 
+/** A sector folder whose on-disk name must be migrated when the editable ID changes. */
+export type SectorStorageMove = { from: SectorId; to: SectorId };
+
 export type SourceCragRef = {
 	path: string;
 	id: CragId;
+};
+
+export type HierarchyEntry = {
+	key: string;
+	feature: EditableCrag;
+	source: SourceCragRef;
+	parentKey: string | null;
+	childKeys: string[];
+	dirty: boolean;
+	isCurrent: boolean;
+	/** Unknown top-level GeoJSON members retained when the entry is written. */
+	featureExtras?: Record<string, unknown>;
+};
+
+export type MetadataTarget = { type: 'entry'; key: string } | { type: 'sector'; id: SectorId };
+
+export type MetadataValue = EditableCrag | CragSector;
+
+export type HierarchyValidationError = {
+	key: string;
+	message: string;
+	kind: EntryKind;
 };
 
 export type CragEditorSnapshot = {
 	crag: EditableCrag;
 	access: AccessCollection;
 	routeDocuments: RouteDocument[];
+	sectorStorageMoves: SectorStorageMove[];
 	sourceCrag: SourceCragRef | null;
+	hierarchyEntries: HierarchyEntry[];
+	activeMetadataTarget: MetadataTarget | null;
 };
 
 export type CragHistoryEntry = {
@@ -64,7 +95,22 @@ export type CragEditorSession = CragEditorSnapshot & {
 	readonly canRedo: boolean;
 	reset(): void;
 	markDocumentDirty(path: string): RouteDocument | undefined;
+	sectorStorageMoves: SectorStorageMove[];
 	setCragGeometry(geometry: GeoJSONGeometry): void;
+	commitGeometry(target: MetadataTarget | null, geometry: GeoJSONGeometry, label: string): boolean;
+	getMetadataTarget(target?: MetadataTarget | null): MetadataValue | null;
+	setActiveMetadataTarget(target: MetadataTarget | null): void;
+	setMetadataField(field: string, value: unknown, target?: MetadataTarget | null): void;
+	setMetadataEquipment(equipment: unknown[], target?: MetadataTarget | null): void;
+	setMetadataImages(images: unknown[], target?: MetadataTarget | null): void;
+	updateMetadataEquipmentItem(
+		index: number,
+		field: string,
+		value: unknown,
+		target?: MetadataTarget | null
+	): void;
+	markHierarchyEntryClean(key: string): void;
+	readonly hierarchyErrors: HierarchyValidationError[];
 	setCragField(field: keyof EditableCrag | string, value: unknown): void;
 	setEquipment(equipment: unknown[]): void;
 	setCragImages(images: unknown[]): void;

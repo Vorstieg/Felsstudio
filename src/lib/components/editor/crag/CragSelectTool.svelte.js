@@ -69,7 +69,7 @@ export function createCragSelectTool({
 		}
 		if (properties.feature === 'sector' && properties.id) {
 			selectObject({ type: 'sector', id: properties.id });
-			setActiveTab?.('sectors');
+			setActiveTab?.('info');
 			return true;
 		}
 		return false;

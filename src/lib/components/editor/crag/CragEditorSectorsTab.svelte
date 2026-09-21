@@ -1,21 +1,16 @@
 <script>
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
-	import { availableTags, cragTypes, securityOptions } from './crag-editor-options.js';
-	import { rockTypes } from '$lib/config.ts';
 	const cragEditorState = getCragEditorSession();
 	const { sectorTool, routeTool, actions } = getCragEditorTools();
 	const {
 		createSector: onAddSector, duplicateSector: onDuplicateSector, removeSector: onRemoveSector,
-		focusSector: onFocusSector,
-		setSectorGeometryType: onSetSectorGeometryType
+		focusSector: onFocusSector
 	} = sectorTool;
 	const { addRoute: onAddSectorRoute, selectRoute: onSelectRoute, deleteRoute: onDeleteRoute } = routeTool;
 	const onAddParentRoute = () => routeTool.addRoute();
 	const onPlanGenerated = actions.handleFlightPlanGenerated;
 	let routeDocuments = $derived(cragEditorState.routeDocuments);
-	import TagSelector from '$lib/components/ui/TagSelector.svelte';
-	import { getGeometryCenter } from '$lib/assets/js/sector-utils.js';
 	import CragFlightPlanPanel from './CragFlightPlanPanel.svelte';
 	import CragEditorRouteTable from './CragEditorRouteTable.svelte';
 
@@ -23,7 +18,6 @@
 		map = null,
 		selectedObject = $bindable(null)
 	} = $props();
-	let selectedSector = $derived(selectedObject?.type === 'sector' ? (cragEditorState.crag.sectors || []).find((sector) => sector.id === selectedObject.id) : null);
 	let parentRoutes = $derived(routeDocuments.flatMap((document) => document.sectorId ? [] : (document.data?.routes || []).map((route) => ({
 		document,
 		route
@@ -34,16 +28,6 @@
 			document,
 			route
 		})));
-	}
-
-	function updateSelectedSectorId(sector, value) {
-		cragEditorState.updateSector(sector.id, 'id', value);
-		selectedObject = value ? { type: 'sector', id: value } : null;
-	}
-
-	function formatGeometryCenter(geometry) {
-		const center = getGeometryCenter(geometry);
-		return center ? `${center[1].toFixed(5)}, ${center[0].toFixed(5)}` : '';
 	}
 
 	function selectSector(sector) {
@@ -91,87 +75,31 @@
 						<div class="text-body-text font-bold truncate">{sector.name || sector.id || 'Unnamed Sector'}</div>
 						<div class="text-micro-data text-warm-gray-400 truncate">{sector.id || 'missing-id'}</div>
 					</div>
-					<div class="flex items-center gap-1">
-						<button class="h-6 rounded-sm px-1.5 text-[10px] font-bold text-creator-blue"
-						        title="Add route to this sector"
-						        onclick={(e) => { e.stopPropagation(); onAddSectorRoute(sector.id); }}><i
-							class="fa-solid fa-route mr-1"></i>+ Route
-						</button>
-
+						<div class="flex items-center gap-1">
+							<button class="h-6 rounded-sm px-1.5 text-[10px] font-bold text-creator-blue"
+							        title="Add route to this sector"
+							        onclick={(e) => { e.stopPropagation(); onAddSectorRoute(sector.id); }}><i
+								class="fa-solid fa-route mr-1"></i>+ Route
+							</button>
+							<button onclick={(e) => { e.stopPropagation(); onDuplicateSector(sector.id); }}
+							        class="h-6 w-6 text-warm-gray-400 hover:text-creator-blue"
+							        title="Duplicate sector"><i class="fa-solid fa-copy text-[10px]"></i></button>
+							<button onclick={(e) => { e.stopPropagation(); onRemoveSector(sector.id); }}
+							        class="h-6 w-6 text-warm-gray-300 hover:text-rose-600"
+							        title="Delete sector"><i class="fa-solid fa-trash-can text-[10px]"></i></button>
+						</div>
 					</div>
+					{#if routes.length > 0}
+						<div class="mt-2 border-t border-black/10">
+							<CragEditorRouteTable routes={routes} {selectedObject} {onSelectRoute} {onDeleteRoute} />
+						</div>
+					{/if}
+					{#if isSelected}
+						<div onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="presentation">
+							<CragFlightPlanPanel {sector} cragName={cragEditorState.crag.name} {map} onPlanGenerated={onPlanGenerated} />
+						</div>
+					{/if}
 				</div>
-				{#if routes.length > 0}
-					<div class="mt-2 border-t border-black/10">
-						<CragEditorRouteTable routes={routes} {selectedObject} {onSelectRoute} {onDeleteRoute} />
-					</div>
-				{/if}
-			</div>
-		{/each}
-	</div>
-	{#if selectedSector}{@const sector = selectedSector}
-		<div class="space-y-3 pt-3 border-t border-black/15">
-			<div class="flex items-center justify-between"><h3 class="text-ui-label text-near-black !m-0">Selected Sector</h3>
-				<div class="flex items-center gap-1">
-					<button onclick={() => onDuplicateSector(sector.id)} class="w-7 h-7 text-warm-gray-400"
-					        title="Duplicate sector"><i class="fa-solid fa-copy text-[10px]"></i></button>
-					<button onclick={() => onRemoveSector(sector.id)} class="w-7 h-7 text-warm-gray-300 hover:text-rose-600"
-					        title="Delete sector"><i class="fa-solid fa-trash-can text-[10px]"></i></button>
-				</div>
-			</div>
-			<div class="grid grid-cols-2 gap-2">
-			<div class="space-y-0.5"><label for={'sector-name-' + sector.id} class="text-ui-label block">Name</label><input id={'sector-name-' + sector.id} type="text"
-	                                                                               value={sector.name}
-	                                                                               oninput={(event) => cragEditorState.updateSector(sector.id, 'name', event.currentTarget.value)}
-				                                                                               class="input-studio w-full"
-				                                                                               placeholder="Sector name" />
-				</div>
-			<div class="space-y-0.5"><label for={'sector-id-' + sector.id} class="text-ui-label block">ID</label><input id={'sector-id-' + sector.id} type="text" value={sector.id}
-				                                                                             oninput={(e) => updateSelectedSectorId(sector, e.currentTarget.value)}
-				                                                                             class="input-studio w-full font-mono"
-				                                                                             placeholder="sector-id" /></div>
-			</div>
-			<div class="space-y-0.5"><p class="text-ui-label block">Geometry</p>
-				<div class="grid grid-cols-2 gap-1 bg-black/5 rounded-sm p-0.5 border border-black/10">
-					{#each ['Point', 'Polygon'] as type}
-						<button
-							class="py-1 rounded-sm text-ui-label transition-none {sector.geometry?.type === type ? 'bg-white shadow-sm text-creator-blue' : 'text-warm-gray-500 hover:bg-black/5'}"
-							onclick={() => onSetSectorGeometryType(sector.id, type)}>{type}</button>
-					{/each}
-				</div>
-			</div>
-			<div class="grid grid-cols-2 gap-2">
-			<div class="space-y-0.5"><label for={'sector-security-' + sector.id} class="text-ui-label block">Security</label><select id={'sector-security-' + sector.id} value={sector.security} onchange={(event) => cragEditorState.updateSector(sector.id, 'security', event.currentTarget.value)}
-				                                                                                    class="input-studio w-full appearance-none">
-					<option value="">Crag default</option>
-					{#each securityOptions as opt}
-						<option value={opt}>{opt}</option>
-					{/each}
-				</select></div>
-			<div class="space-y-0.5"><label for={'sector-rock-type-' + sector.id} class="text-ui-label block">Rock Type</label><select id={'sector-rock-type-' + sector.id}
-					value={sector.rock_type} onchange={(event) => cragEditorState.updateSector(sector.id, 'rock_type', event.currentTarget.value)} class="input-studio w-full appearance-none">
-					<option value="">Crag default</option>
-					{#each rockTypes as opt}
-						<option value={opt}>{opt}</option>
-					{/each}
-				</select></div>
-			</div>
-			<div class="space-y-0.5"><p class="text-ui-label block">Sector Type</p>
-				<TagSelector selectedTags={sector.type} availableTags={cragTypes} onChange={(value) => cragEditorState.updateSector(sector.id, 'type', value)} />
-			</div>
-			<div class="space-y-0.5"><p class="text-ui-label block">Tags</p>
-				<TagSelector selectedTags={sector.tags} availableTags={availableTags} onChange={(value) => cragEditorState.updateSector(sector.id, 'tags', value)} />
-			</div>
-			<div class="space-y-0.5 pt-2 border-t border-black/15"><label for={'sector-description-de-' + sector.id} class="text-ui-label block">Description (DE)</label><textarea id={'sector-description-de-' + sector.id}
-				value={sector.description_de} oninput={(event) => cragEditorState.updateSector(sector.id, 'description_de', event.currentTarget.value)} rows="2" class="input-studio w-full resize-none"></textarea></div>
-			<div class="space-y-0.5"><label for={'sector-description-en-' + sector.id} class="text-ui-label block">Description (EN)</label><textarea id={'sector-description-en-' + sector.id}
-				value={sector.description_en} oninput={(event) => cragEditorState.updateSector(sector.id, 'description_en', event.currentTarget.value)} rows="2" class="input-studio w-full resize-none"></textarea></div>
-			<div class="flex items-center justify-between bg-white rounded-sm border border-black/15 p-2"><span
-				class="text-ui-label text-warm-gray-500 !m-0">{sector.geometry?.type === 'Polygon' ? 'Center' : 'Position'}</span>
-				{#if formatGeometryCenter(sector.geometry)}<span
-					class="font-mono text-micro-data text-creator-blue font-bold">{formatGeometryCenter(sector.geometry)}</span>{:else}
-					<span class="text-micro-data text-warm-gray-400">Crag default</span>{/if}
-			</div>
-			<CragFlightPlanPanel {sector} cragName={cragEditorState.crag.name} {map} onPlanGenerated={onPlanGenerated} />
+			{/each}
 		</div>
-	{/if}
-</div>
+	</div>

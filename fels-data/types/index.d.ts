@@ -38,7 +38,6 @@ export interface CragProperties {
 	id: string;
 	name: string;
 	kind: EntryKind;
-	path?: string;
 	type?: string[];
 	tags?: string[];
 	security?: string;

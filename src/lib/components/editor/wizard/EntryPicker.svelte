@@ -1,5 +1,6 @@
 <script>
 	import { _ } from 'svelte-i18n';
+	import { getCragEntryPath } from '$lib/assets/js/editor-entry-paths.js';
 
 	let {
 		workSpaceWrapper,
@@ -58,7 +59,7 @@
 					<div class="text-body-text font-bold group-hover:text-creator-blue transition-none">
 						{crag.properties.name}
 					</div>
-					<div class="text-micro-data text-warm-gray-400">{crag.properties.path}</div>
+					<div class="text-micro-data text-warm-gray-400">{getCragEntryPath(crag)}</div>
 				</div>
 				<i
 					class="fa-solid {showSectorChoices && expandedCragId === crag.properties.id
