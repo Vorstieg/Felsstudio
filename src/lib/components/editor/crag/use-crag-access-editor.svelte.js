@@ -15,7 +15,7 @@ export function useCragAccessEditor({ state, getMap, getIsMapLoaded, getActiveTo
 	let areDetectionPointHandlersReady = false;
 	let detectionRescanTimeout = null;
 
-	const accessFeatures = () => state.access.features || [];
+	const accessFeatures = () => state.getWorkspaceAccess()?.features || [];
 	const pointFeatures = () =>
 		accessFeatures().filter((feature) => feature.geometry?.type === 'Point');
 
@@ -41,7 +41,7 @@ export function useCragAccessEditor({ state, getMap, getIsMapLoaded, getActiveTo
 		const map = getMap();
 		if (!map || !getIsMapLoaded()) return;
 		isDetectionLoading = !map.isSourceLoaded('maptiler_planet');
-		const coords = $state.snapshot(getGeometryCenter(state.crag.geometry) || [0, 0]);
+		const coords = $state.snapshot(getGeometryCenter(state.getActiveEntry()?.geometry) || [0, 0]);
 		const features = map.querySourceFeatures('maptiler_planet', { sourceLayer: 'poi' });
 		isDetectionZoomLimited = !isDetectionLoading && map.getZoom() <= 16 && features.length === 0;
 		const suggestions = [];

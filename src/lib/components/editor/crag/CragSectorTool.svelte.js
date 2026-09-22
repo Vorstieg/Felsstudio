@@ -3,12 +3,7 @@ import {
 	getGeometryCenter,
 	translateGeometryTo
 } from '$lib/assets/js/sector-utils.js';
-import {
-	addSector,
-	createDefaultSector,
-	duplicateSectorById,
-	removeSectorById
-} from './crag-editor-sectors.ts';
+import { createFelsEntry } from '$lib/state/crag-session.svelte.ts';
 
 /** Core sector mutations and selection/focus workflows for the crag editor. */
 export function createCragSectorTool({
@@ -30,7 +25,7 @@ export function createCragSectorTool({
 			{
 				id: 'sector-polygons-fill',
 				type: 'fill',
-				filter: ['==', ['get', 'feature'], 'sector'],
+				filter: ['==', ['get', 'feature'], 'child-entry'],
 				paint: {
 					'fill-color': ['case', ['==', ['get', 'selected'], true], '#0075de', '#31302e'],
 					'fill-opacity': ['case', ['==', ['get', 'selected'], true], 0.22, 0.12]
@@ -39,7 +34,7 @@ export function createCragSectorTool({
 			{
 				id: 'sector-polygons-outline',
 				type: 'line',
-				filter: ['==', ['get', 'feature'], 'sector'],
+				filter: ['==', ['get', 'feature'], 'child-entry'],
 				layout: { 'line-join': 'round', 'line-cap': 'round' },
 				paint: {
 					'line-color': ['case', ['==', ['get', 'selected'], true], '#0075de', '#31302e'],
@@ -60,15 +55,19 @@ export function createCragSectorTool({
 		if (!map) return;
 		ensureMapLayers(map);
 		const features = [];
-		(state.crag.sectors || []).forEach((sector) => {
-			if (sector.geometry?.type !== 'Polygon') return;
-			const selected = getSelection()?.type === 'sector' && getSelection().id === sector.id;
+		state.getActiveSectors().forEach((node) => {
+			const sector = node.entry?.properties;
+			const geometry = node.entry?.geometry;
+			if (!sector || geometry?.type !== 'Polygon') return;
+			const path = state.getWorkspaceEntryPath(node);
+			const selected = getSelection()?.type === 'entry' && getSelection().key === path;
 			features.push({
 				type: 'Feature',
-				geometry: sector.geometry,
+				geometry,
 				properties: {
-					feature: 'sector',
+					feature: 'child-entry',
 					id: sector.id || '',
+					path,
 					name: sector.name || '',
 					selected
 				}
@@ -76,81 +75,83 @@ export function createCragSectorTool({
 		});
 		map.getSource('sector-editor-data')?.setData({ type: 'FeatureCollection', features });
 	}
-	function focusSector(sector) {
-		selectObject({ type: 'sector', id: sector.id });
+	function focusSector(node, { select = true } = {}) {
+		if (select && node?.entry) selectObject({ type: 'entry', key: state.getWorkspaceEntryPath(node) });
 		setActiveTool('geometry');
-		const center = getGeometryCenter(sector.geometry);
+		const center = getGeometryCenter(node?.entry?.geometry);
 		const map = getMap();
 		if (center && map) map.easeTo({ center, zoom: Math.max(map.getZoom(), 15), duration: 400 });
 	}
 
 	function createSector() {
-		const sectors = state.crag.sectors || [];
-		const sector = createDefaultSector({
-			sectors,
-			cragCoordinates: getGeometryCenter(state.crag.geometry) || [0, 0]
-		});
-		state.setSectors(addSector(sectors, sector));
-		selectObject({ type: 'sector', id: sector.id });
+		let next = 1;
+		while (state.getActiveSectors().some((node) => node.entry?.properties.id === `child-${next}`))
+			next++;
+		const entry = createFelsEntry('area', { id: `child-${next}`, name: `Child ${next}` });
+		entry.geometry = state.getActiveEntry()?.geometry || entry.geometry;
+		const node = state.createWorkspaceEntry(entry);
+		if (!node) return;
+		selectObject({ type: 'entry', key: state.getWorkspaceEntryPath(node) });
 		setActiveTab('info');
 		setActiveTool('geometry');
 	}
 
 	function duplicateSector(id) {
-		const result = duplicateSectorById(state.crag.sectors || [], id);
-		if (!result.duplicatedId) return;
-		state.setSectors(result.sectors);
-		selectObject({ type: 'sector', id: result.duplicatedId });
+		const source = state.getActiveSectors().find((node) => node.entry?.properties.id === id)?.entry;
+		if (!source) return;
+		let duplicateId = `${id}-copy`;
+		let count = 2;
+		while (state.getActiveSectors().some((node) => node.entry?.properties.id === duplicateId))
+			duplicateId = `${id}-copy-${count++}`;
+		const duplicate = JSON.parse(JSON.stringify(source));
+		duplicate.properties.id = duplicateId;
+		duplicate.properties.name = `${source.properties.name || id} Copy`;
+		const node = state.createWorkspaceEntry(duplicate);
+		if (!node) return;
+		selectObject({ type: 'entry', key: state.getWorkspaceEntryPath(node) });
 		setActiveTab('info');
 	}
 
 	function removeSector(id) {
-		state.setSectors(removeSectorById(state.crag.sectors || [], id));
+		const active = state.getActiveWorkspaceEntry();
+		const node =
+			active?.childEntries.find((child) => child.entry?.properties.id === id) ||
+			(active?.entry?.properties.id === id && state.getWorkspaceEntry(active.path) ? active : null);
+		if (!node) return;
+		const childPath = state.getWorkspaceEntryPath(node);
+		const parentPath = node.path;
+		const wasActive = state.activeWorkspaceEntryPath === childPath;
+		state.removeWorkspaceEntry(childPath);
 		const selection = getSelection?.();
-		if (selection?.type === 'sector' && selection.id === id) {
-			const current = state.hierarchyEntries?.find((entry) => entry.isCurrent);
-			selectObject(current ? { type: 'entry', key: current.key } : null);
-		}
+		if (wasActive || (selection?.type === 'entry' && selection.key === childPath))
+			selectObject({ type: 'entry', key: parentPath });
 	}
 
 	function setSectorGeometryType(id, type) {
-		state.setSectors(
-			(state.crag.sectors || []).map((sector) => {
-				if (sector.id !== id || sector.geometry?.type === type) return sector;
-				const center = getGeometryCenter(sector.geometry) ||
-					getGeometryCenter(state.crag.geometry) || [0, 0];
-				return {
-					...sector,
-					geometry:
-						type === 'Polygon'
-							? createPolygonAround(center)
-							: { type: 'Point', coordinates: [...center] }
-				};
-			})
+		const node = state
+			.getActiveSectors()
+			.find((candidate) => candidate.entry?.properties.id === id);
+		if (!node?.entry || node.entry.geometry?.type === type) return;
+		const center = getGeometryCenter(node.entry.geometry) ||
+			getGeometryCenter(state.getActiveEntry()?.geometry) || [0, 0];
+		state.commitGeometry(
+			state.getWorkspaceEntryPath(node),
+			type === 'Polygon'
+				? createPolygonAround(center)
+				: { type: 'Point', coordinates: [...center] },
+			'Change sector geometry'
 		);
 	}
 
-	function updateSectorCoordinates(id, coordinates) {
-		state.setSectors(
-			(state.crag.sectors || []).map((sector) =>
-				sector.id !== id
-					? sector
-					: {
-							...sector,
-							geometry: translateGeometryTo(
-								sector.geometry || { type: 'Point', coordinates },
-								coordinates
-							)
-						}
-			)
-		);
-	}
-
-	function updateSectorGeometry(id, updater) {
-		state.setSectors(
-			(state.crag.sectors || []).map((sector) =>
-				sector.id === id ? { ...sector, geometry: updater(sector.geometry) } : sector
-			)
+	function moveSectorPosition(id, coordinates) {
+		const node = state
+			.getActiveSectors()
+			.find((candidate) => candidate.entry?.properties.id === id);
+		if (!node?.entry) return;
+		state.commitGeometry(
+			state.getWorkspaceEntryPath(node),
+			translateGeometryTo(node.entry.geometry || { type: 'Point', coordinates }, coordinates),
+			'Move sector'
 		);
 	}
 
@@ -162,7 +163,6 @@ export function createCragSectorTool({
 		duplicateSector,
 		removeSector,
 		setSectorGeometryType,
-		updateSectorCoordinates,
-		updateSectorGeometry
+		moveSectorPosition
 	};
 }

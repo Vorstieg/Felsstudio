@@ -1,18 +1,13 @@
 import { slugifyName } from '$lib/components/editor/crag/crag-editor-paths.js';
 
 export class Topo {
-	constructor(path, cragId, sectorId) {
+	constructor(path, cragId) {
 		this.path = path;
 		this.cragId = cragId;
-		this.sectorId = sectorId;
 	}
 
 	_getPath() {
-		if (this.sectorId) {
-			return `${this.path}/${this.cragId}/${this.sectorId}/${this.sectorId}`;
-		} else {
-			return `${this.path}/${this.cragId}/${this.cragId}`;
-		}
+		return `${this.path}/${this.cragId}/${this.cragId}`;
 	}
 
 	getTopoPath() {
@@ -27,13 +22,8 @@ export class Topo {
 		return `${this.path}/${this.cragId}/${this.cragId}.json`;
 	}
 
-	getSectorPath() {
-		if (!this.sectorId) return this.getCragPath();
-		return `${this.path}/${this.cragId}/${this.sectorId}/${this.getFileName()}`;
-	}
-
 	getBaseName() {
-		return this.sectorId ? this.sectorId : this.cragId;
+		return this.cragId;
 	}
 
 	getFileName() {
@@ -42,7 +32,7 @@ export class Topo {
 	getAccessPath() {
 		return `${this._getPath()}-access.json`;
 	}
-	getImagePath(name, index = 0) {
+	getImagePath(name, token = '') {
 		const lastDot = name.lastIndexOf('.');
 		let ext = '';
 		let baseName = name;
@@ -51,6 +41,7 @@ export class Topo {
 			baseName = name.substring(0, lastDot);
 		}
 		const slug = slugifyName(baseName) || 'img';
-		return `${this._getPath()}-image${index > 0 ? '-' + index : ''}-${slug}${ext}`;
+		const suffix = token === '' || token === 0 ? '' : `-${token}`;
+		return `${this._getPath()}-image${suffix}-${slug}${ext}`;
 	}
 }

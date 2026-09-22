@@ -21,6 +21,7 @@ const LAYERS = {
 };
 
 function targetKey(target) {
+	if (typeof target === 'string') return target;
 	return target ? `${target.type}:${target.type === 'entry' ? target.key : target.id}` : '';
 }
 
@@ -263,7 +264,7 @@ export function useCragGeometryEditor({
 				);
 				if (['vertex', 'midpoint'].includes(kind) && !Number.isInteger(vertexIndex)) return null;
 				return {
-					target: target ? { ...target } : null,
+					target,
 					geometry: cloneGeoJsonGeometry(geometry),
 					kind,
 					vertexIndex

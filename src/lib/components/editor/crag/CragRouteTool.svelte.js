@@ -1,5 +1,5 @@
 import { generateId, generateRouteId } from '$lib/assets/js/id-utils.ts';
-import { Topo } from '$lib/assets/js/topo-paths.js';
+import { workspaceDocumentPaths, workspaceNodeDocumentPaths } from '$lib/assets/js/workspace-paths.ts';
 import {
 	assignTopoPath,
 	createPathFeature,
@@ -19,22 +19,61 @@ export function createCragRouteTool({
 	editRoutePathTrack,
 	setActiveTool
 } = {}) {
-	let deletedRoutePathUndo = null;
+	function documents() {
+		const active = state.getActiveWorkspaceEntry();
+		return [active, ...(active?.childEntries || [])].flatMap((node) =>
+			node?.entry?.properties.id && node.topo
+				? [
+						{
+							node,
+							path: workspaceNodeDocumentPaths(node).topo,
+							data: node.topo
+						}
+					]
+				: []
+		);
+	}
+	function documentAt(path) {
+		return documents().find((document) => document.path === path);
+	}
+	function updateDocument(path, updater) {
+		const document = documentAt(path);
+		return document
+			? state.updateWorkspaceTopo(
+					path,
+					(topo) => updater(topo, document),
+					state.getWorkspaceEntryPath(document.node)
+				)
+			: null;
+	}
+	function markDirty(path) {
+		const document = documentAt(path);
+		if (document) state.markWorkspaceDirty(path, state.getWorkspaceEntryPath(document.node));
+	}
 
 	function getRouteDocument(sectorId) {
-		return state.routeDocuments.find((document) => document.sectorId === sectorId);
+		const active = state.getActiveWorkspaceEntry();
+		const node = sectorId
+			? active?.childEntries.find((child) => child.entry?.properties.id === sectorId)
+			: active;
+		return node?.topo ? documents().find((document) => document.node === node) : null;
 	}
 
 	function createRouteDocument(sectorId) {
-		const sectorTopo = new Topo(state.crag.path, state.crag.id, sectorId || undefined);
+		const active = state.getActiveWorkspaceEntry();
+		const crag = active?.entry;
+		const node = sectorId
+			? active?.childEntries.find((child) => child.entry?.properties.id === sectorId)
+			: active;
+		const sectorPaths = workspaceDocumentPaths(node?.path || '', String(node?.entry?.properties.id || ''));
 		return {
-			path: sectorTopo.getTopoPath(),
-			sectorId,
+			path: sectorPaths.topo,
+			node,
 			data: {
-				id: sectorId ? `${state.crag.id}:${sectorId}` : state.crag.id,
-				crag_id: state.crag.id,
+				id: sectorId ? `${crag?.properties.id}:${sectorId}` : crag?.properties.id,
+				crag_id: crag?.properties.id,
 				sector_id: sectorId || '',
-				name: sectorId || state.crag.name,
+				name: sectorId || crag?.properties.name,
 				routes: [],
 				paths: { type: 'FeatureCollection', features: [] }
 			},
@@ -46,27 +85,27 @@ export function createCragRouteTool({
 		let document = getRouteDocument(sectorId);
 		if (!document) {
 			document = createRouteDocument(sectorId);
-			state.addRouteDocument(document);
+			if (!document.node) return;
+			document.node.topo = document.data;
+			state.markWorkspaceDirty(document.path, state.getWorkspaceEntryPath(document.node));
 		}
 
 		let routeId;
 		do {
 			routeId = generateRouteId();
 		} while (
-			state.routeDocuments.some((entry) =>
-				(entry.data.routes || []).some((route) => route.id === routeId)
-			)
+			documents().some((entry) => (entry.data.routes || []).some((route) => route.id === routeId))
 		);
 
 		const route = { id: routeId, name: '', type: 'sports-climbing', tags: [], pathRefs: [] };
-		state.updateRouteDocument(document.path, (data) => {
+		updateDocument(document.path, (data) => {
 			data.routes = [...(data.routes || []), route];
 		});
 		selectObject({ type: 'route', key: `${document.path}:${route.id}` });
 	}
 
 	function deleteRoute(path, routeId) {
-		const document = state.routeDocuments.find((entry) => entry.path === path);
+		const document = documentAt(path);
 		if (!document) return;
 		const routeKey = `${path}:${routeId}`;
 		const selection = getSelection();
@@ -75,7 +114,7 @@ export function createCragRouteTool({
 		const isDraftForRoute =
 			draft?.documentPath === path && String(draft.routeId) === String(routeId);
 		if (isDraftForRoute) cancelTrackEdit();
-		state.updateRouteDocument(path, (data) => {
+		updateDocument(path, (data) => {
 			data.routes = (data.routes || []).filter((route) => String(route.id) !== String(routeId));
 		});
 		if (isSelectedRoute || isDraftForRoute) selectObject(null);
@@ -86,7 +125,7 @@ export function createCragRouteTool({
 	}
 
 	function updateRoute(path, routeId, field, value) {
-		const document = state.routeDocuments.find((entry) => entry.path === path);
+		const document = documentAt(path);
 		if (!document?.data.routes?.some((entry) => entry.id === routeId)) return;
 		state.updateRoute(path, routeId, (current) => {
 			current[field] = value;
@@ -94,7 +133,7 @@ export function createCragRouteTool({
 	}
 
 	function updateRoutePaths(path, routeId, update) {
-		const document = state.routeDocuments.find((entry) => entry.path === path);
+		const document = documentAt(path);
 		if (!document?.data.routes?.some((entry) => entry.id === routeId)) return;
 		state.updateRoute(path, routeId, (current) => {
 			current.pathRefs = update(current.pathRefs || []);
@@ -102,14 +141,14 @@ export function createCragRouteTool({
 	}
 
 	function addRoutePath(path, routeId) {
-		const document = state.routeDocuments.find((entry) => entry.path === path);
-		if (!document) return;
+		const document = documentAt(path);
+		if (!document?.data.routes?.some((route) => String(route.id) === String(routeId))) return;
 		let pathId;
 		do {
 			pathId = generateId('path');
 		} while (document.data.paths.features.some((feature) => String(feature.id) === pathId));
 		const pathIndex = document.data.paths.features.length;
-		state.updateRouteDocument(path, (data) => {
+		updateDocument(path, (data) => {
 			data.paths = data.paths || { type: 'FeatureCollection', features: [] };
 			data.paths.features = [
 				...data.paths.features,
@@ -120,53 +159,65 @@ export function createCragRouteTool({
 					geometry: { type: 'LineString', coordinates: [] }
 				}
 			];
+			const route = data.routes.find((item) => String(item.id) === String(routeId));
+			route.pathRefs = [...(route.pathRefs || []), { pathId, role: 'main' }];
 		});
-		updateRoutePaths(path, routeId, (refs) => [...refs, { pathId, role: 'main' }]);
 		startRouteDraft({ documentPath: path, routeId, pathId, pathIndex });
 		startRoutingDraft();
 	}
 
 	function assignExistingRoutePath(path, routeId, pathId, role = 'main', label = '') {
-		const document = state.routeDocuments.find((entry) => entry.path === path);
+		const document = documentAt(path);
 		if (!document || !findTopoPath(document.data, pathId)) return false;
-		const assigned = assignTopoPath(document.data, routeId, pathId, { role, label });
-		if (assigned) state.markDocumentDirty(path);
+		let assigned = false;
+		state.commit('Assign route path', () => {
+			assigned = assignTopoPath(document.data, routeId, pathId, { role, label });
+			if (assigned) markDirty(path);
+		});
 		return assigned;
 	}
 
 	function createRoutePathFromAccess(documentPath, routeId, accessFeatureId) {
-		const document = state.routeDocuments.find((entry) => entry.path === documentPath);
-		const access = state.access.features.find(
+		const document = documentAt(documentPath);
+		const access = (state.getWorkspaceAccess()?.features || []).find(
 			(feature) => feature.id === accessFeatureId && feature.properties?.kind === 'approach'
 		);
 		if (!document || !access?.geometry?.coordinates?.length) return false;
-		document.data.paths = document.data.paths || { type: 'FeatureCollection', features: [] };
 		let pathId;
 		do {
 			pathId = generateId('path');
-		} while (document.data.paths.features.some((feature) => String(feature.id) === pathId));
-		document.data.paths.features = [
-			...document.data.paths.features,
-			createPathFeature(
-				access.geometry.coordinates,
-				{ name: access.properties?.name || 'Copied access path' },
-				pathId
-			)
-		];
-		assignTopoPath(document.data, routeId, pathId, {
-			role: 'approach',
-			label: access.properties?.name || ''
+		} while (document.data.paths?.features?.some((feature) => String(feature.id) === pathId));
+		updateDocument(documentPath, (data) => {
+			data.paths = data.paths || { type: 'FeatureCollection', features: [] };
+			data.paths.features = [
+				...data.paths.features,
+				createPathFeature(
+					access.geometry.coordinates,
+					{ name: access.properties?.name || 'Copied access path' },
+					pathId
+				)
+			];
+			assignTopoPath(data, routeId, pathId, {
+				role: 'approach',
+				label: access.properties?.name || ''
+			});
 		});
-		state.markDocumentDirty(documentPath);
 		return true;
 	}
 
 	function moveApproachTrackToTopoPaths(documentPath, accessFeatureId) {
-		const document = state.routeDocuments.find((entry) => entry.path === documentPath);
-		const access = state.access.features.find(
+		const document = documentAt(documentPath);
+		const accessNode = state.getActiveWorkspaceEntry();
+		const accessDocument = state.getWorkspaceAccess();
+		const access = (accessDocument?.features || []).find(
 			(feature) => feature.id === accessFeatureId && feature.properties?.kind === 'approach'
 		);
-		if (!document || !access?.geometry?.coordinates || access.geometry.coordinates.length < 2)
+		if (
+			!document ||
+			!accessNode?.entry ||
+			!access?.geometry?.coordinates ||
+			access.geometry.coordinates.length < 2
+		)
 			return false;
 
 		let pathId;
@@ -184,11 +235,14 @@ export function createCragRouteTool({
 					pathId
 				)
 			];
-			document.dirty = true;
-			state.access = {
-				...state.access,
-				features: state.access.features.filter((feature) => feature.id !== accessFeatureId)
-			};
+			markDirty(documentPath);
+			accessDocument.features = accessDocument.features.filter(
+				(feature) => feature.id !== accessFeatureId
+			);
+			state.markWorkspaceDirty(
+				workspaceNodeDocumentPaths(accessNode).access,
+				state.getWorkspaceEntryPath(accessNode)
+			);
 		});
 		const selection = getSelection();
 		if (selection?.type === 'approach' && selection.id === accessFeatureId) {
@@ -205,17 +259,17 @@ export function createCragRouteTool({
 	}
 
 	function saveRoutePathCoordinates({ documentPath, pathId, pathIndex }, coordinates) {
-		const document = state.routeDocuments.find((entry) => entry.path === documentPath);
+		const document = documentAt(documentPath);
 		const feature = findPathFeature(document, pathId, pathIndex);
 		if (!feature) return false;
-		state.updateRouteDocument(documentPath, () => {
+		updateDocument(documentPath, () => {
 			feature.geometry = { type: 'LineString', coordinates };
 		});
 		return true;
 	}
 
 	function editRoutePath(path, routeId, pathId, pathIndex = null) {
-		const document = state.routeDocuments.find((entry) => entry.path === path);
+		const document = documentAt(path);
 		const feature = findPathFeature(
 			document,
 			pathId,
@@ -229,7 +283,7 @@ export function createCragRouteTool({
 	}
 
 	function duplicateRoutePath(path, _routeId, pathId) {
-		const document = state.routeDocuments.find((entry) => entry.path === path);
+		const document = documentAt(path);
 		const feature = document ? findTopoPath(document.data, pathId) : null;
 		if (!document || !feature) return false;
 		let duplicatePathId;
@@ -244,7 +298,7 @@ export function createCragRouteTool({
 				? `${duplicateFeature.properties.name} copy`
 				: 'Route path copy'
 		};
-		state.updateRouteDocument(path, (data) => {
+		updateDocument(path, (data) => {
 			data.paths = data.paths || { type: 'FeatureCollection', features: [] };
 			data.paths.features = [...data.paths.features, duplicateFeature];
 		});
@@ -258,14 +312,16 @@ export function createCragRouteTool({
 		mode = 'shared'
 	) {
 		if (startCoordinates.length < 2 || endCoordinates.length < 2) return false;
-		const document = state.routeDocuments.find((entry) => entry.path === documentPath);
+		const document = documentAt(documentPath);
 		if (!document || !findTopoPath(document.data, pathId)) return false;
-		if (
-			!splitTopoPath(document.data, pathId, startCoordinates, endCoordinates, { mode, routeId })
-				.length
-		)
-			return false;
-		state.markDocumentDirty(documentPath);
+		let split = false;
+		state.commit('Split route path', () => {
+			split =
+				splitTopoPath(document.data, pathId, startCoordinates, endCoordinates, { mode, routeId })
+					.length > 0;
+			if (split) markDirty(documentPath);
+		});
+		if (!split) return false;
 		cancelTrackEdit();
 		setActiveTool('geometry');
 		return true;
@@ -308,7 +364,7 @@ export function createCragRouteTool({
 		basePathIndex = null,
 		appendPathIndex = null
 	) {
-		const document = state.routeDocuments.find((entry) => entry.path === path);
+		const document = documentAt(path);
 		const features = document?.data.paths?.features || [];
 		const baseIndex = Number.isInteger(basePathIndex)
 			? basePathIndex
@@ -331,7 +387,7 @@ export function createCragRouteTool({
 		)
 			return false;
 
-		state.updateRouteDocument(path, (data) => {
+		updateDocument(path, (data) => {
 			base.geometry = {
 				type: 'LineString',
 				coordinates: orientConcatCoordinates(base.geometry.coordinates, append.geometry.coordinates)
@@ -369,10 +425,10 @@ export function createCragRouteTool({
 	}
 
 	function updateRoutePathFeature(path, pathId, field, value) {
-		const document = state.routeDocuments.find((entry) => entry.path === path);
+		const document = documentAt(path);
 		const feature = document ? findTopoPath(document.data, pathId) : null;
 		if (!document || !feature) return false;
-		state.updateRouteDocument(path, () => {
+		updateDocument(path, () => {
 			feature.properties = { ...(feature.properties || {}) };
 			if (value == null || value === '') delete feature.properties[field];
 			else feature.properties[field] = value;
@@ -387,56 +443,31 @@ export function createCragRouteTool({
 	}
 
 	function deleteRoutePath(path, pathId, pathIndex = null) {
-		const document = state.routeDocuments.find((entry) => entry.path === path);
+		const document = documentAt(path);
 		const features = document?.data.paths?.features || [];
 		const resolvedIndex = Number.isInteger(pathIndex)
 			? pathIndex
 			: features.findIndex((item) => String(item.id) === String(pathId));
 		const feature = features[resolvedIndex];
 		if (!document || !feature || String(feature.id) !== String(pathId)) return false;
-		const routeRefs = (document.data.routes || [])
-			.filter((route) =>
-				(route.pathRefs || []).some((ref) => String(ref.pathId) === String(pathId))
-			)
-			.map((route) => ({ id: route.id, pathRefs: JSON.parse(JSON.stringify(route.pathRefs)) }));
-		features.splice(resolvedIndex, 1);
-		const hasSameId = features.some((item) => String(item.id) === String(pathId));
-		if (!hasSameId) {
-			for (const route of document.data.routes || [])
+		updateDocument(path, (data) => {
+			data.paths.features.splice(resolvedIndex, 1);
+			if (data.paths.features.some((item) => String(item.id) === String(pathId))) return;
+			for (const route of data.routes || [])
 				route.pathRefs = (route.pathRefs || []).filter(
 					(ref) => String(ref.pathId) !== String(pathId)
 				);
-		}
-		const deleted = true;
-		if (deleted) {
-			deletedRoutePathUndo = { path, feature: JSON.parse(JSON.stringify(feature)), routeRefs };
-			document.dirty = true;
-			const draft = getRouteDraft();
-			const selection = getSelection();
-			if (draft?.pathId === pathId && draft?.documentPath === path) cancelTrackEdit();
-			if (
-				selection?.type === 'route-path' &&
-				selection.documentPath === path &&
-				String(selection.pathId) === String(pathId) &&
-				(selection.pathIndex == null || Number(selection.pathIndex) === resolvedIndex)
-			)
-				selectObject(null);
-		}
-		return deleted;
-	}
-
-	function undoDeleteRoutePath() {
-		const undo = deletedRoutePathUndo;
-		if (!undo) return false;
-		const document = state.routeDocuments.find((entry) => entry.path === undo.path);
-		if (!document || findTopoPath(document.data, undo.feature.id)) return false;
-		document.data.paths.features = [...(document.data.paths?.features || []), undo.feature];
-		for (const savedRoute of undo.routeRefs) {
-			const route = document.data.routes?.find((item) => String(item.id) === String(savedRoute.id));
-			if (route) route.pathRefs = savedRoute.pathRefs;
-		}
-		document.dirty = true;
-		deletedRoutePathUndo = null;
+		});
+		const draft = getRouteDraft();
+		const selection = getSelection();
+		if (draft?.pathId === pathId && draft?.documentPath === path) cancelTrackEdit();
+		if (
+			selection?.type === 'route-path' &&
+			selection.documentPath === path &&
+			String(selection.pathId) === String(pathId) &&
+			(selection.pathIndex == null || Number(selection.pathIndex) === resolvedIndex)
+		)
+			selectObject(null);
 		return true;
 	}
 
@@ -457,7 +488,6 @@ export function createCragRouteTool({
 		updateRoutePath,
 		updateRoutePathFeature,
 		removeRoutePath,
-		deleteRoutePath,
-		undoDeleteRoutePath
+		deleteRoutePath
 	};
 }

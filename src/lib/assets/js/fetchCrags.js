@@ -1,8 +1,7 @@
 import { cragsPerPage } from '$lib/config';
 import { listDir, readJson } from '$lib/api/felslager.ts';
-import { normalizeAccessCollection } from '$lib/assets/js/access-geojson.js';
 
-/** @typedef {import('@vorstieg/fels-data/types').CragFeature} CragFeature */
+/** @typedef {import('@vorstieg/fels-types/types').FelsEntry} FelsEntry */
 
 function isEntryJsonFile(file) {
 	if (file.type !== 'file') return false;
@@ -11,11 +10,14 @@ function isEntryJsonFile(file) {
 	const name = file.name.toLowerCase();
 	if (name.includes('-transit')) return false;
 	if (name.includes('-parking')) return false;
+	if (name.endsWith('-access.json')) return false;
 	return !name.includes('-topo');
 }
 
 function getEntryPathFromFile(filePath) {
-	const parts = String(filePath || '').split('/').filter(Boolean);
+	const parts = String(filePath || '')
+		.split('/')
+		.filter(Boolean);
 	const filename = parts.pop() || '';
 	const id = filename.replace(/\.json$/i, '');
 	if (!id) return '';
@@ -28,17 +30,10 @@ function filterAndPaginateCrags(crags, { offset = 0, limit = cragsPerPage, searc
 	if (search) {
 		const query = search.toLowerCase();
 		filteredCrags = filteredCrags.filter((crag) => {
-			const sectors = crag.properties?.sectors ?? [];
 			return (
 				(crag.properties?.name ?? '').toLowerCase().includes(query) ||
 				(crag.properties?.type?.includes(search) ?? false) ||
-				(crag.entryPath ?? '').toLowerCase().includes(query) ||
-				sectors.some(
-					(sector) =>
-						(sector.name || '').toLowerCase().includes(query) ||
-						(sector.id || '').toLowerCase().includes(query) ||
-						(sector.type || []).includes(search)
-				)
+				(crag.entryPath ?? '').toLowerCase().includes(query)
 			);
 		});
 	}
@@ -64,8 +59,7 @@ function manifestEntryToCragFeature(entry) {
 			name: entry.name,
 			kind: entry.kind,
 			type: entry.type || [],
-			hash: entry.hash,
-			sectors: entry.sectors || []
+			hash: entry.hash
 		}
 	};
 }
@@ -73,9 +67,7 @@ function manifestEntryToCragFeature(entry) {
 export const fetchCragsFromManifest = async (options = {}) => {
 	const manifest = await readJson('manifest.json');
 	const entries = Array.isArray(manifest) ? manifest : [];
-	const crags = entries
-		.filter((entry) => entry.kind !== 'sector')
-		.map((entry) => manifestEntryToCragFeature(entry));
+	const crags = entries.map((entry) => manifestEntryToCragFeature(entry));
 
 	return filterAndPaginateCrags(crags, options);
 };
@@ -88,10 +80,8 @@ const fetchCrags = async ({ offset = 0, limit = cragsPerPage, search = '' } = {}
 		await Promise.all(
 			entryFiles.map(async (file) => {
 				try {
-					const data = await /** @type {Promise<CragFeature>} */ (readJson(file.path));
+					const data = await /** @type {Promise<FelsEntry>} */ (readJson(file.path));
 					data.properties = data.properties || {};
-					if (data.properties.kind === 'sector') return null;
-
 					data.properties.id = file.name.slice(0, -'.json'.length);
 					data.entryPath = getEntryPathFromFile(file.path);
 					return data;
@@ -108,14 +98,5 @@ const fetchCrags = async ({ offset = 0, limit = cragsPerPage, search = '' } = {}
 	);
 	return filterAndPaginateCrags(sortedCrags, { offset, limit, search });
 };
-
-export async function loadAccessCollection(topo, cragEditorState) {
-	try {
-		const data = await readJson(topo.getAccessPath());
-		cragEditorState.access = normalizeAccessCollection(data);
-	} catch {
-		cragEditorState.access = normalizeAccessCollection(null);
-	}
-}
 
 export default fetchCrags;

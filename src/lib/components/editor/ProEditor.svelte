@@ -30,7 +30,6 @@
 	import ToolPalette3D from '$lib/components/editor/3d/ToolPalette3D.svelte';
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
 	import { fixpointSymbols } from '@vorstieg/topo-renderer';
-	import { page } from '$app/state';
 	import {
 		loadTopoEditorEntry,
 		persistTopoSessionImmediately
@@ -40,7 +39,6 @@
 
 	let { workspace = '3d-create', entryPath = null, children } = $props();
 	const initialEntryPath = untrack(() => entryPath);
-	const initialSectorId = untrack(() => page.url.searchParams.get('sector'));
 	const topoSession = provideTopo2DEditorState(createTopo2DEditorState());
 	let saveStatus = $state('idle');
 	let saveError = $state('');
@@ -90,8 +88,11 @@
 
 	let element = $state();
 	let loadedGltfScene = $state(null);
+	let isLoadingGltf = $state(false);
+	let gltfError = $state('');
 
 	let showMapModal = $state(false);
+	let isMobile = $state(false);
 
 	// --- Camera Focus Logic (Svelte Native Animation) ---
 	const cameraPosStore = tweened([0, 1, 5], {
@@ -203,7 +204,6 @@
 		loadEntrySession: async () => {
 			const { loadedTopo } = await loadTopoEditorEntry({
 				entryPath: initialEntryPath,
-				sectorId: initialSectorId,
 				workspace: '/topos/3d/editor',
 				topoSession: topoSession
 			});
@@ -231,7 +231,6 @@
 		onInitialized: () => {
 			initializeIdCounters(topoSession.topo);
 			activeTool = getInitialActiveTool();
-			modelPositionOffset = topoSession.topo.modelOffset;
 			if (topoSession.transient.modelUrl) loadGlbFromUrl(topoSession.transient.modelUrl);
 		},
 		getSaveSignature: () =>

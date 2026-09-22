@@ -34,7 +34,7 @@ export function createCragSelectTool({
 			({ properties }) => properties?.feature === 'route-path' || properties?.kind === 'approach'
 		);
 		if (pathFeature || pathsOnly) return pathFeature;
-		return features.find(({ properties }) => properties?.feature === 'sector') || features[0];
+		return features.find(({ properties }) => properties?.feature === 'child-entry') || features[0];
 	}
 
 	function routeForPath(documentPath, pathId) {
@@ -67,8 +67,8 @@ export function createCragSelectTool({
 			if (editPath) onEditTrack?.(properties.accessFeatureId);
 			return true;
 		}
-		if (properties.feature === 'sector' && properties.id) {
-			selectObject({ type: 'sector', id: properties.id });
+		if (properties.feature === 'child-entry' && properties.path) {
+			selectObject({ type: 'entry', key: properties.path });
 			setActiveTab?.('info');
 			return true;
 		}

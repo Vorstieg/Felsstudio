@@ -15,7 +15,10 @@
 	} = routeTool;
 	const { setHoverHighlight: onSetHoverHighlight, clearDetectedAssets: onClearDetectedAssets, addDetectedAsset: onAddDetectedAsset, removeAccessFeature: onRemoveAccessFeature } = accessEditor;
 	const { editTrack: onEditTrack, removeTrack: onRemoveTrack, finalizeTrack: onFinalizeTrack, cancelTrackEdit: onCancelTrackEdit } = trackEditor;
-	let routeDocuments = $derived(cragEditorState.routeDocuments);
+	let activeWorkspace = $derived(cragEditorState.getActiveWorkspaceEntry());
+	let topoEntries = $derived.by(() => [activeWorkspace, ...(activeWorkspace?.childEntries || [])].flatMap((node) =>
+		node?.entry?.properties.id && node.topo ? [{ path: `${node.path}/${node.entry.properties.id}/${node.entry.properties.id}-topo.json`, data: node.topo }] : []
+	));
 
 	let {
 		detectedAssets = [],
@@ -24,7 +27,7 @@
 		activeTrackTarget = null,
 		selectedObject = $bindable(null)
 	} = $props();
-	let accessFeatures = $derived(cragEditorState.access?.features || []);
+	let accessFeatures = $derived(activeWorkspace?.access?.features || []);
 	let transitFeatures = $derived(
 		accessFeatures.filter((feature) => feature.properties?.kind === 'transit')
 	);
@@ -41,7 +44,7 @@
 		accessFeatures.filter((feature) => feature.properties?.kind !== 'approach')
 	);
 	let topoPathCount = $derived(
-		routeDocuments.reduce(
+		topoEntries.reduce(
 			(count, document) => count + (document.data?.paths?.features?.length || 0),
 			0
 		)
@@ -304,14 +307,14 @@
 				class="input-studio w-full"
 				placeholder="Track Name"
 			/>
-			{#if routeDocuments.length > 0}
+			{#if topoEntries.length > 0}
 				<select
 					class="input-studio w-full"
 					aria-label="Move approach track to topo paths"
 					onchange={(event) => moveApproachTrack(event, track)}
 				>
 					<option value="" selected>Move to topo paths…</option>
-					{#each routeDocuments as document}
+					{#each topoEntries as document}
 						<option value={document.path}>{document.path.split('/').at(-1)}</option>
 					{/each}
 				</select>
@@ -329,7 +332,7 @@
 				</div>
 			</div>
 		</div>
-		{#each routeDocuments as document}
+		{#each topoEntries as document}
 			<div class="space-y-2 rounded-sm border border-black/10 bg-white p-2.5 shadow-sm">
 				<div class="flex items-center justify-between gap-2 border-b border-black/5 pb-2">
 					<div class="min-w-0">
@@ -366,11 +369,12 @@
 								placeholder="Unnamed path"
 								aria-label="Path name"
 								onchange={(event) => {
-									feature.properties = {
-										...(feature.properties || {}),
-										name: event.currentTarget.value
-									};
-									document.dirty = true;
+									onUpdateRoutePathFeature(
+										document.path,
+										feature.id,
+										'name',
+										event.currentTarget.value
+									);
 								}}
 							/>
 							<span

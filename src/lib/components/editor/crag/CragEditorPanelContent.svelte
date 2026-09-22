@@ -25,10 +25,10 @@
 			<i class="fa-solid fa-circle-info mr-1.5"></i> Metadata
 		</button>
 		<button class="flex-1 px-2 py-1.5 rounded-sm text-ui-label transition-none {activeTab === 'registry' ? 'bg-white shadow-sm text-near-black' : 'text-warm-gray-500 hover:bg-black/5'}" onclick={() => activeTab = 'registry'}>
-			<i class="fa-solid fa-layer-group mr-1.5"></i> Registry <span class="ml-1 text-micro-data">{cragEditorState.access?.features?.length || 0}</span>
+			<i class="fa-solid fa-layer-group mr-1.5"></i> Registry <span class="ml-1 text-micro-data">{cragEditorState.getWorkspaceAccess()?.features?.length || 0}</span>
 		</button>
 		<button class="flex-1 px-2 py-1.5 rounded-sm text-ui-label transition-none {activeTab === 'sectors' ? 'bg-white shadow-sm text-near-black' : 'text-warm-gray-500 hover:bg-black/5'}" onclick={() => activeTab = 'sectors'}>
-			<i class="fa-solid fa-table-cells-large mr-1.5"></i> Sectors <span class="ml-1 text-micro-data">{cragEditorState.crag.sectors?.length || 0}</span>
+			<i class="fa-solid fa-table-cells-large mr-1.5"></i> Children <span class="ml-1 text-micro-data">{cragEditorState.getActiveSectors().length}</span>
 		</button>
 	</div>
 {/if}

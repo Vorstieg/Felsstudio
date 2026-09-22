@@ -16,19 +16,9 @@
 		locations.filter((l) => {
 			const query = searchQuery.toLowerCase();
 			if (query === '') return true;
-
-			const sectors = l.properties?.sectors ?? [];
-			const sectorMatch = sectors.some(
-				(sector) =>
-					(sector.name || '').toLowerCase().includes(query) ||
-					(sector.id || '').toLowerCase().includes(query) ||
-					(sector.type || []).includes(searchQuery)
-			);
-
 			return (
 				(l.properties?.name ?? '').toLowerCase().includes(query) ||
-				getCragEntryPath(l).toLowerCase().includes(query) ||
-				sectorMatch
+				getCragEntryPath(l).toLowerCase().includes(query)
 			);
 		})
 	);
@@ -58,12 +48,13 @@
 		isTopoWorkspace() {
 			return this.is2DEditor() || this.is3DEditor();
 		}
+
 	}
 
-	function loadFromEntry(crag, sector = null) {
+	function loadFromEntry(crag) {
 		const path = workSpaceWrapper.isCragEditor()
 			? getCragEditorPath(crag)
-			: getTopoEditorPath(workSpaceWrapper.path, crag, sector);
+			: getTopoEditorPath(workSpaceWrapper.path, crag);
 		goto(resolve(path));
 	}
 </script>

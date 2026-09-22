@@ -1,4 +1,4 @@
-import type { Point2D } from '@vorstieg/fels-data/types';
+import type { Point2D } from '@vorstieg/fels-types/types';
 
 export type SelectionId = string | number;
 

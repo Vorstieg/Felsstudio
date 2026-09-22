@@ -137,5 +137,9 @@ export async function renameFile(oldPath: string, newPath: string): Promise<Resp
 }
 
 export function fileUrl(path: string): string {
-	return `${BASE_URL}/${normalizePath(path)}`;
+	const encodedPath = normalizePath(path)
+		.split('/')
+		.map((segment) => encodeURIComponent(segment))
+		.join('/');
+	return `${BASE_URL}/${encodedPath}`;
 }

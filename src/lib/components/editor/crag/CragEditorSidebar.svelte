@@ -15,9 +15,9 @@
 			id: 'registry',
 			label: 'Registry',
 			icon: 'fa-layer-group',
-			count: (cragEditorState.access?.features || []).length
+			count: (cragEditorState.getWorkspaceAccess()?.features || []).length
 		},
-		{ id: 'sectors', label: 'Sectors', icon: 'fa-table-cells-large', count: cragEditorState.crag.sectors?.length || 0 }
+		{ id: 'sectors', label: 'Children', icon: 'fa-table-cells-large', count: cragEditorState.getActiveSectors().length }
 	]);
 </script>
 

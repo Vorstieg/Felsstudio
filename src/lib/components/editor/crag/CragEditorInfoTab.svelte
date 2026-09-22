@@ -17,41 +17,43 @@
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
 	import { fileUrl } from '$lib/api/felslager.ts';
 	import CragHierarchyPlacement from './CragHierarchyPlacement.svelte';
-	import { HIERARCHY_KINDS } from '$lib/state/crag-session.svelte.ts';
+	const HIERARCHY_KINDS = ['country', 'region', 'area', 'crag', 'sector'];
 	import { getHierarchySourceRefs } from '$lib/assets/js/load-crag-editor-entry.ts';
 
 	let {
 		saveStatus = 'idle'
 	} = $props();
-	let metadata = $derived(cragEditorState.getMetadataTarget() || cragEditorState.crag);
-	let activeEntry = $derived(cragEditorState.activeMetadataTarget?.type === 'entry'
-		? cragEditorState.hierarchyEntries.find((entry) => entry.key === cragEditorState.activeMetadataTarget.key)
-		: null);
-	let isCurrentEntry = $derived(activeEntry?.isCurrent === true || cragEditorState.hierarchyEntries.length === 0);
-	let isSector = $derived(cragEditorState.activeMetadataTarget?.type === 'sector');
-	let validationEntry = $derived(activeEntry || (isSector ? cragEditorState.hierarchyEntries.find((entry) => entry.isCurrent) : null));
-	let hierarchyError = $derived(validationEntry
-		? cragEditorState.hierarchyErrors.find((error) => error.key === validationEntry.key)
-		: null);
-	// Build crumbs from the complete current folder path. The loader supplies a
-	// clean editable entry for folders that do not yet have a crag.json.
+	let activeEntry = $derived(cragEditorState.getWorkspaceEntry(cragEditorState.activeMetadataTarget));
+	let metadata = $derived(cragEditorState.getMetadataTarget() || cragEditorState.getActiveEntry()?.properties || {});
+	let isCurrentEntry = $derived(activeEntry === cragEditorState.getActiveWorkspaceEntry());
+	let hierarchyError = $derived(
+		cragEditorState.identityError ||
+		cragEditorState.hierarchyErrors.find(
+			(error) => error.key === cragEditorState.activeMetadataTarget
+		) ||
+		null
+	);
 	let breadcrumbs = $derived.by(() => {
-		const entryPath = [cragEditorState.crag.path, cragEditorState.crag.id]
-			.filter(Boolean)
-			.join('/');
-		return getHierarchySourceRefs(entryPath).map((source) => {
-			const key = [source.path, source.id].filter(Boolean).join('/');
-			return {
-				key,
-				source,
-				entry: cragEditorState.hierarchyEntries.find((entry) => entry.key === key) || null
-			};
-		});
+		const entryPath =
+			cragEditorState.activeMetadataTarget || cragEditorState.activeWorkspaceEntryPath || '';
+		return getHierarchySourceRefs(entryPath)
+			.map((source) => {
+				const key = [source.path, source.id].filter(Boolean).join('/');
+				return { key, source, entry: cragEditorState.getWorkspaceEntry(key) };
+			});
 	});
-	let pendingCragImageCount = $derived((metadata.assets?.images || []).filter((image) => image?._file).length);
+	let pendingCragImages = $derived(activeEntry?.pendingImages || []);
+	let pendingCragImageCount = $derived(pendingCragImages.filter(Boolean).length);
 
 	function selectEntry(entry) {
-		selectMetadataTarget({ type: 'entry', key: entry.key });
+		selectMetadataTarget(cragEditorState.getWorkspaceEntryPath(entry));
+	}
+
+	function selectBreadcrumb(breadcrumb) {
+		const entry =
+			breadcrumb.entry || cragEditorState.getWorkspaceEntry(breadcrumb.key);
+		if (!entry) return;
+		selectEntry(entry);
 	}
 
 	function handleCragImageInput(event) {
@@ -60,13 +62,13 @@
 	}
 
 	function getImageSrc(image) {
-		const src = image?.previewUrl || image?.path;
+		const src = pendingCragImages.find((pending) => pending?.path === image?.path)?.previewUrl || image?.path;
 		if (!src) return '';
 		return /^(blob:|data:|https?:\/\/)/i.test(src) ? src : fileUrl(src);
 	}
 
 	function getImageStatus(image) {
-		if (!image?._file) return {
+		if (!pendingCragImages.some((pending) => pending?.path === image?.path)) return {
 			icon: 'fa-cloud-check',
 			label: 'Saved',
 			classes: 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -84,20 +86,13 @@
 	<nav class="flex flex-wrap items-center gap-1 rounded-sm border border-black/10 bg-black/[0.03] p-2" aria-label="Metadata hierarchy">
 		{#each breadcrumbs as breadcrumb, i}
 			{#if i > 0}<i class="fa-solid fa-chevron-right text-[9px] text-warm-gray-300"></i>{/if}
-			{#if breadcrumb.entry}
-				<button type="button" onclick={() => selectEntry(breadcrumb.entry)}
-					class="rounded-sm px-1.5 py-1 text-micro-data {activeEntry?.key === breadcrumb.entry.key ? 'bg-white font-bold text-creator-blue shadow-sm' : 'text-warm-gray-500 hover:bg-white'}">
-					{breadcrumb.entry.feature.name || breadcrumb.entry.feature.id} <span class="opacity-60">({breadcrumb.entry.feature.kind})</span>
-				</button>
-			{:else}
-				<span class="rounded-sm px-1.5 py-1 text-micro-data text-warm-gray-400">
-					{breadcrumb.source.id}
-				</span>
-			{/if}
+			<button type="button" onclick={() => selectBreadcrumb(breadcrumb)}
+				class="rounded-sm px-1.5 py-1 text-micro-data {activeEntry === breadcrumb.entry ? 'bg-white font-bold text-creator-blue shadow-sm' : 'text-warm-gray-500 hover:bg-white'}">
+				{breadcrumb.entry?.entry?.properties.name || breadcrumb.entry?.entry?.properties.id || breadcrumb.source.id} <span class="opacity-60">({breadcrumb.entry?.entry?.properties.kind || 'area'})</span>
+			</button>
 		{/each}
-		{#if isSector}
-			{#if breadcrumbs.length}<i class="fa-solid fa-chevron-right text-[9px] text-warm-gray-300"></i>{/if}
-			<span class="rounded-sm bg-white px-1.5 py-1 text-micro-data font-bold text-creator-blue shadow-sm">{metadata.name || metadata.id} ({metadata.kind})</span>
+		{#if isCurrentEntry}
+			<CragHierarchyPlacement compact />
 		{/if}
 	</nav>
 	<div class="space-y-3">
@@ -117,14 +112,17 @@
 				</select>
 			</div>
 			<div class="space-y-0.5"><label for="metadata-id" class="text-ui-label block">ID</label>
-				<input id="metadata-id" value={metadata.id} readonly={!isCurrentEntry && !isSector}
-					oninput={(event) => setActiveMetadataId(event.currentTarget.value)}
+				<input id="metadata-id" value={metadata.id} readonly={!isCurrentEntry}
+					onchange={(event) => {
+						setActiveMetadataId(event.currentTarget.value);
+						event.currentTarget.value = cragEditorState.getMetadataTarget()?.id || '';
+					}}
 					class="input-studio w-full font-mono read-only:bg-black/5 read-only:text-warm-gray-400" />
 			</div>
 		</div>
 		{#if hierarchyError}<p class="rounded-sm border border-rose-200 bg-rose-50 p-2 text-micro-data font-bold text-rose-700">{hierarchyError.message}</p>{/if}
-		{#if isCurrentEntry}<CragHierarchyPlacement />{:else if activeEntry}
-			<div class="rounded-sm border border-black/10 bg-black/[0.03] p-2 text-micro-data text-warm-gray-500">Source: <span class="font-mono">{activeEntry.source.path}/{activeEntry.source.id}</span> (read-only)</div>
+		{#if !isCurrentEntry && activeEntry}
+			<div class="rounded-sm border border-black/10 bg-black/[0.03] p-2 text-micro-data text-warm-gray-500">Source: <span class="font-mono">{cragEditorState.getWorkspaceEntryPath(activeEntry)}</span> (read-only)</div>
 		{/if}
 		<div class="grid grid-cols-2 gap-2">
 			<div class="space-y-0.5">
@@ -189,14 +187,14 @@
 			<div class="flex justify-between items-center">
 				<div><p class="text-ui-label !m-0">Pictures</p>
 					{#if pendingCragImageCount > 0}<p class="text-micro-data text-amber-700 !m-0">{pendingCragImageCount}
-						picture{pendingCragImageCount === 1 ? '' : 's'} ready to upload. Press Save to publish.</p>{/if}
+						picture{pendingCragImageCount === 1 ? '' : 's'} ready to upload. Press Save before leaving or reloading; draft storage cannot keep image files.</p>{/if}
 				</div>
 				<label class="text-ui-label text-creator-blue hover:text-creator-blue-active cursor-pointer">+ Add<input
 					type="file" accept="image/*" multiple class="hidden" onchange={handleCragImageInput} /></label></div>
-			{#if (metadata.assets?.images || []).length === 0}<p class="text-micro-data text-warm-gray-400">No
+			{#if (activeEntry?.images || []).length === 0}<p class="text-micro-data text-warm-gray-400">No
 				pictures added.</p>{:else}
 				<div class="grid grid-cols-2 gap-2">
-					{#each metadata.assets?.images || [] as image, i}{@const imageStatus = getImageStatus(image)}
+					{#each activeEntry?.images || [] as image, i}{@const imageStatus = getImageStatus(image)}
 						<div class="relative rounded-sm border border-black/15 bg-white p-1 shadow-sm">
 							{#if getImageSrc(image)}<img src={getImageSrc(image)} alt={image.name || 'Crag picture'}
 							                             class="h-20 w-full rounded-sm object-cover" />{/if}

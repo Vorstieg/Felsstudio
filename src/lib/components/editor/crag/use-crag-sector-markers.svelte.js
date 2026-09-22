@@ -9,17 +9,20 @@ export function useCragSectorMarkers({ state, getMap, getSelection, selectObject
 		if (!map) return;
 		for (const item of markers) item.remove();
 		markers = [];
-		for (const sector of state.crag.sectors || []) {
-			const coordinates = getGeometryCenter(sector.geometry);
+		for (const node of state.getActiveSectors()) {
+			const sector = node.entry?.properties;
+			if (!sector) continue;
+			const coordinates = getGeometryCenter(node.entry?.geometry);
 			if (!coordinates) continue;
 			const element = document.createElement('button');
 			element.type = 'button';
-			element.className = `sector-marker ${getSelection()?.type === 'sector' && getSelection().id === sector.id ? 'is-selected' : ''}`;
+			const path = state.getWorkspaceEntryPath(node);
+			element.className = `sector-marker ${getSelection()?.type === 'entry' && getSelection().key === path ? 'is-selected' : ''}`;
 			element.title = sector.name || sector.id || 'Sector';
 			element.innerHTML = `<span>${sector.id || 'S'}</span>`;
 			element.addEventListener('click', (event) => {
 				event.stopPropagation();
-				selectObject({ type: 'sector', id: sector.id });
+				selectObject({ type: 'entry', key: path });
 				setActiveTab('info');
 			});
 			markers.push(

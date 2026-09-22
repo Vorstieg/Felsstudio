@@ -11,14 +11,14 @@
 	let { open = true, onClose = null } = $props();
 	const cragEditorState = getCragEditorSession();
 	const { geometryEditor } = getCragEditorTools();
-	let metadata = $derived(cragEditorState.getMetadataTarget() || cragEditorState.crag);
+	let metadata = $derived(cragEditorState.getMetadataTarget() || cragEditorState.getActiveEntry()?.properties || {});
 	let geometryCenter = $derived(getGeometryCenter(metadata.geometry) || [0, 0]);
 	let selectedGeometryVertex = $derived(geometryEditor.selectedVertex);
 
 	function setGeometryType(type) {
 		const center =
 			getGeometryCenter(metadata.geometry) ||
-			getGeometryCenter(cragEditorState.crag.geometry) ||
+			getGeometryCenter(cragEditorState.getActiveEntry()?.geometry) ||
 			[0, 0];
 		cragEditorState.commitGeometry(
 			cragEditorState.activeMetadataTarget,
@@ -46,9 +46,7 @@
 <ToolOptions title="Edit Geometry" {open} {onClose}>
 	<div class="rounded-sm border border-black/10 bg-black/[0.03] p-2">
 		<p class="text-ui-label !m-0 truncate">{metadata.name || metadata.id || 'Active target'}</p>
-		<p class="mt-0.5 text-micro-data text-warm-gray-400">
-			{cragEditorState.activeMetadataTarget?.type === 'sector' ? 'Sector' : 'Hierarchy entry'}
-		</p>
+		<p class="mt-0.5 text-micro-data text-warm-gray-400">Entry</p>
 	</div>
 
 	<div class="grid grid-cols-2 gap-1 rounded-sm border border-black/10 bg-black/5 p-0.5">

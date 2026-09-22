@@ -2,6 +2,7 @@ node_modules
 .svelte-kit
 .svelte-kit-test
 build
+vite.config.js.timestamp-*.mjs
 .env
 .env.*
 !.env.example

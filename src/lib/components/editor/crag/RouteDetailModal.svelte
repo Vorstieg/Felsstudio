@@ -19,7 +19,7 @@
 		removeRoutePath: onRemoveRoutePath,
 		deleteRoutePath: onDeleteRoutePath
 	} = routeTool;
-	let accessFeatures = $derived(cragEditorState.access.features);
+	let accessFeatures = $derived(cragEditorState.getWorkspaceAccess()?.features || []);
 
 	let {
 		routeEntry = null,

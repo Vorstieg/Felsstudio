@@ -6,7 +6,11 @@ import { Topo } from '$lib/assets/js/topo-paths.js';
 import { initializeIdCounters } from '$lib/assets/js/id-utils.ts';
 import { loadGlbIntoEditorState } from '$lib/assets/js/gltf-loader.ts';
 import { normalizeTopoPaths } from '$lib/assets/js/topo-document-paths.js';
-import { getCragEntryPath, getTopoEditorPath, splitEntryPath } from '$lib/assets/js/editor-entry-paths.js';
+import {
+	getCragEntryPath,
+	getTopoEditorPath,
+	splitEntryPath
+} from '$lib/assets/js/editor-entry-paths.js';
 
 export async function persistTopoSessionImmediately(topoSession, snapshot = (value) => value) {
 	draftsState.load();
@@ -28,22 +32,15 @@ function getCragDirectory(topo) {
 
 export { getTopoEditorPath };
 
-export function getTopoSourceEntryPath(entryPath, sectorId = null) {
+export function getTopoSourceEntryPath(entryPath) {
 	const splitPath = splitEntryPath(entryPath);
-	return new Topo(splitPath.path, splitPath.id, sectorId)._getPath();
+	return new Topo(splitPath.path, splitPath.id)._getPath();
 }
 
-export async function loadTopoEditorEntry({
-	crag,
-	entryPath,
-	sector = null,
-	sectorId = null,
-	workspace,
-	topoSession
-}) {
+export async function loadTopoEditorEntry({ crag, entryPath, workspace, topoSession }) {
 	topoSession.reset();
 	const splitPath = splitEntryPath(entryPath || getCragEntryPath(crag));
-	const topo = new Topo(splitPath.path, splitPath.id, sector?.id || sectorId);
+	const topo = new Topo(splitPath.path, splitPath.id);
 	let entry = crag || {
 		properties: {
 			...splitPath,
@@ -114,14 +111,8 @@ export async function loadTopoEditorEntry({
 	return { loadedTopo, topo };
 }
 
-export async function openTopoEditorEntry({
-	crag,
-	sector = null,
-	workspace,
-	topoSession,
-	snapshot
-}) {
-	const { loadedTopo } = await loadTopoEditorEntry({ crag, sector, workspace, topoSession });
+export async function openTopoEditorEntry({ crag, workspace, topoSession, snapshot }) {
+	const { loadedTopo } = await loadTopoEditorEntry({ crag, workspace, topoSession });
 
 	if (workspace.startsWith('/topos/3d') && !loadedTopo) {
 		const draftId = await persistTopoSessionImmediately(topoSession, snapshot);

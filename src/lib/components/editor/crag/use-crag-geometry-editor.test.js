@@ -117,6 +117,57 @@ describe('geometry editor overlay', () => {
 		);
 	});
 
+	it('commits geometry drag edits to a string workspace target', () => {
+		vi.stubGlobal('window', {});
+		vi.stubGlobal('navigator', { maxTouchPoints: 0 });
+		vi.stubGlobal(
+			'requestAnimationFrame',
+			vi.fn(() => 1)
+		);
+		vi.stubGlobal('cancelAnimationFrame', vi.fn());
+		const handlers = new Map();
+		const sources = new Map();
+		const map = {
+			dragPan: { disable: vi.fn(), enable: vi.fn(), isEnabled: () => true },
+			touchZoomRotate: { disable: vi.fn(), enable: vi.fn(), isEnabled: () => true },
+			getCanvas: () => ({ style: {} }),
+			getSource: (id) => sources.get(id) || null,
+			addSource: (id, source) => sources.set(id, { ...source, setData: vi.fn() }),
+			getLayer: vi.fn(() => null),
+			addLayer: vi.fn(),
+			on(...args) {
+				handlers.set(args.slice(0, -1).join(':'), args.at(-1));
+			},
+			off: vi.fn()
+		};
+		const state = {
+			activeMetadataTarget: 'country/wall',
+			getMetadataTarget: () => ({ geometry: { type: 'Point', coordinates: [16, 48] } }),
+			commitGeometry: vi.fn()
+		};
+		const editor = useCragGeometryEditor({
+			state,
+			getMap: () => map,
+			getActiveTool: () => 'geometry'
+		});
+		editor.initHandlers(map);
+		editor.syncDrawing();
+		handlers.get('mousedown:geometry-editor-point')({
+			features: [{ properties: {} }],
+			preventDefault: vi.fn(),
+			lngLat: { lng: 16, lat: 48 }
+		});
+		handlers.get('mousemove')({ lngLat: { lng: 17, lat: 49 } });
+		handlers.get('mouseup')({ lngLat: { lng: 17, lat: 49 } });
+
+		expect(state.commitGeometry).toHaveBeenCalledWith(
+			'country/wall',
+			{ type: 'Point', coordinates: [17, 49] },
+			'Move point geometry'
+		);
+		vi.unstubAllGlobals();
+	});
+
 	it('recreates style layers without registering duplicate handlers and cannot drag in select mode', () => {
 		vi.stubGlobal('window', {});
 		vi.stubGlobal('navigator', { maxTouchPoints: 0 });

@@ -12,7 +12,6 @@ export function getCragEditorPath(crag) {
 	return `/crags/editor/${getCragEntryPath(crag)}`;
 }
 
-export function getTopoEditorPath(workspace, crag, sector = null) {
-	const path = `${workspace}/${getCragEntryPath(crag)}`;
-	return sector?.id ? `${path}?sector=${encodeURIComponent(sector.id)}` : path;
+export function getTopoEditorPath(workspace, entry) {
+	return `${workspace}/${getCragEntryPath(entry)}`;
 }

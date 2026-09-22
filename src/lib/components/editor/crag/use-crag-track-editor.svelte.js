@@ -30,12 +30,16 @@ export function useCragTrackEditor({
 	onTrackPointDragEnd = () => {},
 	getTrackFeature = (target) => {
 		if (target?.kind !== 'access') return null;
-		return state.access.features.find((feature) => feature.id === target.featureId) || null;
+		return (
+			(state.getWorkspaceAccess()?.features || []).find(
+				(feature) => feature.id === target.featureId
+			) || null
+		);
 	},
 	saveTrackGeometry = (target, coordinates) => {
 		if (target?.kind !== 'access') return false;
 		state.replaceAccessFeatures(
-			state.access.features.map((feature) =>
+			(state.getWorkspaceAccess()?.features || []).map((feature) =>
 				feature.id === target.featureId
 					? { ...feature, geometry: { type: 'LineString', coordinates } }
 					: feature
@@ -46,7 +50,9 @@ export function useCragTrackEditor({
 	removeTrackTarget = (target) => {
 		if (target?.kind !== 'access') return false;
 		state.replaceAccessFeatures(
-			state.access.features.filter((feature) => feature.id !== target.featureId)
+			(state.getWorkspaceAccess()?.features || []).filter(
+				(feature) => feature.id !== target.featureId
+			)
 		);
 		return true;
 	}
@@ -67,11 +73,12 @@ export function useCragTrackEditor({
 	let lastTouchPointDeleteAt = 0;
 	let areTrackPointDragHandlersReady = false;
 	let trackEditHistory = [];
+	const accessFeatures = () => state.getWorkspaceAccess()?.features || [];
 	const approachFeatures = () =>
-		state.access.features.filter((feature) => feature.properties?.kind === 'approach');
+		accessFeatures().filter((feature) => feature.properties?.kind === 'approach');
 	const replaceApproaches = (features) => {
 		state.replaceAccessFeatures([
-			...state.access.features.filter((feature) => feature.properties?.kind !== 'approach'),
+			...accessFeatures().filter((feature) => feature.properties?.kind !== 'approach'),
 			...features
 		]);
 	};
@@ -611,12 +618,11 @@ export function useCragTrackEditor({
 						coordinate[0] - drag.startCoordinate[0],
 						coordinate[1] - drag.startCoordinate[1]
 					];
-					const points = drag.startPoints.map((point, index) =>
+					currentTrackPoints = drag.startPoints.map((point, index) =>
 						drag.selectedIndexes.includes(index)
 							? [point[0] + offset[0], point[1] + offset[1]]
 							: point
-					);
-					currentTrackPoints = points;
+					);;
 					draggingTrackPoint = { ...draggingTrackPoint, coordinate };
 					return;
 				}

@@ -105,4 +105,10 @@ describe('Felslager API client', () => {
 			'https://felslager.vorstieg.eu/api/fs/images/wall.png'
 		);
 	});
+
+	it('encodes individual public file path segments', () => {
+		expect(fileUrl('europe/austria/tyrol/ötztaler-alpen/wildspitze/my photo #1.jpg')).toBe(
+			'https://felslager.vorstieg.eu/api/fs/europe/austria/tyrol/%C3%B6tztaler-alpen/wildspitze/my%20photo%20%231.jpg'
+		);
+	});
 });

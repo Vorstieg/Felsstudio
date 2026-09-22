@@ -1,9 +1,6 @@
 <script>
 	import ToolPalette2D from '$lib/components/editor/2d/ToolPalette2D.svelte';
-	import {
-		createTopo2DEditorState,
-		provideTopo2DEditorState
-	} from '$lib/state/topo-2d-editor-state.svelte.js';
+	import { createTopo2DEditorState, provideTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
 	import { useTopoDraftAutosave } from '$lib/components/editor/use-topo-draft-autosave.svelte.js';
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.ts';
 	import Topo2DEditor from '$lib/components/editor/2d/Topo2DEditor.svelte';
@@ -24,14 +21,12 @@
 	import { topoSymbols } from '@vorstieg/topo-renderer';
 	import { _ } from 'svelte-i18n';
 	import { browser } from '$app/environment';
-	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import { loadTopoEditorEntry } from '$lib/assets/js/open-topo-editor-entry.js';
 	import { isMobileViewport } from '$lib/assets/js/mobile-utils.ts';
 
 	let { entryPath = null } = $props();
 	const initialEntryPath = untrack(() => entryPath);
-	const initialSectorId = untrack(() => page.url.searchParams.get('sector'));
 	const editorState = provideTopo2DEditorState(createTopo2DEditorState());
 	let toolOptionsOpen = $state(false);
 	let showMapModal = $state(false);
@@ -126,7 +121,6 @@
 		loadEntrySession: async () => {
 			await loadTopoEditorEntry({
 				entryPath: initialEntryPath,
-				sectorId: initialSectorId,
 				workspace: '/topos/2d/editor',
 				topoSession: editorState
 			});

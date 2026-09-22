@@ -6,9 +6,11 @@
 	import CragHierarchyModal from './CragHierarchyModal.svelte';
 	import { slugifyName, normalizePath } from '$lib/components/editor/crag/crag-editor-paths.js';
 
+	let { compact = false } = $props();
 	let knownFolders = $state(new Set());
 	let hierarchyError = $state('');
-	let parentPath = $derived(normalizePath(cragEditorState.crag.path));
+	let activeEntry = $derived(cragEditorState.getActiveEntry());
+	let parentPath = $derived(normalizePath(cragEditorState.getActiveWorkspaceEntry()?.path || ''));
 	let draftParentPath = $state('');
 	let cragSlug = $state('');
 	let showModal = $state(false);
@@ -45,7 +47,7 @@
 	}
 
 	$effect(() => {
-		cragSlug = cragEditorState.crag.id || slugifyName(cragEditorState.crag.name);
+		cragSlug = activeEntry?.properties.id || slugifyName(activeEntry?.properties.name);
 	});
 
 	function openModal() {
@@ -54,11 +56,22 @@
 	}
 
 	function closeModal() {
-		cragEditorState.setCragField('path', normalizePath(draftParentPath));
+		const node = cragEditorState.getActiveWorkspaceEntry();
+		if (node) cragEditorState.remapWorkspacePaths(cragEditorState.getWorkspaceEntryPath(node), normalizePath(draftParentPath));
 		showModal = false;
 	}
 </script>
 
+{#if compact}
+	<button
+		type="button"
+		onclick={openModal}
+		class="rounded-sm px-1.5 py-1 text-micro-data font-bold text-creator-blue hover:bg-white"
+		title="Edit hierarchy placement"
+	>
+		<i class="fa-solid fa-pen text-[10px] mr-1"></i>Edit hierarchy
+	</button>
+{:else}
 <div class="space-y-2 rounded-sm border border-black/10 bg-black/[0.03] p-2">
 	<div class="flex items-start justify-between gap-2">
 		<div>
@@ -97,11 +110,12 @@
 		<p class="text-[10px] text-amber-600 font-bold">{hierarchyError}</p>
 	{/if}
 </div>
+{/if}
 
 	{#if showModal}
 	<CragHierarchyModal
 		bind:cragSlug
-		cragName={cragEditorState.crag.name}
+		cragName={activeEntry?.properties.name}
 		{knownFolders}
 		{hierarchyError}
 		bind:parentPath={draftParentPath}

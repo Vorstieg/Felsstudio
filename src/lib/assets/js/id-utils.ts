@@ -1,4 +1,4 @@
-import type { TopoDocument } from '@vorstieg/fels-data/types';
+import type { FelsTopoDocument } from '@vorstieg/fels-types/types';
 
 let routeIdCounter = 1;
 let outlineIdCounter = 1;
@@ -41,11 +41,14 @@ function findMaxId(items: ItemWithId[] | undefined, prefix: string): number {
 	return max;
 }
 
-export function initializeIdCounters(topo: TopoDocument | null | undefined): void {
+export function initializeIdCounters(
+	topo: (FelsTopoDocument & { outlines?: ItemWithId[] }) | null | undefined
+): void {
 	if (!topo) return;
 
 	routeIdCounter = findMaxId(topo.routes, 'route-') + 1;
-	outlineIdCounter = findMaxId(topo.outlines, 'outline-') + 1;
+	outlineIdCounter =
+		Math.max(findMaxId(topo.outlines, 'outline-'), findMaxId(topo.lineOverlays, 'outline-')) + 1;
 	symbolIdCounter = findMaxId(topo.fixPoints, 'symbol-') + 1;
 	textIdCounter = findMaxId(topo.textLabels, 'text-') + 1;
 

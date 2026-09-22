@@ -10,8 +10,6 @@
 		startNewEntry,
 		loadFromEntry
 	} = $props();
-	let expandedCragId = $state(null);
-
 </script>
 
 {#if workSpaceWrapper.isCragEditor()}
@@ -47,12 +45,10 @@
 	{/if}
 
 	{#each filteredLocations as crag}
-		{@const sectors = crag.properties.sectors || []}
-		{@const showSectorChoices = workSpaceWrapper.isTopoWorkspace() && sectors.length > 0}
-		<div class="bg-white rounded border border-transparent hover:border-black/15 transition-none">
+			<div class="bg-white rounded border border-transparent hover:border-black/15 transition-none">
 			<button
 				class="w-full p-2.5 text-left hover:bg-black/5 rounded transition-none group flex items-center justify-between disabled:opacity-50"
-				onclick={() =>showSectorChoices ? expandedCragId = crag.properties.id: loadFromEntry(crag)}
+				onclick={() => loadFromEntry(crag)}
 				disabled={isLoading}
 			>
 				<div>
@@ -62,36 +58,9 @@
 					<div class="text-micro-data text-warm-gray-400">{getCragEntryPath(crag)}</div>
 				</div>
 				<i
-					class="fa-solid {showSectorChoices && expandedCragId === crag.properties.id
-							? 'fa-chevron-down'
-							: 'fa-chevron-right'} text-warm-gray-300 text-[10px] group-hover:text-creator-blue transition-none"
-				></i>
-			</button>
-
-			{#if showSectorChoices && expandedCragId === crag.properties.id}
-				<div class="border-t border-black/10 p-1.5 space-y-1 bg-warm-white/70">
-					<button
-						class="w-full px-2 py-1.5 rounded-sm text-left text-body-text bg-white border border-black/10 hover:border-creator-blue hover:text-creator-blue transition-none disabled:opacity-50"
-						onclick={() => loadFromEntry(crag)}
-						disabled={isLoading}
-					>
-						<span class="font-bold">{crag.properties.name}</span>
-						<span class="block text-micro-data text-warm-gray-400">Whole crag</span>
-					</button>
-					{#each sectors as sector}
-						<button
-							class="w-full px-2 py-1.5 rounded-sm text-left text-body-text bg-white border border-black/10 hover:border-creator-blue hover:text-creator-blue transition-none disabled:opacity-50"
-							onclick={() => loadFromEntry(crag, sector)}
-							disabled={isLoading}
-						>
-							<span class="font-bold">{sector.name || sector.id}</span>
-							<span class="block text-micro-data text-warm-gray-400"
-							>{sector.assets?.topos?.[0] || 'No topo asset'}</span
-							>
-						</button>
-					{/each}
-				</div>
-			{/if}
+				class="fa-solid fa-chevron-right text-warm-gray-300 text-[10px] group-hover:text-creator-blue transition-none"
+			></i>
+		</button>
 		</div>
 	{:else}
 		<div class="text-center py-6 text-body-text text-warm-gray-500">

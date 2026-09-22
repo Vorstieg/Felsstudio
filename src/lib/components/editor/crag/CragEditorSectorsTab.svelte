@@ -1,6 +1,7 @@
 <script>
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
+	import { workspaceNodeDocumentPaths } from '$lib/assets/js/workspace-paths.ts';
 	const cragEditorState = getCragEditorSession();
 	const { sectorTool, routeTool, actions } = getCragEditorTools();
 	const {
@@ -10,7 +11,11 @@
 	const { addRoute: onAddSectorRoute, selectRoute: onSelectRoute, deleteRoute: onDeleteRoute } = routeTool;
 	const onAddParentRoute = () => routeTool.addRoute();
 	const onPlanGenerated = actions.handleFlightPlanGenerated;
-	let routeDocuments = $derived(cragEditorState.routeDocuments);
+	let activeWorkspace = $derived(cragEditorState.getActiveWorkspaceEntry());
+	let sectors = $derived(activeWorkspace?.childEntries || []);
+	let topoEntries = $derived.by(() => [activeWorkspace, ...sectors].flatMap((node) =>
+		node?.entry?.properties.id && node.topo ? [{ path: workspaceNodeDocumentPaths(node).topo, node, data: node.topo }] : []
+	));
 	import CragFlightPlanPanel from './CragFlightPlanPanel.svelte';
 	import CragEditorRouteTable from './CragEditorRouteTable.svelte';
 
@@ -18,32 +23,34 @@
 		map = null,
 		selectedObject = $bindable(null)
 	} = $props();
-	let parentRoutes = $derived(routeDocuments.flatMap((document) => document.sectorId ? [] : (document.data?.routes || []).map((route) => ({
+	let parentRoutes = $derived(topoEntries.flatMap((document) => document.node !== activeWorkspace ? [] : (document.data?.routes || []).map((route) => ({
 		document,
 		route
 	}))));
 
 	function sectorRoutes(sectorId) {
-		return routeDocuments.flatMap((document) => document.sectorId !== sectorId ? [] : (document.data?.routes || []).map((route) => ({
+		return topoEntries.flatMap((document) => document.node?.entry?.properties.id !== sectorId ? [] : (document.data?.routes || []).map((route) => ({
 			document,
 			route
 		})));
 	}
 
-	function selectSector(sector) {
-		selectedObject = { type: 'sector', id: sector.id };
-		onFocusSector(sector);
+	async function selectSector(sectorNode) {
+		const key = cragEditorState.getWorkspaceEntryPath(sectorNode);
+		await actions.selectObject({ type: 'entry', key });
+		selectedObject = { type: 'entry', key };
+		onFocusSector(sectorNode, { select: false });
 	}
 
 </script>
 
 <div class="flex flex-col gap-3">
 	<div class="flex items-center justify-between">
-		<div><h3 class="text-ui-label text-near-black !m-0">Sectors</h3>
-			<p class="text-micro-data text-warm-gray-400">Optional wall sections inside this crag</p></div>
+		<div><h3 class="text-ui-label text-near-black !m-0">Child entries</h3>
+			<p class="text-micro-data text-warm-gray-400">Direct children of this entry</p></div>
 		<button onclick={onAddSector}
 		        class="w-7 h-7 rounded-sm bg-creator-blue text-white flex items-center justify-center hover:bg-creator-blue-active"
-		        title="Add sector"><i class="fa-solid fa-plus text-[10px]"></i></button>
+		        title="Add child entry"><i class="fa-solid fa-plus text-[10px]"></i></button>
 	</div>
 	<div class="rounded-sm border border-black/10 bg-black/[0.02] p-2">
 		<div class="mb-2 flex items-center justify-between">
@@ -57,22 +64,22 @@
 			<CragEditorRouteTable routes={parentRoutes} {selectedObject} {onSelectRoute} {onDeleteRoute} />
 		{/if}
 	</div>
-	{#if !cragEditorState.crag.sectors || cragEditorState.crag.sectors.length === 0}
+	{#if sectors.length === 0}
 		<div class="bg-warm-white rounded-sm p-6 text-center border border-black/15"><i
 			class="fa-solid fa-table-cells-large text-2xl text-warm-gray-300 mb-2 block"></i>
-			<p class="text-ui-label text-warm-gray-500">No Sectors</p></div>
+			<p class="text-ui-label text-warm-gray-500">No child entries</p></div>
 	{/if}
 	<div class="space-y-1">
-		{#each cragEditorState.crag.sectors || [] as sector}{@const
-			isSelected = selectedObject?.type === 'sector' && selectedObject.id === sector.id}{@const
+		{#each sectors as sectorNode}{@const sector = sectorNode.entry?.properties}{#if sector}{@const
+			isSelected = selectedObject?.type === 'entry' && selectedObject.key === cragEditorState.getWorkspaceEntryPath(sectorNode)}{@const
 			routes = sectorRoutes(sector.id)}
 			<div
 				class="w-full panel-inner p-2 text-left border-black/10 hover:border-creator-blue cursor-pointer {isSelected ? 'border-creator-blue bg-creator-blue/5' : ''}"
-				role="button" tabindex="0" onclick={() => selectSector(sector)}
-				onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectSector(sector); } }}>
+				role="button" tabindex="0" onclick={() => selectSector(sectorNode)}
+				onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectSector(sectorNode); } }}>
 				<div class="flex items-center justify-between gap-2">
 					<div class="min-w-0">
-						<div class="text-body-text font-bold truncate">{sector.name || sector.id || 'Unnamed Sector'}</div>
+						<div class="text-body-text font-bold truncate">{sector.name || sector.id || 'Unnamed entry'}</div>
 						<div class="text-micro-data text-warm-gray-400 truncate">{sector.id || 'missing-id'}</div>
 					</div>
 						<div class="flex items-center gap-1">
@@ -96,10 +103,10 @@
 					{/if}
 					{#if isSelected}
 						<div onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="presentation">
-							<CragFlightPlanPanel {sector} cragName={cragEditorState.crag.name} {map} onPlanGenerated={onPlanGenerated} />
+						<CragFlightPlanPanel {sector} cragName={activeWorkspace?.entry?.properties.name} {map} onPlanGenerated={onPlanGenerated} />
 						</div>
 					{/if}
 				</div>
-			{/each}
+			{/if}{/each}
 		</div>
 	</div>
