@@ -4,7 +4,11 @@ import { listDir, readJson } from '$lib/api/felslager.ts';
 import { getCragEditorPath, splitEntryPath } from '$lib/assets/js/editor-entry-paths.js';
 import { normalizeTopoPaths } from '$lib/assets/js/topo-document-paths.js';
 import { normalizeAccessCollection } from '$lib/assets/js/access-geojson.js';
-import { workspaceEntryPath, workspaceNodePath, workspaceDocumentPaths } from '$lib/assets/js/workspace-paths.ts';
+import {
+	workspaceEntryPath,
+	workspaceNodePath,
+	workspaceDocumentPaths
+} from '$lib/assets/js/workspace-paths.ts';
 
 export { getCragEditorPath };
 
@@ -137,10 +141,7 @@ function findWorkspaceNode(
 	entryPath: string
 ): FelsEntryWorkspace | null {
 	if (!node) return null;
-	if (
-		workspaceNodePath(node) === entryPath
-	)
-		return node;
+	if (workspaceNodePath(node) === entryPath) return node;
 	for (const child of node.childEntries) {
 		const found = findWorkspaceNode(child, entryPath);
 		if (found) return found;
@@ -172,7 +173,10 @@ export async function loadFelsEntryWorkspaceDetails(
 		const optional = await loadOptionalFiles(node.path, id, reader);
 		if (!node.topo) node.topo = optional.topo;
 		if (!node.access) node.access = optional.access;
-		if (optional.topoMigrated && !node.dirtyPaths.includes(workspaceDocumentPaths(node.path, id).topo))
+		if (
+			optional.topoMigrated &&
+			!node.dirtyPaths.includes(workspaceDocumentPaths(node.path, id).topo)
+		)
 			node.dirtyPaths.push(workspaceDocumentPaths(node.path, id).topo);
 		node.documentsLoaded = true;
 	}
@@ -199,10 +203,13 @@ export async function loadFelsEntryWorkspaceDetails(
 		.map((item) => directoryItemPath(folder, item));
 	const directories = items.filter((item) => item.type === 'dir');
 	const existingChildren = new Map(
-		node.childEntries.map((child) => [
-			child.sourcePath || workspaceNodePath(child),
-			child
-		])
+		node.childEntries.flatMap(
+			(child) =>
+				[
+					[workspaceNodePath(child), child],
+					[child.sourcePath || workspaceNodePath(child), child]
+				] as const
+		)
 	);
 	const children = await Promise.all(
 		directories.map(async (item) => {
@@ -223,7 +230,12 @@ export async function loadFelsEntryWorkspaceDetails(
 	);
 	node.images = [...loadedImages, ...(node.images || []).filter((image) => image.clientId)];
 	node.auxiliaryFiles = auxiliaryFiles;
-	node.childEntries = children;
+	// Preserve entries moved or created in this session even when they are absent
+	// from the destination folder's persisted listing.
+	node.childEntries = [
+		...children,
+		...node.childEntries.filter((child) => !children.includes(child))
+	];
 	node.detailsLoaded = true;
 	return node;
 }
@@ -231,7 +243,7 @@ export async function loadFelsEntryWorkspaceDetails(
 /** Initial navigation loads only the selected feature file. */
 export async function loadFelsEntryWorkspace(
 	entryPath: string,
-	reader: typeof readJson = readJson,
+	reader: typeof readJson = readJson
 ): Promise<FelsEntryWorkspace | null> {
 	const { path, id } = splitEntryPath(entryPath);
 	if (!id) return null;

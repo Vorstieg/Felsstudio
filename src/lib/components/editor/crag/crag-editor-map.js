@@ -34,10 +34,7 @@ const FLIGHT_PATH_GUIDES_SOURCE_ID = 'flight-path-vertical-guides';
 const FLIGHT_PATH_WAYPOINTS_SOURCE_ID = 'flight-path-waypoints';
 const FLIGHT_PATH_CAMERA_SOURCE_ID = 'flight-path-camera-view';
 const DETECTED_WALL_SOURCE_ID = 'detected-wall';
-const FLIGHT_PATH_ELEVATION_LAYER_ID = 'flight-path-elevation';
 const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] };
-const flightPathElevationLayers = new WeakMap();
-const pendingFlightPathElevationWaypoints = new WeakMap();
 const flightPathDeckOverlays = new WeakMap();
 
 function detectedWallFeatureCollection(flightPlan) {
@@ -224,160 +221,6 @@ export function buildFlightPathFeatureCollections(flightPlan, map) {
 			}))
 		}
 	};
-}
-
-// MapLibre deliberately drapes GeoJSON lines on terrain and has no `line-z-offset` equivalent.
-// This small adapter is therefore the rendering boundary for the altitude fields above. It receives
-// only derived waypoint data; it never owns or mutates the mission/path state.
-function mercatorPosition(longitude, latitude, altitude) {
-	const latitudeRadians = (latitude * Math.PI) / 180;
-	return [
-		(longitude + 180) / 360,
-		(1 - Math.log(Math.tan(Math.PI / 4 + latitudeRadians / 2)) / Math.PI) / 2,
-		altitude / 40075016.68557849 / Math.cos(latitudeRadians)
-	];
-}
-
-function createFlightPathElevationLayer() {
-	const empty = new Float32Array();
-	let glContext;
-	let program;
-	let positionBuffer;
-	let colorBuffer;
-	let positionLocation;
-	let colorLocation;
-	let matrixLocation;
-	let routePositions = empty;
-	let routeColors = empty;
-	let guidePositions = empty;
-	let pointPositions = empty;
-	let pointColors = empty;
-	let pointOutlineColors = empty;
-
-	const upload = (gl, buffer, data) => {
-		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-		gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
-	};
-	const preview = {
-		id: FLIGHT_PATH_ELEVATION_LAYER_ID,
-		type: 'custom',
-		renderingMode: '3d',
-		onAdd(map, gl) {
-			glContext = gl;
-			flightPathElevationLayers.set(map, preview);
-			const vertex = gl.createShader(gl.VERTEX_SHADER);
-			gl.shaderSource(
-				vertex,
-				'attribute vec3 a_position; attribute vec4 a_color; uniform mat4 u_matrix; uniform float u_point_size; varying vec4 v_color; void main() { gl_Position = u_matrix * vec4(a_position, 1.0); gl_PointSize = u_point_size; v_color = a_color; }'
-			);
-			gl.compileShader(vertex);
-			const fragment = gl.createShader(gl.FRAGMENT_SHADER);
-			gl.shaderSource(
-				fragment,
-				'precision mediump float; varying vec4 v_color; uniform float u_points; void main() { if (u_points > 0.5 && length(gl_PointCoord - vec2(0.5)) > 0.5) discard; gl_FragColor = v_color; }'
-			);
-			gl.compileShader(fragment);
-			program = gl.createProgram();
-			gl.attachShader(program, vertex);
-			gl.attachShader(program, fragment);
-			gl.linkProgram(program);
-			positionBuffer = gl.createBuffer();
-			colorBuffer = gl.createBuffer();
-			positionLocation = gl.getAttribLocation(program, 'a_position');
-			colorLocation = gl.getAttribLocation(program, 'a_color');
-			matrixLocation = gl.getUniformLocation(program, 'u_matrix');
-			// MapLibre may invoke onAdd after the first sync. Retain the latest derived
-			// collection outside the layer so the first render cannot miss its waypoints.
-			preview.setWaypoints(map, pendingFlightPathElevationWaypoints.get(map) || []);
-		},
-		setWaypoints(map, waypoints) {
-			preview.waypoints = waypoints;
-			if (!glContext || !program) return;
-			const vertices = [];
-			const colors = [];
-			const guides = [];
-			waypoints.forEach((waypoint, index) => {
-				const ground = terrainElevation(map, waypoint);
-				guides.push(
-					...mercatorPosition(waypoint.longitude, waypoint.latitude, ground),
-					...mercatorPosition(waypoint.longitude, waypoint.latitude, waypoint.altitude)
-				);
-				if (index === waypoints.length - 1) return;
-				const end = waypoints[index + 1];
-				vertices.push(
-					...mercatorPosition(waypoint.longitude, waypoint.latitude, waypoint.altitude),
-					...mercatorPosition(end.longitude, end.latitude, end.altitude)
-				);
-				const hex = waypointColor(waypoint).slice(1);
-				const color = [
-					parseInt(hex.slice(0, 2), 16) / 255,
-					parseInt(hex.slice(2, 4), 16) / 255,
-					parseInt(hex.slice(4, 6), 16) / 255,
-					0.95
-				];
-				colors.push(...color, ...color);
-			});
-			routePositions = new Float32Array(vertices);
-			routeColors = new Float32Array(colors);
-			guidePositions = new Float32Array(guides);
-			pointPositions = new Float32Array(
-				waypoints.flatMap((waypoint) =>
-					mercatorPosition(waypoint.longitude, waypoint.latitude, waypoint.altitude)
-				)
-			);
-			pointColors = new Float32Array(
-				waypoints.flatMap((waypoint) => {
-					const hex = waypointColor(waypoint).slice(1);
-					return [
-						parseInt(hex.slice(0, 2), 16) / 255,
-						parseInt(hex.slice(2, 4), 16) / 255,
-						parseInt(hex.slice(4, 6), 16) / 255,
-						1
-					];
-				})
-			);
-			pointOutlineColors = new Float32Array(
-				Array.from({ length: waypoints.length }, () => [1, 1, 1, 1]).flat()
-			);
-			map.triggerRepaint();
-		},
-		render(gl, { defaultProjectionData }) {
-			if (!program || pointPositions.length === 0) return;
-			gl.useProgram(program);
-			gl.uniformMatrix4fv(
-				matrixLocation,
-				false,
-				defaultProjectionData.projectionMatrix || defaultProjectionData.mainMatrix
-			);
-			gl.disable(gl.DEPTH_TEST);
-			gl.enable(gl.BLEND);
-			gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-			gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-			gl.enableVertexAttribArray(positionLocation);
-			gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
-			const draw = (positions, colors, mode, points = false, pointSize = 1) => {
-				upload(gl, positionBuffer, positions);
-				upload(gl, colorBuffer, colors);
-				gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-				gl.enableVertexAttribArray(colorLocation);
-				gl.vertexAttribPointer(colorLocation, 4, gl.FLOAT, false, 0, 0);
-				gl.uniform1f(gl.getUniformLocation(program, 'u_points'), points ? 1 : 0);
-				gl.uniform1f(gl.getUniformLocation(program, 'u_point_size'), pointSize);
-				gl.drawArrays(mode, 0, positions.length / 3);
-			};
-			draw(guidePositions, new Float32Array((guidePositions.length / 3) * 4).fill(0.6), gl.LINES);
-			draw(routePositions, routeColors, gl.LINES);
-			draw(pointPositions, pointOutlineColors, gl.POINTS, true, 15);
-			draw(pointPositions, pointColors, gl.POINTS, true, 10);
-		},
-		onRemove(map, gl) {
-			gl.deleteBuffer(positionBuffer);
-			gl.deleteBuffer(colorBuffer);
-			gl.deleteProgram(program);
-			flightPathElevationLayers.delete(map);
-		}
-	};
-	return preview;
 }
 
 function ensureFlightPathDeckOverlay(map) {
@@ -602,8 +445,6 @@ export function syncFlightPlanPreview(map, flightPlan) {
 export function ensureCragEditorLayers(map) {
 	const detectionRadius = getMapHitRadius(12);
 	const drawingPointRadius = getTouchTargetSize(5);
-	const midpointRadius = getTouchTargetSize(5);
-	const vertexRadius = getTouchTargetSize(7);
 	const deleteTextSize = getTouchTargetSize(17);
 
 	const maptilerSourceUrl = maptilerTilesUrl();
@@ -827,7 +668,6 @@ export function ensureCragEditorLayers(map) {
 
 export function buildEditorFeatureCollection({
 	savedAccessFeatures = [],
-	routes = [],
 	routePaths = [],
 	selectedObject = null,
 	editingRoutePath = null,
@@ -837,8 +677,7 @@ export function buildEditorFeatureCollection({
 	selectedTrackPointIndex = null,
 	selectedTrackPointIndexes = [],
 	draggingTrackPointIndex = null,
-	activeTrackTarget = null,
-	flightPlan = null
+	activeTrackTarget = null
 }) {
 	const features = [];
 	savedAccessFeatures

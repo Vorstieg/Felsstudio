@@ -14,15 +14,6 @@ const WPML_NAMESPACE = 'http://www.uav.com/wpmz/1.0.2';
 const MAVIC_4_PRO_DRONE_ENUM = 68;
 const MAVIC_4_PRO_DRONE_SUB_ENUM = 0;
 
-function escapeXml(value) {
-	return String(value ?? '')
-		.replaceAll('&', '&amp;')
-		.replaceAll('<', '&lt;')
-		.replaceAll('>', '&gt;')
-		.replaceAll('"', '&quot;')
-		.replaceAll("'", '&apos;');
-}
-
 function number(value, fieldName, index) {
 	const parsed = Number(value);
 	if (!Number.isFinite(parsed)) {

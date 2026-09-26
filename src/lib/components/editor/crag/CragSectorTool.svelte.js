@@ -76,7 +76,8 @@ export function createCragSectorTool({
 		map.getSource('sector-editor-data')?.setData({ type: 'FeatureCollection', features });
 	}
 	function focusSector(node, { select = true } = {}) {
-		if (select && node?.entry) selectObject({ type: 'entry', key: state.getWorkspaceEntryPath(node) });
+		if (select && node?.entry)
+			selectObject({ type: 'entry', key: state.getWorkspaceEntryPath(node) });
 		setActiveTool('geometry');
 		const center = getGeometryCenter(node?.entry?.geometry);
 		const map = getMap();

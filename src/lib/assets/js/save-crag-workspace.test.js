@@ -49,7 +49,7 @@ function filesystem(paths) {
 }
 
 describe('saveCragWorkspace', () => {
-	it('preserves existing asset references on unrelated metadata edits', async () => {
+	it('drops legacy image metadata while preserving other asset references', async () => {
 		const root = node('wall', '', 'wall');
 		root.entry.properties.assets = { images: ['wall/image.jpg'], models: ['wall/wall.glb'] };
 		root.entry.properties.name = 'Renamed wall';
@@ -57,7 +57,38 @@ describe('saveCragWorkspace', () => {
 		await saveCragWorkspace(root, {
 			write: async (path, data) => writes.push([path, data])
 		});
-		expect(writes[0][1].properties.assets).toEqual(root.entry.properties.assets);
+		expect(writes[0][1].properties.assets).toEqual({ models: ['wall/wall.glb'] });
+		expect(root.entry.properties.assets).toEqual({ models: ['wall/wall.glb'] });
+	});
+	it('cleans legacy image metadata even when no other entry fields changed', async () => {
+		const root = node('wall', '', 'wall');
+		root.dirtyPaths = [];
+		root.entry.properties.assets = { images: ['wall/image.jpg'] };
+		const writes = [];
+		const save = () => saveCragWorkspace(root, { write: async (path, data) => writes.push([path, data]) });
+		await save();
+		expect(writes).toHaveLength(1);
+		expect(writes[0][1].properties).not.toHaveProperty('assets');
+		await save();
+		expect(writes).toHaveLength(1);
+	});
+	it('uploads a new image without writing image metadata', async () => {
+		const root = node('wall');
+		root.images = [{ name: 'photo.jpg', path: 'wall/wall-image-photo.jpg', clientId: 'photo' }];
+		root.pendingImages = [{
+			clientId: 'photo',
+			path: 'wall/wall-image-photo.jpg',
+			file: { type: 'image/jpeg' }
+		}];
+		const writes = [];
+		const uploads = [];
+		await saveCragWorkspace(root, {
+			write: async (path, data) => writes.push([path, data]),
+			writeBinary: async (path) => uploads.push(path),
+			finishUpload: () => {}
+		});
+		expect(uploads).toEqual(['wall/wall-image-photo.jpg']);
+		expect(writes[0][1].properties).not.toHaveProperty('assets');
 	});
 
 	it('moves a renamed entry and leaves one canonical filename plus unrelated files', async () => {
@@ -76,6 +107,49 @@ describe('saveCragWorkspace', () => {
 			['move', 'old', 'new'],
 			['move', 'new/old-image-photo.jpg', 'new/new-image-photo.jpg']
 		]);
+	});
+	it('updates topo identifiers and asset paths when an entry is renamed', async () => {
+		const root = node('new', '', 'old');
+		root.topo = { id: 'old', crag_id: 'old', sector_id: '', routes: [] };
+		root.entry.properties.assets = {
+			images: ['old/old-image-photo.jpg', 'other/shared.jpg'],
+			models: ['old/old.glb']
+		};
+		root.images = [
+			{ name: 'photo.jpg', path: 'new/new-image-photo.jpg', sourcePath: 'old/old-image-photo.jpg' }
+		];
+		root.modelPath = 'new/new.glb';
+		root.modelSourcePath = 'old/old.glb';
+		const writes = [];
+		await saveCragWorkspace(root, {
+			rename: async () => {},
+			write: async (path, data) => writes.push([path, data]),
+			remove: async () => {}
+		});
+		expect(writes.find(([path]) => path.endsWith('/new/new.json'))[1].properties.assets).toEqual({
+			models: ['new/new.glb']
+		});
+		expect(writes.find(([path]) => path.endsWith('/new/new-topo.json'))[1]).toMatchObject({
+			id: 'new',
+			crag_id: 'new',
+			sector_id: ''
+		});
+	});
+	it('updates a sector topo when it moves under another crag', async () => {
+		const sector = node('north', 'other', 'wall/north');
+		sector.topo = { id: 'wall:north', crag_id: 'wall', sector_id: 'north', routes: [] };
+		const root = node('other', '', 'other', [sector]);
+		const writes = [];
+		await saveCragWorkspace(root, {
+			rename: async () => {},
+			write: async (path, data) => writes.push([path, data]),
+			remove: async () => {}
+		});
+		expect(writes.find(([path]) => path.endsWith('/north/north-topo.json'))[1]).toMatchObject({
+			id: 'other:north',
+			crag_id: 'other',
+			sector_id: 'north'
+		});
 	});
 
 	it('moves parent then renamed child at its new location', async () => {

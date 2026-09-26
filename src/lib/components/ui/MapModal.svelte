@@ -128,7 +128,7 @@
 				style.sources.places.data = { type: 'FeatureCollection', features: [] };
 			if (style.sources?.routes?.data)
 				style.sources.routes.data = { type: 'FeatureCollection', features: [] };
-		} catch (e) {
+		} catch {
 			style = 'https://demotiles.maplibre.org/style.json';
 		}
 
@@ -193,7 +193,6 @@
 				this.renderer.autoClear = false;
 			},
 			render: function (gl, args) {
-				const elevation = map.queryTerrainElevation(coordinates) || 0;
 				// The altitude is bound and modified directly by the vertical dragger.
 				const modelAltitude = altitude;
 
@@ -257,28 +256,21 @@
 					this.dummyCamera.updateProjectionMatrix();
 
 					// 3. Sync Position (Translate Mercator to Model Space)
+					const centerMc = maplibregl.MercatorCoordinate.fromLngLat(map.getCenter(), 0);
+					const freePosition = map.getFreeCameraOptions?.()?.position;
 					let camMercator;
-					if (typeof map.getFreeCameraOptions === 'function') {
-						const fco = map.getFreeCameraOptions();
-						camMercator = new THREE.Vector3(fco.position.x, fco.position.y, fco.position.z);
+					if (freePosition) {
+						camMercator = new THREE.Vector3(freePosition.x, freePosition.y, freePosition.z);
 					} else {
-						// Fallback if fco not available
-						const center = map.getCenter();
-						const centerMc = maplibregl.MercatorCoordinate.fromLngLat(center, 0);
 						const pitch = tr._pitch || 0;
 						const bearing = tr._bearing || 0;
 						const alt = tr.cameraToCenterDistance || 1000;
 						const worldSize = tr.worldSize || 512;
-
-						const yOffset = -Math.cos(pitch) * alt;
-						const zOffset = Math.sin(pitch) * alt;
-
-						const xOffsetRot = yOffset * Math.sin(bearing);
-						const yOffsetRot = yOffset * Math.cos(bearing);
-
+						const yOffset = -Math.sin(pitch) * alt;
+						const zOffset = Math.cos(pitch) * alt;
 						camMercator = new THREE.Vector3(
-							centerMc.x + xOffsetRot / worldSize,
-							centerMc.y + yOffsetRot / worldSize,
+							centerMc.x + (yOffset * Math.sin(bearing)) / worldSize,
+							centerMc.y + (yOffset * Math.cos(bearing)) / worldSize,
 							zOffset / worldSize
 						);
 					}
@@ -287,8 +279,6 @@
 					this.dummyCamera.position.copy(camMercator);
 
 					// 4. Sync Rotation (Look exactly at the map's center ground point)
-					const center = map.getCenter();
-					const centerMc = maplibregl.MercatorCoordinate.fromLngLat(center, 0);
 					const centerMercatorVec = new THREE.Vector3(centerMc.x, centerMc.y, centerMc.z);
 					centerMercatorVec.applyMatrix4(lInv);
 					this.dummyCamera.lookAt(centerMercatorVec);

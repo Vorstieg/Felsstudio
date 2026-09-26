@@ -4,7 +4,7 @@ export class SelectTool {
 		this.state = editor;
 	}
 
-	onMouseDown(event, point) {
+	onMouseDown() {
 		// Select tool just delegates to generic hit testing or is handled by Topo2DEditor's global click handlers
 		// for selecting routes/outlines which I kept in Topo2DEditor helpers (handleRouteClick etc).
 		// But clicking empty space deselects.
@@ -15,8 +15,8 @@ export class SelectTool {
 		// So deselection of symbols/routes is handled in Topo2DEditor before calling this.
 	}
 
-	onMouseMove(event, point) {}
-	onMouseUp(event, point) {}
+	onMouseMove() {}
+	onMouseUp() {}
 	onKeyDown(event) {
 		if (event.key === 'Delete' || event.key === 'Backspace') {
 			const idToDelete = this.state.selectedId('symbol');

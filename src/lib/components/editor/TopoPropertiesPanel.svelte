@@ -205,7 +205,6 @@
 					{topoJsonError}
 					onformatjson={formatTopoJson}
 					onapplyjson={applyTopoJson}
-					{mobile}
 				/>
 			{:else if activeTab === 'routes'}
 				<TopoRoutesPanel {routes} bind:drawingTarget bind:activeTool {mobile} />

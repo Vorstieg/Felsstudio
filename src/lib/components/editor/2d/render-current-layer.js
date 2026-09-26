@@ -4,7 +4,6 @@ import { getOutlineLineStyle } from '@vorstieg/topo-renderer';
 export function renderCurrentLayer({
 	layers,
 	renderModel,
-	currentOutlinePoints,
 	selectedOutlineStyle,
 	outlinePreview,
 	brushPreview = null

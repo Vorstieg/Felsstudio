@@ -42,8 +42,9 @@ test('supports outline and path geometry workflows', async () => {
 		translateOutline,
 		updatePresetOutline
 	} = await vite.ssrLoadModule('/src/lib/assets/js/outline-geometry.js');
-	const { createBrushMaskOutline, createBrushOutline, isValidBrushOutline } =
-		await vite.ssrLoadModule('/src/lib/assets/js/brush-outline-geometry.js');
+	const { createBrushMaskOutline, isValidBrushOutline } = await vite.ssrLoadModule(
+		'/src/lib/assets/js/brush-outline-geometry.js'
+	);
 	const { createBrushMaskPredicate, findBrushImageEdge } = await vite.ssrLoadModule(
 		'/src/lib/assets/js/brush-edge-assist.js'
 	);
@@ -305,7 +306,7 @@ test('supports outline and path geometry workflows', async () => {
 	);
 
 	const brushCanvas = { baseWidth: 1000, baseHeight: 500 };
-	const brushOutline = createBrushOutline(
+	const brushOutline = createBrushMaskOutline(
 		[
 			[0.2, 0.4],
 			[0.45, 0.4],
@@ -323,7 +324,10 @@ test('supports outline and path geometry workflows', async () => {
 		'brush adds horizontal radius'
 	);
 	assert.ok(Math.min(...brushYs) < 0.4 && Math.max(...brushYs) > 0.6, 'brush adds vertical radius');
-	const brushDot = createBrushOutline([[0.5, 0.5]], { brushRadiusPx: 16, canvasSize: brushCanvas });
+	const brushDot = createBrushMaskOutline([[0.5, 0.5]], {
+		brushRadiusPx: 16,
+		canvasSize: brushCanvas
+	});
 	assert.equal(
 		isValidBrushOutline(brushDot, brushCanvas),
 		true,
@@ -358,7 +362,7 @@ test('supports outline and path geometry workflows', async () => {
 	);
 	assert.ok(paintedBlob.length > 4, 'the traced mask retains an editable contour');
 	assert.deepEqual(
-		createBrushOutline([], { canvasSize: brushCanvas }),
+		createBrushMaskOutline([], { canvasSize: brushCanvas }),
 		[],
 		'empty brush strokes are ignored'
 	);

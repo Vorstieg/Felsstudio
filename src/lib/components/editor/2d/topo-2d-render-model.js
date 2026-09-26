@@ -103,7 +103,6 @@ export function buildTopo2DRenderModel({
 			(route.variants || []).some((variant) => isSelected('variant', variant.id));
 		const addRouteLine = ({
 			points,
-			id: _id,
 			label,
 			pitchId = null,
 			variantId = null,
@@ -145,7 +144,6 @@ export function buildTopo2DRenderModel({
 			route.pitches.forEach((pitch, pitchIndex) =>
 				addRouteLine({
 					points: pitch.points2D,
-					id: pitch.id,
 					label: formatPitchLabel(pitch, pitchIndex),
 					pitchId: pitch.id,
 					routeObject: pitch
@@ -154,7 +152,6 @@ export function buildTopo2DRenderModel({
 			if (route.pitches[0]?.points2D?.length) {
 				addRouteLine({
 					points: route.pitches[0].points2D,
-					id: route.id,
 					label: index + 1,
 					routeObject: route,
 					labelOnly: true
@@ -163,14 +160,13 @@ export function buildTopo2DRenderModel({
 			(route.variants || []).forEach((variant, variantIndex) =>
 				addRouteLine({
 					points: variant.points2D,
-					id: variant.id,
 					label: formatVariantLabel(variant, variantIndex),
 					variantId: variant.id,
 					routeObject: variant
 				})
 			);
 		} else {
-			addRouteLine({ points: route.points2D, id: route.id, label: index + 1, routeObject: route });
+			addRouteLine({ points: route.points2D, label: index + 1, routeObject: route });
 		}
 	});
 

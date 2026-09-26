@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { SelectTool } from './SelectTool.svelte.js';
 import { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
 

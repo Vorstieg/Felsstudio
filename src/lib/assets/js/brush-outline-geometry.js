@@ -54,23 +54,6 @@ function pointLineDistance(point, start, end) {
 	);
 }
 
-function simplifyOpen(points, tolerance) {
-	if (points.length <= 2 || tolerance <= 0) return points;
-	let largestDistance = 0;
-	let largestIndex = 0;
-	for (let index = 1; index < points.length - 1; index++) {
-		const candidateDistance = pointLineDistance(points[index], points[0], points.at(-1));
-		if (candidateDistance > largestDistance) {
-			largestDistance = candidateDistance;
-			largestIndex = index;
-		}
-	}
-	if (largestDistance <= tolerance) return [points[0], points.at(-1)];
-	const left = simplifyOpen(points.slice(0, largestIndex + 1), tolerance);
-	const right = simplifyOpen(points.slice(largestIndex), tolerance);
-	return [...left.slice(0, -1), ...right];
-}
-
 function signedArea(points) {
 	let area = 0;
 	for (let index = 0; index < points.length; index++) {
@@ -328,6 +311,3 @@ export function createBrushMaskOutline(
 	outline.push([...outline[0]]);
 	return isValidBrushOutline(outline, canvasSize) ? outline : [];
 }
-
-/** Backward-compatible name used by the drawing tool. */
-export const createBrushOutline = createBrushMaskOutline;

@@ -1,5 +1,8 @@
 import { generateId, generateRouteId } from '$lib/assets/js/id-utils.ts';
-import { workspaceDocumentPaths, workspaceNodeDocumentPaths } from '$lib/assets/js/workspace-paths.ts';
+import {
+	workspaceDocumentPaths,
+	workspaceNodeDocumentPaths
+} from '$lib/assets/js/workspace-paths.ts';
 import {
 	assignTopoPath,
 	createPathFeature,
@@ -65,7 +68,10 @@ export function createCragRouteTool({
 		const node = sectorId
 			? active?.childEntries.find((child) => child.entry?.properties.id === sectorId)
 			: active;
-		const sectorPaths = workspaceDocumentPaths(node?.path || '', String(node?.entry?.properties.id || ''));
+		const sectorPaths = workspaceDocumentPaths(
+			node?.path || '',
+			String(node?.entry?.properties.id || '')
+		);
 		return {
 			path: sectorPaths.topo,
 			node,

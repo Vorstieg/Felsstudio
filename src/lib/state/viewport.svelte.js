@@ -28,8 +28,7 @@ export function initViewport() {
 		const height = window.innerHeight;
 		const isPortrait = height > width;
 		const isLandscape = !isPortrait;
-		const isTouch =
-			'ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+		const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
 		viewport.width = width;
 		viewport.height = height;

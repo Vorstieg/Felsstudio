@@ -19,8 +19,7 @@
 		topoJsonText = $bindable(''),
 		topoJsonError = '',
 		onformatjson,
-		onapplyjson,
-		mobile = false
+		onapplyjson
 	} = $props();
 
 	function updateTopoField(field, value) {

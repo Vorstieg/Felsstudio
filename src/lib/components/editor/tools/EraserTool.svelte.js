@@ -5,13 +5,13 @@ export class EraserTool {
 		this.state = editor;
 	}
 
-	onMouseDown(event, point) {
+	onMouseDown(_event, point) {
 		this.state.deleteSymbolAt(point);
 	}
 
-	onMouseMove(event, point) {}
-	onMouseUp(event, point) {}
-	onKeyDown(event) {}
+	onMouseMove() {}
+	onMouseUp() {}
+	onKeyDown() {}
 	onActivate() {}
 	onDeactivate() {}
 }

@@ -556,10 +556,9 @@ export function createTopo2DEditorState({ topo, getTopo, setTopo, ui, viewport =
 	}
 
 	function pasteSelection(canvasSize = state.viewport) {
-		let count = 0;
 		return commit('Paste selection', () => {
 			const topo = readTopo();
-			const dx = (PASTE_OFFSET_PX * (count = 1)) / (canvasSize.baseWidth || 1);
+			const dx = PASTE_OFFSET_PX / (canvasSize.baseWidth || 1);
 			const dy = PASTE_OFFSET_PX / (canvasSize.baseHeight || 1);
 			const pasted = [];
 			for (const { type, item } of state.clipboard) {

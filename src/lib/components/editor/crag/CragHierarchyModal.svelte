@@ -8,7 +8,8 @@
 		cragSlug = $bindable(''),
 		knownFolders = new Set(),
 		hierarchyError = '',
-		onClose
+		onClose,
+		onCancel = onClose
 	} = $props();
 
 	let modalCard = $state();
@@ -28,20 +29,20 @@
 	}
 
 	function handleBackdropClick(event) {
-		if (event.target === event.currentTarget) onClose?.();
+		if (event.target === event.currentTarget) onCancel?.();
 	}
 
 	function handleKeydown(event) {
 		if (event.key === 'Escape') {
 			event.preventDefault();
-			onClose?.();
+			onCancel?.();
 		}
 	}
 
 	function handleBackdropKeydown(event) {
 		if (event.key === 'Enter' || event.key === ' ') {
 			event.preventDefault();
-			onClose?.();
+			onCancel?.();
 		}
 	}
 </script>
@@ -71,7 +72,7 @@
 				<p class="text-ui-label !m-0">Choose where this crag lives in the folder tree</p>
 			</div>
 			<button
-				onclick={onClose}
+				onclick={onCancel}
 				aria-label="Close"
 				class="w-7 h-7 flex items-center justify-center rounded-sm hover:bg-black/5 transition-none border border-transparent hover:border-black/10"
 			>

@@ -1,16 +1,10 @@
-import { goto } from '$app/navigation';
-import { resolve } from '$app/paths';
 import { fileUrl, readJson } from '$lib/api/felslager.ts';
 import { draftsState } from '$lib/state/drafts.svelte.js';
 import { Topo } from '$lib/assets/js/topo-paths.js';
 import { initializeIdCounters } from '$lib/assets/js/id-utils.ts';
 import { loadGlbIntoEditorState } from '$lib/assets/js/gltf-loader.ts';
 import { normalizeTopoPaths } from '$lib/assets/js/topo-document-paths.js';
-import {
-	getCragEntryPath,
-	getTopoEditorPath,
-	splitEntryPath
-} from '$lib/assets/js/editor-entry-paths.js';
+import { getCragEntryPath, splitEntryPath } from '$lib/assets/js/editor-entry-paths.js';
 
 export async function persistTopoSessionImmediately(topoSession, snapshot = (value) => value) {
 	draftsState.load();
@@ -28,13 +22,6 @@ export async function persistTopoSessionImmediately(topoSession, snapshot = (val
 
 function getCragDirectory(topo) {
 	return [topo.path, topo.cragId].filter(Boolean).join('/');
-}
-
-export { getTopoEditorPath };
-
-export function getTopoSourceEntryPath(entryPath) {
-	const splitPath = splitEntryPath(entryPath);
-	return new Topo(splitPath.path, splitPath.id)._getPath();
 }
 
 export async function loadTopoEditorEntry({ crag, entryPath, workspace, topoSession }) {
@@ -109,17 +96,4 @@ export async function loadTopoEditorEntry({ crag, entryPath, workspace, topoSess
 	topoSession.topo._topoFileName = topo.getTopoPath();
 
 	return { loadedTopo, topo };
-}
-
-export async function openTopoEditorEntry({ crag, workspace, topoSession, snapshot }) {
-	const { loadedTopo } = await loadTopoEditorEntry({ crag, workspace, topoSession });
-
-	if (workspace.startsWith('/topos/3d') && !loadedTopo) {
-		const draftId = await persistTopoSessionImmediately(topoSession, snapshot);
-		goto(`${resolve('/topos/3d/upload')}?draft=${encodeURIComponent(draftId)}`);
-		return;
-	}
-
-	await persistTopoSessionImmediately(topoSession, snapshot);
-	goto(`${resolve(workspace)}?draft=${encodeURIComponent(topoSession.ui.activeDraftId)}`);
 }

@@ -49,6 +49,31 @@ describe('getHierarchySourceRefs', () => {
 		expect(workspace.entry.properties.assets).toEqual(assets);
 		expect(workspace.entry.properties).not.toHaveProperty('sectors');
 	});
+	it('retains a moved child when loading its destination parent', async () => {
+		const feature = {
+			type: 'Feature',
+			properties: { id: 'wall', kind: 'crag' },
+			geometry: null
+		};
+		const reader = async (path) => {
+			if (path.endsWith('/wall.json')) return feature;
+			throw Error(`Failed to read ${path}: 404 Not Found`);
+		};
+		const workspace = await loadFelsEntryWorkspace('wall', reader);
+		workspace.childEntries.push({
+			entry: { ...feature, properties: { id: 'north', kind: 'sector' } },
+			path: 'wall',
+			sourcePath: 'old/north',
+			childEntries: [],
+			topo: null,
+			access: null,
+			dirtyPaths: [],
+			removedPaths: [],
+			images: []
+		});
+		await loadFelsEntryWorkspaceDetails(workspace, 'wall', reader, async () => []);
+		expect(workspace.childEntries.map((child) => child.entry?.properties.id)).toEqual(['north']);
+	});
 
 	it('loads only the opened feature initially, then loads selected documents and direct children', async () => {
 		const files = {

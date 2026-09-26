@@ -8,13 +8,13 @@ export class SymbolTool {
 
 	selectedType = 'bolt';
 
-	onMouseDown(event, point) {
+	onMouseDown(_event, point) {
 		this.state.createSymbol(point, this.selectedType);
 	}
 
-	onMouseMove(event, point) {}
-	onMouseUp(event, point) {}
-	onKeyDown(event) {}
+	onMouseMove() {}
+	onMouseUp() {}
+	onKeyDown() {}
 	onActivate() {}
 	onDeactivate() {}
 }

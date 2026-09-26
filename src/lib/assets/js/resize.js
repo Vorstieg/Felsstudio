@@ -263,7 +263,7 @@ export function resize(element) {
 		}
 	}
 
-	function onContentTouchEnd(_) {
+	function onContentTouchEnd() {
 		if (contentDragActive) {
 			onMouseup();
 			contentDragActive = false;

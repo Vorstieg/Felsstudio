@@ -315,7 +315,6 @@
 		{detectedAssets}
 		{isDetectionLoading}
 		{isDetectionZoomLimited}
-		{activeTrackTarget}
 		bind:selectedObject
 		{saveStatus}
 	/>

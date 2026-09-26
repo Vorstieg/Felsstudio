@@ -138,7 +138,9 @@ export function validateWorkspaceHierarchy(
 		const id = entryId(node);
 		const key = workspaceEntryPath(node);
 		const kind = node.entry?.properties.kind || 'area';
-		if (!validEntryId(id)) errors.push(invalidIdError(key, kind, id));
+		// A move across top-level folders uses an empty, path-only root to hold both branches.
+		if (!(node === root && !node.entry && !id) && !validEntryId(id))
+			errors.push(invalidIdError(key, kind, id));
 		const seen = new Set<string>();
 		for (const child of node.childEntries) {
 			const childId = entryId(child);
@@ -425,14 +427,65 @@ export function createCragEditorSession(): CragEditorSession {
 		remapWorkspacePaths(entryPath: string, parentPath: string) {
 			const node = this.getWorkspaceEntry(entryPath);
 			if (!node) return;
+			const sourceParent = this.getWorkspaceEntry(node.path);
 			const destination = [parentPath, entryId(node)].filter(Boolean).join('/');
 			if (
 				entryPath === destination ||
+				this.getWorkspaceEntry(destination) ||
 				parentPath === entryPath ||
 				parentPath.startsWith(`${entryPath}/`)
 			)
 				return;
 			this.commit('Move entry', () => {
+				// The picker can select a folder that was not loaded into this workspace.
+				// Add path-only ancestors so the moved node stays reachable for edits and saving.
+				let destinationParent = this.getWorkspaceEntry(parentPath);
+				if (sourceParent && !destinationParent && this.workspace) {
+					const placeholder = (path: string, id: string): FelsEntryWorkspace => ({
+						entry: null,
+						id,
+						path,
+						childEntries: [],
+						topo: null,
+						access: null,
+						dirtyPaths: [],
+						removedPaths: [],
+						images: []
+					});
+					while (
+						this.workspace &&
+						workspaceEntryPath(this.workspace) !== '' &&
+						parentPath !== workspaceEntryPath(this.workspace) &&
+						!parentPath.startsWith(`${workspaceEntryPath(this.workspace)}/`)
+					) {
+						const rootPath = workspaceEntryPath(this.workspace);
+						const parent = rootPath.split('/').slice(0, -1).join('/');
+						const ancestor = placeholder(
+							parent.split('/').slice(0, -1).join('/'),
+							parent.split('/').at(-1) || ''
+						);
+						ancestor.childEntries.push(this.workspace);
+						this.workspace = ancestor;
+					}
+					let branch = this.workspace;
+					const rootPath = workspaceEntryPath(branch);
+					for (const id of parentPath.slice(rootPath.length).split('/').filter(Boolean)) {
+						const childPath = workspaceEntryPath(branch);
+						let child = branch.childEntries.find((candidate) => entryId(candidate) === id);
+						if (!child) {
+							child = placeholder(childPath, id);
+							branch.childEntries.push(child);
+						}
+						branch = child;
+					}
+					destinationParent = branch;
+				}
+				if (destinationParent && sourceParent && destinationParent !== sourceParent) {
+					const index = sourceParent.childEntries.indexOf(node);
+					if (index >= 0) sourceParent.childEntries.splice(index, 1);
+					if (!destinationParent.childEntries.includes(node))
+						destinationParent.childEntries.push(node);
+				}
 				const visit = (candidate: FelsEntryWorkspace) => {
 					const oldPath = workspaceEntryPath(candidate);
 					candidate.path =

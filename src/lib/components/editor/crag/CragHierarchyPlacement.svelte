@@ -5,6 +5,7 @@
 	import { listDir } from '$lib/api/felslager.ts';
 	import CragHierarchyModal from './CragHierarchyModal.svelte';
 	import { slugifyName, normalizePath } from '$lib/components/editor/crag/crag-editor-paths.js';
+	import { destinationEntryExists } from './crag-hierarchy-destination.js';
 
 	let { compact = false } = $props();
 	let knownFolders = $state(new Set());
@@ -14,6 +15,8 @@
 	let draftParentPath = $state('');
 	let cragSlug = $state('');
 	let showModal = $state(false);
+	let checkingDestination = false;
+	let destinationCheck = 0;
 
 	const finalPath = $derived(normalizePath([parentPath, cragSlug].filter(Boolean).join('/')));
 	const breadcrumbParts = $derived(getBreadcrumbParts(finalPath));
@@ -55,9 +58,46 @@
 		showModal = true;
 	}
 
-	function closeModal() {
+	function cancelModal() {
+		destinationCheck++;
+		checkingDestination = false;
+		showModal = false;
+		hierarchyError = '';
+	}
+
+	async function closeModal() {
+		if (checkingDestination) return;
 		const node = cragEditorState.getActiveWorkspaceEntry();
-		if (node) cragEditorState.remapWorkspacePaths(cragEditorState.getWorkspaceEntryPath(node), normalizePath(draftParentPath));
+		const entryPath = node && cragEditorState.getWorkspaceEntryPath(node);
+		const destinationParent = normalizePath(draftParentPath);
+		const destination = normalizePath(
+			[destinationParent, node?.entry?.properties.id || node?.id].filter(Boolean).join('/')
+		);
+		if (node && entryPath !== destination) {
+			if (cragEditorState.getWorkspaceEntry(destination)) {
+				hierarchyError = `An entry already exists at ${destination}.`;
+				return;
+			}
+			checkingDestination = true;
+			const checkId = ++destinationCheck;
+			try {
+				const exists = await destinationEntryExists(destinationParent, node.entry?.properties.id || node.id);
+				if (checkId !== destinationCheck) return;
+				if (exists) {
+					hierarchyError = `An entry already exists at ${destination}.`;
+					return;
+				}
+			} catch (error) {
+				if (checkId !== destinationCheck) return;
+				hierarchyError = 'Could not check the destination folder.';
+				return;
+			} finally {
+				if (checkId === destinationCheck) checkingDestination = false;
+			}
+			if (checkId !== destinationCheck) return;
+			cragEditorState.remapWorkspacePaths(entryPath, destinationParent);
+		}
+		hierarchyError = '';
 		showModal = false;
 	}
 </script>
@@ -120,5 +160,6 @@
 		{hierarchyError}
 		bind:parentPath={draftParentPath}
 		onClose={closeModal}
+		onCancel={cancelModal}
 	/>
 {/if}

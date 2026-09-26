@@ -12,7 +12,6 @@
 		detectedAssets = [],
 		isDetectionLoading = false,
 		isDetectionZoomLimited = false,
-		activeTrackTarget = null,
 		selectedObject = $bindable(null),
 		saveStatus = 'idle'
 	} = $props();
@@ -37,7 +36,7 @@
 	{#if activeTab === 'info'}
 		<CragEditorInfoTab {saveStatus} />
 	{:else if activeTab === 'registry'}
-		<CragEditorRegistryTab {detectedAssets} {isDetectionLoading} {isDetectionZoomLimited} {activeTrackTarget} bind:selectedObject />
+		<CragEditorRegistryTab {detectedAssets} {isDetectionLoading} {isDetectionZoomLimited} bind:selectedObject />
 	{:else}
 		<CragEditorSectorsTab {map} bind:selectedObject />
 	{/if}

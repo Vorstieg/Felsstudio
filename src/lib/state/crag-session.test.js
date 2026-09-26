@@ -250,6 +250,120 @@ describe('createCragEditorSession workspace state', () => {
 		expect(session.getWorkspaceEntry('country/wall/north')).not.toBeNull();
 		expect(session.getWorkspaceEntry('country/other')).not.toBeNull();
 	});
+	it('moves a child between loaded parents in the workspace tree', () => {
+		const session = createCragEditorSession();
+		session.workspace = workspace();
+		const country = session.workspace;
+		const wall = country.childEntries[0];
+		const other = {
+			entry: createFelsEntry('crag', { id: 'other' }),
+			path: 'country',
+			childEntries: [],
+			topo: null,
+			access: null,
+			dirtyPaths: [],
+			removedPaths: [],
+			images: []
+		};
+		const sector = {
+			entry: createFelsEntry('sector', { id: 'north' }),
+			path: 'country/wall',
+			childEntries: [],
+			topo: null,
+			access: null,
+			dirtyPaths: [],
+			removedPaths: [],
+			images: []
+		};
+		country.childEntries.push(other);
+		wall.childEntries.push(sector);
+		session.activeWorkspaceEntryPath = 'country/wall/north';
+		session.remapWorkspacePaths('country/wall/north', 'country/other');
+		expect(session.getWorkspaceEntry('country/wall').childEntries).toHaveLength(0);
+		expect(session.getWorkspaceEntry('country/other').childEntries).toHaveLength(1);
+		expect(session.getWorkspaceEntry('country/other/north')?.entry.properties.id).toBe('north');
+		expect(session.getActiveWorkspaceEntry()?.entry.properties.id).toBe('north');
+		session.undo();
+		expect(session.getWorkspaceEntry('country/wall/north')).not.toBeNull();
+		expect(session.getWorkspaceEntry('country/other/north')).toBeNull();
+	});
+	it('moves a child into an unloaded folder outside the workspace root', async () => {
+		const session = createCragEditorSession();
+		session.workspace = workspace();
+		const source = session.getWorkspaceEntry('country/wall');
+		const sector = {
+			entry: createFelsEntry('sector', { id: 'north' }),
+			path: 'country/wall',
+			childEntries: [],
+			topo: null,
+			access: null,
+			dirtyPaths: [],
+			sourcePath: 'country/wall/north',
+			removedPaths: [],
+			images: []
+		};
+		source.childEntries.push(sector);
+		session.activeWorkspaceEntryPath = 'country/wall/north';
+		session.remapWorkspacePaths('country/wall/north', 'austria/cliff');
+
+		expect(session.getWorkspaceEntry('country/wall').childEntries).toHaveLength(0);
+		expect(session.getWorkspaceEntry('austria/cliff').childEntries).toHaveLength(1);
+		expect(session.getActiveWorkspaceEntry()?.path).toBe('austria/cliff');
+		expect(session.hierarchyErrors).toEqual([]);
+		expect(session.undo()).toBe(true);
+		expect(session.getWorkspaceEntry('country/wall/north')).not.toBeNull();
+		expect(session.getWorkspaceEntry('austria/cliff/north')).toBeNull();
+		expect(session.redo()).toBe(true);
+
+		const renames = [];
+		await saveCragWorkspace(session.workspace, {
+			rename: async (from, to) => renames.push([from, to]),
+			write: async () => {},
+			remove: async () => {}
+		});
+		expect(renames).toContainEqual(['country/wall/north', 'austria/cliff/north']);
+	});
+	it('does not move onto a child already loaded at the destination', () => {
+		const session = createCragEditorSession();
+		session.workspace = workspace();
+		const wall = session.getWorkspaceEntry('country/wall');
+		const sector = createFelsEntry('sector', { id: 'north' });
+		wall.childEntries.push({
+			entry: sector,
+			path: 'country/wall',
+			childEntries: [],
+			topo: null,
+			access: null,
+			dirtyPaths: [],
+			removedPaths: [],
+			images: []
+		});
+		session.workspace.childEntries.push({
+			entry: createFelsEntry('crag', { id: 'other' }),
+			path: 'country',
+			childEntries: [
+				{
+					entry: createFelsEntry('sector', { id: 'north' }),
+					path: 'country/other',
+					childEntries: [],
+					topo: null,
+					access: null,
+					dirtyPaths: [],
+					removedPaths: [],
+					images: []
+				}
+			],
+			topo: null,
+			access: null,
+			dirtyPaths: [],
+			removedPaths: [],
+			images: []
+		});
+		session.remapWorkspacePaths('country/wall/north', 'country/other');
+		expect(wall.childEntries).toHaveLength(1);
+		expect(session.getWorkspaceEntry('country/other').childEntries).toHaveLength(1);
+		expect(session.history.entries).toHaveLength(0);
+	});
 	it('remaps descendants when moving a root entry into a parent folder', () => {
 		const session = createCragEditorSession();
 		const root = createFelsEntry('crag', { id: 'new-crag' });

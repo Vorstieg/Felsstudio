@@ -296,7 +296,7 @@
 		});
 
 		// Map these as dependencies too
-		const _deps = {
+		void {
 			active: editor.ui.activeTool,
 			selectedRoute: editor.ui.selectedRouteId,
 			selectedPitch: editor.ui.selectedPitchId,

@@ -622,7 +622,7 @@ export function useCragTrackEditor({
 						drag.selectedIndexes.includes(index)
 							? [point[0] + offset[0], point[1] + offset[1]]
 							: point
-					);;
+					);
 					draggingTrackPoint = { ...draggingTrackPoint, coordinate };
 					return;
 				}

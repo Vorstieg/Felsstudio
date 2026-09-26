@@ -14,7 +14,7 @@
 		updateRoutePathFeature: onUpdateRoutePathFeature
 	} = routeTool;
 	const { setHoverHighlight: onSetHoverHighlight, clearDetectedAssets: onClearDetectedAssets, addDetectedAsset: onAddDetectedAsset, removeAccessFeature: onRemoveAccessFeature } = accessEditor;
-	const { editTrack: onEditTrack, removeTrack: onRemoveTrack, finalizeTrack: onFinalizeTrack, cancelTrackEdit: onCancelTrackEdit } = trackEditor;
+	const { editTrack: onEditTrack, removeTrack: onRemoveTrack } = trackEditor;
 	let activeWorkspace = $derived(cragEditorState.getActiveWorkspaceEntry());
 	let topoEntries = $derived.by(() => [activeWorkspace, ...(activeWorkspace?.childEntries || [])].flatMap((node) =>
 		node?.entry?.properties.id && node.topo ? [{ path: `${node.path}/${node.entry.properties.id}/${node.entry.properties.id}-topo.json`, data: node.topo }] : []
@@ -24,7 +24,6 @@
 		detectedAssets = [],
 		isDetectionLoading = false,
 		isDetectionZoomLimited = false,
-		activeTrackTarget = null,
 		selectedObject = $bindable(null)
 	} = $props();
 	let accessFeatures = $derived(activeWorkspace?.access?.features || []);

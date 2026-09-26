@@ -1,5 +1,5 @@
 import { generateOutlineId } from '$lib/assets/js/id-utils.ts';
-import { createBrushOutline } from '$lib/assets/js/brush-outline-geometry.js';
+import { createBrushMaskOutline } from '$lib/assets/js/brush-outline-geometry.js';
 import { findBrushImageEdge } from '$lib/assets/js/brush-edge-assist.js';
 import {
 	CIRCLE_SEGMENTS,
@@ -285,7 +285,7 @@ export class OutlineTool {
 	}
 
 	createBrushOutline() {
-		return createBrushOutline(this.brushPoints, {
+		return createBrushMaskOutline(this.brushPoints, {
 			brushRadiusPx: this.brushSizePx / 2,
 			canvasSize: this.canvasSize,
 			simplifyTolerancePx: this.freehandSmoothingPx

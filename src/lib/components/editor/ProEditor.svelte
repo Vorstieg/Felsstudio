@@ -20,7 +20,6 @@
 	} from '$lib/state/topo-2d-editor-state.svelte.js';
 	import { isBlankTopoSession } from '$lib/state/drafts.svelte.js';
 	import { useTopoDraftAutosave } from '$lib/components/editor/use-topo-draft-autosave.svelte.js';
-	import { isMobileViewport } from '$lib/assets/js/mobile-utils.ts';
 
 	// 2D Editor imports
 
@@ -88,11 +87,7 @@
 
 	let element = $state();
 	let loadedGltfScene = $state(null);
-	let isLoadingGltf = $state(false);
-	let gltfError = $state('');
-
 	let showMapModal = $state(false);
-	let isMobile = $state(false);
 
 	// --- Camera Focus Logic (Svelte Native Animation) ---
 	const cameraPosStore = tweened([0, 1, 5], {
@@ -164,13 +159,6 @@
 	});
 
 	onMount(async () => {
-		// Initialize mobile detection (client-side only)
-		isMobile = isMobileViewport();
-		const handleResize = () => {
-			isMobile = isMobileViewport();
-		};
-		window.addEventListener('resize', handleResize);
-
 		const handleKeyDown = (e) => {
 			if (activeTool === 'crop') {
 				if (e.key === 'Delete' || e.key === 'Del') applyLassoCut();
@@ -185,7 +173,6 @@
 		window.addEventListener('keydown', handleKeyDown);
 		window.addEventListener('keyup', handleKeyUp);
 		return () => {
-			window.removeEventListener('resize', handleResize);
 			window.removeEventListener('keydown', handleKeyDown);
 			window.removeEventListener('keyup', handleKeyUp);
 		};
@@ -257,7 +244,6 @@
 	});
 
 	async function loadGlbFromUrl(url) {
-		isLoadingGltf = true;
 		const loader = createGltfLoader();
 		try {
 			const gltf = await loader.loadAsync(url);
@@ -280,9 +266,6 @@
 			loadedGltfScene = gltf.scene;
 		} catch (err) {
 			console.error('Error loading GLB from state URL', err);
-			gltfError = err.message;
-		} finally {
-			isLoadingGltf = false;
 		}
 	}
 

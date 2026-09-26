@@ -819,12 +819,6 @@
 		source.setData(
 			buildEditorFeatureCollection({
 				savedAccessFeatures: $state.snapshot(activeAccess.features) || [],
-				routes: workspaceTopos.flatMap((document) =>
-					(document.data?.routes || []).map((route) => ({
-						key: `${document.path}:${route.id}`,
-						route: $state.snapshot(route)
-					}))
-				),
 				routePaths: workspaceTopos.flatMap((document) =>
 					(document.data?.paths?.features || []).map((feature, pathIndex) => ({
 						documentPath: document.path,
@@ -846,7 +840,6 @@
 				selectedTrackPointIndexes,
 				activeTrackTarget,
 				draggingTrackPointIndex: untrack(() => activeTrackDragState?.pointIndex ?? null),
-				flightPlan: $state.snapshot(flightPlan)
 			})
 		);
 		syncFlightPlanPreview(map, $state.snapshot(flightPlan));
@@ -944,9 +937,10 @@
 
 	function setActiveMetadataId(value) {
 		const target = cragEditorState.activeMetadataTarget;
+		const node = cragEditorState.getWorkspaceEntry(target);
 		cragEditorState.setMetadataField('id', value);
-		if (selectedObject?.type === 'entry' && target && selectedObject.key === target)
-			selectedObject = { type: 'entry', key: target.replace(/[^/]+$/, value) };
+		if (selectedObject?.type === 'entry' && target && selectedObject.key === target && node)
+			selectedObject = { type: 'entry', key: cragEditorState.getWorkspaceEntryPath(node) };
 	}
 
 	function getCragTrackFeature(target) {
