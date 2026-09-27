@@ -1,7 +1,10 @@
-<script>
+<script lang="ts">
 	import ToolPalette2D from '$lib/components/editor/2d/ToolPalette2D.svelte';
-	import { createTopo2DEditorState, provideTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
-	import { useTopoDraftAutosave } from '$lib/components/editor/use-topo-draft-autosave.svelte.js';
+	import {
+		createTopo2DEditorState,
+		provideTopo2DEditorState
+	} from '$lib/state/topo-2d-editor-state.svelte.ts';
+	import { useTopoDraftAutosave } from '$lib/components/editor/use-topo-draft-autosave.svelte.ts';
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.ts';
 	import Topo2DEditor from '$lib/components/editor/2d/Topo2DEditor.svelte';
 	import OutlineToolOptions from '$lib/components/editor/tools/OutlineToolOptions.svelte';
@@ -11,32 +14,43 @@
 		createOutlineGridOptionsLogic,
 		createSelectedOutlineCurveLogic,
 		createSelectedOutlineStyleLogic
-	} from '$lib/components/editor/tools/outline-tool-options-logic.js';
-	import { createPathDrawingOptionsLogic } from '$lib/components/editor/tools/path-drawing-logic.js';
+	} from '$lib/components/editor/tools/outline-tool-options-logic.ts';
+	import { createPathDrawingOptionsLogic } from '$lib/components/editor/tools/path-drawing-logic.ts';
 	import TextToolOptions from '$lib/components/editor/tools/TextToolOptions.svelte';
+	import type { TextTool } from '$lib/components/editor/tools/TextTool.svelte.ts';
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
 	import TopoPropertiesPanel from '$lib/components/editor/TopoPropertiesPanel.svelte';
-	import { authState } from '$lib/api/auth.svelte.js';
+	import { authState } from '$lib/api/auth.svelte.ts';
 	import { writeJson } from '$lib/api/felslager.ts';
 	import { topoSymbols } from '@vorstieg/topo-renderer';
 	import { _ } from 'svelte-i18n';
 	import { browser } from '$app/environment';
 	import { untrack } from 'svelte';
-	import { loadTopoEditorEntry } from '$lib/assets/js/open-topo-editor-entry.js';
+	import { loadTopoEditorEntry } from '$lib/assets/js/open-topo-editor-entry.ts';
 	import { isMobileViewport } from '$lib/assets/js/mobile-utils.ts';
+	import { RouteTool } from '$lib/components/editor/tools/RouteTool.svelte.ts';
+	import { OutlineTool } from '$lib/components/editor/tools/OutlineTool.svelte.ts';
 
-	let { entryPath = null } = $props();
+	let { entryPath = null }: { entryPath?: string | null } = $props();
 	const initialEntryPath = untrack(() => entryPath);
 	const editorState = provideTopo2DEditorState(createTopo2DEditorState());
 	let toolOptionsOpen = $state(false);
 	let showMapModal = $state(false);
-	let editor2D = $state();
-	let saveStatus = $state();
-	let saveError = $state();
+	let editor2D = $state<ReturnType<typeof Topo2DEditor> | null>(null);
+	let routeTool = $derived.by(() => {
+		const tool = editor2D?.getCurrentTool();
+		return tool instanceof RouteTool ? tool : null;
+	});
+	let outlineTool = $derived.by(() => {
+		const tool = editor2D?.getCurrentTool();
+		return tool instanceof OutlineTool ? tool : null;
+	});
+	let saveStatus = $state<'idle' | 'success' | 'error' | undefined>();
+	let saveError = $state<string | undefined>();
 	let outlineSimplifyTolerancePx = $state(2);
 	let outlineSimplifySummary = $state('');
 	let outlineEditTool = $derived(editor2D?.getOutlineEditTool?.() || null);
-	let lastOpenedOutlineEditId = $state(null);
+	let lastOpenedOutlineEditId = $state<string | number | null>(null);
 	let isEditingSelectedPath = $derived.by(() => {
 		if (editorState.ui.activeTool !== 'select') return false;
 
@@ -75,11 +89,11 @@
 		() => editorState.ui.selectedOutlineId
 	);
 	const routeDrawingActions = createPathDrawingOptionsLogic({
-		getGridTool: () => editor2D?.getCurrentTool?.(),
-		getCurveTarget: () => editor2D?.getCurrentTool?.(),
+		getGridTool: () => routeTool,
+		getCurveTarget: () => routeTool,
 		updateCurve: (tool, changes) => {
-			if ('enabled' in changes) tool.curveEnabled = changes.enabled;
-			if ('tension' in changes) tool.curveTension = changes.tension;
+			if (changes.enabled !== undefined) tool.curveEnabled = changes.enabled;
+			if (changes.tension !== undefined) tool.curveTension = changes.tension;
 		}
 	});
 
@@ -118,9 +132,9 @@
 		session: editorState,
 		draftId: browser ? new URL(window.location.href).searchParams.get('draft') : null,
 		entryPath: initialEntryPath,
-		loadEntrySession: async () => {
+		loadEntrySession: async (entryPath) => {
 			await loadTopoEditorEntry({
-				entryPath: initialEntryPath,
+				entryPath,
 				workspace: '/topos/2d/editor',
 				topoSession: editorState
 			});
@@ -164,7 +178,10 @@
 			delete topoToSave._topoFileName;
 			delete topoToSave.name;
 
-			await writeJson(editorState.topo._topoFileName, topoToSave);
+			const fileName = editorState.topo._topoFileName;
+			if (typeof fileName !== 'string' || !fileName)
+				throw new Error('Topo file path is unavailable');
+			await writeJson(fileName, topoToSave);
 			editorState.markSaved();
 
 			saveStatus = 'success';
@@ -174,7 +191,7 @@
 		} catch (err) {
 			console.error('Save failed:', err);
 			saveStatus = 'error';
-			saveError = err.message;
+			saveError = err instanceof Error ? err.message : String(err);
 		}
 	}
 
@@ -193,10 +210,9 @@
 	bind:activeTool={editorState.ui.activeTool}
 	bind:toolOptionsOpen
 	bind:selectedSymbol={editorState.ui.selectedSymbol}
-	bind:selectedOutlineStyle={editorState.ui.selectedOutlineStyle}
 	hasPendingChanges={editorState.hasPendingChanges}
-	onFinishRoute={() => editor2D.finalize()}
-	onCancelAction={() => editor2D.cancel()}
+	onFinishRoute={() => editor2D?.finalize()}
+	onCancelAction={() => editor2D?.cancel()}
 	onUndo={() => editor2D?.undo()}
 	onRedo={() => editor2D?.redo()}
 	onExport={saveTopo}
@@ -206,14 +222,13 @@
 {#if hasVisibleToolOptions}
 	{#if editorState.ui.activeTool === 'outline'}
 		<OutlineToolOptions
-			outlineTool={editor2D?.getCurrentTool?.()}
-			activeTool={editorState.ui.activeTool}
+			{outlineTool}
 			bind:selectedOutlineStyle={editorState.ui.selectedOutlineStyle}
 			onClose={() => (toolOptionsOpen = false)}
 		/>
 	{:else if editorState.ui.activeTool === 'text'}
 		<TextToolOptions
-			textTool={editor2D?.getCurrentTool?.()}
+			textTool={editor2D?.getCurrentTool?.() as TextTool | undefined}
 			open={toolOptionsOpen}
 			onClose={() => (toolOptionsOpen = false)}
 		/>
@@ -223,7 +238,6 @@
 			open={toolOptionsOpen}
 			onClose={() => (toolOptionsOpen = false)}
 		>
-			{@const routeTool = editor2D?.getCurrentTool?.()}
 			<PathDrawingOptions
 				snapToGrid={routeTool?.snapToGrid}
 				gridSize={routeTool?.gridSize}

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import ProEditor from '$lib/components/editor/ProEditor.svelte';
 	import ClusteringPanel from '$lib/components/editor/ClusteringPanel.svelte';
 </script>

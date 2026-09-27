@@ -21,7 +21,7 @@ test('supports outline and path geometry workflows', async () => {
 		movePathVertex,
 		removePathVertex,
 		translatePath
-	} = await vite.ssrLoadModule('/src/lib/assets/js/path-geometry.js');
+	} = await vite.ssrLoadModule('/src/lib/assets/js/path-geometry.ts');
 	const {
 		OUTLINE_PRESETS,
 		OUTLINE_SHAPE_TYPES,
@@ -41,12 +41,12 @@ test('supports outline and path geometry workflows', async () => {
 		simplifyPoints,
 		translateOutline,
 		updatePresetOutline
-	} = await vite.ssrLoadModule('/src/lib/assets/js/outline-geometry.js');
+	} = await vite.ssrLoadModule('/src/lib/assets/js/outline-geometry.ts');
 	const { createBrushMaskOutline, isValidBrushOutline } = await vite.ssrLoadModule(
-		'/src/lib/assets/js/brush-outline-geometry.js'
+		'/src/lib/assets/js/brush-outline-geometry.ts'
 	);
 	const { createBrushMaskPredicate, findBrushImageEdge } = await vite.ssrLoadModule(
-		'/src/lib/assets/js/brush-edge-assist.js'
+		'/src/lib/assets/js/brush-edge-assist.ts'
 	);
 
 	const open = [

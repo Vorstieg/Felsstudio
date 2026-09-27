@@ -12,7 +12,7 @@ vi.mock('$lib/api/felslager.ts', () => ({
 	clearCredentials: credentials.clear
 }));
 
-import { authState } from './auth.svelte.js';
+import { authState } from './auth.svelte.ts';
 
 describe('authState', () => {
 	beforeEach(() => {

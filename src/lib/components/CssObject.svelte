@@ -1,14 +1,27 @@
-<script>
+<script lang="ts">
 	import { T, useThrelte, useTask } from '@threlte/core';
 	import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 	import { Vector3 } from 'three';
+	import type { Snippet } from 'svelte';
 
-	// Use $props() to get pointerEvents and restProps (like position)
-	let { position, pointerEvents = false, scaleWithZoom = false, referenceDistance = 15, children } = $props();
+	type Props = {
+		position: [number, number, number] | Vector3;
+		pointerEvents?: boolean;
+		scaleWithZoom?: boolean;
+		referenceDistance?: number;
+		children?: Snippet<[{ ref?: CSS2DObject }?]>;
+	};
+	let {
+		position,
+		pointerEvents = false,
+		scaleWithZoom = false,
+		referenceDistance = 15,
+		children
+	}: Props = $props();
 
-	let element = $state(); // Bind to the wrapper div element
-	let innerElement = $state();
-	let cssObject = $state();
+	let element = $state<HTMLDivElement | undefined>();
+	let innerElement = $state<HTMLDivElement | undefined>();
+	let cssObject = $state<CSS2DObject | undefined>();
 
 	const { camera } = useThrelte();
 	const vec = new Vector3();
@@ -29,29 +42,29 @@
 			innerElement.style.transform = `scale(${scale})`;
 		}
 	});
-	</script>
+</script>
 
-	<div
+<div
 	bind:this={element}
 	style:pointer-events={pointerEvents ? 'auto' : 'none'}
 	style:position="absolute"
 	style:user-select="none"
 	style:will-change="transform"
-	>
+>
 	<div bind:this={innerElement} style:transition="transform 0.1s linear">
 		{@render children?.()}
 	</div>
-	</div>
+</div>
 
-	{#if element !== undefined}
+{#if element !== undefined}
 	<T
 		is={CSS2DObject}
 		args={[element]}
 		bind:ref={cssObject}
-	{position}
+		position={position instanceof Vector3 ? position.toArray() : position}
 	>
 		{#snippet children({ ref })}
 			{@render children?.({ ref })}
 		{/snippet}
 	</T>
-	{/if}
+{/if}

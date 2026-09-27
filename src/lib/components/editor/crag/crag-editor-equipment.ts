@@ -5,9 +5,9 @@ type EquipmentItem = {
 };
 
 export function addEquipment(
-	equipment: EquipmentItem[] = [],
+	equipment: unknown[] = [],
 	item: EquipmentItem = { name: 'Expressschlingen', amount: 12 }
-): EquipmentItem[] {
+): unknown[] {
 	return [...equipment, item];
 }
 

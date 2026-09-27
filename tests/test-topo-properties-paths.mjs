@@ -10,7 +10,7 @@ test('adds and removes topo property path assets', async () => {
 		appType: 'custom'
 	});
 	const { addPathAsset, removePathAsset } = await vite.ssrLoadModule(
-		'/src/lib/components/editor/topo-properties/topo-properties-utils.js'
+		'/src/lib/components/editor/topo-properties/topo-properties-utils.ts'
 	);
 
 	const document = {

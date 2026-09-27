@@ -1,5 +1,14 @@
-<script>
+<script lang="ts">
 	import { _ } from 'svelte-i18n';
+	type Props = {
+		isLoading?: boolean;
+		onBack: () => void;
+		onSubmit: () => void | Promise<void>;
+		zipFile?: File | null;
+		glbFile?: File | null;
+		projectFile?: File | null;
+		cropFolderFiles?: File[];
+	};
 
 	let {
 		isLoading = false,
@@ -9,7 +18,7 @@
 		glbFile = $bindable(null),
 		projectFile = $bindable(null),
 		cropFolderFiles = $bindable([])
-	} = $props();
+	}: Props = $props();
 </script>
 
 <div class="space-y-4">
@@ -30,7 +39,7 @@
 				<input
 					type="file"
 					accept=".zip"
-					onchange={(e) => (zipFile = e.target.files[0])}
+					onchange={(e) => (zipFile = e.currentTarget.files?.[0] ?? null)}
 					class="block w-full text-body-text text-near-black file:mr-2 file:py-1 file:px-2 file:rounded file:border file:border-black/15 file:text-ui-label file:bg-white hover:file:bg-black/5 file:transition-none file:cursor-pointer"
 				/>
 			</label>
@@ -49,7 +58,7 @@
 					id="glb-model"
 					type="file"
 					accept=".glb"
-					onchange={(e) => (glbFile = e.target.files[0])}
+					onchange={(e) => (glbFile = e.currentTarget.files?.[0] ?? null)}
 					class="input-studio w-full file:hidden cursor-pointer"
 				/>
 			</div>
@@ -59,7 +68,7 @@
 					id="project-json"
 					type="file"
 					accept=".json"
-					onchange={(e) => (projectFile = e.target.files[0])}
+					onchange={(e) => (projectFile = e.currentTarget.files?.[0] ?? null)}
 					class="input-studio w-full file:hidden cursor-pointer"
 				/>
 			</div>
@@ -70,8 +79,7 @@
 					type="file"
 					multiple
 					webkitdirectory
-					directory
-					onchange={(e) => (cropFolderFiles = Array.from(e.target.files))}
+					onchange={(e) => (cropFolderFiles = Array.from(e.currentTarget.files ?? []))}
 					class="input-studio w-full file:hidden cursor-pointer"
 				/>
 			</div>

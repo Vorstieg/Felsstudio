@@ -10,7 +10,7 @@ test('scales symbols according to the selected handle', async () => {
 		appType: 'custom'
 	});
 	const { SymbolEditTool } = await vite.ssrLoadModule(
-		'/src/lib/components/editor/tools/SymbolEditTool.svelte.js'
+		'/src/lib/components/editor/tools/SymbolEditTool.svelte.ts'
 	);
 
 	const topo = {

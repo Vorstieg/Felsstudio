@@ -1,8 +1,14 @@
-<script>
+<script lang="ts">
 	import { _ } from 'svelte-i18n';
 	import ToolOptions from './ToolOptions.svelte';
+	import type { TextTool } from './TextTool.svelte.ts';
 
-	let { textTool, open = true, onClose } = $props();
+	let {
+		textTool,
+		open = true,
+		onClose
+	}: { textTool?: TextTool | null; open?: boolean; onClose?: (() => void) | null } = $props();
+	const alignments = ['left', 'center', 'right'] as const;
 </script>
 
 <ToolOptions title={$_('ui.text_options')} {open} {onClose}>
@@ -16,7 +22,7 @@
 			max="72"
 			step="1"
 			value={textTool?.fontSize2D ?? 24}
-			onchange={(event) => textTool?.format({ fontSize2D: event.currentTarget.value })}
+				onchange={(event) => textTool?.format({ fontSize2D: Number(event.currentTarget.value) })}
 		/>
 
 		<label class="text-ui-label" for="text-color">{$_('ui.text_color')}</label>
@@ -33,7 +39,7 @@
 			id="text-weight"
 			class="input-studio w-full"
 			value={textTool?.fontWeight ?? 600}
-			onchange={(event) => textTool?.format({ fontWeight: event.currentTarget.value })}
+				onchange={(event) => textTool?.format({ fontWeight: Number(event.currentTarget.value) })}
 		>
 			<option value="400">{$_('ui.regular')}</option>
 			<option value="600">{$_('ui.semibold')}</option>
@@ -42,7 +48,7 @@
 
 		<label class="text-ui-label" for="text-alignment">{$_('ui.text_alignment')}</label>
 		<div id="text-alignment" class="grid grid-cols-3 gap-1">
-			{#each ['left', 'center', 'right'] as alignment}
+				{#each alignments as alignment}
 				<button
 					type="button"
 					class="button-studio"

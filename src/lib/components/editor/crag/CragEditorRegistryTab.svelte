@@ -1,7 +1,40 @@
-<script>
+<script lang="ts">
 	import { _ } from 'svelte-i18n';
+	import type { FelsTopoDocument, PathFeature, Route } from '@vorstieg/fels-types/types';
+	import type { FelsEntryWorkspace } from '$lib/types/crag';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
-	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
+	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.ts';
+	import type { CragSelection } from './crag-route-types.ts';
+	type AccessKind = 'parking' | 'transit' | 'hut' | 'approach';
+	type AccessFeature = {
+		id: string;
+		properties: { kind: AccessKind; name?: string; mode?: 'bus' | 'train'; [key: string]: unknown };
+	};
+	type DetectedAsset = {
+		id: string;
+		name: string;
+		kind: 'parking' | 'transit' | 'hut';
+		mode: 'bus' | 'train' | null;
+		coordinates: [number, number];
+		distance: number;
+	};
+	type SelectedObject = CragSelection;
+	type TopoEntry = { path: string; data: FelsTopoDocument };
+	type RegistryPathFeature = PathFeature & {
+		properties?: {
+			name?: string;
+			description?: string;
+			accessFeatureId?: string;
+			[key: string]: unknown;
+		};
+	};
+	type Props = {
+		detectedAssets?: DetectedAsset[];
+		isDetectionLoading?: boolean;
+		isDetectionZoomLimited?: boolean;
+		selectedObject?: SelectedObject | null;
+	};
+
 	const cragEditorState = getCragEditorSession();
 	const { accessEditor, trackEditor, routeTool } = getCragEditorTools();
 	const {
@@ -13,20 +46,36 @@
 		moveApproachTrackToTopoPaths: onMoveApproachTrackToTopoPaths,
 		updateRoutePathFeature: onUpdateRoutePathFeature
 	} = routeTool;
-	const { setHoverHighlight: onSetHoverHighlight, clearDetectedAssets: onClearDetectedAssets, addDetectedAsset: onAddDetectedAsset, removeAccessFeature: onRemoveAccessFeature } = accessEditor;
+	const {
+		setHoverHighlight: onSetHoverHighlight,
+		clearDetectedAssets: onClearDetectedAssets,
+		addDetectedAsset: onAddDetectedAsset,
+		removeAccessFeature: onRemoveAccessFeature
+	} = accessEditor;
 	const { editTrack: onEditTrack, removeTrack: onRemoveTrack } = trackEditor;
-	let activeWorkspace = $derived(cragEditorState.getActiveWorkspaceEntry());
-	let topoEntries = $derived.by(() => [activeWorkspace, ...(activeWorkspace?.childEntries || [])].flatMap((node) =>
-		node?.entry?.properties.id && node.topo ? [{ path: `${node.path}/${node.entry.properties.id}/${node.entry.properties.id}-topo.json`, data: node.topo }] : []
-	));
+	let activeWorkspace = $derived<FelsEntryWorkspace | null>(
+		cragEditorState.getActiveWorkspaceEntry()
+	);
+	let topoEntries = $derived.by<TopoEntry[]>(() =>
+		[activeWorkspace, ...(activeWorkspace?.childEntries || [])].flatMap((node) =>
+			node?.entry?.properties.id && node.topo
+				? [
+						{
+							path: `${node.path}/${node.entry.properties.id}/${node.entry.properties.id}-topo.json`,
+							data: node.topo
+						}
+					]
+				: []
+		)
+	);
 
 	let {
 		detectedAssets = [],
 		isDetectionLoading = false,
 		isDetectionZoomLimited = false,
 		selectedObject = $bindable(null)
-	} = $props();
-	let accessFeatures = $derived(activeWorkspace?.access?.features || []);
+	}: Props = $props();
+	let accessFeatures = $derived((activeWorkspace?.access?.features || []) as AccessFeature[]);
 	let transitFeatures = $derived(
 		accessFeatures.filter((feature) => feature.properties?.kind === 'transit')
 	);
@@ -49,17 +98,25 @@
 		)
 	);
 
-	function assignedRoutes(document, pathId) {
+	function topoPaths(document: TopoEntry): RegistryPathFeature[] {
+		return (document.data.paths?.features || []) as RegistryPathFeature[];
+	}
+
+	function assignedRoutes(document: TopoEntry, pathId: string | number | undefined): Route[] {
 		return (document.data?.routes || []).filter((route) =>
 			(route.pathRefs || []).some((ref) => String(ref.pathId) === String(pathId))
 		);
 	}
 
-	function isSelectedApproach(track) {
+	function isSelectedApproach(track: AccessFeature): boolean {
 		return selectedObject?.type === 'approach' && selectedObject.id === track.id;
 	}
 
-	function isSelectedPath(document, feature, pathIndex) {
+	function isSelectedPath(
+		document: TopoEntry,
+		feature: RegistryPathFeature,
+		pathIndex: number
+	): boolean {
 		return (
 			selectedObject?.type === 'route-path' &&
 			selectedObject.documentPath === document.path &&
@@ -68,11 +125,11 @@
 		);
 	}
 
-	function selectApproach(track) {
+	function selectApproach(track: AccessFeature): void {
 		selectedObject = { type: 'approach', id: track.id };
 	}
 
-	function selectPath(document, feature, pathIndex) {
+	function selectPath(document: TopoEntry, feature: RegistryPathFeature, pathIndex: number): void {
 		selectedObject = {
 			type: 'route-path',
 			documentPath: document.path,
@@ -81,34 +138,51 @@
 		};
 	}
 
-	function editPath(document, feature, pathIndex) {
+	function editPath(document: TopoEntry, feature: RegistryPathFeature, pathIndex: number): void {
 		selectPath(document, feature, pathIndex);
 		const route = assignedRoutes(document, feature.id)[0];
 		onEditRoutePath(document.path, route?.id, feature.id, pathIndex);
 	}
 
-	function duplicatePath(document, feature) {
-		onDuplicateRoutePath(document.path, null, feature.id);
+	function duplicatePath(document: TopoEntry, feature: RegistryPathFeature): void {
+		onDuplicateRoutePath(document.path, feature.id);
 	}
 
-	function concatPath(event, document, feature, pathIndex) {
+	function concatPath(
+		event: Event & { currentTarget: HTMLSelectElement },
+		document: TopoEntry,
+		feature: RegistryPathFeature,
+		pathIndex: number
+	): void {
 		const appendPathIndex = Number(event.currentTarget.value);
 		if (!Number.isInteger(appendPathIndex)) return;
-		const append = document.data?.paths?.features?.[appendPathIndex];
-		if (append) onConcatRoutePaths(document.path, feature.id, append.id, pathIndex, appendPathIndex);
+		const append = topoPaths(document)[appendPathIndex];
+		if (append)
+			onConcatRoutePaths(document.path, feature.id, append.id, pathIndex, appendPathIndex);
 		event.currentTarget.value = '';
 	}
 
-	function pathLabel(feature, index) {
+	function pathLabel(feature: RegistryPathFeature, index: number): string {
 		return feature.properties?.name || `Path ${index + 1}`;
 	}
 
-	function accessFeatureLabel(feature) {
-		const kindLabel = { parking: 'Parking', hut: 'Hut', transit: 'Transit' }[feature?.properties?.kind] || 'Access';
-		return feature?.properties?.name ? `${feature.properties.name} (${kindLabel})` : `${kindLabel} ${feature?.id || ''}`;
+	function accessFeatureLabel(feature: AccessFeature): string {
+		const kindLabels: Record<AccessKind, string> = {
+			parking: 'Parking',
+			hut: 'Hut',
+			transit: 'Transit',
+			approach: 'Approach'
+		};
+		const kindLabel = kindLabels[feature.properties.kind];
+		return feature?.properties?.name
+			? `${feature.properties.name} (${kindLabel})`
+			: `${kindLabel} ${feature?.id || ''}`;
 	}
 
-	function moveApproachTrack(event, track) {
+	function moveApproachTrack(
+		event: Event & { currentTarget: HTMLSelectElement },
+		track: AccessFeature
+	): void {
 		const documentPath = event.currentTarget.value;
 		if (!documentPath) return;
 		onMoveApproachTrackToTopoPaths(documentPath, track.id);
@@ -119,15 +193,20 @@
 
 <div class="flex flex-col gap-2">
 	{#if isDetectionLoading}
-		<div class="flex items-center gap-2 rounded-sm border border-creator-blue/20 bg-creator-blue/5 p-2 text-ui-label text-creator-blue">
+		<div
+			class="flex items-center gap-2 rounded-sm border border-creator-blue/20 bg-creator-blue/5 p-2 text-ui-label text-creator-blue"
+		>
 			<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
 			<span>Searching nearby access points…</span>
 		</div>
 	{/if}
 	{#if isDetectionZoomLimited}
-		<div class="flex items-start gap-2 rounded-sm border border-amber-500/30 bg-amber-50 p-2 text-ui-label text-amber-800">
+		<div
+			class="flex items-start gap-2 rounded-sm border border-amber-500/30 bg-amber-50 p-2 text-ui-label text-amber-800"
+		>
 			<i class="fa-solid fa-triangle-exclamation mt-0.5" aria-hidden="true"></i>
-			<span>Nearby access data is unavailable at this zoom level. Zoom in to find suggestions.</span>
+			<span>Nearby access data is unavailable at this zoom level. Zoom in to find suggestions.</span
+			>
 		</div>
 	{/if}
 	{#if detectedAssets.length > 0}
@@ -155,10 +234,10 @@
 								class="w-6 h-6 rounded-sm bg-black/5 flex items-center justify-center text-warm-gray-500 text-micro-data"
 							>
 								{#if asset.kind === 'parking'}<i class="fa-solid fa-square-parking"
-								></i>{:else if asset.kind === 'hut'}
+									></i>{:else if asset.kind === 'hut'}
 									<i class="fa-solid fa-house"></i>{:else if asset.mode === 'bus'}<i
-									class="fa-solid fa-bus"
-								></i>{:else}
+										class="fa-solid fa-bus"
+									></i>{:else}
 									<i class="fa-solid fa-train"></i>{/if}
 							</div>
 							<p class="text-body-text font-bold text-near-black truncate leading-tight w-28">
@@ -168,7 +247,7 @@
 						<button
 							class="px-2 py-1 bg-near-black text-white rounded-sm text-micro-data font-bold hover:bg-black"
 							onclick={() => onAddDetectedAsset(asset)}
-						>Add
+							>Add
 						</button>
 					</div>
 				{/each}
@@ -196,7 +275,7 @@
 					onclick={() => onRemoveAccessFeature(point.id)}
 					aria-label="Remove transit point"
 					class="w-6 h-6 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600"
-				><i class="fa-solid fa-trash-can text-[10px]"></i></button
+					><i class="fa-solid fa-trash-can text-[10px]"></i></button
 				>
 			</div>
 			<div class="flex gap-1.5">
@@ -204,11 +283,11 @@
 					<option value="bus">Bus</option>
 					<option value="train">Train</option>
 				</select><input
-				type="text"
-				bind:value={point.properties.name}
-				class="input-studio flex-1"
-				placeholder="Station Name"
-			/>
+					type="text"
+					bind:value={point.properties.name}
+					class="input-studio flex-1"
+					placeholder="Station Name"
+				/>
 			</div>
 		</div>
 	{/each}
@@ -228,7 +307,7 @@
 				onclick={() => onRemoveAccessFeature(point.id)}
 				aria-label="Remove parking space"
 				class="w-6 h-6 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600"
-			><i class="fa-solid fa-trash-can text-[10px]"></i></button
+				><i class="fa-solid fa-trash-can text-[10px]"></i></button
 			>
 		</div>
 	{/each}
@@ -247,7 +326,7 @@
 					onclick={() => onRemoveAccessFeature(hut.id)}
 					aria-label="Remove mountain hut"
 					class="w-6 h-6 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600"
-				><i class="fa-solid fa-trash-can text-[10px]"></i></button
+					><i class="fa-solid fa-trash-can text-[10px]"></i></button
 				>
 			</div>
 			<input
@@ -260,7 +339,11 @@
 	{/each}
 	{#each approachFeatures as track}
 		<div
-			class="panel-inner p-2 flex flex-col gap-2 hover:border-creator-blue {isSelectedApproach(track) ? 'border-creator-blue bg-creator-blue/5 ring-1 ring-creator-blue/20' : 'border-black/10'}"
+			class="panel-inner p-2 flex flex-col gap-2 hover:border-creator-blue {isSelectedApproach(
+				track
+			)
+				? 'border-creator-blue bg-creator-blue/5 ring-1 ring-creator-blue/20'
+				: 'border-black/10'}"
 			onclick={() => selectApproach(track)}
 			role="button"
 			tabindex="0"
@@ -318,7 +401,9 @@
 					{/each}
 				</select>
 			{:else}
-				<div class="text-micro-data text-warm-gray-500">Add a route first to create a topo-path destination.</div>
+				<div class="text-micro-data text-warm-gray-500">
+					Add a route first to create a topo-path destination.
+				</div>
 			{/if}
 		</div>
 	{/each}
@@ -350,15 +435,18 @@
 						</button>
 					{/if}
 				</div>
-				{#each document.data?.paths?.features || [] as feature, pathIndex}
+				{#each topoPaths(document) as feature, pathIndex}
 					{@const routes = assignedRoutes(document, feature.id)}
 					<div
-						class="space-y-2 rounded-sm border p-2 {isSelectedPath(document, feature, pathIndex) ? 'border-creator-blue bg-creator-blue/5 ring-1 ring-creator-blue/20' : 'border-black/10 bg-warm-white/40'}"
+						class="space-y-2 rounded-sm border p-2 {isSelectedPath(document, feature, pathIndex)
+							? 'border-creator-blue bg-creator-blue/5 ring-1 ring-creator-blue/20'
+							: 'border-black/10 bg-warm-white/40'}"
 						onclick={() => selectPath(document, feature, pathIndex)}
 						role="button"
 						tabindex="0"
 						onkeydown={(event) => {
-							if (event.key === 'Enter' || event.key === ' ') selectPath(document, feature, pathIndex);
+							if (event.key === 'Enter' || event.key === ' ')
+								selectPath(document, feature, pathIndex);
 						}}
 					>
 						<div class="flex items-start justify-between gap-2">
@@ -368,70 +456,76 @@
 								placeholder="Unnamed path"
 								aria-label="Path name"
 								onchange={(event) => {
-									onUpdateRoutePathFeature(
-										document.path,
-										feature.id,
-										'name',
-										event.currentTarget.value
-									);
+									onUpdateRoutePathFeature(document.path, feature.id, {
+										name: event.currentTarget.value
+									});
 								}}
 							/>
 							<span
 								class="shrink-0 rounded-full bg-black/5 px-1.5 py-0.5 text-micro-data text-warm-gray-500"
-							>{routes.length} route{routes.length === 1 ? '' : 's'}</span
+								>{routes.length} route{routes.length === 1 ? '' : 's'}</span
 							>
 						</div>
 						<div class="flex min-w-0 items-center gap-2 text-micro-data text-warm-gray-500">
 							{#if routes.length > 0}Used by: {routes
-								.map((route) => route.name || route.id)
-								.join(', ')}{:else}Not assigned to a route
+									.map((route) => route.name || route.id)
+									.join(', ')}{:else}Not assigned to a route
 							{/if}
 							<span id="route-edit-buttons" class="ml-auto inline-flex shrink-0 items-center gap-1">
-							<button
-								type="button"
-								class="action-button text-creator-blue"
-								title="Edit path"
-								aria-label="Edit path"
-								onclick={(event) => {
-									event.stopPropagation();
-									editPath(document, feature, pathIndex);
-								}}>
-								<i class="fa-solid fa-pen text-[10px]"></i>
-							</button>
-							<button
-								type="button"
-								class="action-button text-warm-gray-500 hover:text-creator-blue"
-								title="Duplicate path"
-								aria-label="Duplicate path"
-								onclick={(event) => {
-									event.stopPropagation();
-									duplicatePath(document, feature);
-								}}>
-								<i class="fa-solid fa-copy text-[10px]"></i>
-							</button>
-							<button
-								type="button"
-								class="action-button text-rose-600"
-								title="Delete path"
-								aria-label="Delete path"
-								onclick={(event) => {
-									event.stopPropagation();
-									onDeleteRoutePath(document.path, feature.id, pathIndex);
-									if (isSelectedPath(document, feature, pathIndex)) selectedObject = null;
-								}}>
-								<i class="fa-solid fa-trash-can text-[10px]"></i>
-							</button>
+								<button
+									type="button"
+									class="action-button text-creator-blue"
+									title="Edit path"
+									aria-label="Edit path"
+									onclick={(event) => {
+										event.stopPropagation();
+										editPath(document, feature, pathIndex);
+									}}
+								>
+									<i class="fa-solid fa-pen text-[10px]"></i>
+								</button>
+								<button
+									type="button"
+									class="action-button text-warm-gray-500 hover:text-creator-blue"
+									title="Duplicate path"
+									aria-label="Duplicate path"
+									onclick={(event) => {
+										event.stopPropagation();
+										duplicatePath(document, feature);
+									}}
+								>
+									<i class="fa-solid fa-copy text-[10px]"></i>
+								</button>
+								<button
+									type="button"
+									class="action-button text-rose-600"
+									title="Delete path"
+									aria-label="Delete path"
+									onclick={(event) => {
+										event.stopPropagation();
+										onDeleteRoutePath(document.path, feature.id, pathIndex);
+										if (isSelectedPath(document, feature, pathIndex)) selectedObject = null;
+									}}
+								>
+									<i class="fa-solid fa-trash-can text-[10px]"></i>
+								</button>
 							</span>
 						</div>
 						<div class="space-y-1" onclick={(event) => event.stopPropagation()} role="presentation">
-							<label class="text-micro-data font-bold uppercase tracking-wide text-warm-gray-400" for={`path-description-${document.path}-${feature.id}`}>Path text</label>
+							<label
+								class="text-micro-data font-bold uppercase tracking-wide text-warm-gray-400"
+								for={`path-description-${document.path}-${feature.id}`}>Path text</label
+							>
 							<textarea
 								id={`path-description-${document.path}-${feature.id}`}
 								class="input-studio w-full resize-none"
 								rows="3"
 								value={feature.properties?.description || ''}
 								placeholder="e.g. Approach path, not marked. Hohe Trittsicherheit erforderlich…"
-								oninput={(event) => onUpdateRoutePathFeature(document.path, feature.id, 'description', event.currentTarget.value)}
+								oninput={(event) =>
+									onUpdateRoutePathFeature(document.path, feature.id, {
+										description: event.currentTarget.value
+									})}
 							></textarea>
 						</div>
 						{#if assignableAccessFeatures.length > 0}
@@ -440,7 +534,10 @@
 								aria-label="Assign access feature"
 								value={feature.properties?.accessFeatureId || ''}
 								onclick={(event) => event.stopPropagation()}
-								onchange={(event) => onUpdateRoutePathFeature(document.path, feature.id, 'accessFeatureId', event.currentTarget.value)}
+								onchange={(event) =>
+									onUpdateRoutePathFeature(document.path, feature.id, {
+										accessFeatureId: event.currentTarget.value
+									})}
 							>
 								<option value="">No access feature</option>
 								{#each assignableAccessFeatures as accessFeature}
@@ -448,7 +545,7 @@
 								{/each}
 							</select>
 						{/if}
-						{#if (document.data?.paths?.features || []).length > 1}
+						{#if topoPaths(document).length > 1}
 							<select
 								class="input-studio w-full"
 								aria-label="Concatenate with another path"
@@ -456,7 +553,7 @@
 								onchange={(event) => concatPath(event, document, feature, pathIndex)}
 							>
 								<option value="" selected>Concat with…</option>
-								{#each document.data?.paths?.features || [] as otherFeature, otherIndex}
+								{#each topoPaths(document) as otherFeature, otherIndex}
 									{#if otherIndex !== pathIndex}
 										<option value={otherIndex}>{pathLabel(otherFeature, otherIndex)}</option>
 									{/if}
@@ -471,28 +568,28 @@
 </div>
 
 <style>
-    .detected-asset-row {
-        cursor: pointer;
-    }
+	.detected-asset-row {
+		cursor: pointer;
+	}
 
-    .detected-asset-row:hover {
-        border-color: #0075de !important;
-    }
+	.detected-asset-row:hover {
+		border-color: #0075de !important;
+	}
 
-    .path-name-input {
-        min-height: 1.25rem;
-    }
+	.path-name-input {
+		min-height: 1.25rem;
+	}
 
-    .action-button {
-        display: inline-flex;
-        width: 1.5rem;
-        height: 1.5rem;
-        align-items: center;
-        justify-content: center;
-        border-radius: 0.125rem;
-    }
+	.action-button {
+		display: inline-flex;
+		width: 1.5rem;
+		height: 1.5rem;
+		align-items: center;
+		justify-content: center;
+		border-radius: 0.125rem;
+	}
 
-    .action-button:hover {
-        background: rgb(0 0 0 / 0.05);
-    }
+	.action-button:hover {
+		background: rgb(0 0 0 / 0.05);
+	}
 </style>

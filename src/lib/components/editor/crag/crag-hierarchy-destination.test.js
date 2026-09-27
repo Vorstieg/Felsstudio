@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { destinationEntryExists } from './crag-hierarchy-destination.js';
+import { destinationEntryExists } from './crag-hierarchy-destination.ts';
 
 describe('destinationEntryExists', () => {
 	it('finds a persisted child in an unloaded destination folder', async () => {

@@ -1,6 +1,19 @@
-<script>
+<script lang="ts">
 	import { _ } from 'svelte-i18n';
-	import { getCragEntryPath } from '$lib/assets/js/editor-entry-paths.js';
+	import { fetchCragsFromManifest } from '$lib/assets/js/fetchCrags.ts';
+
+	type Location = Awaited<ReturnType<typeof fetchCragsFromManifest>>[number];
+	type WorkspacePath = {
+		isCragEditor: () => boolean;
+	};
+	type Props = {
+		workSpaceWrapper: WorkspacePath;
+		filteredLocations?: Location[];
+		isLoading?: boolean;
+		searchQuery?: string;
+		startNewEntry: () => void;
+		loadFromEntry: (_location: Location) => void;
+	};
 
 	let {
 		workSpaceWrapper,
@@ -9,7 +22,7 @@
 		searchQuery = $bindable(''),
 		startNewEntry,
 		loadFromEntry
-	} = $props();
+	}: Props = $props();
 </script>
 
 {#if workSpaceWrapper.isCragEditor()}
@@ -38,14 +51,14 @@
 			<div class="flex flex-col items-center gap-2">
 				<i class="fa-solid fa-spinner fa-spin text-creator-blue text-xl"></i>
 				<span class="text-micro-data font-bold text-near-black uppercase tracking-widest"
-				>{$_('ui.initializing')}</span
+					>{$_('ui.initializing')}</span
 				>
 			</div>
 		</div>
 	{/if}
 
 	{#each filteredLocations as crag}
-			<div class="bg-white rounded border border-transparent hover:border-black/15 transition-none">
+		<div class="bg-white rounded border border-transparent hover:border-black/15 transition-none">
 			<button
 				class="w-full p-2.5 text-left hover:bg-black/5 rounded transition-none group flex items-center justify-between disabled:opacity-50"
 				onclick={() => loadFromEntry(crag)}
@@ -55,12 +68,12 @@
 					<div class="text-body-text font-bold group-hover:text-creator-blue transition-none">
 						{crag.properties.name}
 					</div>
-					<div class="text-micro-data text-warm-gray-400">{getCragEntryPath(crag)}</div>
+					<div class="text-micro-data text-warm-gray-400">{crag.entryPath}</div>
 				</div>
 				<i
-				class="fa-solid fa-chevron-right text-warm-gray-300 text-[10px] group-hover:text-creator-blue transition-none"
-			></i>
-		</button>
+					class="fa-solid fa-chevron-right text-warm-gray-300 text-[10px] group-hover:text-creator-blue transition-none"
+				></i>
+			</button>
 		</div>
 	{:else}
 		<div class="text-center py-6 text-body-text text-warm-gray-500">

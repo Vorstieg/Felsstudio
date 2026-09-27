@@ -1,12 +1,13 @@
-<script>
-	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+<script lang="ts">
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
 	const topoSession = getTopo2DEditorState();
-	import { runClusteringPipeline } from '$lib/assets/js/clustering.js';
+	import { runClusteringPipeline } from '$lib/assets/js/clustering.ts';
 	import { _ } from 'svelte-i18n';
 
 	let bounds = $derived.by(() => {
 		let hits = topoSession.clustering.rawHits;
-		if (!hits || hits.length === 0) return { conf: [0, 1], edge: [0, 1.2], angle: [0, 1], cam: [1, 100] };
+		if (!hits || hits.length === 0)
+			return { conf: [0, 1], edge: [0, 1.2], angle: [0, 1], cam: [1, 100] };
 		let conf = [Infinity, -Infinity];
 		let edge = [Infinity, -Infinity];
 		let angle = [Infinity, -Infinity];
@@ -37,10 +38,15 @@
 
 		if (hitCount > 0 && hitCount !== topoSession.clustering.initializedHits) {
 			topoSession.clustering.initializedHits = hitCount;
-			topoSession.clustering.minConfidence = bounds.conf[0] + (bounds.conf[1] - bounds.conf[0]) * 0.33;
-			topoSession.clustering.maxEdgeDist = bounds.edge[0] + (bounds.edge[1] - bounds.edge[0]) * 0.66;
-			topoSession.clustering.minAngleCos = bounds.angle[0] + (bounds.angle[1] - bounds.angle[0]) * 0.33;
-			topoSession.clustering.maxCamDist = Math.round(bounds.cam[0] + (bounds.cam[1] - bounds.cam[0]) * 0.66);
+			topoSession.clustering.minConfidence =
+				bounds.conf[0] + (bounds.conf[1] - bounds.conf[0]) * 0.33;
+			topoSession.clustering.maxEdgeDist =
+				bounds.edge[0] + (bounds.edge[1] - bounds.edge[0]) * 0.66;
+			topoSession.clustering.minAngleCos =
+				bounds.angle[0] + (bounds.angle[1] - bounds.angle[0]) * 0.33;
+			topoSession.clustering.maxCamDist = Math.round(
+				bounds.cam[0] + (bounds.cam[1] - bounds.cam[0]) * 0.66
+			);
 		}
 
 		const params = {
@@ -62,7 +68,7 @@
 			topoSession.clustering.clusters = result.clusters;
 			topoSession.clustering.stats = result.stats;
 
-			if (topoSession.topo.coordinates[0] === 0 && topoSession.topo.coordinates[1] === 0) {
+			if (topoSession.topo.coordinates?.[0] === 0 && topoSession.topo.coordinates?.[1] === 0) {
 				const gpsKeys = Object.keys(topoSession.clustering.gpsData);
 				if (gpsKeys.length > 0) {
 					const firstGps = topoSession.clustering.gpsData[gpsKeys[0]];
@@ -79,17 +85,23 @@
 </script>
 
 <div class="panel flex flex-col shadow-panel overflow-hidden">
-	<div class="flex justify-between items-center border-b border-black/15 p-3 pb-2 mb-2 flex-shrink-0">
+	<div
+		class="flex justify-between items-center border-b border-black/15 p-3 pb-2 mb-2 flex-shrink-0"
+	>
 		<div>
 			<h1 class="text-section-title">{$_('ui.ai-bolts')}</h1>
 			<p class="text-ui-label !m-0">{$_('ui.global_controls')}</p>
 		</div>
 		<div class="flex gap-2">
 			<label class="flex items-center gap-1.5 cursor-pointer group">
-				<input type="checkbox" bind:checked={topoSession.clustering.showAnnotations}
-							 class="w-3 h-3 rounded-sm border border-black/15 text-creator-blue focus:ring-1 focus:ring-creator-blue transition-none" />
-				<span
-					class="text-micro-data text-warm-gray-400 group-hover:text-near-black transition-none">{$_('ui.labels')}</span>
+				<input
+					type="checkbox"
+					bind:checked={topoSession.clustering.showAnnotations}
+					class="w-3 h-3 rounded-sm border border-black/15 text-creator-blue focus:ring-1 focus:ring-creator-blue transition-none"
+				/>
+				<span class="text-micro-data text-warm-gray-400 group-hover:text-near-black transition-none"
+					>{$_('ui.labels')}</span
+				>
 			</label>
 		</div>
 	</div>
@@ -99,45 +111,75 @@
 		<div class="space-y-1.5">
 			<div class="flex justify-between items-center px-1">
 				<span class="text-ui-label text-near-black">{$_('ui.clustering_radius')}</span>
-				<span class="text-ui-label text-creator-blue font-mono">{topoSession.clustering.radius.toFixed(2)}m</span>
+				<span class="text-ui-label text-creator-blue font-mono"
+					>{topoSession.clustering.radius.toFixed(2)}m</span
+				>
 			</div>
-			<input type="range" min="0.05" max="1.5" step="0.01" bind:value={topoSession.clustering.radius}
-						 class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue" />
+			<input
+				type="range"
+				min="0.05"
+				max="1.5"
+				step="0.01"
+				bind:value={topoSession.clustering.radius}
+				class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue"
+			/>
 		</div>
 
 		<div class="space-y-3">
 			<div class="border-t border-black/15 pt-2">
-				<p
-					class="text-[9px] font-black text-warm-gray-400 uppercase tracking-widest mb-2.5 px-1">{$_('ui.hard_cutoffs')}</p>
+				<p class="text-[9px] font-black text-warm-gray-400 uppercase tracking-widest mb-2.5 px-1">
+					{$_('ui.hard_cutoffs')}
+				</p>
 				<div class="grid grid-cols-2 gap-x-4 gap-y-3 px-1">
 					<div class="space-y-1">
 						<div class="flex justify-between text-[10px] leading-none">
 							<span class="text-warm-gray-500">{$_('ui.confidence')}</span>
-							<span class="text-near-black font-bold">{Math.round(topoSession.clustering.minConfidence * 100)}%</span>
+							<span class="text-near-black font-bold"
+								>{Math.round(topoSession.clustering.minConfidence * 100)}%</span
+							>
 						</div>
-						<input type="range" min={bounds.conf[0]} max={bounds.conf[1]} step="0.01"
-									 bind:value={topoSession.clustering.minConfidence}
-									 class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue" />
+						<input
+							type="range"
+							min={bounds.conf[0]}
+							max={bounds.conf[1]}
+							step="0.01"
+							bind:value={topoSession.clustering.minConfidence}
+							class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue"
+						/>
 					</div>
 
 					<div class="space-y-1">
 						<div class="flex justify-between text-[10px] leading-none">
 							<span class="text-warm-gray-500">{$_('ui.edge_dist')}</span>
-							<span class="text-near-black font-bold">{topoSession.clustering.maxEdgeDist.toFixed(2)}</span>
+							<span class="text-near-black font-bold"
+								>{topoSession.clustering.maxEdgeDist.toFixed(2)}</span
+							>
 						</div>
-						<input type="range" min={bounds.edge[0]} max={bounds.edge[1]} step="0.01"
-									 bind:value={topoSession.clustering.maxEdgeDist}
-									 class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue" />
+						<input
+							type="range"
+							min={bounds.edge[0]}
+							max={bounds.edge[1]}
+							step="0.01"
+							bind:value={topoSession.clustering.maxEdgeDist}
+							class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue"
+						/>
 					</div>
 
 					<div class="space-y-1">
 						<div class="flex justify-between text-[10px] leading-none">
 							<span class="text-warm-gray-500">{$_('ui.angle_cos')}</span>
-							<span class="text-near-black font-bold">{topoSession.clustering.minAngleCos.toFixed(2)}</span>
+							<span class="text-near-black font-bold"
+								>{topoSession.clustering.minAngleCos.toFixed(2)}</span
+							>
 						</div>
-						<input type="range" min={bounds.angle[0]} max={bounds.angle[1]} step="0.01"
-									 bind:value={topoSession.clustering.minAngleCos}
-									 class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue" />
+						<input
+							type="range"
+							min={bounds.angle[0]}
+							max={bounds.angle[1]}
+							step="0.01"
+							bind:value={topoSession.clustering.minAngleCos}
+							class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue"
+						/>
 					</div>
 
 					<div class="space-y-1">
@@ -145,32 +187,53 @@
 							<span class="text-warm-gray-500">{$_('ui.cam_dist')}</span>
 							<span class="text-near-black font-bold">{topoSession.clustering.maxCamDist}m</span>
 						</div>
-						<input type="range" min={bounds.cam[0]} max={bounds.cam[1]} step="1"
-									 bind:value={topoSession.clustering.maxCamDist}
-									 class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue" />
+						<input
+							type="range"
+							min={bounds.cam[0]}
+							max={bounds.cam[1]}
+							step="1"
+							bind:value={topoSession.clustering.maxCamDist}
+							class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue"
+						/>
 					</div>
 				</div>
 			</div>
 
 			<div class="border-t border-black/15 pt-2">
-				<p
-					class="text-[9px] font-black text-warm-gray-400 uppercase tracking-widest mb-2.5 px-1">{$_('ui.filtering')}</p>
+				<p class="text-[9px] font-black text-warm-gray-400 uppercase tracking-widest mb-2.5 px-1">
+					{$_('ui.filtering')}
+				</p>
 				<div class="grid grid-cols-2 gap-x-4 gap-y-3 px-1">
 					<div class="space-y-1">
 						<div class="flex justify-between text-[10px] leading-none">
 							<span class="text-warm-gray-500">{$_('ui.min_spread')}</span>
-							<span class="text-near-black font-bold">{topoSession.clustering.minViewSpread.toFixed(2)}m</span>
+							<span class="text-near-black font-bold"
+								>{topoSession.clustering.minViewSpread.toFixed(2)}m</span
+							>
 						</div>
-						<input type="range" min="0" max="2" step="0.05" bind:value={topoSession.clustering.minViewSpread}
-									 class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue" />
+						<input
+							type="range"
+							min="0"
+							max="2"
+							step="0.05"
+							bind:value={topoSession.clustering.minViewSpread}
+							class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue"
+						/>
 					</div>
 					<div class="space-y-1">
 						<div class="flex justify-between text-[10px] leading-none">
 							<span class="text-warm-gray-500">{$_('ui.min_obs')}</span>
-							<span class="text-near-black font-bold">{topoSession.clustering.minObservations}</span>
+							<span class="text-near-black font-bold">{topoSession.clustering.minObservations}</span
+							>
 						</div>
-						<input type="range" min="1" max="50" step="1" bind:value={topoSession.clustering.minObservations}
-									 class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue" />
+						<input
+							type="range"
+							min="1"
+							max="50"
+							step="1"
+							bind:value={topoSession.clustering.minObservations}
+							class="w-full h-1 bg-black/10 rounded-none appearance-none cursor-pointer accent-creator-blue"
+						/>
 					</div>
 				</div>
 			</div>
@@ -181,43 +244,52 @@
 	<div class="mt-1 pt-3 border-t border-black/15 bg-black/5 rounded-sm p-2">
 		<p class="text-ui-label text-creator-blue mb-1.5">{$_('ui.diagnostics')}</p>
 		<div class="space-y-0.5 mb-3">
-			<div class="flex justify-between text-micro-data font-mono"><span
-				class="text-warm-gray-500">{$_('ui.input')}</span> <span
-				class="font-bold">{topoSession.clustering.stats.totalHits}</span></div>
-			<div class="flex justify-between text-micro-data font-mono"><span
-				class="text-warm-gray-500">{$_('ui.filtered')}</span> <span
-				class="font-bold">{topoSession.clustering.stats.totalHits - topoSession.clustering.stats.confCut - topoSession.clustering.stats.edgeCut}</span>
+			<div class="flex justify-between text-micro-data font-mono">
+				<span class="text-warm-gray-500">{$_('ui.input')}</span>
+				<span class="font-bold">{topoSession.clustering.stats.totalHits}</span>
 			</div>
-			<div class="flex justify-between text-micro-data font-mono border-t border-black/15 mt-1 pt-1"><span
-				class="text-near-black font-bold">{$_('ui.final_clusters')}</span> <span
-				class="text-creator-blue font-bold">{topoSession.clustering.stats.finalClusters}</span></div>
+			<div class="flex justify-between text-micro-data font-mono">
+				<span class="text-warm-gray-500">{$_('ui.filtered')}</span>
+				<span class="font-bold"
+					>{topoSession.clustering.stats.totalHits -
+						topoSession.clustering.stats.confCut -
+						topoSession.clustering.stats.edgeCut}</span
+				>
+			</div>
+			<div
+				class="flex justify-between text-micro-data font-mono border-t border-black/15 mt-1 pt-1"
+			>
+				<span class="text-near-black font-bold">{$_('ui.final_clusters')}</span>
+				<span class="text-creator-blue font-bold">{topoSession.clustering.stats.finalClusters}</span
+				>
+			</div>
 		</div>
 	</div>
 </div>
 
 <style>
-    input[type='range'] {
-        -webkit-appearance: none;
-        background: transparent;
-    }
+	input[type='range'] {
+		-webkit-appearance: none;
+		background: transparent;
+	}
 
-    input[type='range']::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        height: 10px;
-        width: 10px;
-        border-radius: 2px;
-        background: #ffffff;
-        cursor: pointer;
-        margin-top: -3px;
-        border: 2px solid #0075de;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-    }
+	input[type='range']::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		height: 10px;
+		width: 10px;
+		border-radius: 2px;
+		background: #ffffff;
+		cursor: pointer;
+		margin-top: -3px;
+		border: 2px solid #0075de;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+	}
 
-    input[type='range']::-webkit-slider-runnable-track {
-        width: 100%;
-        height: 4px;
-        cursor: pointer;
-        background: rgba(0, 0, 0, 0.1);
-        border-radius: 0px;
-    }
+	input[type='range']::-webkit-slider-runnable-track {
+		width: 100%;
+		height: 4px;
+		cursor: pointer;
+		background: rgba(0, 0, 0, 0.1);
+		border-radius: 0px;
+	}
 </style>

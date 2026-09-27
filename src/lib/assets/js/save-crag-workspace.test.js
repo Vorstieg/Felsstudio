@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
-import { saveCragWorkspace } from './save-crag-workspace.js';
+import { saveCragWorkspace } from './save-crag-workspace.ts';
 
 const entry = (id) => ({ type: 'Feature', properties: { id, kind: 'crag' }, geometry: null });
 const node = (id, path = '', sourcePath = null, children = []) => ({
@@ -49,37 +49,16 @@ function filesystem(paths) {
 }
 
 describe('saveCragWorkspace', () => {
-	it('drops legacy image metadata while preserving other asset references', async () => {
-		const root = node('wall', '', 'wall');
-		root.entry.properties.assets = { images: ['wall/image.jpg'], models: ['wall/wall.glb'] };
-		root.entry.properties.name = 'Renamed wall';
-		const writes = [];
-		await saveCragWorkspace(root, {
-			write: async (path, data) => writes.push([path, data])
-		});
-		expect(writes[0][1].properties.assets).toEqual({ models: ['wall/wall.glb'] });
-		expect(root.entry.properties.assets).toEqual({ models: ['wall/wall.glb'] });
-	});
-	it('cleans legacy image metadata even when no other entry fields changed', async () => {
-		const root = node('wall', '', 'wall');
-		root.dirtyPaths = [];
-		root.entry.properties.assets = { images: ['wall/image.jpg'] };
-		const writes = [];
-		const save = () => saveCragWorkspace(root, { write: async (path, data) => writes.push([path, data]) });
-		await save();
-		expect(writes).toHaveLength(1);
-		expect(writes[0][1].properties).not.toHaveProperty('assets');
-		await save();
-		expect(writes).toHaveLength(1);
-	});
 	it('uploads a new image without writing image metadata', async () => {
 		const root = node('wall');
 		root.images = [{ name: 'photo.jpg', path: 'wall/wall-image-photo.jpg', clientId: 'photo' }];
-		root.pendingImages = [{
-			clientId: 'photo',
-			path: 'wall/wall-image-photo.jpg',
-			file: { type: 'image/jpeg' }
-		}];
+		root.pendingImages = [
+			{
+				clientId: 'photo',
+				path: 'wall/wall-image-photo.jpg',
+				file: { type: 'image/jpeg' }
+			}
+		];
 		const writes = [];
 		const uploads = [];
 		await saveCragWorkspace(root, {
@@ -112,7 +91,6 @@ describe('saveCragWorkspace', () => {
 		const root = node('new', '', 'old');
 		root.topo = { id: 'old', crag_id: 'old', sector_id: '', routes: [] };
 		root.entry.properties.assets = {
-			images: ['old/old-image-photo.jpg', 'other/shared.jpg'],
 			models: ['old/old.glb']
 		};
 		root.images = [

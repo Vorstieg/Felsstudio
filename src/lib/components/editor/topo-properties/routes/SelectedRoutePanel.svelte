@@ -1,10 +1,9 @@
-<script>
-	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
-
-	const editorState = getTopo2DEditorState();
-	import { cragTypes } from '$lib/components/editor/crag/crag-editor-options.js';
-	import { availableRouteTags, convertRouteType } from '$lib/assets/js/topo-utils.js';
-	import { snapToSmallestHeight } from '$lib/assets/js/resize.js';
+<script lang="ts">
+	import type { Pitch, Route, Variant } from '@vorstieg/fels-types/types';
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
+	import { cragTypes } from '$lib/components/editor/crag/crag-editor-options.ts';
+	import { availableRouteTags, convertRouteType } from '$lib/assets/js/topo-utils.ts';
+	import { snapToSmallestHeight } from '$lib/assets/js/resize.ts';
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
 	import PitchComponent from './PitchComponent.svelte';
 	import {
@@ -12,51 +11,66 @@
 		createVariant,
 		removePathAsset,
 		routeLineStyles
-	} from '../topo-properties-utils.js';
+	} from '../topo-properties-utils.ts';
 	import { _ } from 'svelte-i18n';
 
+	type RouteId = Route['id'];
+	type EditablePitch = Pitch | Route;
+	type Props = {
+		route: Route;
+		mobile?: boolean;
+		onPathSelect?: ((_route: Route, _pathId: RouteId) => void) | null;
+	};
+
+	const editorState = getTopo2DEditorState();
+
 	let {
-		route = $bindable(null),
+		route = $bindable(),
 		mobile = false,
 		onPathSelect = null
-	} = $props();
+	}: Props = $props();
 
-	function hasRouteType(route, type) {
+	function hasRouteType(route: Pick<Route, 'type'>, type: string) {
 		return Array.isArray(route.type) ? route.type.includes(type) : route.type === type;
 	}
 
-	function updateRoute(changes) {
+	function updateRoute(changes: Partial<Route>) {
 		editorState.updateRoute(route.id, changes);
 	}
 
-	function updatePitch(pitchId, changes) {
+	function updatePitch(pitchId: Pitch['id'], changes: Partial<Pitch>) {
 		editorState.updatePitch(route.id, pitchId, changes);
 	}
 
-	function updateVariant(variantId, changes) {
+	function updateVariant(variantId: Variant['id'], changes: Partial<Variant>) {
 		editorState.updateVariant(route.id, variantId, changes);
 	}
 
-	function updateRouteType(value) {
+	function updateRouteType(value: string) {
 		editorState.commit('Change route type', () => {
 			convertRouteType(route, value);
 			return true;
 		});
 	}
 
-	function selectPathAsset(route, index) {
-		editorState.selectPath('path', route.id, index);
+	function selectPathAsset(route: Route, pathId: RouteId) {
+		editorState.selectPath('path', route.id, pathId);
 		editorState.ui.drawingTarget = null;
-		onPathSelect?.(route, index);
+		onPathSelect?.(route, pathId);
 	}
 
 	function pathRefs() {
 		return route?.pathRefs || [];
 	}
 
-	function addPitch(route) {
-		if (!route.pitches) editorState.updateRoute(route.id, { pitches: [] });
-		const lastPitch = route.pitches.at(-1);
+	function pathDocument() {
+		return editorState.topo as NonNullable<Parameters<typeof addPathAsset>[1]>;
+	}
+
+	function addPitch(route: Route) {
+		const pitches = route.pitches || [];
+		if (!route.pitches) editorState.updateRoute(route.id, { pitches });
+		const lastPitch = pitches.at(-1);
 		if (lastPitch && (lastPitch.points2D?.length || 0) < 2) {
 			drawPitch(route, lastPitch);
 			return;
@@ -68,14 +82,14 @@
 		if (mobile) snapToSmallestHeight?.();
 	}
 
-	function drawPitch(route, pitch) {
+	function drawPitch(route: Route, pitch: EditablePitch) {
 		editorState.selectObject('route', route.id);
 		editorState.ui.drawingTarget = { type: 'pitch', routeId: route.id, pitchId: pitch.id };
 		editorState.ui.activeTool = 'multipitch';
 		if (mobile) snapToSmallestHeight?.();
 	}
 
-	function addVariant(route) {
+	function addVariant(route: Route) {
 		const variant = createVariant(route);
 		editorState.commit('Add route variant', () => {
 			route.variants = [...(route.variants || []), variant];
@@ -84,36 +98,42 @@
 		drawVariant(route, variant);
 	}
 
-	function drawVariant(route, variant) {
+	function drawVariant(route: Route, variant: Variant) {
 		editorState.selectObject('route', route.id);
 		editorState.ui.drawingTarget = { type: 'variant', routeId: route.id, variantId: variant.id };
 		editorState.ui.activeTool = 'multipitch';
 		if (mobile) snapToSmallestHeight?.();
 	}
 
-	function duplicatePitch(route, pitch, targetRouteId) {
+	function duplicatePitch(route: Route, pitch: EditablePitch, targetRouteId: RouteId) {
 		editorState.duplicatePitch(route.id, pitch.id, targetRouteId);
 	}
 
-	function duplicatePitchTargets(route) {
+	function duplicatePitchTargets(route: Route) {
 		return (editorState.topo.routes || []).filter((target) => String(target.id) !== String(route.id));
 	}
 
-	function movePitch(route, pitch, direction) {
+	function movePitch(route: Route, pitch: EditablePitch, direction: number) {
 		editorState.movePitch(route.id, pitch.id, direction);
 	}
 
-	function removePitch(route, pitch) {
+	function removePitch(route: Route, pitch: EditablePitch) {
 		editorState.removePitch(route.id, pitch.id);
-		if (editorState.ui.drawingTarget?.pitchId === pitch.id) editorState.ui.drawingTarget = null;
+		const target = editorState.ui.drawingTarget;
+		if (target?.type === 'pitch' && target.pitchId === pitch.id) {
+			editorState.ui.drawingTarget = null;
+		}
 	}
 
-	function removeVariant(route, variant) {
+	function removeVariant(route: Route, variant: Variant) {
 		editorState.removeVariant(route.id, variant.id);
-		if (editorState.ui.drawingTarget?.variantId === variant.id) editorState.ui.drawingTarget = null;
+		const target = editorState.ui.drawingTarget;
+		if (target?.type === 'variant' && target.variantId === variant.id) {
+			editorState.ui.drawingTarget = null;
+		}
 	}
 
-	function toggleRouteFixpoint(route, fixpointId) {
+	function toggleRouteFixpoint(route: Route, fixpointId: RouteId) {
 		const fixPoints = route.fixPoints || [];
 		const nextFixPoints = fixPoints.includes(fixpointId)
 			? fixPoints.filter((id) => id !== fixpointId)
@@ -167,7 +187,7 @@
 		<PitchComponent
 			pitch={route}
 			kind="single"
-			topoScale={editorState.scale} fixPoints={editorState.fixPoints}
+			topoScale={editorState.topo.scale} fixPoints={editorState.topo.fixPoints}
 			onFieldChange={(field, value) => updateRoute({ [field]: value })}
 		/>
 	{/if}
@@ -179,7 +199,7 @@
 				<button
 					class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-warm-gray-500 hover:bg-creator-blue hover:text-white transition-none"
 					onclick={() => {
-						const pathId = addPathAsset(route, editorState.topo);
+						const pathId = addPathAsset(route, pathDocument());
 						selectPathAsset(route, pathId);
 					}}
 				>
@@ -222,7 +242,7 @@
 						aria-label="Remove path"
 						onclick={(event) => {
 							event.stopPropagation();
-							removePathAsset(route, pathAsset.pathId, editorState.topo);
+							removePathAsset(route, pathAsset.pathId, pathDocument());
 							if (
 								String(editorState.ui.selectedRouteId) === String(route.id) &&
 								String(editorState.ui.selectedPathId) === String(pathAsset.pathId)
@@ -257,7 +277,7 @@
 					{pitch}
 					index={idx}
 					kind="pitch"
-					topoScale={editorState.scale} fixPoints={editorState.fixPoints}
+					topoScale={editorState.topo.scale} fixPoints={editorState.topo.fixPoints}
 					onDraw={(pitch) => drawPitch(route, pitch)}
 					onDuplicate={(pitch, targetRouteId) => duplicatePitch(route, pitch, targetRouteId)}
 					duplicateTargets={duplicatePitchTargets(route)}
@@ -284,7 +304,7 @@
 						pitch={variant}
 						index={idx}
 						kind="variant"
-						topoScale={editorState.scale} fixPoints={editorState.fixPoints}
+						topoScale={editorState.topo.scale} fixPoints={editorState.topo.fixPoints}
 						onDraw={(variant) => drawVariant(route, variant)}
 						onRemove={(variant) => removeVariant(route, variant)}
 						onFieldChange={(field, value) => updateVariant(variant.id,{ [field]: value })}

@@ -1,4 +1,5 @@
-<script>
+<script lang="ts">
+	import type { Map as MapLibreMap } from 'maplibre-gl';
 	import MapSearch from '$lib/components/editor/MapSearch.svelte';
 	import MapStyleControl from '$lib/components/editor/MapStyleControl.svelte';
 	import CragEditorToolbar from '$lib/components/editor/crag/CragEditorToolbar.svelte';
@@ -7,7 +8,44 @@
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
 	import { _ } from 'svelte-i18n';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
-	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
+	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.ts';
+	import type { TrackCoordinate, ActiveTrackTarget } from './use-crag-track-editor.svelte.ts';
+	import type { useCragTrackEditor } from './use-crag-track-editor.svelte.ts';
+	import type { CragSelection } from './crag-route-types.ts';
+
+	type TrackEditor = ReturnType<typeof useCragTrackEditor>;
+	type TrackDraftMode = Parameters<TrackEditor['setTrackDraftMode']>[0];
+	type Selection = CragSelection;
+	type DetectedAsset = {
+		id: string;
+		name: string;
+		kind: 'parking' | 'transit' | 'hut';
+		mode: 'bus' | 'train' | null;
+		coordinates: [number, number];
+		distance: number;
+	};
+	type Props = {
+		inspectorShadow?: boolean;
+		map?: MapLibreMap | null;
+		isExpanded?: boolean;
+		activeTool?: string;
+		toolOptionsOpen?: boolean;
+		mapStyle?: 'transport' | 'satellite' | 'terrain';
+		activeTab?: string;
+		detectedAssets?: DetectedAsset[];
+		isDetectionLoading?: boolean;
+		isDetectionZoomLimited?: boolean;
+		selectedObject?: Selection | null;
+		currentTrackPoints?: TrackCoordinate[];
+		activeTrackTarget?: ActiveTrackTarget | null;
+		trackDraftMode?: TrackDraftMode;
+		selectedTrackPointCount?: number;
+		isRoutingTrack?: boolean;
+		hasPendingTrackCut?: boolean;
+		isRoutePathDrawing?: boolean;
+		saveStatus?: 'idle' | 'saving' | 'success' | 'error';
+		saveError?: string;
+	};
 	const cragEditorState = getCragEditorSession();
 	const { trackEditor, actions } = getCragEditorTools();
 	const {
@@ -25,7 +63,6 @@
 		handleGpxUpload: onGpxUpload
 	} = trackEditor;
 	const {
-		back: onBack,
 		startTrackCut: onStartTrackCut,
 		confirmTrackCut: onConfirmTrackCut,
 		cancelTrackCut: onCancelTrackCut,
@@ -54,8 +91,8 @@
 		hasPendingTrackCut = false,
 		isRoutePathDrawing = false,
 		saveStatus = 'idle',
-		saveError = '',
-	} = $props();
+		saveError = ''
+	}: Props = $props();
 
 	let canUndo = $derived(cragEditorState.canUndo);
 	let canRedo = $derived(cragEditorState.canRedo);
@@ -91,29 +128,25 @@
 			? `${result.previousPointCount} → ${result.pointCount} points after collapsing pauses within ${result.radius} m.`
 			: 'No pause clusters matched these settings.';
 	}
-
 </script>
 
 <CragEditorToolbar
 	{map}
 	bind:activeTool
 	bind:toolOptionsOpen
-		{currentTrackPoints}
-		{trackDraftMode}
-		{isRoutingTrack}
-		{hasPendingTrackCut}
-	{isRoutePathDrawing}
-	{onBack}
+	{currentTrackPoints}
+	{isRoutingTrack}
+	{hasPendingTrackCut}
 	{onStartRoutingDraft}
 	{onHandleTrackConfirm}
 	{onCancelTrackEdit}
-		{onUndoTrackPoint}
-		{onUndo}
-	{onRedo}
+	onUndoTrackPoint={() => void onUndoTrackPoint()}
+	onUndo={() => void onUndo()}
+	onRedo={() => void onRedo()}
 	{canUndo}
 	{canRedo}
-		{onConfirmTrackCut}
-		{onCancelTrackCut}
+	{onConfirmTrackCut}
+	{onCancelTrackCut}
 	{onExport}
 	status={saveStatus}
 	errorMessage={saveError}
@@ -142,15 +175,21 @@
 {/if}
 
 {#if toolOptionsOpen && activeTool === 'track'}
-	<ToolOptions title={$_('ui.track_tool_options')} open={toolOptionsOpen} onClose={() => (toolOptionsOpen = false)}>
+	<ToolOptions
+		title={$_('ui.track_tool_options')}
+		open={toolOptionsOpen}
+		onClose={() => (toolOptionsOpen = false)}
+	>
 		<div class="flex flex-col gap-2">
 			<div class="text-xs font-medium text-warm-gray-600">{$_('ui.drawing_mode')}</div>
 			<div class="grid grid-cols-2 gap-1">
 				<button
 					type="button"
-					class={`flex flex-col items-center gap-1 rounded-sm p-2 transition-none ${trackDraftMode === 'routing'
-						? 'bg-creator-blue text-white'
-						: 'bg-black/5 text-warm-gray-500 hover:bg-black/10'}`}
+					class={`flex flex-col items-center gap-1 rounded-sm p-2 transition-none ${
+						trackDraftMode === 'routing'
+							? 'bg-creator-blue text-white'
+							: 'bg-black/5 text-warm-gray-500 hover:bg-black/10'
+					}`}
 					onclick={() => onSetTrackDraftMode('routing')}
 				>
 					<i class="fa-solid fa-route text-sm"></i>
@@ -158,9 +197,11 @@
 				</button>
 				<button
 					type="button"
-					class={`flex flex-col items-center gap-1 rounded-sm p-2 transition-none ${trackDraftMode === 'delete'
-						? 'bg-red-600 text-white'
-						: 'bg-black/5 text-warm-gray-500 hover:bg-black/10'}`}
+					class={`flex flex-col items-center gap-1 rounded-sm p-2 transition-none ${
+						trackDraftMode === 'delete'
+							? 'bg-red-600 text-white'
+							: 'bg-black/5 text-warm-gray-500 hover:bg-black/10'
+					}`}
 					onclick={() => onSetTrackDraftMode('delete')}
 				>
 					<i class="fa-solid fa-trash text-sm"></i>
@@ -168,9 +209,11 @@
 				</button>
 				<button
 					type="button"
-					class={`flex flex-col items-center gap-1 rounded-sm p-2 transition-none ${trackDraftMode === 'editing'
-						? 'bg-creator-blue text-white'
-						: 'bg-black/5 text-warm-gray-500 hover:bg-black/10'}`}
+					class={`flex flex-col items-center gap-1 rounded-sm p-2 transition-none ${
+						trackDraftMode === 'editing'
+							? 'bg-creator-blue text-white'
+							: 'bg-black/5 text-warm-gray-500 hover:bg-black/10'
+					}`}
 					onclick={() => onSetTrackDraftMode('editing')}
 				>
 					<i class="fa-solid fa-pen-to-square text-sm"></i>
@@ -178,9 +221,11 @@
 				</button>
 				<button
 					type="button"
-					class={`flex flex-col items-center gap-1 rounded-sm p-2 transition-none ${trackDraftMode === 'select'
-						? 'bg-creator-blue text-white'
-						: 'bg-black/5 text-warm-gray-500 hover:bg-black/10'}`}
+					class={`flex flex-col items-center gap-1 rounded-sm p-2 transition-none ${
+						trackDraftMode === 'select'
+							? 'bg-creator-blue text-white'
+							: 'bg-black/5 text-warm-gray-500 hover:bg-black/10'
+					}`}
 					onclick={() => onSetTrackDraftMode('select')}
 				>
 					<i class="fa-solid fa-arrow-pointer text-sm"></i>
@@ -195,8 +240,9 @@
 					type="button"
 					class="px-2 py-1 rounded-sm border border-red-200 bg-white text-ui-label text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
 					onclick={onDeleteSelectedTrackPoints}
-					disabled={selectedTrackPointCount === 0 || currentTrackPoints.length - selectedTrackPointCount < 2}
-				>Delete selected</button>
+					disabled={selectedTrackPointCount === 0 ||
+						currentTrackPoints.length - selectedTrackPointCount < 2}>Delete selected</button
+				>
 			</div>
 		</div>
 		<label
@@ -210,7 +256,9 @@
 			type="button"
 			class="flex h-10 items-center justify-center gap-1.5 rounded-sm border border-black/15 bg-warm-white px-3 text-[10px] font-bold uppercase tracking-widest text-creator-blue transition-none hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40"
 			onclick={onStartTrackCut}
-			disabled={(activeTrackTarget === null && (!isRoutePathDrawing || trackDraftMode !== 'editing')) || !canEditTrack}
+			disabled={(activeTrackTarget === null &&
+				(!isRoutePathDrawing || trackDraftMode !== 'editing')) ||
+				!canEditTrack}
 		>
 			<i class="fa-solid fa-scissors text-xs"></i>
 			Cut track
@@ -218,8 +266,12 @@
 		<div class="rounded-sm border border-black/10 bg-black/[0.02] p-2 space-y-2">
 			<div class="flex items-center justify-between gap-2">
 				<div>
-					<div class="text-ui-label font-bold uppercase tracking-wide text-warm-gray-500">Track tools</div>
-					<div class="text-[10px] text-warm-gray-400">Enter points to trim from the selected end.</div>
+					<div class="text-ui-label font-bold uppercase tracking-wide text-warm-gray-500">
+						Track tools
+					</div>
+					<div class="text-[10px] text-warm-gray-400">
+						Enter points to trim from the selected end.
+					</div>
 				</div>
 				<button
 					class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
@@ -264,7 +316,9 @@
 					disabled={!canEditTrack}>Simplify path</button
 				>
 			</div>
-			<div class="text-[10px] text-warm-gray-400">Removes redundant points using the tolerance in meters.</div>
+			<div class="text-[10px] text-warm-gray-400">
+				Removes redundant points using the tolerance in meters.
+			</div>
 			{#if simplifySummary}
 				<div class="text-[10px] text-warm-gray-500">{simplifySummary}</div>
 			{/if}
@@ -294,7 +348,9 @@
 				onclick={cleanPauses}
 				disabled={!canEditTrack}>Clean pauses</button
 			>
-			<div class="text-[10px] text-warm-gray-400">Collapses dense GPS-drift clusters; keeps each cluster's endpoints.</div>
+			<div class="text-[10px] text-warm-gray-400">
+				Collapses dense GPS-drift clusters; keeps each cluster's endpoints.
+			</div>
 			{#if pauseCleanupSummary}
 				<div class="text-[10px] text-warm-gray-500">{pauseCleanupSummary}</div>
 			{/if}
@@ -309,12 +365,12 @@
 {/if}
 
 <CragEditorSidebar
-		{inspectorShadow}
-		{map}
-		bind:activeTab
-		{detectedAssets}
-		{isDetectionLoading}
-		{isDetectionZoomLimited}
-		bind:selectedObject
-		{saveStatus}
-	/>
+	{inspectorShadow}
+	{map}
+	bind:activeTab
+	{detectedAssets}
+	{isDetectionLoading}
+	{isDetectionZoomLimited}
+	bind:selectedObject
+	{saveStatus}
+/>

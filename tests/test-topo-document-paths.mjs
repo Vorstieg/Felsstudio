@@ -10,49 +10,47 @@ import {
 	splitTopoPath,
 	unassignTopoPath,
 	validateTopoPaths
-} from '../src/lib/assets/js/topo-document-paths.js';
+} from '../src/lib/assets/js/topo-document-paths.ts';
 
-test('manages, migrates, and validates topo document paths', () => {
-	const legacy = {
-		routes: [
-			{
-				id: 'route-1',
-				assets: {
-					paths: [
-						{
-							role: 'approach',
-							label: 'Common',
-							path: {
-								type: 'LineString',
-								coordinates: [
-									[1, 2],
-									[3, 4]
-								]
-							}
-						}
-					],
-					keep: true
+test('manages and validates topo document paths', () => {
+	const document = {
+		paths: {
+			type: 'FeatureCollection',
+			features: [
+				{
+					type: 'Feature',
+					id: 'common',
+					properties: { name: 'Common' },
+					geometry: {
+						type: 'LineString',
+						coordinates: [
+							[1, 2],
+							[3, 4]
+						]
+					}
 				}
-			},
+			]
+		},
+		routes: [
+			{ id: 'route-1', pathRefs: [{ pathId: 'common', role: 'approach' }] },
 			{ id: 'route-2', pathRefs: [] }
 		]
 	};
-	const migrated = normalizeTopoPaths(legacy);
-	assert.equal(migrated.migrated, true);
-	assert.equal(migrated.data.paths.features.length, 1);
-	assert.equal(migrated.data.routes[0].assets.keep, true);
-	assert.deepEqual(migrated.data.routes[0].pathRefs[0].role, 'approach');
-	const pathId = migrated.data.paths.features[0].id;
-	assert.equal(assignTopoPath(migrated.data, 'route-2', pathId, { role: 'descent' }), true);
-	assert.equal(assignTopoPath(migrated.data, 'route-2', pathId), false);
-	assert.equal(routesUsingTopoPath(migrated.data, pathId).length, 2);
-	assert.deepEqual(validateTopoPaths(migrated.data), []);
-	assert.equal(unassignTopoPath(migrated.data, 'route-1', pathId), true);
-	assert.equal(routesUsingTopoPath(migrated.data, pathId).length, 1);
-	assert.equal(deleteTopoPath(migrated.data, pathId), true);
-	assert.equal(migrated.data.paths.features.length, 0);
-	assert.equal(migrated.data.routes[1].pathRefs.length, 0);
-	assert.deepEqual(validateTopoPaths(migrated.data), []);
+	const normalized = normalizeTopoPaths(document);
+	assert.equal(normalized.changed, false);
+	assert.equal(normalized.data.paths.features.length, 1);
+	assert.deepEqual(normalized.data.routes[0].pathRefs[0].role, 'approach');
+	const pathId = normalized.data.paths.features[0].id;
+	assert.equal(assignTopoPath(normalized.data, 'route-2', pathId, { role: 'descent' }), true);
+	assert.equal(assignTopoPath(normalized.data, 'route-2', pathId), false);
+	assert.equal(routesUsingTopoPath(normalized.data, pathId).length, 2);
+	assert.deepEqual(validateTopoPaths(normalized.data), []);
+	assert.equal(unassignTopoPath(normalized.data, 'route-1', pathId), true);
+	assert.equal(routesUsingTopoPath(normalized.data, pathId).length, 1);
+	assert.equal(deleteTopoPath(normalized.data, pathId), true);
+	assert.equal(normalized.data.paths.features.length, 0);
+	assert.equal(normalized.data.routes[1].pathRefs.length, 0);
+	assert.deepEqual(validateTopoPaths(normalized.data), []);
 
 	const shared = normalizeTopoPaths({
 		paths: {

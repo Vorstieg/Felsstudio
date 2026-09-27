@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it } from 'vitest';
-import { createEditablePathResolver } from './editable-path.js';
+import { createEditablePathResolver } from './editable-path.ts';
 import fixture from '../../../../../tests/fixtures/2d/mixed-topo.json';
 
 function createResolver() {
@@ -66,5 +66,18 @@ describe('createEditablePathResolver', () => {
 			[0.32, 0.44],
 			[0.41000000000000003, 0.21999999999999997]
 		]);
+	});
+
+	it('translates an outline without changing its snapshot', () => {
+		const { topo, resolver } = createResolver();
+		const path = resolver.resolve({ outlineId: 'outline-polyline' });
+		const snapshot = path.snapshot();
+
+		path.translateFrom(snapshot, [0.1, 0.05]);
+
+		const outline = topo.outlines.find((item) => item.id === 'outline-polyline');
+		expect(outline.points2D[0][0]).toBeCloseTo(0.18);
+		expect(outline.points2D[0][1]).toBeCloseTo(0.25);
+		expect(snapshot.points2D[0]).toEqual([0.08, 0.2]);
 	});
 });

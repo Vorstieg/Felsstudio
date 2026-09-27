@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { expect, test } from 'vitest';
 import { createCragEditorSession, createFelsEntry } from '$lib/state/crag-session.svelte.ts';
-import { createCragRouteTool } from './CragRouteTool.svelte.js';
+import { createCragRouteTool } from './CragRouteTool.svelte.ts';
 
 test('adds a route to the active workspace topo document', () => {
 	const state = createCragEditorSession();
@@ -172,4 +172,46 @@ test('assigning, copying, and deleting route paths each create one undo step', (
 	expect(state.workspace.topo.paths.features).toHaveLength(0);
 	expect(state.undo()).toBe(true);
 	expect(state.workspace.topo.paths.features).toHaveLength(1);
+});
+
+test('updates route, path reference, and path feature through typed patches', () => {
+	const state = createCragEditorSession();
+	state.workspace = {
+		entry: createFelsEntry('crag', { id: 'wall', name: 'Wall' }),
+		path: 'crags',
+		topo: {
+			id: 'wall',
+			routes: [{ id: 'route-1', name: 'Old', pathRefs: [{ pathId: 'path-1', role: 'main' }] }],
+			paths: {
+				type: 'FeatureCollection',
+				features: [
+					{
+						type: 'Feature',
+						id: 'path-1',
+						properties: { name: 'Old path' },
+						geometry: {
+							type: 'LineString',
+							coordinates: [
+								[0, 0],
+								[1, 1]
+							]
+						}
+					}
+				]
+			}
+		},
+		access: null,
+		dirtyPaths: [],
+		childEntries: []
+	};
+	state.activeWorkspaceEntryPath = 'crags/wall';
+	const tool = createCragRouteTool({ state });
+	const path = 'crags/wall/wall-topo.json';
+	tool.updateRoute(path, 'route-1', { name: 'New' });
+	tool.updateRoutePath(path, 'route-1', 'path-1', { label: 'North' });
+	tool.updateRoutePathFeature(path, 'path-1', { name: 'New path', description: '' });
+	const topo = state.getActiveWorkspaceEntry().topo;
+	expect(topo.routes[0].name).toBe('New');
+	expect(topo.routes[0].pathRefs[0].label).toBe('North');
+	expect(topo.paths.features[0].properties).toEqual({ name: 'New path' });
 });

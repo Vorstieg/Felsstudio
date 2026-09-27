@@ -1,5 +1,5 @@
 import type { FelsEntryWorkspace } from '$lib/types/crag';
-import { Topo } from './topo-paths.js';
+import { Topo } from './topo-paths.ts';
 
 type WorkspaceNodeLocation = Pick<FelsEntryWorkspace, 'path' | 'id' | 'entry'>;
 

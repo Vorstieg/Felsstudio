@@ -8,9 +8,9 @@ const mocks = vi.hoisted(() => ({
 	}
 }));
 
-vi.mock('$lib/assets/js/db.js', () => ({ topoStore: mocks.topoStore }));
+vi.mock('$lib/assets/js/db.ts', () => ({ topoStore: mocks.topoStore }));
 
-import { draftsState, isBlankTopoSession } from './drafts.svelte.js';
+import { draftsState, isBlankTopoSession } from './drafts.svelte.ts';
 
 if (!globalThis.localStorage) {
 	let values = new Map();

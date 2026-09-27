@@ -4,7 +4,7 @@ import {
 	moveGeometryVertex,
 	removeGeometryVertex,
 	translateGeometryPath
-} from './geometry-path-adapters.js';
+} from './geometry-path-adapters.ts';
 
 describe('geometry path adapters', () => {
 	it('edits LineStrings without mutating the original geometry', () => {

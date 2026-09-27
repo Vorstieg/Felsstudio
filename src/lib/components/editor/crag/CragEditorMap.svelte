@@ -1,20 +1,32 @@
-<script>
+<script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import maplibregl from 'maplibre-gl';
+	import type { Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import { loadMapStyle } from '$lib/map-style.ts';
 
+	type Coordinates = [longitude: number, latitude: number];
+	type MapStyle = 'transport' | 'satellite' | 'terrain';
+	type Props = {
+		map?: MapLibreMap | null;
+		isMapLoaded?: boolean;
+		mapStyle?: MapStyle;
+		initialCoordinates?: Coordinates;
+		onStyleLoad?: (_map: MapLibreMap) => void;
+		onMapClick?: (_event: MapMouseEvent) => void;
+	};
+
 	let {
-		map = $bindable(),
+		map = $bindable<MapLibreMap | null>(null),
 		isMapLoaded = $bindable(false),
 		mapStyle = 'terrain',
-		initialCoordinates = [0, 0],
+		initialCoordinates = [0, 0] as Coordinates,
 		onStyleLoad = () => {},
 		onMapClick = () => {}
-	} = $props();
+	}: Props = $props();
 
-	let mapElement = $state();
-	let currentLoadedStyle = $state();
+	let mapElement = $state<HTMLDivElement | undefined>();
+	let currentLoadedStyle = $state<MapStyle | undefined>();
 
 	onMount(() => {
 		let disposed = false;
@@ -32,8 +44,8 @@
 			const style = await loadMapStyle(mapStyle).catch(
 				() => 'https://demotiles.maplibre.org/style.json'
 			);
-			if (disposed) return;
-			map = new maplibregl.Map({
+			if (disposed || !mapElement) return;
+			const currentMap = new maplibregl.Map({
 				container: mapElement,
 				style,
 				center: [coords[0], coords[1]],
@@ -46,13 +58,14 @@
 				pitchWithRotate: true,
 				attributionControl: false
 			});
-			map.on('style.load', () => {
+			map = currentMap;
+			currentMap.on('style.load', () => {
 				currentLoadedStyle = mapStyle;
 				isMapLoaded = true;
-				onStyleLoad(map);
+				onStyleLoad(currentMap);
 			});
 
-			map.on('click', onMapClick);
+			currentMap.on('click', onMapClick);
 		}
 	});
 

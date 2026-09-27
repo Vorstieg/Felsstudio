@@ -1,6 +1,15 @@
-<script>
+<script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import maplibregl from 'maplibre-gl';
+	import type {
+		GeoJSONSource,
+		Map as MapLibreMap,
+		MapMouseEvent,
+		Marker,
+		PointLike
+	} from 'maplibre-gl';
+	import type { Feature, FeatureCollection } from 'geojson';
+	import type { FelsEntryWorkspace } from '$lib/types/crag';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import * as turf from '@turf/turf';
 	import {
@@ -10,95 +19,129 @@
 		provideCragEditorSession,
 		snapshotDraftWorkspace
 	} from '$lib/state/crag-session.svelte.ts';
-	import { provideCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
-	import { viewport } from '$lib/state/viewport.svelte.js';
+	import { provideCragEditorTools } from '$lib/state/crag-controller-context.svelte.ts';
+	import { viewport } from '$lib/state/viewport.svelte.ts';
 	import { base } from '$app/paths';
 	import { goto } from '$app/navigation';
 
 	import CragEditorMap from '$lib/components/editor/crag/CragEditorMap.svelte';
 	import CragEditorLayout from '$lib/components/editor/crag/CragEditorLayout.svelte';
 	import RouteDetailModal from '$lib/components/editor/crag/RouteDetailModal.svelte';
-	import { authState } from '$lib/api/auth.svelte.js';
+	import { authState } from '$lib/api/auth.svelte.ts';
 	import { storage } from '$lib/assets/js/storage-utils.ts';
-	import { Topo } from '$lib/assets/js/topo-paths.js';
-	import { workspaceDocumentPaths, workspaceNodeDocumentPaths } from '$lib/assets/js/workspace-paths.ts';
-	import { loadFelsEntryWorkspaceDetails } from '$lib/assets/js/load-crag-editor-entry.ts';
-	import { saveCragWorkspace } from '$lib/assets/js/save-crag-workspace.js';
-	import { addEquipment, removeEquipment } from '$lib/components/editor/crag/crag-editor-equipment.ts';
-	import { useCragTrackEditor } from '$lib/components/editor/crag/use-crag-track-editor.svelte.js';
-	import { createCragRouteTool } from '$lib/components/editor/crag/CragRouteTool.svelte.js';
-	import { createCragSelectTool } from '$lib/components/editor/crag/CragSelectTool.svelte.js';
-	import { createCragSectorTool } from '$lib/components/editor/crag/CragSectorTool.svelte.js';
-	import { useCragGeometryEditor } from '$lib/components/editor/crag/use-crag-geometry-editor.svelte.js';
-	import { useCragSectorMarkers } from '$lib/components/editor/crag/use-crag-sector-markers.svelte.js';
-	import { useCragAccessEditor } from '$lib/components/editor/crag/use-crag-access-editor.svelte.js';
-	import { initMapPointDragHandlers } from '$lib/components/editor/map-point-drag-handlers.js';
+	import { Topo } from '$lib/assets/js/topo-paths.ts';
 	import {
-		buildEditorFeatureCollection,
+		workspaceDocumentPaths,
+		workspaceNodeDocumentPaths
+	} from '$lib/assets/js/workspace-paths.ts';
+	import { loadFelsEntryWorkspaceDetails } from '$lib/assets/js/load-crag-editor-entry.ts';
+	import { saveCragWorkspace } from '$lib/assets/js/save-crag-workspace.ts';
+	import {
+		addEquipment,
+		removeEquipment
+	} from '$lib/components/editor/crag/crag-editor-equipment.ts';
+	import { useCragTrackEditor } from '$lib/components/editor/crag/use-crag-track-editor.svelte.ts';
+	import type {
+		AccessTrackFeature,
+		ActiveTrackTarget,
+		RoutePathTarget,
+		TrackCoordinate
+	} from '$lib/components/editor/crag/use-crag-track-editor.svelte.ts';
+	import { createCragRouteTool } from '$lib/components/editor/crag/CragRouteTool.svelte.ts';
+	import type { CragSelection } from '$lib/components/editor/crag/crag-route-types.ts';
+	import { createCragSelectTool } from '$lib/components/editor/crag/CragSelectTool.svelte.ts';
+	import { createCragSectorTool } from '$lib/components/editor/crag/CragSectorTool.svelte.ts';
+	import { useCragGeometryEditor } from '$lib/components/editor/crag/use-crag-geometry-editor.svelte.ts';
+	import { useCragSectorMarkers } from '$lib/components/editor/crag/use-crag-sector-markers.svelte.ts';
+	import { useCragAccessEditor } from '$lib/components/editor/crag/use-crag-access-editor.svelte.ts';
+	import { initMapPointDragHandlers } from '$lib/components/editor/map-point-drag-handlers.ts';
+	import {
 		createIconMarkerElement,
 		ensureCragEditorLayers,
 		syncFlightPlanPreview
-	} from '$lib/components/editor/crag/crag-editor-map.js';
+	} from '$lib/components/editor/crag/crag-editor-map.ts';
+	import type { FlightPlan } from '$lib/assets/js/flight-plan-types.ts';
+	import { buildEditorFeatureCollection } from '$lib/components/editor/crag/crag-editor-data.ts';
 	import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.ts';
-	import { createRouteEditController } from './route-editing.js';
-	import { getGeometryCenter } from '$lib/assets/js/sector-utils.js';
+	import { createRouteEditController } from './route-editing.ts';
+	import { getGeometryCenter } from '$lib/assets/js/sector-utils.ts';
 
-	let { inspectorShadow = true, initialSession = null } = $props();
+	type Point2 = [number, number];
+	type Selection = CragSelection;
+	type RoutePathDraft = RoutePathTarget;
+	type TrackCut = { startCoordinates: Point2[]; endCoordinates: Point2[]; intersection: Point2 };
+	type DraftSession = {
+		workspace: FelsEntryWorkspace;
+		activeWorkspaceEntryPath: string | null;
+		activeMetadataTarget?: string | null;
+	};
+	let {
+		inspectorShadow = true,
+		initialSession = null
+	}: { inspectorShadow?: boolean; initialSession?: DraftSession | null } = $props();
 	const cragEditorState = provideCragEditorSession(createCragEditorSession());
 
 	// Layout flags
-	let isCompact = $derived(viewport.isCompact);
-	let isMedium = $derived(viewport.isMedium);
 	let isExpanded = $derived(viewport.isExpanded);
-	let isLandscape = $derived(viewport.isLandscape);
 
-	let map = $state();
-	let cragMarker;
-	let mapStyle = $state('transport');
+	let map = $state<MapLibreMap | null>(null);
+	let cragMarker: Marker | null = null;
+	let mapStyle = $state<'transport' | 'satellite' | 'terrain'>('transport');
 	let isMapLoaded = $state(false);
-	let saveStatus = $state('idle');
+	let saveStatus = $state<'idle' | 'saving' | 'success' | 'error'>('idle');
 	let saveError = $state('');
 
 	let activeTool = $state('select'); // 'select' | 'geometry' | 'transit' | 'parking' | 'hut' | 'track'
 	let toolOptionsOpen = $state(false);
 	let activeTab = $state('info'); // 'info' | 'registry'
-	let selectedObject = $state(null);
+	let selectedObject = $state<Selection | null>(null);
 	// Preview state is replaced whenever the user generates another mission.
-	let flightPlan = $state(null);
-	let routeTool;
-	let geometryEditor;
+	let flightPlan = $state<FlightPlan | null>(null);
+	let routeTool: ReturnType<typeof createCragRouteTool>;
+	let geometryEditor: ReturnType<typeof useCragGeometryEditor>;
 	let activeWorkspace = $derived(cragEditorState.getActiveWorkspaceEntry());
 	let activeEntry = $derived(activeWorkspace?.entry || null);
 	let activeSectors = $derived(activeWorkspace?.childEntries || []);
-	let activeAccess = $derived(activeWorkspace?.access || { type: 'FeatureCollection', version: 1, features: [] });
-	let workspaceTopos = $derived.by(() => [activeWorkspace, ...activeSectors].flatMap((node) =>
-		node?.entry?.properties.id && node.topo ? [{
-			node,
-			path: workspaceNodeDocumentPaths(node).topo,
-			data: node.topo
-		}] : []
-	));
+	let activeAccess = $derived(
+		activeWorkspace?.access || { type: 'FeatureCollection', version: 1, features: [] }
+	);
+	let workspaceTopos = $derived.by(() =>
+		[activeWorkspace, ...activeSectors].flatMap((node) =>
+			node?.entry?.properties.id && node.topo
+				? [
+						{
+							node,
+							path: workspaceNodeDocumentPaths(node).topo,
+							data: node.topo
+						}
+					]
+				: []
+		)
+	);
 
 	let selectedRouteEntry = $derived.by(() => {
-		if (selectedObject?.type !== 'route') return null;
-		return workspaceTopos
-			.flatMap((document) => (document.data?.routes || []).map((route) => ({ document, route })))
-			.find(({ document, route }) => `${document.path}:${route.id}` === selectedObject.key);
+		const selection = selectedObject;
+		if (selection?.type !== 'route') return null;
+		return (
+			workspaceTopos
+				.flatMap((document) => (document.data?.routes || []).map((route) => ({ document, route })))
+				.find(({ document, route }) => `${document.path}:${route.id}` === selection.key) ?? null
+		);
 	});
-	let routeEditDraft = $state(null);
+	let routeEditDraft = $state<RoutePathDraft | null>(null);
 	let isRoutePathDrawing = $derived(routeEditDraft !== null);
-	let cutLineStart = $state(null);
-	let cutLineEnd = $state(null);
-	let pendingTrackCut = $state(null);
+	let cutLineStart = $state<Point2 | null>(null);
+	let cutLineEnd = $state<Point2 | null>(null);
+	let pendingTrackCut = $state<TrackCut | null>(null);
 	let hasPendingTrackCut = $derived(pendingTrackCut !== null);
 	let areTrackCutDragHandlersReady = false;
 	let areTrackViewportSyncHandlersReady = false;
 	let suppressNextMapClick = false;
 	let canAutosaveSession = $state(false);
-	let autosaveSessionTimeout;
-	let activeCragDraftId = $state(null);
+	let autosaveSessionTimeout: ReturnType<typeof setTimeout> | undefined;
+	let activeCragDraftId = $state<string | null>(null);
 	const CRAG_DRAFTS_KEY = 'crag_editor_drafts_v1';
-	const cragDraftSessionKey = (id) => `crag_editor_draft_session_${id}`;
+	const cragDraftSessionKey = (id: string) => `crag_editor_draft_session_${id}`;
 
 	const trackEditor = useCragTrackEditor({
 		state: cragEditorState,
@@ -125,13 +168,13 @@
 		setDraft: (value) => (routeEditDraft = value)
 	});
 
-	async function activateWorkspaceEntry(target) {
+	async function activateWorkspaceEntry(target: string) {
 		if (!target || !cragEditorState.workspace) return;
 		try {
 			await loadFelsEntryWorkspaceDetails(cragEditorState.workspace, target);
 		} catch (error) {
 			saveStatus = 'error';
-			saveError = `Could not load ${target}: ${error.message}`;
+			saveError = `Could not load ${target}: ${error instanceof Error ? error.message : String(error)}`;
 			return false;
 		}
 		saveError = '';
@@ -142,15 +185,18 @@
 		return true;
 	}
 
-	async function selectObject(value) {
+	async function selectObject(value: Selection | null) {
 		if (value?.type === 'entry') {
-			if (!await activateWorkspaceEntry(value.key)) return;
+			if (typeof value.key !== 'string' || !(await activateWorkspaceEntry(value.key))) return;
 			activeTab = 'info';
 		}
 		routeEditController.selectObject(value);
 	}
 
-	async function selectMetadataTarget(target, { focus = true, edit = false } = {}) {
+	async function selectMetadataTarget(
+		target: string | null,
+		{ focus = true, edit = false }: { focus?: boolean; edit?: boolean } = {}
+	) {
 		if (!target) return;
 		await selectObject({ type: 'entry', key: target });
 		geometryEditor?.clearSelection();
@@ -168,20 +214,20 @@
 	let selectedTrackPointIndexes = $derived(trackEditor.selectedTrackPointIndexes);
 	let selectedTrackPointCount = $derived(trackEditor.selectedTrackPointCount);
 
-	const addTrackPoint = (...args) => trackEditor.addTrackPoint(...args);
-	const handleTrackConfirm = (...args) => trackEditor.handleTrackConfirm(...args);
-	const startRoutingDraft = (...args) => trackEditor.startRoutingDraft(...args);
-	const undoTrackPoint = (...args) => trackEditor.undoTrackPoint(...args);
-	const splitEditingTrack = (...args) => trackEditor.splitEditingTrack(...args);
-	const editTrack = (...args) => {
+	const addTrackPoint = trackEditor.addTrackPoint;
+	const handleTrackConfirm = trackEditor.handleTrackConfirm;
+	const startRoutingDraft = trackEditor.startRoutingDraft;
+	const undoTrackPoint = trackEditor.undoTrackPoint;
+	const splitEditingTrack = trackEditor.splitEditingTrack;
+	const editTrack = (...args: Parameters<typeof trackEditor.editTrack>) => {
 		toolOptionsOpen = false;
 		return trackEditor.editTrack(...args);
 	};
-	const editRoutePathTrack = (...args) => {
+	const editRoutePathTrack = (...args: Parameters<typeof trackEditor.editRoutePath>) => {
 		toolOptionsOpen = false;
 		return trackEditor.editRoutePath(...args);
 	};
-	const cancelTrackEdit = (...args) => trackEditor.cancelTrackEdit(...args);
+	const cancelTrackEdit = trackEditor.cancelTrackEdit;
 
 	const accessEditor = useCragAccessEditor({
 		state: cragEditorState,
@@ -192,10 +238,10 @@
 	let detectedAssets = $derived(accessEditor.detectedAssets);
 	let isDetectionLoading = $derived(accessEditor.isDetectionLoading);
 	let isDetectionZoomLimited = $derived(accessEditor.isDetectionZoomLimited);
-	const addDetectedAsset = (...args) => accessEditor.addDetectedAsset(...args);
-	const addTransitPoint = (...args) => accessEditor.addTransitPoint(...args);
-	const addParkingPoint = (...args) => accessEditor.addParkingPoint(...args);
-	const addHutPoint = (...args) => accessEditor.addHutPoint(...args);
+	const addDetectedAsset = accessEditor.addDetectedAsset;
+	const addTransitPoint = accessEditor.addTransitPoint;
+	const addParkingPoint = accessEditor.addParkingPoint;
+	const addHutPoint = accessEditor.addHutPoint;
 
 	const sectorTool = createCragSectorTool({
 		state: cragEditorState,
@@ -246,15 +292,18 @@
 		return !cragEditorState.workspace;
 	}
 
-	function restoreCragSession(session, id = null) {
+	function restoreCragSession(session: DraftSession | null, id: string | null = null) {
 		if (!session?.workspace) return false;
 		cragEditorState.workspace = snapshotDraftWorkspace(session.workspace);
 		cragEditorState.activeWorkspaceEntryPath = session.activeWorkspaceEntryPath;
-		cragEditorState.activeMetadataTarget = session.activeMetadataTarget || session.activeWorkspaceEntryPath;
-		selectedObject = cragEditorState.activeWorkspaceEntryPath ? {
-			type: 'entry',
-			key: cragEditorState.activeWorkspaceEntryPath
-		} : null;
+		cragEditorState.activeMetadataTarget =
+			session.activeMetadataTarget || session.activeWorkspaceEntryPath;
+		selectedObject = cragEditorState.activeWorkspaceEntryPath
+			? {
+					type: 'entry',
+					key: cragEditorState.activeWorkspaceEntryPath
+				}
+			: null;
 		activeCragDraftId = id;
 		return true;
 	}
@@ -264,7 +313,7 @@
 		return new URL(window.location.href).searchParams.get('draft');
 	}
 
-	function setCragDraftParamInUrl(id) {
+	function setCragDraftParamInUrl(id: string | null) {
 		if (!id || typeof window === 'undefined') return;
 		const url = new URL(window.location.href);
 		if (url.searchParams.get('draft') === id) return;
@@ -273,19 +322,22 @@
 	}
 
 	function createCragDraftId() {
-		return activeEntry?.properties.id ? `crag-${activeEntry.properties.id}` : `draft-crag-${Date.now()}`;
+		return activeEntry?.properties.id
+			? `crag-${activeEntry.properties.id}`
+			: `draft-crag-${Date.now()}`;
 	}
 
-	function getCragDraftSession(id) {
-		return id ? storage.get(cragDraftSessionKey(id), null) : null;
+	function getCragDraftSession(id: string) {
+		return storage.get<DraftSession>(cragDraftSessionKey(id), null);
 	}
 
 	function saveLatestCragSession() {
-		if (isBlankCragSession()) return;
+		const workspace = cragEditorState.workspace;
+		if (!workspace) return;
 		const timestamp = new Date().toISOString();
 		const id = activeCragDraftId || createCragDraftId();
 		const session = {
-			workspace: snapshotDraftWorkspace(cragEditorState.workspace),
+			workspace: snapshotDraftWorkspace(workspace),
 			activeWorkspaceEntryPath: cragEditorState.activeWorkspaceEntryPath,
 			activeMetadataTarget: cragEditorState.activeMetadataTarget,
 			updated: timestamp
@@ -297,14 +349,16 @@
 			cragId: activeEntry?.properties.id || '',
 			updated: timestamp
 		};
-		const drafts = storage.get(CRAG_DRAFTS_KEY, []).filter((draft) => draft.id !== id);
+		const drafts = (storage.get<Array<{ id: string }>>(CRAG_DRAFTS_KEY, []) ?? []).filter(
+			(draft) => draft.id !== id
+		);
 		storage.set(CRAG_DRAFTS_KEY, [metadata, ...drafts]);
 		storage.set(cragDraftSessionKey(id), session);
 		activeCragDraftId = id;
 		setCragDraftParamInUrl(id);
 	}
 
-	function initializeCragSession(sourceSession) {
+	function initializeCragSession(sourceSession: DraftSession | null) {
 		const draftId = getCragDraftIdFromUrl();
 		if (draftId && restoreCragSession(getCragDraftSession(draftId), draftId)) return;
 		if (sourceSession && restoreCragSession(sourceSession)) return;
@@ -328,11 +382,17 @@
 		selectedObject = { type: 'entry', key: entry.properties.id };
 	}
 
-	function coordinatesEqual(a, b) {
+	function coordinatesEqual(a: Point2 | undefined, b: Point2): boolean {
+		if (!a) return false;
 		return Math.abs(a[0] - b[0]) < 1e-10 && Math.abs(a[1] - b[1]) < 1e-10;
 	}
 
-	function segmentLineIntersection(a, b, c, d) {
+	function segmentLineIntersection(
+		a: Point2,
+		b: Point2,
+		c: Point2,
+		d: Point2
+	): { coordinate: Point2; t: number } | null {
 		const [x1, y1] = a;
 		const [x2, y2] = b;
 		const [x3, y3] = c;
@@ -346,7 +406,7 @@
 		return { coordinate: [x1 + t * (x2 - x1), y1 + t * (y2 - y1)], t };
 	}
 
-	function findTrackCutIntersection(coordinates, lineStart, lineEnd) {
+	function findTrackCutIntersection(coordinates: Point2[], lineStart: Point2, lineEnd: Point2) {
 		for (let index = 0; index < coordinates.length - 1; index += 1) {
 			const intersection = segmentLineIntersection(
 				coordinates[index],
@@ -359,7 +419,10 @@
 		return null;
 	}
 
-	function splitTrackAtIntersection(coordinates, intersection) {
+	function splitTrackAtIntersection(
+		coordinates: Point2[],
+		intersection: { coordinate: Point2; segmentIndex: number }
+	): [Point2[], Point2[]] {
 		const { coordinate, segmentIndex } = intersection;
 		const startCoordinates = coordinates.slice(0, segmentIndex + 1);
 		const endCoordinates = coordinates.slice(segmentIndex + 1);
@@ -368,8 +431,8 @@
 		return [startCoordinates, endCoordinates];
 	}
 
-	function cutOverlayFeatures() {
-		const features = [];
+	function cutOverlayFeatures(): FeatureCollection {
+		const features: Feature[] = [];
 		if (cutLineStart && cutLineEnd) {
 			features.push({
 				type: 'Feature',
@@ -396,14 +459,14 @@
 	}
 
 	function syncTrackCutOverlay() {
-		const source = map?.getSource('track-cut-overlay');
+		const source = map?.getSource('track-cut-overlay') as GeoJSONSource | undefined;
 		if (source) source.setData(cutOverlayFeatures());
 	}
 
-	function trackDragOverlayFeatures() {
+	function trackDragOverlayFeatures(): FeatureCollection {
 		if (!activeTrackDragState) return { type: 'FeatureCollection', features: [] };
 		const { pointIndex, coordinate } = activeTrackDragState;
-		const features = [];
+		const features: Feature[] = [];
 		const dragPoints = [...currentTrackPoints];
 		dragPoints[pointIndex] = coordinate;
 		if (currentTrackPoints[pointIndex - 1]) {
@@ -453,14 +516,14 @@
 	}
 
 	function syncTrackDragOverlay() {
-		const source = map?.getSource('tracks-drag-overlay');
+		const source = map?.getSource('tracks-drag-overlay') as GeoJSONSource | undefined;
 		if (source) source.setData(trackDragOverlayFeatures());
 	}
 
-	function visibleDrawingPointIndexes(points) {
+	function visibleDrawingPointIndexes(points: Point2[]): number[] {
 		const bounds = map?.getBounds?.();
 		if (!bounds) return [];
-		const indexes = [];
+		const indexes: number[] = [];
 		for (let index = 0; index < points.length; index += 1) {
 			if (bounds.contains(points[index])) indexes.push(index);
 		}
@@ -508,7 +571,7 @@
 		resetTrackCut();
 	}
 
-	function handleTrackCutClick(coordinate) {
+	function handleTrackCutClick(coordinate: Point2) {
 		if (!cutLineStart || pendingTrackCut) {
 			cutLineStart = coordinate;
 			cutLineEnd = null;
@@ -522,14 +585,12 @@
 
 	function confirmTrackCut() {
 		if (!pendingTrackCut) return;
-		const splitMode = 'shared';
 		const wasSplit = routeEditDraft
 			? routeTool.splitRoutePath(
-				routeEditDraft,
-				pendingTrackCut.startCoordinates,
-				pendingTrackCut.endCoordinates,
-				splitMode
-			)
+					routeEditDraft,
+					pendingTrackCut.startCoordinates,
+					pendingTrackCut.endCoordinates
+				)
 			: splitEditingTrack(pendingTrackCut.startCoordinates, pendingTrackCut.endCoordinates);
 		if (wasSplit) resetTrackCut();
 	}
@@ -546,7 +607,7 @@
 				return cutPointIndex === 0 || cutPointIndex === 1 ? { cutPointIndex } : null;
 			},
 			onDragMove: ({ cutPointIndex }, event) => {
-				const coordinate = [event.lngLat.lng, event.lngLat.lat];
+				const coordinate: Point2 = [event.lngLat.lng, event.lngLat.lat];
 				if (cutPointIndex === 0) cutLineStart = coordinate;
 				else cutLineEnd = coordinate;
 				rebuildPendingTrackCut();
@@ -561,7 +622,7 @@
 	onMount(() => {
 		canAutosaveSession = true;
 
-		const handleKeyDown = (e) => {
+		const handleKeyDown = (e: KeyboardEvent) => {
 			if (activeTool === 'track') {
 				if (e.key === 'Enter' || e.key === 'n' || e.key === 'N') handleTrackConfirm();
 				else if (e.key === 'Escape') cancelTrackEdit();
@@ -587,7 +648,8 @@
 	// crag path during initialization and must not start with a blank path.
 	if (isBlankCragSession()) initializeCragSession(untrack(() => initialSession));
 
-	async function handleMapClick(e) {
+	async function handleMapClick(e: MapMouseEvent) {
+		if (!map) return;
 		if (suppressNextMapClick) {
 			suppressNextMapClick = false;
 			return;
@@ -603,12 +665,17 @@
 			return;
 		}
 
-		if (activeTool === 'track' && ['select', 'delete'].includes(trackDraftMode) && currentTrackPoints.length > 0) {
+		if (
+			activeTool === 'track' &&
+			['select', 'delete'].includes(trackDraftMode) &&
+			currentTrackPoints.length > 0
+		) {
 			if (trackDraftMode === 'select') trackEditor.clearTrackSelection();
 			return;
 		}
 
-		const canSelectPathFromTool = activeTool !== 'track' || (!routeEditDraft && currentTrackPoints.length === 0);
+		const canSelectPathFromTool =
+			activeTool !== 'track' || (!routeEditDraft && currentTrackPoints.length === 0);
 		if (canSelectPathFromTool) {
 			const selectedPath = selectTool.handlePathMapClick(e, { editPath: activeTool === 'track' });
 			if (selectedPath) return;
@@ -620,11 +687,20 @@
 				[e.point.x - hitRadius, e.point.y - hitRadius],
 				[e.point.x + hitRadius, e.point.y + hitRadius]
 			];
-			const features = map.queryRenderedFeatures(bbox, { layers: ['detection-points'] });
+			const features = map.queryRenderedFeatures(bbox as [PointLike, PointLike], {
+				layers: ['detection-points']
+			});
 			if (features.length > 0) {
+				const distanceTo = (feature: (typeof features)[number]) =>
+					feature.geometry.type === 'Point'
+						? turf.distance(
+								turf.point(e.lngLat.toArray()),
+								turf.point(feature.geometry.coordinates)
+							)
+						: Infinity;
 				const closest = features.reduce((prev, curr) => {
-					const prevDist = turf.distance(turf.point(e.lngLat.toArray()), prev);
-					const currDist = turf.distance(turf.point(e.lngLat.toArray()), curr);
+					const prevDist = distanceTo(prev);
+					const currDist = distanceTo(curr);
 					return currDist < prevDist ? curr : prev;
 				});
 				const assetId = closest.properties.id;
@@ -636,7 +712,7 @@
 			}
 		}
 
-		let lngLat = [e.lngLat.lng, e.lngLat.lat];
+		let lngLat: Point2 = [e.lngLat.lng, e.lngLat.lat];
 		if (activeTool === 'track' && isSnappingEnabled) {
 			lngLat = snapToNearestWay(e.point, lngLat);
 		}
@@ -721,8 +797,9 @@
 		accessEditor.syncDetectionHighlights();
 	});
 
-	function snapToNearestWay(point, originalLngLat) {
+	function snapToNearestWay(point: { x: number; y: number }, originalLngLat: Point2): Point2 {
 		if (!map) return originalLngLat;
+		const activeMap = map;
 		const layers = [
 			'Path',
 			'Track',
@@ -732,8 +809,8 @@
 			'Highway',
 			'Road construction',
 			'snap-helper'
-		].filter((id) => map.getLayer(id));
-		const features = map.queryRenderedFeatures(
+		].filter((id) => activeMap.getLayer(id));
+		const features = activeMap.queryRenderedFeatures(
 			[
 				[point.x - 20, point.y - 20],
 				[point.x + 20, point.y + 20]
@@ -741,15 +818,25 @@
 			{ layers }
 		);
 		if (features.length === 0) return originalLngLat;
-		let closestPoint = null;
+		let closestPoint: Point2 | null = null;
 		let minDistance = Infinity;
 		features.forEach((feature) => {
 			if (feature.geometry.type === 'LineString' || feature.geometry.type === 'MultiLineString') {
-				const snapped = turf.nearestPointOnLine(feature, turf.point(originalLngLat));
-				const dist = turf.distance(turf.point(originalLngLat), snapped);
-				if (dist < minDistance) {
-					minDistance = dist;
-					closestPoint = snapped.geometry.coordinates;
+				const lines =
+					feature.geometry.type === 'LineString'
+						? [feature.geometry.coordinates]
+						: feature.geometry.coordinates;
+				for (const coordinates of lines) {
+					if (coordinates.length < 2) continue;
+					const snapped = turf.nearestPointOnLine(
+						turf.lineString(coordinates),
+						turf.point(originalLngLat)
+					);
+					const dist = turf.distance(turf.point(originalLngLat), snapped);
+					if (dist < minDistance) {
+						minDistance = dist;
+						closestPoint = [snapped.geometry.coordinates[0], snapped.geometry.coordinates[1]];
+					}
 				}
 			}
 		});
@@ -758,25 +845,31 @@
 
 	function centerMapOnUser() {
 		if (!navigator.geolocation || !map) return;
+		const activeMap = map;
 		navigator.geolocation.getCurrentPosition(
 			(position) => {
-				const coordinates = [position.coords.longitude, position.coords.latitude];
-				map.easeTo({ center: coordinates, zoom: Math.max(map.getZoom(), 15), duration: 500 });
+				const coordinates: Point2 = [position.coords.longitude, position.coords.latitude];
+				activeMap.easeTo({
+					center: coordinates,
+					zoom: Math.max(activeMap.getZoom(), 15),
+					duration: 500
+				});
 			},
-			() => {
-			},
+			() => {},
 			{ enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
 		);
 	}
 
-	function initMarkersAndLayers(loadedMap = map) {
+	function initMarkersAndLayers(loadedMap: MapLibreMap | null = map) {
 		if (!loadedMap) return;
 		map = loadedMap;
 		sectorTool.ensureMapLayers(loadedMap);
 		ensureCragEditorLayers(loadedMap);
 		geometryEditor.ensureMapLayers(loadedMap);
 
-		const markerPos = $state.snapshot(getGeometryCenter(activeEntry?.geometry) || [0, 0]);
+		const markerPos: [number, number] = $state.snapshot(
+			getGeometryCenter(activeEntry?.geometry) || ([0, 0] as [number, number])
+		);
 		if (cragMarker) cragMarker.remove();
 		cragMarker = new maplibregl.Marker({
 			element: createIconMarkerElement({
@@ -812,7 +905,7 @@
 		// shared route/access source is being recreated after a map style change.
 		sectorTool.syncDrawing();
 		geometryEditor.syncDrawing();
-		const source = map?.getSource('crag-editor-data');
+		const source = map?.getSource('crag-editor-data') as GeoJSONSource | undefined;
 		if (!source) return;
 		const drawingPoints = $state.snapshot(currentTrackPoints) || [];
 		const editingRoutePath = routeEditDraft || null;
@@ -839,13 +932,13 @@
 				selectedTrackPointIndex: trackEditor.selectedTrackPointIndex,
 				selectedTrackPointIndexes,
 				activeTrackTarget,
-				draggingTrackPointIndex: untrack(() => activeTrackDragState?.pointIndex ?? null),
+				draggingTrackPointIndex: untrack(() => activeTrackDragState?.pointIndex ?? null)
 			})
 		);
 		syncFlightPlanPreview(map, $state.snapshot(flightPlan));
 	}
 
-	function handleFlightPlanGenerated(plan) {
+	function handleFlightPlanGenerated(plan: FlightPlan | null) {
 		flightPlan = plan;
 		syncEditorData();
 	}
@@ -880,7 +973,7 @@
 		} catch (err) {
 			console.error('Save failed:', err);
 			saveStatus = 'error';
-			saveError = err.message;
+			saveError = err instanceof Error ? err.message : String(err);
 		}
 	}
 
@@ -889,7 +982,7 @@
 		cragEditorState.setMetadataEquipment(addEquipment(target?.equipment || []));
 	}
 
-	function removeEquipmentItem(idx) {
+	function removeEquipmentItem(idx: number) {
 		const target = cragEditorState.getMetadataTarget();
 		cragEditorState.setMetadataEquipment(removeEquipment(target?.equipment || [], idx));
 	}
@@ -898,44 +991,57 @@
 		return cragEditorState.getWorkspaceEntry();
 	}
 
-	function addCragImages(files = []) {
+	function addCragImages(files: File[] = []) {
 		const node = getActiveImageWorkspace();
-		if (!node?.entry) return;
+		const entry = node?.entry;
+		if (!node || !entry) return;
 		const uploads = files
 			.filter((file) => file?.type?.startsWith('image/'))
 			.map((file) => {
-				const imagePath = new Topo(node.path, node.entry.properties.id).getImagePath(
+				const imagePath = new Topo(node.path, entry.properties.id).getImagePath(
 					file.name,
 					createImageToken()
 				);
-				return { file, previewUrl: URL.createObjectURL(file), path: imagePath, clientId: createImageToken() };
+				return {
+					file,
+					previewUrl: URL.createObjectURL(file),
+					path: imagePath,
+					clientId: createImageToken()
+				};
 			});
 		if (!uploads.length) return;
 		cragEditorState.commit('Add images', () => {
-			node.images = [...(node.images || []), ...uploads.map(({ file, path, clientId }) => ({
-				name: file.name,
-				path,
-				clientId
-			}))];
+			node.images = [
+				...(node.images || []),
+				...uploads.map(({ file, path, clientId }) => ({
+					name: file.name,
+					path,
+					clientId
+				}))
+			];
 			for (const upload of uploads) cragEditorState.addPendingImage(node, upload);
 		});
 	}
 
-	function removeCragImage(index) {
+	function removeCragImage(index: number) {
 		const node = getActiveImageWorkspace();
 		if (!node) return;
 		const images = node.images || [];
 		const image = images[index];
 		if (!image) return;
 		cragEditorState.commit('Remove image', () => {
-			if (!cragEditorState.getPendingImages(node).some((pending) => pending.clientId === image.clientId))
+			if (
+				!cragEditorState
+					.getPendingImages(node)
+					.some((pending) => pending.clientId === image.clientId)
+			)
 				node.removedPaths.push(image.sourcePath || image.path);
 			node.images = images.filter((_, i) => i !== index);
 			node.pendingImages = cragEditorState.getPendingImages(node);
 		});
 	}
 
-	function setActiveMetadataId(value) {
+	function setActiveMetadataId(value: string) {
 		const target = cragEditorState.activeMetadataTarget;
 		const node = cragEditorState.getWorkspaceEntry(target);
 		cragEditorState.setMetadataField('id', value);
@@ -943,28 +1049,24 @@
 			selectedObject = { type: 'entry', key: cragEditorState.getWorkspaceEntryPath(node) };
 	}
 
-	function getCragTrackFeature(target) {
-		if (target?.kind === 'access')
-			return (
-				activeAccess.features.find((feature) => feature.id === target.featureId) || null
-			);
-		if (target?.kind === 'route-path')
-			return (
-				workspaceTopos
-					.find((entry) => entry.path === target.documentPath)
-					?.data?.paths?.features?.find(
-					(feature) => String(feature.id) === String(target.pathId)
-				) || null
-			);
-		return null;
+	function getCragTrackFeature(target: ActiveTrackTarget | null): AccessTrackFeature | null {
+		if (target?.kind !== 'access') return null;
+		return (
+			(activeAccess.features as AccessTrackFeature[]).find(
+				(feature) => feature.id === target.featureId
+			) ?? null
+		);
 	}
 
-	function saveCragTrackGeometry(target, coordinates) {
+	function saveCragTrackGeometry(
+		target: ActiveTrackTarget | null,
+		coordinates: TrackCoordinate[]
+	): boolean {
 		if (target?.kind === 'route-path')
 			return Boolean(routeTool.saveRoutePathCoordinates(target, coordinates));
 		if (target?.kind !== 'access') return false;
 		cragEditorState.replaceAccessFeatures(
-			activeAccess.features.map((feature) =>
+			(activeAccess.features as AccessTrackFeature[]).map((feature) =>
 				feature.id === target.featureId
 					? { ...feature, geometry: { type: 'LineString', coordinates } }
 					: feature
@@ -1007,7 +1109,7 @@
 <CragEditorMap
 	bind:map
 	bind:isMapLoaded
-	bind:mapStyle
+	{mapStyle}
 	initialCoordinates={$state.snapshot(getGeometryCenter(activeEntry?.geometry) || [0, 0])}
 	onStyleLoad={initMarkersAndLayers}
 	onMapClick={handleMapClick}
@@ -1017,9 +1119,6 @@
 	{inspectorShadow}
 	{map}
 	{isExpanded}
-	{isCompact}
-	{isMedium}
-	{isLandscape}
 	bind:activeTool
 	bind:toolOptionsOpen
 	bind:mapStyle

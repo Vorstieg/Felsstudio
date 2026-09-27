@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it, vi } from 'vitest';
-import { createToolInteraction } from './tool-interaction.js';
+import { createToolInteraction } from './tool-interaction.ts';
 
 describe('createToolInteraction', () => {
 	it('keeps options closed on the first mobile tool press and opens them on the second', () => {

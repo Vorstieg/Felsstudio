@@ -1,0 +1,121 @@
+import type {
+	Topo2DEditorClustering,
+	Topo2DEditorDocument
+} from './topo-2d-editor-initial-state.ts';
+
+export type DraftTopoData = {
+	id?: string;
+	name?: string;
+	editorMode?: '2d' | '3d';
+	crag_id?: string;
+	sector_id?: string;
+	description?: string;
+	image2D?: string | null;
+	routes?: Topo2DEditorDocument['routes'];
+	fixPoints?: Topo2DEditorDocument['fixPoints'];
+	outlines?: Topo2DEditorDocument['outlines'];
+	textLabels?: Topo2DEditorDocument['textLabels'];
+	_entryPath?: string;
+	entryPath?: string;
+	_topoFileName?: string;
+};
+
+export type DraftClustering = Partial<Topo2DEditorClustering> & {
+	cropsBuffers?: Record<string, SerializedCrop>;
+};
+
+/** Data supplied by the editor alongside its topo document. */
+export type DraftEditorExtras = {
+	clustering?: DraftClustering;
+	glbBlob?: Blob | null;
+	glbArrayBuffer?: ArrayBuffer;
+	selectedRouteId?: string | null;
+};
+
+/** A complete in-memory editor session. */
+export type DraftSession = DraftEditorExtras & {
+	topo: DraftTopoData;
+	id?: string;
+	updated?: string;
+};
+
+export type StoredTopoDraft = DraftEditorExtras & {
+	topo: DraftTopoData;
+	id: string;
+	updated: string;
+};
+
+type SerializedCrop = { buffer: ArrayBuffer; type: string };
+
+/**
+ * Convert editor-only resources into data that can survive IndexedDB storage.
+ * Blob URLs are intentionally resolved here because they are not durable across
+ * sessions.
+ */
+export async function serializeDraftExtras(
+	extras: DraftEditorExtras = {},
+	{ fetchImpl = globalThis.fetch }: { fetchImpl?: typeof fetch } = {}
+): Promise<DraftEditorExtras> {
+	const serialized: DraftEditorExtras = { ...extras };
+
+	if (typeof Blob !== 'undefined' && serialized.glbBlob instanceof Blob) {
+		serialized.glbArrayBuffer = await serialized.glbBlob.arrayBuffer();
+		delete serialized.glbBlob;
+	}
+
+	const cropsMap = serialized.clustering?.cropsMap;
+	if (!cropsMap || Object.keys(cropsMap).length === 0) return serialized;
+
+	const buffersByUrl = new Map<string, SerializedCrop>();
+	for (const url of new Set(Object.values(cropsMap))) {
+		if (typeof url !== 'string') continue;
+		if (!url.startsWith('blob:')) continue;
+
+		try {
+			const response = await fetchImpl(url);
+			buffersByUrl.set(url, {
+				buffer: await response.arrayBuffer(),
+				type: response.headers.get('content-type') || 'image/jpeg'
+			});
+		} catch {
+			// A blob URL may have expired before autosave completes.
+		}
+	}
+
+	const cropsBuffers = Object.fromEntries(
+		Object.entries(cropsMap)
+			.map(([key, url]) => [key, typeof url === 'string' ? buffersByUrl.get(url) : undefined])
+			.filter((entry): entry is [string, SerializedCrop] => entry[1] !== undefined)
+	);
+
+	serialized.clustering = { ...serialized.clustering, cropsBuffers };
+	delete serialized.clustering.cropsMap;
+	return serialized;
+}
+
+/** Restore resources that were serialized for IndexedDB. */
+export function restoreDraftSession(
+	session: DraftSession | null | undefined,
+	{ createObjectURL = URL.createObjectURL }: { createObjectURL?: typeof URL.createObjectURL } = {}
+): DraftSession | null | undefined {
+	if (!session) return session;
+
+	if (session.glbArrayBuffer instanceof ArrayBuffer) {
+		session.glbBlob = new Blob([session.glbArrayBuffer], { type: 'model/gltf-binary' });
+		delete session.glbArrayBuffer;
+	}
+
+	const cropsBuffers = session.clustering?.cropsBuffers;
+	if (cropsBuffers && Object.keys(cropsBuffers).length > 0) {
+		const cropsMap: Record<string, string> = {};
+		for (const [key, { buffer, type }] of Object.entries(cropsBuffers)) {
+			if (buffer instanceof ArrayBuffer) {
+				cropsMap[key] = createObjectURL(new Blob([buffer], { type: type || 'image/jpeg' }));
+			}
+		}
+		session.clustering = { ...session.clustering, cropsMap };
+		delete session.clustering.cropsBuffers;
+	}
+
+	return session;
+}

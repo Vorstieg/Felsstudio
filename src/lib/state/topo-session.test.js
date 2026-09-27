@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it } from 'vitest';
-import { createTopo2DEditorState } from './topo-2d-editor-state.svelte.js';
+import { createTopo2DEditorState } from './topo-2d-editor-state.svelte.ts';
 
 describe('createTopo2DEditorState', () => {
 	it('creates independent sessions with fresh document and UI state', () => {

@@ -39,15 +39,14 @@ describe('getHierarchySourceRefs', () => {
 	});
 
 	it('keeps existing asset references when loading an entry', async () => {
-		const assets = { images: ['wall/image.jpg'], models: ['wall/wall.glb'] };
+		const assets = { models: ['wall/wall.glb'] };
 		const entry = {
 			type: 'Feature',
-			properties: { id: 'wall', kind: 'crag', assets, sectors: [] },
+			properties: { id: 'wall', kind: 'crag', assets },
 			geometry: null
 		};
 		const workspace = await loadFelsEntryWorkspace('wall', async () => entry);
 		expect(workspace.entry.properties.assets).toEqual(assets);
-		expect(workspace.entry.properties).not.toHaveProperty('sectors');
 	});
 	it('retains a moved child when loading its destination parent', async () => {
 		const feature = {

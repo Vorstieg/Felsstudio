@@ -7,7 +7,7 @@ import {
 	movePathVertex,
 	removePathVertex,
 	translatePath
-} from './path-geometry.js';
+} from './path-geometry.ts';
 
 describe('path geometry', () => {
 	it('maintains a closed ring while editing its first or closing vertex', () => {

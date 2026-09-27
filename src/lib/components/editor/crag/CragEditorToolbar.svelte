@@ -1,7 +1,32 @@
-<script>
+<script lang="ts">
 	import { _ } from 'svelte-i18n';
 	import ToolBar from '$lib/components/editor/tools/ToolBar.svelte';
 	import MapSearch from '$lib/components/editor/MapSearch.svelte';
+	import type { Map as MapLibreMap } from 'maplibre-gl';
+	import type { TrackCoordinate } from './use-crag-track-editor.svelte.ts';
+
+	type Action = () => void | Promise<void>;
+	type Props = {
+		map?: MapLibreMap | null;
+		activeTool?: string;
+		toolOptionsOpen?: boolean;
+		currentTrackPoints?: TrackCoordinate[];
+		isRoutingTrack?: boolean;
+		hasPendingTrackCut?: boolean;
+		onStartRoutingDraft?: Action;
+		onHandleTrackConfirm?: Action;
+		onCancelTrackEdit?: Action;
+		onUndoTrackPoint?: Action;
+		onUndo?: Action;
+		onRedo?: Action;
+		canUndo?: boolean;
+		canRedo?: boolean;
+		onConfirmTrackCut?: Action;
+		onCancelTrackCut?: Action;
+		onExport?: Action;
+		status?: 'idle' | 'saving' | 'success' | 'error';
+		errorMessage?: string;
+	};
 
 	let {
 		map = null,
@@ -10,7 +35,6 @@
 		currentTrackPoints = [],
 		isRoutingTrack = false,
 		hasPendingTrackCut = false,
-		onBack = () => {},
 		onStartRoutingDraft = () => {},
 		onHandleTrackConfirm = () => {},
 		onCancelTrackEdit = () => {},
@@ -24,7 +48,7 @@
 		onExport = () => {},
 		status = 'idle',
 		errorMessage = ''
-	} = $props();
+	}: Props = $props();
 
 	let tools = $derived([
 		{ id: 'select', icon: 'fa-arrow-pointer', label: 'Select' },
@@ -43,7 +67,7 @@
 			icon: 'fa-route',
 			label: 'Approach Track',
 			hasOptions: true,
-			onSelect: ({ isActive }) => {
+			onSelect: ({ isActive }: { isActive: boolean }) => {
 				if (!isActive) onStartRoutingDraft();
 			}
 		},
@@ -56,7 +80,6 @@
 	bind:toolOptionsOpen
 	neutralTool="select"
 	{tools}
-	{onBack}
 	undo={activeTool === 'track'
 		? { label: 'Undo', run: onUndoTrackPoint, disabled: currentTrackPoints.length === 0 }
 		: canUndo ? { label: 'Undo', run: onUndo } : null}

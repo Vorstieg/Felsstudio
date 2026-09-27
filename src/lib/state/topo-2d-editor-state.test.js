@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it } from 'vitest';
-import { createTopo2DEditorState } from './topo-2d-editor-state.svelte.js';
+import { createTopo2DEditorState } from './topo-2d-editor-state.svelte.ts';
 
 const document = () => ({
 	routes: [{ id: 'route-1', points2D: [[0, 0]], pitches: [] }],
@@ -21,6 +21,24 @@ describe('createTopo2DEditorState', () => {
 		expect(first.hasPendingChanges).toBe(false);
 	});
 
+	it('owns the active interaction through start, update, and cancel', () => {
+		const editor = createTopo2DEditorState({ topo: document() });
+		editor.startInteraction({
+			kind: 'selection-region',
+			start: { x: 0, y: 0 },
+			end: { x: 1, y: 1 },
+			mode: 'replace'
+		});
+		expect(editor.interaction).toMatchObject({ kind: 'selection-region', end: { x: 1, y: 1 } });
+
+		editor.interaction.end = { x: 2, y: 2 };
+		expect(editor.cancelInteraction()).toMatchObject({
+			kind: 'selection-region',
+			end: { x: 2, y: 2 }
+		});
+		expect(editor.interaction).toBeNull();
+	});
+
 	it('records one entry for a real transaction and none for a no-op', () => {
 		const editor = createTopo2DEditorState({ topo: document() });
 		editor.commit('noop', () => true);
@@ -32,6 +50,17 @@ describe('createTopo2DEditorState', () => {
 		expect(editor.topo.routes[0].name).toBeUndefined();
 		editor.redo();
 		expect(editor.topo.routes[0].name).toBe('Changed');
+	});
+
+	it('rolls back a rejected transaction without adding history', () => {
+		const editor = createTopo2DEditorState({ topo: document() });
+		const result = editor.commit('Rejected edit', (topo) => {
+			topo.routes[0].name = 'Discarded';
+			return false;
+		});
+		expect(result).toBe(false);
+		expect(editor.topo.routes[0].name).toBeUndefined();
+		expect(editor.history.entries).toHaveLength(0);
 	});
 
 	it('invalidates redo after a new branch and reconciles selection', () => {
@@ -66,6 +95,29 @@ describe('createTopo2DEditorState', () => {
 		expect(editor.ui.selectedVariantId).toBe('variant-1');
 	});
 
+	it('reconciles selected paths using pathRefs IDs', () => {
+		const editor = createTopo2DEditorState({
+			topo: { routes: [{ id: 'route-1', pathRefs: [{ pathId: 'approach-1' }] }] }
+		});
+		editor.selectPath('path', 'route-1', 'approach-1');
+		editor.reconcileSelection();
+		expect([...editor.selectedItems]).toEqual(['route:route-1', 'path:approach-1']);
+		editor.updateRoute('route-1', { pathRefs: [] });
+		expect([...editor.selectedItems]).toEqual(['route:route-1']);
+	});
+
+	it('updates typed document fields and records the change for undo', () => {
+		const editor = createTopo2DEditorState({ topo: { routes: [] } });
+		expect(editor.topo.fixPoints).toEqual([]);
+		expect(editor.topo.textLabels).toEqual([]);
+		editor.updateTopoField('author', 'A. Climber');
+		editor.updateTopoField('backgroundFit', 'cover');
+		expect(editor.topo.author).toBe('A. Climber');
+		expect(editor.topo.backgroundFit).toBe('cover');
+		editor.undo();
+		expect(editor.topo.backgroundFit).toBe('contain');
+	});
+
 	it('tracks route-point marquee selection separately from object selection', () => {
 		const editor = createTopo2DEditorState({ topo: document() });
 		editor.selectObject('route', 'route-1');
@@ -80,7 +132,7 @@ describe('createTopo2DEditorState', () => {
 
 	it('cleans fixpoint references and keeps transient state out of save snapshots', () => {
 		const editor = createTopo2DEditorState({ topo: document() });
-		editor.topo.name = 'Legacy topo name';
+		editor.topo.name = 'Previous topo name';
 		editor.topo.routes[0].fixPoints = ['symbol-1'];
 		editor.topo.routes[0].pitches = [
 			{ id: 'pitch-1', startNodeId: 'symbol-1', endNodeId: 'symbol-1' }
@@ -92,7 +144,7 @@ describe('createTopo2DEditorState', () => {
 		});
 		editor.beginRouteDraft();
 		editor.appendRouteDraftPoint({ x: 0.2, y: 0.3 });
-		editor.startInteraction('move-selection', { x: 1 });
+		editor.startInteraction({ kind: 'rotate-symbol', id: 'symbol-1' });
 		const saved = editor.getSaveSnapshot();
 		expect(saved).not.toHaveProperty('drafts');
 		expect(saved).not.toHaveProperty('name');
@@ -306,6 +358,34 @@ describe('createTopo2DEditorState', () => {
 		expect(editor.undo()).toBe(true);
 		expect(editor.topo.textLabels.some((label) => label.id === pasted.id)).toBe(true);
 		expect(editor.getSaveSnapshot().textLabels).toHaveLength(4);
+	});
+
+	it('pastes independent outline and symbol copies with a canvas offset', () => {
+		const editor = createTopo2DEditorState({
+			topo: {
+				outlines: [
+					{
+						id: 'outline-1',
+						points2D: [
+							[0.2, 0.3],
+							[0.4, 0.5]
+						]
+					}
+				],
+				fixPoints: [{ id: 'symbol-1', type: 'bolt', position2D: [0.6, 0.7] }]
+			}
+		});
+		editor.selectItems([
+			{ type: 'outline', id: 'outline-1' },
+			{ type: 'symbol', id: 'symbol-1' }
+		]);
+		expect(editor.copySelection()).toBe(2);
+		const pasted = editor.pasteSelection({ baseWidth: 800, baseHeight: 800 });
+		expect(pasted).toHaveLength(2);
+		expect(editor.topo.outlines[1].points2D[0]).toEqual([0.22, 0.32]);
+		expect(editor.topo.fixPoints[1].position2D).toEqual([0.62, 0.72]);
+		expect(editor.topo.outlines[0].points2D[0]).toEqual([0.2, 0.3]);
+		expect(editor.topo.fixPoints[0].position2D).toEqual([0.6, 0.7]);
 	});
 
 	it('supports the public numeric ID form for text-label selection and deletion', () => {

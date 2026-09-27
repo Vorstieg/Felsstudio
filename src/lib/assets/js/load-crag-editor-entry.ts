@@ -1,9 +1,9 @@
 import type { EntryKind, FelsEntry, FelsTopoDocument } from '@vorstieg/fels-types/types';
 import type { AccessCollection, FelsEntryWorkspace, LoadedCragEditorEntry } from '$lib/types/crag';
 import { listDir, readJson } from '$lib/api/felslager.ts';
-import { getCragEditorPath, splitEntryPath } from '$lib/assets/js/editor-entry-paths.js';
-import { normalizeTopoPaths } from '$lib/assets/js/topo-document-paths.js';
-import { normalizeAccessCollection } from '$lib/assets/js/access-geojson.js';
+import { getCragEditorPath, splitEntryPath } from '$lib/assets/js/editor-entry-paths.ts';
+import { normalizeTopoPaths } from '$lib/assets/js/topo-document-paths.ts';
+import { normalizeAccessCollection } from '$lib/assets/js/access-geojson.ts';
 import {
 	workspaceEntryPath,
 	workspaceNodePath,
@@ -25,15 +25,6 @@ export function getHierarchySourceRefs(entryPath: string) {
 		.split('/')
 		.filter(Boolean);
 	return parts.map((id, index) => ({ path: parts.slice(0, index).join('/'), id }));
-}
-
-function withoutLegacySectors(entry: FelsEntry): FelsEntry {
-	const {
-		sectors: _sectors,
-		path: _path,
-		...properties
-	} = entry.properties as Record<string, unknown>;
-	return { ...entry, properties: properties as FelsEntry['properties'] };
 }
 
 function emptyEntry(id: string, kind: EntryKind): FelsEntry {
@@ -85,7 +76,7 @@ async function loadOptionalFiles(path: string, id: string, reader: typeof readJs
 	return {
 		topo: normalized?.data || null,
 		access: accessDocument ? (normalizeAccessCollection(accessDocument) as AccessCollection) : null,
-		topoMigrated: normalized?.migrated || false
+		topoChanged: normalized?.changed || false
 	};
 }
 
@@ -114,11 +105,7 @@ async function loadWorkspaceNode(
 		}
 	const { type: _type, properties: _properties, geometry: _geometry, ...entryExtras } = raw || {};
 	const entry =
-		raw && !invalid
-			? withoutLegacySectors(raw)
-			: invalid && fallbackKind
-				? emptyEntry(id, fallbackKind)
-				: null;
+		raw && !invalid ? raw : invalid && fallbackKind ? emptyEntry(id, fallbackKind) : null;
 	return {
 		entry,
 		id,
@@ -174,7 +161,7 @@ export async function loadFelsEntryWorkspaceDetails(
 		if (!node.topo) node.topo = optional.topo;
 		if (!node.access) node.access = optional.access;
 		if (
-			optional.topoMigrated &&
+			optional.topoChanged &&
 			!node.dirtyPaths.includes(workspaceDocumentPaths(node.path, id).topo)
 		)
 			node.dirtyPaths.push(workspaceDocumentPaths(node.path, id).topo);
@@ -223,7 +210,7 @@ export async function loadFelsEntryWorkspaceDetails(
 			child.topo = childOptional.topo;
 			child.access = childOptional.access;
 			child.documentsLoaded = true;
-			if (childOptional.topoMigrated)
+			if (childOptional.topoChanged)
 				child.dirtyPaths.push(workspaceDocumentPaths(folder, item.name).topo);
 			return child;
 		})

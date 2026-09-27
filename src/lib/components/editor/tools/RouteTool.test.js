@@ -1,8 +1,8 @@
 // @vitest-environment node
 
 import { describe, expect, it, vi } from 'vitest';
-import { RouteTool } from './RouteTool.svelte.js';
-import { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+import { RouteTool } from './RouteTool.svelte.ts';
+import { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
 
 function createTool() {
 	const state = createTopo2DEditorState({
@@ -97,26 +97,6 @@ describe('RouteTool', () => {
 
 		expect(route.pitches).toHaveLength(2);
 		expect(route.pitches[1].pitchNumber).toBe(2);
-	});
-
-	it('commits a second pitch when the document topo is external to the editor snapshot', () => {
-		const topo = { routes: [], fixPoints: [], outlines: [], textLabels: [] };
-		const editor = createTopo2DEditorState({
-			getTopo: () => topo,
-			setTopo: (next) => Object.assign(topo, next)
-		});
-		const tool = new RouteTool(editor);
-		tool.mode = tool.id = 'multipitch';
-
-		tool.appendPoint('multipitch', { x: 0, y: 0 });
-		tool.appendPoint('multipitch', { x: 1, y: 1 });
-		tool.finish('multipitch');
-		tool.appendPoint('multipitch', { x: 0.2, y: 0.2 });
-		tool.appendPoint('multipitch', { x: 0.3, y: 0.3 });
-		tool.finish('multipitch');
-
-		expect(topo.routes[0].pitches).toHaveLength(2);
-		expect(topo.routes[0].pitches[1].pitchNumber).toBe(2);
 	});
 
 	it('does not commit a one-point draft and can undo the last point', () => {

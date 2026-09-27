@@ -1,20 +1,35 @@
-<script>
-	import { generateFlightPlan } from '$lib/assets/js/flight-plan-generator.js';
-	import { downloadFlightPlanKmz } from '$lib/assets/js/flight-plan-kml.js';
+<script lang="ts">
+	import type { Map as MapLibreMap } from 'maplibre-gl';
+	import type { PointOrAreaGeometry } from '@vorstieg/fels-types/types';
+	import { generateFlightPlan } from '$lib/assets/js/flight-plan-generator.ts';
+	import { downloadFlightPlanKmz } from '$lib/assets/js/flight-plan-kml.ts';
+	import type { FlightPlan } from '$lib/assets/js/flight-plan-types.ts';
 
+	type Detail = 'standard' | 'high' | 'topo';
+	type FlightPattern = 'facade-grid' | 'constant-distance-grid' | 'half-helix' | 'curved-sweep';
+	type Sector = {
+		id?: string;
+		name?: string;
+		geometry?: PointOrAreaGeometry | null;
+	};
 	let {
 		sector,
 		cragName = '',
 		map = null,
 		onPlanGenerated = () => {}
+	}: {
+		sector?: Sector | null;
+		cragName?: string;
+		map?: MapLibreMap | null;
+		onPlanGenerated?: (_plan: FlightPlan | null) => void;
 	} = $props();
 
-	let detail = $state('topo');
-	let pattern = $state('facade-grid');
+	let detail = $state<Detail>('topo');
+	let pattern = $state<FlightPattern>('facade-grid');
 	let minimumWallDistanceMeters = $state(2);
-	let plan = $state(null);
+	let plan = $state<FlightPlan | null>(null);
 	let error = $state('');
-	let cameraPreviewWaypointIndex = $state(null);
+	let cameraPreviewWaypointIndex = $state<number | null>(null);
 	let rowStarts = $derived(
 		plan?.waypoints?.filter((waypoint) => waypoint.action === 'startInterval') || []
 	);
@@ -25,7 +40,10 @@
 			if (!map?.queryTerrainElevation) {
 				throw new Error('Terrain is still loading. Switch to Satellite view and try again.');
 			}
-			const presets = {
+			const presets: Record<
+				Detail,
+				{ targetGsdCm: number; stripSpacingMeters: number; pointSpacingMeters: number }
+			> = {
 				standard: { targetGsdCm: 1, stripSpacingMeters: 14, pointSpacingMeters: 7 },
 				high: { targetGsdCm: 0.7, stripSpacingMeters: 12, pointSpacingMeters: 6 },
 				topo: { targetGsdCm: 0.5, stripSpacingMeters: 10, pointSpacingMeters: 5 }
@@ -34,14 +52,30 @@
 			if (!Number.isFinite(wallDistance) || wallDistance < 1) {
 				throw new Error('Minimum wall distance must be at least 1 m.');
 			}
-			const terrainElevationAt = (longitude, latitude) => {
+			const terrainElevationAt = (longitude: number, latitude: number) => {
 				const elevation = map.queryTerrainElevation([longitude, latitude]);
-				if (!Number.isFinite(elevation)) {
+				if (elevation === null || !Number.isFinite(elevation)) {
 					throw new Error('MapTerhorn terrain is unavailable here. Switch to Satellite view and wait for terrain to load.');
 				}
 				return elevation;
 			};
-			plan = generateFlightPlan(sector?.geometry, {
+			const geometry = sector?.geometry?.type === 'Polygon' ? sector.geometry : null;
+			const polygon: import('geojson').Polygon | null = geometry
+				? {
+						type: 'Polygon',
+						coordinates: geometry.coordinates.map((ring) =>
+							ring.map((position) => {
+								const longitude = position[0];
+								const latitude = position[1];
+								if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+									throw new Error('Sector geometry contains an invalid coordinate.');
+								}
+								return [longitude, latitude];
+							})
+						)
+					}
+				: null;
+				const generatedPlan = generateFlightPlan(polygon, {
 				...presets[detail],
 				pattern,
 				standOffMeters: wallDistance,
@@ -50,17 +84,20 @@
 				name: `${cragName || 'Crag'} ${sector?.name || sector?.id || 'sector'} capture plan`,
 				terrainElevationAt
 			});
-			plan.filename = `${(cragName || 'crag').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${(sector?.name || sector?.id || 'sector').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}-capture-plan`;
-			plan.metadata.camera = 'tele-6x';
-			plan.metadata.photoCount = plan.waypoints.filter((waypoint) => waypoint.phase === 'capture').length;
-			cameraPreviewWaypointIndex = plan.waypoints.find(
+			generatedPlan.filename = `${(cragName || 'crag').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${(sector?.name || sector?.id || 'sector').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}-capture-plan`;
+			generatedPlan.metadata.camera = 'tele-6x';
+			generatedPlan.metadata.photoCount = generatedPlan.waypoints.filter(
+				(waypoint) => waypoint.phase === 'capture'
+			).length;
+			cameraPreviewWaypointIndex = generatedPlan.waypoints.find(
 				(waypoint) => waypoint.action === 'startInterval'
-			)?.index;
-			plan.previewWaypointIndex = cameraPreviewWaypointIndex;
-			onPlanGenerated(plan);
+			)?.index ?? null;
+			generatedPlan.previewWaypointIndex = cameraPreviewWaypointIndex;
+			plan = generatedPlan;
+			onPlanGenerated(generatedPlan);
 		} catch (generationError) {
 			plan = null;
-			error = generationError.message || 'Unable to generate a flight plan.';
+			error = generationError instanceof Error ? generationError.message : 'Unable to generate a flight plan.';
 		}
 	}
 
@@ -76,7 +113,8 @@
 		onPlanGenerated(null);
 	}
 
-	function selectCameraPreview(event) {
+	function selectCameraPreview(event: Event & { currentTarget: HTMLSelectElement }) {
+		if (!plan) return;
 		const value = event.currentTarget.value;
 		cameraPreviewWaypointIndex = value === '' ? null : Number(value);
 		plan = { ...plan, previewWaypointIndex: cameraPreviewWaypointIndex };

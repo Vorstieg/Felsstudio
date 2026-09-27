@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createTopoInputController } from './create-topo-input-controller.js';
+import { createTopoInputController } from './create-topo-input-controller.ts';
+import { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
 
 describe('createTopoInputController', () => {
 	it('starts a selection region on select-tool pointer down', () => {
@@ -17,11 +18,38 @@ describe('createTopoInputController', () => {
 			shiftKey: true
 		});
 
-		expect(editor.startInteraction).toHaveBeenCalledWith('selection-region', {
+		expect(editor.startInteraction).toHaveBeenCalledWith({
+			kind: 'selection-region',
 			start: { x: 0.2, y: 0.3 },
 			end: { x: 0.2, y: 0.3 },
 			mode: 'add'
 		});
+	});
+
+	it('selects route points inside a completed marquee', () => {
+		const editor = createTopo2DEditorState({
+			topo: {
+				routes: [
+					{
+						id: 'route-1',
+						points2D: [
+							[0.2, 0.2],
+							[0.8, 0.8]
+						]
+					}
+				]
+			}
+		});
+		editor.selectObject('route', 'route-1');
+		const controller = createTopoInputController({ editor });
+		const sourceEvent = {};
+		controller.down({ point: { x: 0.1, y: 0.1 }, sourceEvent, button: 0 });
+		controller.move({ point: { x: 0.6, y: 0.6 }, sourceEvent });
+		controller.up({ point: { x: 0.6, y: 0.6 }, sourceEvent });
+
+		expect(editor.getSelectedRoutePoints()).toEqual([
+			{ routeId: 'route-1', pitchId: null, variantId: null, index: 0 }
+		]);
 	});
 
 	it('commits an open text composer before handling the click-away target', () => {

@@ -1,15 +1,35 @@
-<script>
+<script lang="ts">
 	import { onDestroy } from 'svelte';
+	import type { Map as MapLibreMap } from 'maplibre-gl';
 	import { maptilerApiKey } from '$lib/config';
 
-	let { map = null, embedded = false } = $props();
+	type Position = [number, number];
+	type BoundingBox = [number, number, number, number];
+	type GeocodingFeature = {
+		center?: Position;
+		bbox?: BoundingBox;
+		geometry?: { type?: string; coordinates?: number[] };
+		text_de?: string;
+		text_en?: string;
+		text?: string;
+		place_name_de?: string;
+		place_name_en?: string;
+		place_name?: string;
+		place_type_name?: string[];
+		place_type?: string[];
+		properties?: { kind?: string };
+	};
+	type GeocodingResponse = { features?: GeocodingFeature[] };
+	type Props = { map?: MapLibreMap | null; embedded?: boolean };
+
+	let { map = null, embedded = false }: Props = $props();
 
 	let searchQuery = $state('');
-	let results = $state([]);
+	let results = $state<GeocodingFeature[]>([]);
 	let isSearching = $state(false);
 	let searchError = $state('');
-	let selectedFeature = $state(null);
-	let abortController = null;
+	let selectedFeature = $state<GeocodingFeature | null>(null);
+	let abortController: AbortController | null = null;
 	let resultPanelClass = $derived(
 		embedded ? 'fixed top-14 left-2 right-2 z-[60] panel shadow-panel bg-white' : ''
 	);
@@ -41,7 +61,7 @@
 		if (abortController) abortController.abort();
 	});
 
-	async function searchPlaces(query) {
+	async function searchPlaces(query: string): Promise<void> {
 		if (!maptilerApiKey) {
 			searchError = 'Search unavailable';
 			return;
@@ -66,11 +86,11 @@
 
 			if (!response.ok) throw new Error(`Geocoding failed (${response.status})`);
 
-			const data = await response.json();
+			const data = (await response.json()) as GeocodingResponse;
 			results = data.features || [];
 			searchError = '';
-		} catch (error) {
-			if (error.name === 'AbortError') return;
+		} catch (error: unknown) {
+			if (error instanceof Error && error.name === 'AbortError') return;
 			results = [];
 			searchError = 'Search unavailable';
 		} finally {
@@ -78,7 +98,7 @@
 		}
 	}
 
-	function selectFeature(feature) {
+	function selectFeature(feature: GeocodingFeature): void {
 		const center = getFeatureCenter(feature);
 		if (!center || !map) return;
 
@@ -99,14 +119,14 @@
 		clearSearch();
 	}
 
-	function clearSearch() {
+	function clearSearch(): void {
 		searchQuery = '';
 		results = [];
 		selectedFeature = null;
 		searchError = '';
 	}
 
-	function handleKeydown(event) {
+	function handleKeydown(event: KeyboardEvent): void {
 		if (event.key === 'Enter' && results.length > 0) {
 			event.preventDefault();
 			selectFeature(results[0]);
@@ -115,28 +135,33 @@
 		}
 	}
 
-	function getFeatureCenter(feature) {
+	function getFeatureCenter(feature: GeocodingFeature): Position | null {
 		if (feature?.center?.length === 2) return feature.center;
-		if (feature?.geometry?.type === 'Point' && feature.geometry.coordinates?.length === 2) {
-			return feature.geometry.coordinates;
+		if (
+			feature?.geometry?.type === 'Point' &&
+			feature.geometry.coordinates?.length === 2 &&
+			typeof feature.geometry.coordinates[0] === 'number' &&
+			typeof feature.geometry.coordinates[1] === 'number'
+		) {
+			return [feature.geometry.coordinates[0], feature.geometry.coordinates[1]];
 		}
 		return null;
 	}
 
-	function getFeatureTitle(feature) {
+	function getFeatureTitle(feature: GeocodingFeature): string {
 		return (
 			feature.text_de || feature.text_en || feature.text || feature.place_name || 'Unnamed place'
 		);
 	}
 
-	function getFeatureSubtitle(feature) {
+	function getFeatureSubtitle(feature: GeocodingFeature): string {
 		const title = getFeatureTitle(feature);
 		const placeName = feature.place_name_de || feature.place_name_en || feature.place_name || '';
 		if (!placeName || placeName === title) return getFeatureType(feature);
 		return placeName;
 	}
 
-	function getFeatureType(feature) {
+	function getFeatureType(feature: GeocodingFeature): string {
 		return (
 			feature.place_type_name?.[0] || feature.place_type?.[0] || feature.properties?.kind || 'place'
 		);

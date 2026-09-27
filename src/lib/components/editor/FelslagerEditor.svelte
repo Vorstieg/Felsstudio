@@ -1,27 +1,37 @@
-<script>
+<script lang="ts">
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
 	import { page } from '$app/stores';
 	import { _ } from 'svelte-i18n';
-	import { listDir, readFile, writeFile, deleteFile, fileUrl, renameFile } from '$lib/api/felslager.ts';
-	import { authState } from '$lib/api/auth.svelte.js';
+	import {
+		listDir,
+		readFile,
+		writeFile,
+		deleteFile,
+		fileUrl,
+		renameFile
+	} from '$lib/api/felslager.ts';
+	import { authState } from '$lib/api/auth.svelte.ts';
+	import type { ApiListEntry } from '$lib/types/api.ts';
+
+	const errorMessage = (value: unknown) => (value instanceof Error ? value.message : String(value));
 
 	let currentPath = $derived($page.url.searchParams.get('path') || '');
-	let items = $state([]);
+	let items = $state<ApiListEntry[]>([]);
 	let loadingItems = $state(false);
 
-	let selectedFile = $state(null);
-	let selectedFileType = $state(null);
+	let selectedFile = $state<ApiListEntry | null>(null);
+	let selectedFileType = $state<'image' | 'json' | 'text' | null>(null);
 	let fileContent = $state('');
 	let saving = $state(false);
 	let uploading = $state(false);
-	let error = $state(null);
-	let uploadInput = $state(null);
+	let error = $state<string | null>(null);
+	let uploadInput = $state<HTMLInputElement | null>(null);
 
 	let searchQuery = $state('');
-	let searchResults = $state([]);
+	let searchResults = $state<ApiListEntry[]>([]);
 	let isSearching = $state(false);
-	let allFilesCache = null;
+	let allFilesCache: ApiListEntry[] | null = null;
 
 	$effect(() => {
 		if (searchQuery.trim().length > 0) {
@@ -32,12 +42,13 @@
 						allFilesCache = await listDir('', { recursive: true });
 					}
 					const lowerQuery = searchQuery.toLowerCase();
-					searchResults = allFilesCache.filter(item => 
-						item.path.toLowerCase().includes(lowerQuery) || 
-						item.name.toLowerCase().includes(lowerQuery)
+					searchResults = allFilesCache.filter(
+						(item) =>
+							item.path.toLowerCase().includes(lowerQuery) ||
+							item.name.toLowerCase().includes(lowerQuery)
 					);
 				} catch (e) {
-					error = e.message;
+					error = errorMessage(e);
 				} finally {
 					isSearching = false;
 				}
@@ -48,18 +59,18 @@
 		}
 	});
 
-	async function loadDirectory(path) {
+	async function loadDirectory(path: string) {
 		loadingItems = true;
 		error = null;
 		try {
 			const rawItems = await listDir(path);
 			const cleanPath = path.replace(/\/+$/, '');
-			items = rawItems.map(item => ({
+			items = rawItems.map((item) => ({
 				...item,
 				path: cleanPath ? `${cleanPath}/${item.name}` : item.name
 			}));
 		} catch (e) {
-			error = e.message;
+			error = errorMessage(e);
 		} finally {
 			loadingItems = false;
 		}
@@ -70,7 +81,7 @@
 		loadDirectory(currentPath);
 	});
 
-	async function openItem(item) {
+	async function openItem(item: ApiListEntry) {
 		if (item.type === 'dir') {
 			searchQuery = '';
 			selectedFile = null;
@@ -82,8 +93,12 @@
 		} else {
 			const lowerName = item.name.toLowerCase();
 			const isJson = lowerName.endsWith('.json');
-			const isImage = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico'].some(ext => lowerName.endsWith(ext));
-			const isBinary = ['.zip', '.pdf', '.mp4', '.mp3', '.wav', '.exe', '.bin'].some(ext => lowerName.endsWith(ext));
+			const isImage = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico'].some((ext) =>
+				lowerName.endsWith(ext)
+			);
+			const isBinary = ['.zip', '.pdf', '.mp4', '.mp3', '.wav', '.exe', '.bin'].some((ext) =>
+				lowerName.endsWith(ext)
+			);
 
 			if (isImage) {
 				selectedFile = item;
@@ -98,7 +113,7 @@
 					selectedFileType = isJson ? 'json' : 'text';
 					error = null;
 				} catch (e) {
-					error = e.message;
+					error = errorMessage(e);
 				}
 			} else {
 				error = `Cannot open ${item.name}. Unsupported file type.`;
@@ -113,7 +128,7 @@
 		selectedFile = null;
 		selectedFileType = null;
 		fileContent = '';
-		
+
 		const newPath = parts.join('/');
 		const url = new URL(window.location.href);
 		if (newPath) {
@@ -131,6 +146,7 @@
 	}
 
 	async function saveFileAction() {
+		if (!selectedFile) return;
 		saving = true;
 		error = null;
 		try {
@@ -142,7 +158,7 @@
 				await writeFile(selectedFile.path, fileContent, 'text/plain');
 			}
 		} catch (e) {
-			error = e.message;
+			error = errorMessage(e);
 		} finally {
 			saving = false;
 		}
@@ -152,7 +168,7 @@
 		uploadInput?.click();
 	}
 
-	function handleUploadSelection(event) {
+	function handleUploadSelection(event: Event & { currentTarget: HTMLInputElement }) {
 		const file = event.currentTarget.files?.[0];
 		event.currentTarget.value = '';
 		if (!file) return;
@@ -161,9 +177,12 @@
 		uploadFile(file);
 	}
 
-	async function uploadFile(file) {
+	async function uploadFile(file: File) {
 		const path = currentPath ? `${currentPath}/${file.name}` : file.name;
-		if (items.some((item) => item.path === path) && !confirm(`${file.name} already exists. Replace it?`)) {
+		if (
+			items.some((item) => item.path === path) &&
+			!confirm(`${file.name} already exists. Replace it?`)
+		) {
 			return;
 		}
 
@@ -174,47 +193,47 @@
 			allFilesCache = null;
 			await loadDirectory(currentPath);
 		} catch (e) {
-			error = e.message;
+			error = errorMessage(e);
 		} finally {
 			uploading = false;
 		}
 	}
 
-	function renameItem(item, e) {
+	function renameItem(item: ApiListEntry, e: MouseEvent) {
 		e.stopPropagation();
 		const newName = prompt(`Enter new name for ${item.name}:`, item.name);
 		if (!newName || newName === item.name) return;
-		
+
 		const parts = item.path.split('/');
 		parts.pop();
 		const basePath = parts.join('/');
 		const newPath = basePath ? `${basePath}/${newName}` : newName;
-		
+
 		if (!authState.requireAuth(() => renameItemAction(item, newPath))) return;
 		renameItemAction(item, newPath);
 	}
 
-	async function renameItemAction(item, newPath) {
+	async function renameItemAction(item: ApiListEntry, newPath: string) {
 		try {
 			await renameFile(item.path, newPath);
 			if (selectedFile?.path === item.path) {
 				selectedFile.path = newPath;
-				selectedFile.name = newPath.split('/').pop();
+				selectedFile.name = newPath.split('/').pop() || newPath;
 			}
 			await loadDirectory(currentPath);
 		} catch (err) {
-			error = err.message;
+			error = errorMessage(err);
 		}
 	}
 
-	function deleteItem(item, e) {
+	function deleteItem(item: ApiListEntry, e: MouseEvent) {
 		e.stopPropagation();
 		if (!confirm(`Are you sure you want to delete ${item.name}?`)) return;
 		if (!authState.requireAuth(() => deleteItemAction(item))) return;
 		deleteItemAction(item);
 	}
 
-	async function deleteItemAction(item) {
+	async function deleteItemAction(item: ApiListEntry) {
 		try {
 			await deleteFile(item.path);
 			if (selectedFile?.path === item.path) {
@@ -224,29 +243,35 @@
 			}
 			await loadDirectory(currentPath);
 		} catch (err) {
-			error = err.message;
+			error = errorMessage(err);
 		}
 	}
-	
-	function getFileIcon(item) {
+
+	function getFileIcon(item: ApiListEntry) {
 		if (item.type === 'dir') return 'fa-folder text-amber-500';
 		const name = item.name.toLowerCase();
-		if (['.png', '.jpg', '.jpeg', '.svg', '.gif', '.webp', '.ico'].some(e => name.endsWith(e))) return 'fa-image text-emerald-500';
+		if (['.png', '.jpg', '.jpeg', '.svg', '.gif', '.webp', '.ico'].some((e) => name.endsWith(e)))
+			return 'fa-image text-emerald-500';
 		if (name.endsWith('.json')) return 'fa-file-code text-creator-blue';
-		if (['.txt', '.md', '.csv'].some(e => name.endsWith(e))) return 'fa-file-lines text-warm-gray-400';
+		if (['.txt', '.md', '.csv'].some((e) => name.endsWith(e)))
+			return 'fa-file-lines text-warm-gray-400';
 		return 'fa-file text-warm-gray-400';
 	}
-	
+
 	let breadcrumbs = $derived(currentPath ? currentPath.split('/').filter(Boolean) : []);
 </script>
 
-<div class="creator-studio flex flex-col w-full h-full bg-warm-white text-body-text text-near-black">
+<div
+	class="creator-studio flex flex-col w-full h-full bg-warm-white text-body-text text-near-black"
+>
 	<!-- Header -->
-	<header class="flex items-center justify-between px-3 py-3 bg-white border-b border-black/15 shadow-panel z-10 md:px-4">
+	<header
+		class="flex items-center justify-between px-3 py-3 bg-white border-b border-black/15 shadow-panel z-10 md:px-4"
+	>
 		<div class="flex min-w-0 items-center gap-2 md:gap-4">
 			<button
 				class="tool-btn"
-				onclick={() => currentPath ? navigateUp() : goto(base + '/')}
+				onclick={() => (currentPath ? navigateUp() : goto(base + '/'))}
 				title={currentPath ? 'Go up' : $_('ui.back_to_launcher')}
 			>
 				<i class="fa-solid fa-arrow-left"></i>
@@ -257,12 +282,7 @@
 			</div>
 		</div>
 		<div class="flex gap-2">
-			<input
-				bind:this={uploadInput}
-				type="file"
-				class="hidden"
-				onchange={handleUploadSelection}
-			/>
+			<input bind:this={uploadInput} type="file" class="hidden" onchange={handleUploadSelection} />
 			<button class="btn-secondary px-4" onclick={selectFileForUpload} disabled={uploading}>
 				{uploading ? 'Uploading…' : 'Add file'}
 			</button>
@@ -276,22 +296,25 @@
 
 	<div class="flex flex-1 min-h-0 flex-col overflow-hidden gap-2 p-2 md:flex-row md:gap-4 md:p-4">
 		<!-- Left Pane: File Explorer -->
-		<div class="h-[35dvh] min-h-60 w-full shrink-0 panel flex flex-col overflow-hidden shadow-panel md:h-auto md:min-h-0 md:w-1/3">
+		<div
+			class="h-[35dvh] min-h-60 w-full shrink-0 panel flex flex-col overflow-hidden shadow-panel md:h-auto md:min-h-0 md:w-1/3"
+		>
 			<!-- Search Bar -->
 			<div class="p-3 border-b border-black/15 bg-white">
 				<div class="relative">
-					<i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-warm-gray-300"></i>
-					<input 
-						type="text" 
+					<i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-warm-gray-300"
+					></i>
+					<input
+						type="text"
 						class="input-studio w-full pl-9 py-2 rounded-sm bg-warm-gray-100 focus:bg-white"
-						placeholder={$_('ui.search_crags') || "Search files and folders..."}
+						placeholder={$_('ui.search_crags') || 'Search files and folders...'}
 						bind:value={searchQuery}
 					/>
 					{#if searchQuery}
-						<button 
+						<button
 							class="absolute right-3 top-1/2 -translate-y-1/2 text-warm-gray-300 hover:text-near-black flex items-center justify-center"
 							aria-label="Clear search"
-							onclick={() => searchQuery = ''}
+							onclick={() => (searchQuery = '')}
 						>
 							<i class="fa-solid fa-xmark"></i>
 						</button>
@@ -301,22 +324,34 @@
 
 			<!-- Breadcrumbs -->
 			{#if !searchQuery}
-			<div class="px-3 py-2 border-b border-black/15 bg-warm-gray-100 flex items-center gap-2 overflow-x-auto text-micro-data whitespace-nowrap">
-				<button 
-					class="text-warm-gray-500 hover:text-creator-blue transition-colors cursor-pointer flex items-center justify-center w-6 h-6 rounded-sm hover:bg-black/5"
-					aria-label="Go to root"
-					onclick={() => { const u = new URL(window.location.href); u.searchParams.delete('path'); goto(u.toString(), { keepFocus: true }); }}>
-					<i class="fa-solid fa-house"></i>
-				</button>
-				{#each breadcrumbs as part, i}
-					<span class="text-black/30">/</span>
-					<button 
-						class="text-warm-gray-500 hover:text-creator-blue transition-colors cursor-pointer px-1.5 py-1 rounded-sm hover:bg-black/5"
-						onclick={() => { const u = new URL(window.location.href); u.searchParams.set('path', breadcrumbs.slice(0, i + 1).join('/')); goto(u.toString(), { keepFocus: true }); }}>
-						{part}
+				<div
+					class="px-3 py-2 border-b border-black/15 bg-warm-gray-100 flex items-center gap-2 overflow-x-auto text-micro-data whitespace-nowrap"
+				>
+					<button
+						class="text-warm-gray-500 hover:text-creator-blue transition-colors cursor-pointer flex items-center justify-center w-6 h-6 rounded-sm hover:bg-black/5"
+						aria-label="Go to root"
+						onclick={() => {
+							const u = new URL(window.location.href);
+							u.searchParams.delete('path');
+							goto(u.toString(), { keepFocus: true });
+						}}
+					>
+						<i class="fa-solid fa-house"></i>
 					</button>
-				{/each}
-			</div>
+					{#each breadcrumbs as part, i}
+						<span class="text-black/30">/</span>
+						<button
+							class="text-warm-gray-500 hover:text-creator-blue transition-colors cursor-pointer px-1.5 py-1 rounded-sm hover:bg-black/5"
+							onclick={() => {
+								const u = new URL(window.location.href);
+								u.searchParams.set('path', breadcrumbs.slice(0, i + 1).join('/'));
+								goto(u.toString(), { keepFocus: true });
+							}}
+						>
+							{part}
+						</button>
+					{/each}
+				</div>
 			{/if}
 
 			<!-- List -->
@@ -324,29 +359,44 @@
 				{#if searchQuery}
 					<!-- Search Results -->
 					{#if isSearching}
-						<div class="p-6 text-center text-ui-label flex flex-col items-center justify-center h-full gap-3">
+						<div
+							class="p-6 text-center text-ui-label flex flex-col items-center justify-center h-full gap-3"
+						>
 							<i class="fa-solid fa-spinner fa-spin text-xl text-warm-gray-300"></i>
 							<span>{$_('ui.loading')}</span>
 						</div>
 					{:else if searchResults.length === 0}
-						<div class="p-6 text-center text-body-text text-warm-gray-500 italic flex items-center justify-center h-full">
-							{$_('ui.no_entries_found') || "No entries found."}
+						<div
+							class="p-6 text-center text-body-text text-warm-gray-500 italic flex items-center justify-center h-full"
+						>
+							{$_('ui.no_entries_found') || 'No entries found.'}
 						</div>
 					{:else}
 						<ul class="space-y-1">
-							<div class="px-3 py-1 mb-2 text-micro-data text-warm-gray-400 font-medium">Search Results</div>
+							<div class="px-3 py-1 mb-2 text-micro-data text-warm-gray-400 font-medium">
+								Search Results
+							</div>
 							{#each searchResults as item}
 								<li>
-									<div 
+									<div
 										role="button"
 										tabindex="0"
-										class="w-full flex flex-col px-3 py-2 rounded-sm hover:bg-black/5 text-left group transition-colors cursor-pointer {selectedFile?.path === item.path ? 'bg-creator-blue/10 text-creator-blue' : ''}"
+										class="w-full flex flex-col px-3 py-2 rounded-sm hover:bg-black/5 text-left group transition-colors cursor-pointer {selectedFile?.path ===
+										item.path
+											? 'bg-creator-blue/10 text-creator-blue'
+											: ''}"
 										onclick={() => openItem(item)}
-										onkeydown={(e) => { if (e.key === 'Enter') openItem(item); }}
+										onkeydown={(e) => {
+											if (e.key === 'Enter') openItem(item);
+										}}
 									>
 										<div class="flex items-center gap-3">
 											<i class="fa-solid {getFileIcon(item)} w-4 text-center"></i>
-											<span class="font-medium {selectedFile?.path === item.path ? 'text-creator-blue' : 'text-near-black'}">{item.name}</span>
+											<span
+												class="font-medium {selectedFile?.path === item.path
+													? 'text-creator-blue'
+													: 'text-near-black'}">{item.name}</span
+											>
 										</div>
 										<span class="text-micro-data text-warm-gray-400 mt-1 truncate pl-7">
 											{item.path}
@@ -359,19 +409,23 @@
 				{:else}
 					<!-- Standard Directory Listing -->
 					{#if loadingItems}
-						<div class="p-6 text-center text-ui-label flex flex-col items-center justify-center h-full gap-3">
+						<div
+							class="p-6 text-center text-ui-label flex flex-col items-center justify-center h-full gap-3"
+						>
 							<i class="fa-solid fa-spinner fa-spin text-xl text-warm-gray-300"></i>
 							<span>{$_('ui.loading')}</span>
 						</div>
 					{:else if items.length === 0}
-						<div class="p-6 text-center text-body-text text-warm-gray-500 italic flex items-center justify-center h-full">
+						<div
+							class="p-6 text-center text-body-text text-warm-gray-500 italic flex items-center justify-center h-full"
+						>
 							Empty directory
 						</div>
 					{:else}
 						<ul class="space-y-1">
 							{#if currentPath}
 								<li>
-									<button 
+									<button
 										class="w-full flex items-center gap-3 px-3 py-2.5 rounded-sm hover:bg-black/5 text-left text-body-text group transition-colors md:py-2"
 										onclick={navigateUp}
 									>
@@ -387,24 +441,31 @@
 								<li>
 									<!-- svelte-ignore a11y_interactive_supports_focus -->
 									<!-- svelte-ignore a11y_click_events_have_key_events -->
-									<div 
+									<div
 										role="button"
-										class="w-full flex items-center justify-between px-3 py-2.5 rounded-sm hover:bg-black/5 text-left text-body-text group transition-colors cursor-pointer md:py-2 {selectedFile?.path === item.path ? 'bg-creator-blue/10 text-creator-blue' : ''}"
+										class="w-full flex items-center justify-between px-3 py-2.5 rounded-sm hover:bg-black/5 text-left text-body-text group transition-colors cursor-pointer md:py-2 {selectedFile?.path ===
+										item.path
+											? 'bg-creator-blue/10 text-creator-blue'
+											: ''}"
 										onclick={() => openItem(item)}
 									>
 										<div class="flex items-center gap-3 truncate">
 											<i class="fa-solid {getFileIcon(item)} w-4 text-center"></i>
-											<span class="truncate font-medium {selectedFile?.path === item.path ? 'text-creator-blue' : 'text-near-black'}">{item.name}</span>
+											<span
+												class="truncate font-medium {selectedFile?.path === item.path
+													? 'text-creator-blue'
+													: 'text-near-black'}">{item.name}</span
+											>
 										</div>
 										<div class="flex items-center gap-1">
-											<button 
+											<button
 												class="text-warm-gray-300 hover:text-creator-blue hover:bg-creator-blue/10 w-10 h-10 rounded flex items-center justify-center transition-colors md:w-6 md:h-6"
 												onclick={(e) => renameItem(item, e)}
 												title="Rename"
 											>
 												<i class="fa-solid fa-pen text-[11px]"></i>
 											</button>
-											<button 
+											<button
 												class="text-warm-gray-300 hover:text-rose-600 hover:bg-rose-50 w-10 h-10 rounded flex items-center justify-center transition-colors md:w-6 md:h-6"
 												onclick={(e) => deleteItem(item, e)}
 												title={$_('ui.delete')}
@@ -422,11 +483,19 @@
 		</div>
 
 		<!-- Right Pane: Editor -->
-		<div class="min-h-0 w-full flex-1 panel flex flex-col relative overflow-hidden shadow-panel md:w-2/3">
+		<div
+			class="min-h-0 w-full flex-1 panel flex flex-col relative overflow-hidden shadow-panel md:w-2/3"
+		>
 			{#if error}
-				<div class="absolute top-4 left-4 right-4 bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-sm shadow-sm z-20 text-body-text flex justify-between items-center">
+				<div
+					class="absolute top-4 left-4 right-4 bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-sm shadow-sm z-20 text-body-text flex justify-between items-center"
+				>
 					<span class="font-medium">{error}</span>
-					<button class="w-6 h-6 flex items-center justify-center rounded hover:bg-rose-100" aria-label="Dismiss error" onclick={() => error = null}>
+					<button
+						class="w-6 h-6 flex items-center justify-center rounded hover:bg-rose-100"
+						aria-label="Dismiss error"
+						onclick={() => (error = null)}
+					>
 						<i class="fa-solid fa-xmark"></i>
 					</button>
 				</div>
@@ -434,17 +503,25 @@
 
 			{#if selectedFile}
 				<div class="flex items-center gap-2 p-3 border-b border-black/15 bg-white text-micro-data">
-					<i class="fa-solid {selectedFileType === 'image' ? 'fa-image text-emerald-500' : (selectedFileType === 'json' ? 'fa-file-code text-creator-blue' : 'fa-file-lines text-warm-gray-400')}"></i>
+					<i
+						class="fa-solid {selectedFileType === 'image'
+							? 'fa-image text-emerald-500'
+							: selectedFileType === 'json'
+								? 'fa-file-code text-creator-blue'
+								: 'fa-file-lines text-warm-gray-400'}"
+					></i>
 					<span class="font-bold text-near-black">{selectedFile.name}</span>
-					<span class="text-warm-gray-300 ml-2">{selectedFileType === 'image' ? 'Viewing' : 'Editing'}</span>
+					<span class="text-warm-gray-300 ml-2"
+						>{selectedFileType === 'image' ? 'Viewing' : 'Editing'}</span
+					>
 				</div>
 				<div class="flex-1 bg-warm-white p-4 overflow-hidden relative">
 					{#if selectedFileType === 'image'}
 						<div class="absolute inset-4 bg-white panel-inner flex items-center justify-center p-4">
-							<img 
-								src={fileUrl(selectedFile.path)} 
-								alt={selectedFile.name} 
-								class="max-w-full max-h-full object-contain" 
+							<img
+								src={fileUrl(selectedFile.path)}
+								alt={selectedFile.name}
+								class="max-w-full max-h-full object-contain"
 							/>
 						</div>
 					{:else}
@@ -457,11 +534,15 @@
 				</div>
 			{:else}
 				<div class="flex-1 flex flex-col items-center justify-center text-warm-gray-300 bg-white">
-					<div class="w-16 h-16 rounded-full bg-warm-gray-100 flex items-center justify-center mb-4">
+					<div
+						class="w-16 h-16 rounded-full bg-warm-gray-100 flex items-center justify-center mb-4"
+					>
 						<i class="fa-solid fa-file text-2xl opacity-50"></i>
 					</div>
 					<p class="text-section-title text-warm-gray-500">Select a file</p>
-					<p class="text-body-text mt-2 text-center max-w-xs">Choose a file from the explorer to view or edit its contents.</p>
+					<p class="text-body-text mt-2 text-center max-w-xs">
+						Choose a file from the explorer to view or edit its contents.
+					</p>
 				</div>
 			{/if}
 		</div>

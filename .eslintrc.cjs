@@ -26,6 +26,16 @@ module.exports = {
 	},
 	overrides: [
 		{
+			files: ['*.svelte'],
+			parserOptions: {
+				parser: {
+					ts: '@typescript-eslint/parser',
+					typescript: '@typescript-eslint/parser',
+					js: 'espree'
+				}
+			}
+		},
+		{
 			files: ['*.ts', '*.svelte.ts'],
 			parser: '@typescript-eslint/parser',
 			parserOptions: {

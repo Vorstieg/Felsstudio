@@ -1,42 +1,58 @@
-<script>
+<script lang="ts">
 	import { slide } from 'svelte/transition';
 	import { _ } from 'svelte-i18n';
 
-	let { selectedTags = $bindable(), availableTags = [], small = false, onChange = null } = $props();
+	type Props = {
+		selectedTags?: unknown;
+		availableTags?: readonly string[];
+		small?: boolean;
+		onChange?: (_tags: string[]) => void;
+	};
+
+	let {
+		selectedTags = $bindable<string[] | undefined>(),
+		availableTags = [],
+		small = false,
+		onChange
+	}: Props = $props();
 
 	let isOpen = $state(false);
-	let container;
+	let container: HTMLDivElement | undefined = $state();
+	let normalizedSelectedTags = $derived(
+		Array.isArray(selectedTags)
+			? selectedTags.filter((tag): tag is string => typeof tag === 'string')
+			: []
+	);
 
-	function addTag(tag) {
-		if (!selectedTags) selectedTags = [];
-
-		if (!selectedTags.includes(tag)) {
-			selectedTags = [...selectedTags, tag];
-			onChange?.(selectedTags);
+	function addTag(tag: string) {
+		if (!normalizedSelectedTags.includes(tag)) {
+			const nextTags = [...normalizedSelectedTags, tag];
+			selectedTags = nextTags;
+			onChange?.(nextTags);
 		}
 	}
 
-	function removeTag(tag) {
-		if (!selectedTags) return;
-		selectedTags = selectedTags.filter((t) => t !== tag);
-		onChange?.(selectedTags);
+	function removeTag(tag: string) {
+		const nextTags = normalizedSelectedTags.filter((selectedTag) => selectedTag !== tag);
+		selectedTags = nextTags;
+		onChange?.(nextTags);
 	}
 
-	function handleClickOutside(event) {
-		if (container && !container.contains(event.target) && isOpen) {
+	function handleClickOutside(event: MouseEvent) {
+		if (container && event.target instanceof Node && !container.contains(event.target) && isOpen) {
 			isOpen = false;
 		}
 	}
 
-	let unusedTags = $derived(availableTags.filter((t) => !(selectedTags || []).includes(t)));
+	let unusedTags = $derived(availableTags.filter((tag) => !normalizedSelectedTags.includes(tag)));
 </script>
 
 <svelte:window onclick={handleClickOutside} />
 
 <div class="w-full" bind:this={container}>
 	<div class="flex flex-wrap items-center gap-1">
-		{#if selectedTags}
-			{#each selectedTags as tag}
+			{#if normalizedSelectedTags.length > 0}
+				{#each normalizedSelectedTags as tag}
 				<button
 					class="flex items-center gap-1 {small
 						? 'h-5 px-1.5 text-[9px]'

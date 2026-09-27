@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { translateGeometryTo } from './sector-utils.js';
+import { translateGeometryTo } from './sector-utils.ts';
 
 describe('translateGeometryTo', () => {
 	it('moves every polygon ring by the same delta without changing its shape', () => {

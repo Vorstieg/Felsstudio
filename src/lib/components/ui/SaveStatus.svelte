@@ -1,11 +1,10 @@
-<script>
+<script lang="ts">
 	import { _ } from 'svelte-i18n';
 
-	/**
-	 * Inline save status indicator.
-	 * States: 'idle' | 'saving' | 'success' | 'error'
-	 */
-	let { status = 'idle', errorMessage = '' } = $props();
+	type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
+	type Props = { status?: SaveStatus; errorMessage?: string };
+
+	let { status = 'idle', errorMessage = '' }: Props = $props();
 </script>
 
 {#if status !== 'idle'}

@@ -1,25 +1,28 @@
-<script>
+<script lang="ts">
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
+	import type { FelsProperties } from '@vorstieg/fels-types/types';
+	import type { Point2D } from '$lib/assets/js/path-geometry.ts';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
-	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.js';
+	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.ts';
 	import {
 		createPolygonAround,
 		getGeometryCenter,
 		translateGeometryTo
-	} from '$lib/assets/js/sector-utils.js';
+	} from '$lib/assets/js/sector-utils.ts';
 
-	let { open = true, onClose = null } = $props();
+	type Props = { open?: boolean; onClose?: (() => void) | null };
+	let { open = true, onClose = null }: Props = $props();
 	const cragEditorState = getCragEditorSession();
 	const { geometryEditor } = getCragEditorTools();
-	let metadata = $derived(cragEditorState.getMetadataTarget() || cragEditorState.getActiveEntry()?.properties || {});
-	let geometryCenter = $derived(getGeometryCenter(metadata.geometry) || [0, 0]);
+	let metadata = $derived<Partial<FelsProperties>>(
+		cragEditorState.getMetadataTarget() || cragEditorState.getActiveEntry()?.properties || {}
+	);
+	let geometryCenter = $derived<Point2D>(getGeometryCenter(metadata.geometry) || [0, 0]);
 	let selectedGeometryVertex = $derived(geometryEditor.selectedVertex);
 
-	function setGeometryType(type) {
-		const center =
-			getGeometryCenter(metadata.geometry) ||
-			getGeometryCenter(cragEditorState.getActiveEntry()?.geometry) ||
-			[0, 0];
+	function setGeometryType(type: string) {
+		const center: Point2D = getGeometryCenter(metadata.geometry) ||
+			getGeometryCenter(cragEditorState.getActiveEntry()?.geometry) || [0, 0];
 		cragEditorState.commitGeometry(
 			cragEditorState.activeMetadataTarget,
 			type === 'Polygon'
@@ -30,8 +33,9 @@
 		geometryEditor.clearSelection();
 	}
 
-	function setGeometryCoordinate(index, value) {
-		const center = [...(getGeometryCenter(metadata.geometry) || [0, 0])];
+	function setGeometryCoordinate(index: 0 | 1, value: string) {
+		if (!metadata.geometry) return;
+		const center: Point2D = [...(getGeometryCenter(metadata.geometry) || [0, 0])];
 		const coordinate = Number(value);
 		if (!Number.isFinite(coordinate)) return;
 		center[index] = coordinate;
@@ -56,8 +60,8 @@
 				class="rounded-sm py-2 text-ui-label transition-none {metadata.geometry?.type === type
 					? 'bg-white text-creator-blue shadow-sm'
 					: 'text-warm-gray-500 hover:bg-black/5'}"
-				onclick={() => setGeometryType(type)}
-			>{type}</button>
+				onclick={() => setGeometryType(type)}>{type}</button
+			>
 		{/each}
 	</div>
 
@@ -78,7 +82,9 @@
 		</p>
 		<div class="mt-2 grid grid-cols-2 gap-2">
 			<div>
-				<label for="geometry-tool-longitude" class="text-micro-data text-warm-gray-500">Longitude</label>
+				<label for="geometry-tool-longitude" class="text-micro-data text-warm-gray-500"
+					>Longitude</label
+				>
 				<input
 					id="geometry-tool-longitude"
 					type="number"
@@ -89,7 +95,9 @@
 				/>
 			</div>
 			<div>
-				<label for="geometry-tool-latitude" class="text-micro-data text-warm-gray-500">Latitude</label>
+				<label for="geometry-tool-latitude" class="text-micro-data text-warm-gray-500"
+					>Latitude</label
+				>
 				<input
 					id="geometry-tool-latitude"
 					type="number"

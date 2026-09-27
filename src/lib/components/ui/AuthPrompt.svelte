@@ -1,11 +1,11 @@
-<script>
-	import { authState } from '$lib/api/auth.svelte.js';
+<script lang="ts">
+	import { authState } from '$lib/api/auth.svelte.ts';
 	import { _ } from 'svelte-i18n';
 
 	let user = $state('');
 	let pass = $state('');
 
-	function handleSubmit(e) {
+	function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
 		authState.login(user, pass);
 	}
@@ -14,7 +14,7 @@
 		authState.dismiss();
 	}
 
-	function handleKeydown(e) {
+	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') handleDismiss();
 	}
 </script>

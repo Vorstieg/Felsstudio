@@ -1,8 +1,16 @@
-<script>
+<script lang="ts">
 	import { onMount } from 'svelte';
-	import { normalizePath } from '$lib/components/editor/crag/crag-editor-paths.js';
+	import { normalizePath } from '$lib/components/editor/crag/crag-editor-paths.ts';
 	import TreeFolderSelector from './TreeFolderSelector.svelte';
 
+	type Props = {
+		parentPath?: string;
+		cragSlug?: string;
+		knownFolders?: Set<string>;
+		hierarchyError?: string;
+		onClose?: () => void;
+		onCancel?: () => void;
+	};
 	let {
 		parentPath = $bindable(''),
 		cragSlug = $bindable(''),
@@ -10,9 +18,9 @@
 		hierarchyError = '',
 		onClose,
 		onCancel = onClose
-	} = $props();
+	}: Props = $props();
 
-	let modalCard = $state();
+	let modalCard = $state<HTMLDivElement>();
 
 	const finalPath = $derived(normalizePath([parentPath, cragSlug].filter(Boolean).join('/')));
 
@@ -22,24 +30,24 @@
 		modalCard?.focus();
 	});
 
-	function getBreadcrumbParts(path = '') {
+	function getBreadcrumbParts(path = ''): string[] {
 		const normalized = normalizePath(path);
 		if (!normalized) return [];
 		return normalized.split('/').filter(Boolean);
 	}
 
-	function handleBackdropClick(event) {
+	function handleBackdropClick(event: MouseEvent): void {
 		if (event.target === event.currentTarget) onCancel?.();
 	}
 
-	function handleKeydown(event) {
+	function handleKeydown(event: KeyboardEvent): void {
 		if (event.key === 'Escape') {
 			event.preventDefault();
 			onCancel?.();
 		}
 	}
 
-	function handleBackdropKeydown(event) {
+	function handleBackdropKeydown(event: KeyboardEvent): void {
 		if (event.key === 'Enter' || event.key === ' ') {
 			event.preventDefault();
 			onCancel?.();
@@ -66,9 +74,13 @@
 		onkeydown={handleKeydown}
 	>
 		<!-- Header -->
-		<div class="p-3 border-b border-black/15 flex justify-between items-center bg-white flex-shrink-0">
+		<div
+			class="p-3 border-b border-black/15 flex justify-between items-center bg-white flex-shrink-0"
+		>
 			<div>
-				<h2 id="hierarchy-modal-title" class="text-section-title leading-none mb-0.5">Hierarchy Placement</h2>
+				<h2 id="hierarchy-modal-title" class="text-section-title leading-none mb-0.5">
+					Hierarchy Placement
+				</h2>
 				<p class="text-ui-label !m-0">Choose where this crag lives in the folder tree</p>
 			</div>
 			<button
@@ -85,7 +97,9 @@
 			<!-- Final path preview -->
 			<div class="rounded-sm border border-creator-blue/20 bg-creator-blue/5 p-2.5 space-y-1">
 				<span class="text-ui-label block">Final folder path</span>
-				<div class="flex flex-wrap items-center gap-1 text-[12px] font-mono font-medium text-near-black">
+				<div
+					class="flex flex-wrap items-center gap-1 text-[12px] font-mono font-medium text-near-black"
+				>
 					{#if breadcrumbParts.length === 0}
 						<span class="text-warm-gray-400 italic">No folder selected</span>
 					{:else}
@@ -93,17 +107,16 @@
 							{#if i > 0}
 								<i class="fa-solid fa-chevron-right text-[9px] text-warm-gray-300"></i>
 							{/if}
-							<span class={i === breadcrumbParts.length - 1 ? 'text-creator-blue font-bold' : ''}>{part}</span>
+							<span class={i === breadcrumbParts.length - 1 ? 'text-creator-blue font-bold' : ''}
+								>{part}</span
+							>
 						{/each}
 					{/if}
 				</div>
 			</div>
 
 			<!-- Parent folder selector -->
-			<TreeFolderSelector
-				{knownFolders}
-				bind:selectedPath={parentPath}
-			/>
+			<TreeFolderSelector {knownFolders} bind:selectedPath={parentPath} />
 
 			{#if hierarchyError}
 				<p class="text-[10px] text-amber-600 font-bold">{hierarchyError}</p>

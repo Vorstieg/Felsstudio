@@ -1,7 +1,10 @@
-<script>
+<script lang="ts">
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
-	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+	import type { Route } from '@vorstieg/fels-types/types';
+	import type { Topo2DEditorDocument } from '$lib/state/topo-2d-editor-initial-state.ts';
+	import type { TopoDrawingTarget } from '$lib/state/topo-drawing-target.ts';
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
 	const editorState = getTopo2DEditorState();
 	let topo = $derived(editorState.topo);
 	const ui = editorState.ui;
@@ -10,21 +13,28 @@
 	import TopoRoutesPanel from './topo-properties/routes/TopoRoutesPanel.svelte';
 	import TopoFixpointsPanel from './topo-properties/TopoFixpointsPanel.svelte';
 
+	type Props = {
+		showMapModal?: boolean;
+		drawingTarget?: TopoDrawingTarget | null;
+		activeTool?: string;
+		toolOptionsOpen?: boolean;
+	};
+
 	let {
 		showMapModal = $bindable(false),
 		drawingTarget = $bindable(null),
 		activeTool = $bindable('route'),
 		toolOptionsOpen = $bindable(false)
-	} = $props();
+	}: Props = $props();
 
 	let activeTab = $state('info');
-	let lastSelectedId = $state(null);
-	let lastSelectedFpId = $state(null);
-	let lastLockedClusterId = $state(null);
+	let lastSelectedId = $state<string | number | null>(null);
+	let lastSelectedFpId = $state<string | number | null>(null);
+	let lastLockedClusterId = $state<string | number | null>(null);
 	let showJsonEditor = $state(false);
 	let topoJsonText = $state('');
 	let topoJsonError = $state('');
-	const hasRouteType = (route, type) =>
+	const hasRouteType = (route: Route, type: string) =>
 		Array.isArray(route.type) ? route.type.includes(type) : route.type === type;
 
 	let routes = $derived(topo.routes);
@@ -32,11 +42,11 @@
 		if (activeTool !== 'ai-bolts' || !editorState.clustering.clusters) return [];
 		return editorState.clustering.clusters.filter((cluster) => {
 			return !topo.fixPoints.some((fixpoint) => {
-				if (!Array.isArray(fixpoint.position) || fixpoint.position.length < 3) return false;
+				if (!Array.isArray(fixpoint.position3D) || fixpoint.position3D.length < 3) return false;
 				const dist = Math.sqrt(
-					Math.pow(fixpoint.position[0] - cluster.anchor[0], 2) +
-						Math.pow(fixpoint.position[1] - cluster.anchor[1], 2) +
-						Math.pow(fixpoint.position[2] - cluster.anchor[2], 2)
+					Math.pow(fixpoint.position3D[0] - cluster.anchor[0], 2) +
+						Math.pow(fixpoint.position3D[1] - cluster.anchor[1], 2) +
+						Math.pow(fixpoint.position3D[2] - cluster.anchor[2], 2)
 				);
 				return dist < 0.1;
 			});
@@ -50,16 +60,14 @@
 
 		if (selectedId && selectedId !== lastSelectedId) {
 			lastSelectedId = selectedId;
-			const route = topo.routes.find(
-				(item) => String(item.id) === String(selectedId)
-			);
+			const route = topo.routes.find((item) => String(item.id) === String(selectedId));
 			if (route) {
 				activeTool = 'routeEdit';
 				activeTab = 'routes';
 				if (hasRouteType(route, 'multi-pitch')) {
 					drawingTarget = drawingTarget?.routeId === selectedId ? drawingTarget : null;
 				} else {
-					drawingTarget = { type: 'route', id: selectedId };
+					drawingTarget = { type: 'route', routeId: selectedId };
 				}
 				scrollIntoInspectorView('route-' + selectedId);
 			}
@@ -86,7 +94,7 @@
 	});
 
 	onMount(() => {
-		const handleKeyDown = (event) => {
+		const handleKeyDown = (event: KeyboardEvent) => {
 			if (event.ctrlKey && event.altKey && event.key.toLowerCase() === 'j') {
 				event.preventDefault();
 				toggleJsonEditor();
@@ -99,13 +107,13 @@
 		};
 	});
 
-	function scrollIntoInspectorView(id) {
+	function scrollIntoInspectorView(id: string) {
 		setTimeout(() => {
 			document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 		}, 100);
 	}
 
-	function switchTab(tab) {
+	function switchTab(tab: string) {
 		activeTab = tab;
 		editorState.clearSelection();
 	}
@@ -124,11 +132,11 @@
 	}
 
 	function applyTopoJson() {
-		let parsed;
+		let parsed: unknown;
 		try {
 			parsed = JSON.parse(topoJsonText);
 		} catch (error) {
-			topoJsonError = error.message;
+			topoJsonError = error instanceof Error ? error.message : String(error);
 			return;
 		}
 
@@ -137,29 +145,28 @@
 			return;
 		}
 
+		const data = parsed as Record<string, unknown>;
 		const currentMode = topo.editorMode;
 		const nextTopo = {
-			...parsed,
-			routes: Array.isArray(parsed.routes) ? parsed.routes : [],
-			fixPoints: Array.isArray(parsed.fixPoints) ? parsed.fixPoints : [],
-			outlines: Array.isArray(parsed.outlines) ? parsed.outlines : [],
-			textLabels: Array.isArray(parsed.textLabels) ? parsed.textLabels : [],
-			tags: Array.isArray(parsed.tags) ? parsed.tags : [],
-			coordinates: Array.isArray(parsed.coordinates) ? parsed.coordinates : [0, 0],
-			modelOffset: Array.isArray(parsed.modelOffset) ? parsed.modelOffset : [0, 0, 0],
-			scale: parsed.scale ?? 1,
-			image2D: parsed.image2D ?? null,
-			imageAspectRatio: parsed.imageAspectRatio ?? 1.5,
+			...data,
+			routes: Array.isArray(data.routes) ? data.routes : [],
+			fixPoints: Array.isArray(data.fixPoints) ? data.fixPoints : [],
+			outlines: Array.isArray(data.outlines) ? data.outlines : [],
+			textLabels: Array.isArray(data.textLabels) ? data.textLabels : [],
+			tags: Array.isArray(data.tags) ? data.tags : [],
+			coordinates: Array.isArray(data.coordinates) ? data.coordinates : [0, 0],
+			modelOffset: Array.isArray(data.modelOffset) ? data.modelOffset : [0, 0, 0],
+			scale: data.scale ?? 1,
+			image2D: data.image2D ?? null,
+			imageAspectRatio: data.imageAspectRatio ?? 1.5,
 			canvasAspectRatio:
-				Number.isFinite(Number(parsed.canvasAspectRatio)) && Number(parsed.canvasAspectRatio) > 0
-					? Number(parsed.canvasAspectRatio)
-					: Number.isFinite(Number(parsed.imageAspectRatio)) && Number(parsed.imageAspectRatio) > 0
-						? Number(parsed.imageAspectRatio)
-						: 1.5,
-			backgroundFit: parsed.backgroundFit === 'cover' ? 'cover' : 'contain',
-			editorMode: parsed.editorMode || currentMode
+				Number.isFinite(Number(data.canvasAspectRatio)) && Number(data.canvasAspectRatio) > 0
+					? Number(data.canvasAspectRatio)
+					: 1.5,
+			backgroundFit: data.backgroundFit === 'cover' ? 'cover' : 'contain',
+			editorMode: data.editorMode || currentMode
 		};
-		editorState.load(nextTopo);
+		editorState.load(nextTopo as unknown as Partial<Topo2DEditorDocument>);
 		editorState.clearSelection();
 		drawingTarget = null;
 		topoJsonError = '';

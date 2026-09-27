@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { useCragTrackEditor } from '../src/lib/components/editor/crag/use-crag-track-editor.svelte.js';
+import { useCragTrackEditor } from '../src/lib/components/editor/crag/use-crag-track-editor.svelte.ts';
 
 function createEditor(initialCoordinates) {
 	let target = { documentPath: 'crag-topo.json', routeId: 'route-1', pathId: 'path-1' };

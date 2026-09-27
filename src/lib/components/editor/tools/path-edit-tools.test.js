@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { OutlineEditTool } from './OutlineEditTool.svelte.js';
-import { RouteEditTool } from './RouteEditTool.svelte.js';
+import { OutlineEditTool } from './OutlineEditTool.svelte.ts';
+import { RouteEditTool } from './RouteEditTool.svelte.ts';
 
 const canvasInput = {
 	normalizeEvent: () => ({ point: { x: 0.2, y: 0.3 } })
@@ -148,7 +148,8 @@ describe('persisted path edit tools', () => {
 
 		expect(tool.handleOutlineDown({ stopPropagation: vi.fn() }, { id: 7 }, canvasInput)).toBe(true);
 		expect(editor.selectObject).toHaveBeenCalledWith('outline', 7, false);
-		expect(editor.startInteraction).toHaveBeenCalledWith('move-selection', {
+		expect(editor.startInteraction).toHaveBeenCalledWith({
+			kind: 'move-selection',
 			startMouse: { x: 0.2, y: 0.3 }
 		});
 	});

@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createCragEditorSession, createFelsEntry } from '$lib/state/crag-session.svelte.ts';
 import { loadFelsEntryWorkspaceDetails } from '$lib/assets/js/load-crag-editor-entry.ts';
-import { createCragSectorTool } from './CragSectorTool.svelte.js';
+import { createCragSectorTool } from './CragSectorTool.svelte.ts';
 
 function setup() {
 	const state = createCragEditorSession();

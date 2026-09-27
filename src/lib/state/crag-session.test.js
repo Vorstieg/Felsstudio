@@ -5,8 +5,8 @@ import {
 	snapshotDraftWorkspace,
 	snapshotFelsEntryWorkspace
 } from './crag-session.svelte.ts';
-import { Topo } from '$lib/assets/js/topo-paths.js';
-import { saveCragWorkspace } from '$lib/assets/js/save-crag-workspace.js';
+import { Topo } from '$lib/assets/js/topo-paths.ts';
+import { saveCragWorkspace } from '$lib/assets/js/save-crag-workspace.ts';
 
 function workspace() {
 	const root = createFelsEntry('area', { id: 'country', name: 'Country' });

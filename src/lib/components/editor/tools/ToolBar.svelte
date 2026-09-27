@@ -1,10 +1,24 @@
-<script>
+<script lang="ts">
 	import { _ } from 'svelte-i18n';
+	import type { Snippet } from 'svelte';
 	import SaveStatus from '$lib/components/ui/SaveStatus.svelte';
-	import { viewport } from '$lib/state/viewport.svelte.js';
+	import { viewport } from '$lib/state/viewport.svelte.ts';
 	import ToolButton from './ToolButton.svelte';
 	import ToolActionButton from './ToolActionButton.svelte';
-	import { createToolInteraction } from './tool-interaction.js';
+	import { createToolInteraction } from './tool-interaction.ts';
+	import type { ToolInteractionAction, ToolInteractionTool } from './tool-interaction.ts';
+
+	type ToolbarTool = ToolInteractionTool & {
+		label: string;
+		icon: string;
+		title?: string;
+		hidden?: boolean;
+	};
+	type SaveAction = ToolInteractionAction & {
+		label?: string;
+		status?: 'idle' | 'saving' | 'success' | 'error';
+		errorMessage?: string;
+	};
 
 	let {
 		activeTool = $bindable('select'),
@@ -20,27 +34,43 @@
 		dense = false,
 		controls,
 		children
+	}: {
+		activeTool?: string | null;
+		toolOptionsOpen?: boolean;
+		neutralTool?: string;
+		tools?: ToolbarTool[];
+		undo?: (ToolInteractionAction & { label: string }) | null;
+		redo?: (ToolInteractionAction & { label: string }) | null;
+		finish?: (ToolInteractionAction & { label: string }) | null;
+		cancel?: (ToolInteractionAction & { label: string }) | null;
+		save?: SaveAction | null;
+		mobileSearch?: Snippet;
+		dense?: boolean;
+		controls?: Snippet;
+		children?: Snippet;
 	} = $props();
 
 	let isCompact = $derived(!viewport.isExpanded);
-	function observeMobileDock(node) {
+	function observeMobileDock(node: HTMLDivElement) {
 		const updateDockHeight = () => {
 			document.documentElement.style.setProperty('--mobile-tool-dock-height', `${node.offsetHeight}px`);
 		};
 		const observer = new ResizeObserver(updateDockHeight);
 		observer.observe(node);
 		updateDockHeight();
-		return () => {
-			observer.disconnect();
-			document.documentElement.style.removeProperty('--mobile-tool-dock-height');
+		return {
+			destroy() {
+				observer.disconnect();
+				document.documentElement.style.removeProperty('--mobile-tool-dock-height');
+			}
 		};
 	}
 
 	const { selectTool, runAction } = createToolInteraction({
-		getActiveTool: () => activeTool,
-		setActiveTool: (value) => (activeTool = value),
+		getActiveTool: () => activeTool ?? neutralTool,
+		setActiveTool: (value) => (activeTool = value ?? neutralTool),
 		setOptionsOpen: (value) => (toolOptionsOpen = value),
-		shouldOpenOptionsOnSelect: (tool) => !isCompact || tool.openOptionsOnSelect,
+		shouldOpenOptionsOnSelect: (tool) => !isCompact || Boolean(tool.openOptionsOnSelect),
 		getNeutralTool: () => neutralTool
 	});
 </script>

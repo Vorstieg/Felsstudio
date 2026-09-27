@@ -1,21 +1,54 @@
-<script>
+<script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import maplibregl from 'maplibre-gl';
+	import maplibregl, {
+		type CustomLayerInterface,
+		type CustomRenderMethodInput,
+		type Map as MapLibreMap,
+		type StyleSpecification
+	} from 'maplibre-gl';
 	import * as THREE from 'three';
 	import { loadMapStyle } from '$lib/map-style.ts';
 
+	type Coordinates = [longitude: number, latitude: number];
+	type Vector3Tuple = [x: number, y: number, z: number];
+	type DragAxis = 'x' | 'y' | 'z' | 'ry';
+	type Props = {
+		coordinates?: Coordinates;
+		altitude?: number;
+		gltfScene: THREE.Group | null;
+		modelRotation?: Vector3Tuple;
+		modelScale?: Vector3Tuple;
+		onClose: () => void;
+	};
+	type ModelCustomLayer = CustomLayerInterface & {
+		camera?: THREE.PerspectiveCamera;
+		dummyCamera?: THREE.PerspectiveCamera;
+		lMatrix?: THREE.Matrix4;
+		map?: MapLibreMap;
+		modelGroup?: THREE.Group;
+		renderer?: THREE.WebGLRenderer;
+		scene?: THREE.Scene;
+	};
+	type ExtendedMap = MapLibreMap & {
+		getFreeCameraOptions?: () => { position?: { x: number; y: number; z: number } };
+	};
+	type ExtendedTransform = MapLibreMap['transform'] & {
+		_fov?: number;
+		_pitch?: number;
+		_bearing?: number;
+	};
+
 	let {
-		coordinates = $bindable([0, 0]),
+		coordinates = $bindable([0, 0] as Coordinates),
 		altitude = $bindable(0),
 		gltfScene,
-		modelRotation = $bindable(),
-		modelScale = $bindable(),
+		modelRotation = $bindable<Vector3Tuple>(),
+		modelScale = $bindable<Vector3Tuple>(),
 		onClose
-	} = $props();
+	}: Props = $props();
 
-	let mapContainer;
-	let map;
-	let customLayer;
+	let mapContainer: HTMLDivElement;
+	let map: MapLibreMap | undefined;
 
 	let uniformScale = $state(modelScale?.[0] || 1);
 	function updateScale() {
@@ -30,14 +63,14 @@
 	let mapBearing = $state(0);
 	let mapZoom = $state(18);
 
-	let activeDragAxis = null;
+	let activeDragAxis: DragAxis | null = null;
 	let dragStartX = 0;
 	let dragStartY = 0;
-	let initialCoordinates = [0, 0];
+	let initialCoordinates: Coordinates = [0, 0];
 	let initialAltitude = 0;
-	let initialRotation = [0, 0, 0];
+	let initialRotation: Vector3Tuple = [0, 0, 0];
 
-	function startDrag(e, axis) {
+	function startDrag(e: PointerEvent, axis: DragAxis) {
 		e.preventDefault();
 		e.stopPropagation();
 		activeDragAxis = axis;
@@ -58,7 +91,7 @@
 		}
 	}
 
-	function onDrag(e) {
+	function onDrag(e: PointerEvent) {
 		if (!activeDragAxis) return;
 
 		const deltaX = e.clientX - dragStartX;
@@ -114,59 +147,68 @@
 		}
 	}
 
-	let initialCenter = coordinates[0] === 0 && coordinates[1] === 0 ? [16.37, 48.2] : coordinates;
+	let initialCenter: Coordinates =
+		coordinates[0] === 0 && coordinates[1] === 0 ? [16.37, 48.2] : coordinates;
 
 	if (coordinates[0] === 0 && coordinates[1] === 0) {
 		coordinates = initialCenter;
 	}
 
 	onMount(async () => {
-		let style;
+		let style: string | StyleSpecification;
 		try {
 			style = await loadMapStyle('terrain');
-			if (style.sources?.places?.data)
-				style.sources.places.data = { type: 'FeatureCollection', features: [] };
-			if (style.sources?.routes?.data)
-				style.sources.routes.data = { type: 'FeatureCollection', features: [] };
+			if (typeof style !== 'string') {
+				const places = style.sources?.places;
+				if (places?.type === 'geojson') places.data = { type: 'FeatureCollection', features: [] };
+				const routes = style.sources?.routes;
+				if (routes?.type === 'geojson') routes.data = { type: 'FeatureCollection', features: [] };
+			}
 		} catch {
 			style = 'https://demotiles.maplibre.org/style.json';
 		}
 
-		map = new maplibregl.Map({
+		const activeMap = new maplibregl.Map({
 			container: mapContainer,
 			style: style,
 			center: initialCenter,
 			zoom: 18,
 			pitch: 45,
 			bearing: 0,
-			antialias: true
+			canvasContextAttributes: { antialias: true }
 		});
+		map = activeMap;
 
 		// Removed custom DOM drag/rotate handlers as requested
 
-		customLayer = {
+		const layer: ModelCustomLayer = {
 			id: '3d-model',
 			type: 'custom',
 			renderingMode: '3d',
-			onAdd: function (map, gl) {
+			onAdd: function (
+				this: ModelCustomLayer,
+				map: MapLibreMap,
+				gl: WebGLRenderingContext | WebGL2RenderingContext
+			) {
 				console.log('Custom Layer onAdd triggered');
 				this.camera = new THREE.PerspectiveCamera();
 				this.scene = new THREE.Scene();
+				const scene = this.scene;
 
 				// Lights
 				const directionalLight = new THREE.DirectionalLight(0xffffff);
 				directionalLight.position.set(0, -70, 100).normalize();
-				this.scene.add(directionalLight);
+				scene.add(directionalLight);
 
 				const directionalLight2 = new THREE.DirectionalLight(0xffffff);
 				directionalLight2.position.set(0, 70, 100).normalize();
-				this.scene.add(directionalLight2);
+				scene.add(directionalLight2);
 
 				const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-				this.scene.add(ambientLight);
+				scene.add(ambientLight);
 
 				this.modelGroup = new THREE.Group();
-				this.scene.add(this.modelGroup);
+				scene.add(this.modelGroup);
 
 				if (gltfScene) {
 					console.log('Adding GLTF Scene to Map');
@@ -192,7 +234,11 @@
 
 				this.renderer.autoClear = false;
 			},
-			render: function (gl, args) {
+			render: function (
+				this: ModelCustomLayer,
+				_gl: WebGLRenderingContext | WebGL2RenderingContext,
+				args: CustomRenderMethodInput
+			) {
 				// The altitude is bound and modified directly by the vertical dragger.
 				const modelAltitude = altitude;
 
@@ -223,6 +269,7 @@
 					.multiply(rotationX);
 
 				this.lMatrix = l;
+				if (!this.camera) return;
 				this.camera.projectionMatrix = m.multiply(l);
 
 				// Sync screen coordinates and 3D perspective for DOM gizmo!
@@ -237,15 +284,15 @@
 					gizmoX = ((modelPos.x + 1) / 2) * mapContainer.offsetWidth;
 					gizmoY = ((-modelPos.y + 1) / 2) * mapContainer.offsetHeight;
 
-					const tr = map.transform;
+					const tr = activeMap.transform;
 					mapPitch = tr.pitch;
 					mapBearing = tr.bearing;
-					mapZoom = map.getZoom();
+					mapZoom = activeMap.getZoom();
 				}
 
 				// 100% PERFECT PHYSICAL CLONE OF MAPLIBRE CAMERA INTO THREE.JS
 				if (this.dummyCamera) {
-					const tr = map.transform;
+					const tr = activeMap.transform as ExtendedTransform;
 
 					// 1. Sync Aspect Ratio
 					this.dummyCamera.aspect = tr.width / tr.height;
@@ -256,14 +303,15 @@
 					this.dummyCamera.updateProjectionMatrix();
 
 					// 3. Sync Position (Translate Mercator to Model Space)
-					const centerMc = maplibregl.MercatorCoordinate.fromLngLat(map.getCenter(), 0);
-					const freePosition = map.getFreeCameraOptions?.()?.position;
+					const extendedMap = activeMap as ExtendedMap;
+					const centerMc = maplibregl.MercatorCoordinate.fromLngLat(activeMap.getCenter(), 0);
+					const freePosition = extendedMap.getFreeCameraOptions?.()?.position;
 					let camMercator;
 					if (freePosition) {
 						camMercator = new THREE.Vector3(freePosition.x, freePosition.y, freePosition.z);
 					} else {
-						const pitch = tr._pitch || 0;
-						const bearing = tr._bearing || 0;
+						const pitch = tr._pitch ?? tr.pitch * (Math.PI / 180);
+						const bearing = tr._bearing ?? tr.bearing * (Math.PI / 180);
 						const alt = tr.cameraToCenterDistance || 1000;
 						const worldSize = tr.worldSize || 512;
 						const yOffset = -Math.sin(pitch) * alt;
@@ -297,53 +345,33 @@
 					model.scale.set(currScale[0], currScale[1], currScale[2]);
 				}
 
+				if (!this.renderer || !this.scene || !this.camera || !this.map) return;
 				this.renderer.resetState();
 				this.renderer.render(this.scene, this.camera);
 				this.map.triggerRepaint();
 			}
 		};
-
-		// Keyboard toggle for Transform modes
-		window._handleKeydown = (e) => {
-			if (customLayer && customLayer.transformControls) {
-				if (e.key === 't' || e.key === 'T') customLayer.transformControls.setMode('translate');
-				if (e.key === 'r' || e.key === 'R') customLayer.transformControls.setMode('rotate');
-				if (e.key === 's' || e.key === 'S') customLayer.transformControls.setMode('scale');
-			}
-		};
-		window.addEventListener('keydown', window._handleKeydown);
-
-		map.on('style.load', () => {
-			if (!map.getLayer('3d-model')) {
-				map.addLayer(customLayer);
+		activeMap.on('style.load', () => {
+			if (!activeMap.getLayer('3d-model')) {
+				activeMap.addLayer(layer);
 			}
 		});
 
 		// Fallback if style is already loaded
-		if (map.isStyleLoaded() && !map.getLayer('3d-model')) {
-			map.addLayer(customLayer);
+		if (activeMap.isStyleLoaded() && !activeMap.getLayer('3d-model')) {
+			activeMap.addLayer(layer);
 		}
 	});
 
 	$effect(() => {
 		// Trigger repaint when reactive properties change
-		if (map && (coordinates !== undefined || relativeAltitude !== undefined)) {
+		if (map) {
 			map.triggerRepaint();
 		}
 	});
 
 	onDestroy(() => {
-		if (window._centerMarker) {
-			window._centerMarker.remove();
-			window._centerMarker = null;
-		}
-		if (window._handleKeydown) {
-			window.removeEventListener('keydown', window._handleKeydown);
-			window._handleKeydown = null;
-		}
-		if (customLayer && customLayer.transformControls) {
-			customLayer.transformControls.dispose();
-		}
+		if (activeDragAxis) endDrag();
 		map?.remove();
 	});
 </script>
@@ -477,9 +505,9 @@
 				<button
 					class="bg-white px-5 py-2.5 rounded-full shadow-modal border border-black/15 text-body-text font-bold text-near-black hover:bg-black/5 transition-none flex items-center gap-2"
 					onclick={() => {
+						if (!map) return;
 						const center = map.getCenter();
 						coordinates = [center.lng, center.lat];
-						if (window._centerMarker) window._centerMarker.setLngLat(coordinates);
 						map.triggerRepaint();
 					}}
 				>

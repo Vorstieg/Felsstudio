@@ -5,7 +5,7 @@ import {
 	buildGeometryEditorFeatures,
 	cloneGeoJsonGeometry,
 	useCragGeometryEditor
-} from './use-crag-geometry-editor.svelte.js';
+} from './use-crag-geometry-editor.svelte.ts';
 
 describe('geometry editor overlay', () => {
 	it('clones reactive geometry proxies into plain GeoJSON', () => {

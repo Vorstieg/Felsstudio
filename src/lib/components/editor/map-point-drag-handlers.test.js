@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it, vi } from 'vitest';
-import { initMapPointDragHandlers } from './map-point-drag-handlers.js';
+import { initMapPointDragHandlers } from './map-point-drag-handlers.ts';
 
 function toggle(initial) {
 	let enabled = initial;

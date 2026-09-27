@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getCragEditorPath, getCragEntryPath, getTopoEditorPath } from './editor-entry-paths.js';
+import { getCragEditorPath, getCragEntryPath, getTopoEditorPath } from './editor-entry-paths.ts';
 
 describe('crag entry paths', () => {
 	it('uses the runtime entry path instead of persisted feature metadata', () => {
@@ -13,9 +13,5 @@ describe('crag entry paths', () => {
 		expect(getTopoEditorPath('/topos/2d/editor', crag)).toBe(
 			'/topos/2d/editor/austria/tirol/innsbruck'
 		);
-	});
-
-	it('keeps legacy metadata paths readable while old files are migrated on save', () => {
-		expect(getCragEntryPath({ properties: { path: '/austria/tirol/' } })).toBe('austria/tirol');
 	});
 });

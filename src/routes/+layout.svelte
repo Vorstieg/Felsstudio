@@ -1,4 +1,5 @@
-<script>
+<script lang="ts">
+	import type { Snippet } from 'svelte';
 	import '../app.css';
 	import { base } from '$app/paths';
 	import '@fortawesome/fontawesome-free/css/fontawesome.css';
@@ -8,7 +9,7 @@
 	import en from '$lib/i18n/locales/en.json';
 	import de from '$lib/i18n/locales/de.json';
 	import AuthPrompt from '$lib/components/ui/AuthPrompt.svelte';
-	import { initViewport } from '$lib/state/viewport.svelte.js';
+	import { initViewport } from '$lib/state/viewport.svelte.ts';
 	import { onMount } from 'svelte';
 	import { navigating } from '$app/state';
 	import { browser } from '$app/environment';
@@ -23,19 +24,21 @@
 	onMount(() => {
 		const cleanupViewport = initViewport();
 
-		if (browser && import.meta.env.DEV && !window.__FELSSTUDIO_ERUDA_INITIALIZED__) {
-			window.__FELSSTUDIO_ERUDA_INITIALIZED__ = true;
-			void import('eruda').then(({ default: eruda }) => eruda.init()).catch((error) => {
-				window.__FELSSTUDIO_ERUDA_INITIALIZED__ = false;
-				console.warn('Failed to initialize Eruda:', error);
-			});
+		const erudaWindow = window as Window & { __FELSSTUDIO_ERUDA_INITIALIZED__?: boolean };
+		if (browser && import.meta.env.DEV && !erudaWindow.__FELSSTUDIO_ERUDA_INITIALIZED__) {
+			erudaWindow.__FELSSTUDIO_ERUDA_INITIALIZED__ = true;
+			void import('eruda')
+				.then(({ default: eruda }) => eruda.init())
+				.catch((error) => {
+					erudaWindow.__FELSSTUDIO_ERUDA_INITIALIZED__ = false;
+					console.warn('Failed to initialize Eruda:', error);
+				});
 		}
 
 		return cleanupViewport;
 	});
 
-	/** @type {{children?: import('svelte').Snippet}} */
-	let { children } = $props();
+	let { children }: { children?: Snippet } = $props();
 
 	let displayTitle = $derived($_('menu.creator') + ' | ' + $_('site.title'));
 	let showNavigationSpinner = $derived.by(() => {
@@ -69,18 +72,22 @@
 	</main>
 	<AuthPrompt />
 	{#if showNavigationSpinner}
-		<div class="fixed right-4 top-4 z-50 panel bg-white px-4 py-3 flex items-center gap-3 shadow-lg">
+		<div
+			class="fixed right-4 top-4 z-50 panel bg-white px-4 py-3 flex items-center gap-3 shadow-lg"
+		>
 			<i class="fa-solid fa-spinner fa-spin text-creator-blue text-lg"></i>
-			<span class="text-micro-data font-bold text-near-black uppercase tracking-widest">Loading</span>
+			<span class="text-micro-data font-bold text-near-black uppercase tracking-widest"
+				>Loading</span
+			>
 		</div>
 	{/if}
 </div>
 
 <style>
-    .creator-studio {
-        height: 100vh;
-        width: 100vw;
-        overflow: hidden;
-        background-color: var(--color-warm-white);
-    }
+	.creator-studio {
+		height: 100vh;
+		width: 100vw;
+		overflow: hidden;
+		background-color: var(--color-warm-white);
+	}
 </style>

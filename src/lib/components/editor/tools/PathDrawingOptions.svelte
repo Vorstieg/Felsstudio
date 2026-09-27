@@ -1,5 +1,18 @@
-<script>
+<script lang="ts">
 	import { _ } from 'svelte-i18n';
+	type Props = {
+		showGrid?: boolean;
+		snapToGrid?: boolean;
+		gridSize?: number;
+		gridSizeMax?: number;
+		gridSizeStep?: number;
+		curveEnabled?: boolean;
+		curveTension?: number;
+		onToggleSnapToGrid?: () => void;
+		onGridSizeChange?: (_value: string) => void;
+		onCurveEnabledChange?: (_enabled: boolean) => void;
+		onCurveTensionChange?: (_value: string) => void;
+	};
 
 	let {
 		showGrid = true,
@@ -17,7 +30,7 @@
 		},
 		onCurveTensionChange = () => {
 		}
-	} = $props();
+		}: Props = $props();
 </script>
 <div class="flex flex-col gap-2">
 	{#if showGrid}<div class="flex items-center gap-2"><p class="text-xs font-medium text-warm-gray-600">{$_('ui.snap_to_grid')}</p>

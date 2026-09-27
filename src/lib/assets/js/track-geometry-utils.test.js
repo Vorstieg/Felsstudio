@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it } from 'vitest';
-import { cleanStationaryTrackCoordinates, trimCoordinatesEnd } from './track-geometry-utils.js';
+import { cleanStationaryTrackCoordinates, trimCoordinatesEnd } from './track-geometry-utils.ts';
 
 describe('trimCoordinatesEnd', () => {
 	it('removes the requested number of points from the end', () => {

@@ -1,9 +1,16 @@
-<script>
+<script lang="ts">
 	import ToolOptions from './ToolOptions.svelte';
 	import PathDrawingOptions from './PathDrawingOptions.svelte';
-	import { createPathDrawingOptionsLogic } from './path-drawing-logic.js';
-	import { OUTLINE_FILL_COLORS, OUTLINE_STYLES } from './OutlineTool.svelte.js';
+	import { createPathDrawingOptionsLogic } from './path-drawing-logic.ts';
+	import { OUTLINE_FILL_COLORS, OUTLINE_STYLES } from './OutlineTool.svelte.ts';
 	import { _ } from 'svelte-i18n';
+	import type { RouteEditTool } from './RouteEditTool.svelte.ts';
+	import type { OutlineRecord } from '$lib/assets/js/outline-geometry.ts';
+	type Curve = { enabled?: boolean; tension?: number };
+	type Route = { routeEditTool?: RouteEditTool | null; curve?: Curve | null; onCurveChange?: (_changes: Curve) => void };
+	type GridActions = { toggleSnapToGrid: () => void; setGridSize: (_value: unknown) => void };
+	type CurveActions = { setCurveEnabled: (_enabled: boolean) => void; setCurveTension: (_value: unknown) => void };
+	type StyleActions = { setLineStyle: (_lineStyle: string) => void; setFillColor: (_color: string | null, _opacity?: number) => void };
 
 	let {
 		selectedOutlineId = null,
@@ -17,15 +24,27 @@
 		simplifySummary = '',
 		onSimplify = () => {},
 		onClose = () => {}
+	}: {
+		selectedOutlineId?: string | number | null;
+		selectedRoute?: Route | false | null;
+		outlineEditTool?: { snapToGrid: boolean; gridSize: number } | null;
+		outlineGridActions?: GridActions | null;
+		selectedOutline?: OutlineRecord | null;
+		outlineCurveActions?: CurveActions | null;
+		outlineStyleActions?: StyleActions | null;
+		simplifyTolerancePx?: number;
+		simplifySummary?: string;
+		onSimplify?: () => void;
+		onClose?: (() => void) | null;
 	} = $props();
 
-	const routePathActions = createPathDrawingOptionsLogic({
-		getGridTool: () => selectedRoute?.routeEditTool,
-		getCurveTarget: () => selectedRoute,
+	const routePathActions = createPathDrawingOptionsLogic<RouteEditTool, Route>({
+		getGridTool: () => (selectedRoute && selectedRoute.routeEditTool) || null,
+		getCurveTarget: () => selectedRoute || null,
 		updateCurve: (route, changes) => route.onCurveChange?.(changes)
 	});
 
-	function fillSwatchStyle(color) {
+	function fillSwatchStyle(color: (typeof OUTLINE_FILL_COLORS)[number]): string {
 		if (color.value == null) {
 			return 'background-color: #fff; background-image: linear-gradient(45deg, #d1d5db 25%, transparent 25%), linear-gradient(-45deg, #d1d5db 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d1d5db 75%), linear-gradient(-45deg, transparent 75%, #d1d5db 75%); background-size: 8px 8px; background-position: 0 0, 0 4px, 4px -4px, -4px 0; border: 1px solid #9ca3af;';
 		}
@@ -56,15 +75,18 @@
 				{#each OUTLINE_FILL_COLORS as color}
 					<button
 						type="button"
-						class="relative h-6 w-6 overflow-hidden rounded-sm transition-none {selectedOutline?.fillColor === color.value
+						class="relative h-6 w-6 overflow-hidden rounded-sm transition-none {selectedOutline?.fillColor ===
+						color.value
 							? 'shadow-[inset_0_0_0_2px_var(--color-creator-blue)]'
 							: ''}"
 						style={fillSwatchStyle(color)}
-						onclick={() => outlineStyleActions?.setFillColor(color.value, color.opacity)}
+							onclick={() => outlineStyleActions?.setFillColor(color.value, color.opacity ?? undefined)}
 						title={$_(color.labelKey)}
 						aria-label={$_(color.labelKey)}
 					>
-						{#if color.value == null}<span class="absolute left-1/2 top-0 h-full w-0.5 -rotate-45 bg-red-500"></span>{/if}
+						{#if color.value == null}<span
+								class="absolute left-1/2 top-0 h-full w-0.5 -rotate-45 bg-red-500"
+							></span>{/if}
 					</button>
 				{/each}
 			</div>

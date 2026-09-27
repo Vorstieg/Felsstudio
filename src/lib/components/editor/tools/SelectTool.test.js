@@ -1,8 +1,8 @@
 // @vitest-environment node
 
 import { describe, expect, it } from 'vitest';
-import { SelectTool } from './SelectTool.svelte.js';
-import { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+import { SelectTool } from './SelectTool.svelte.ts';
+import { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
 
 describe('SelectTool', () => {
 	it('deletes a selected fixpoint and cleans route and pitch references', () => {

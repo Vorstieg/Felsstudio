@@ -1,10 +1,19 @@
-<script>
+<script lang="ts">
+	import type { ToolInteractionAction } from './tool-interaction.ts';
+	type ActionButtonVariant = 'default' | 'finish' | 'cancel';
+
 	let {
 		action,
 		icon,
 		compact = false,
 		variant = 'default',
 		onclick
+	}: {
+		action: ToolInteractionAction & { label: string };
+		icon: string;
+		compact?: boolean;
+		variant?: ActionButtonVariant;
+		onclick: () => void;
 	} = $props();
 
 	let classes = $derived(

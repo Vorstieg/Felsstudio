@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPathDrawingOptionsLogic, snapPointToGrid } from './path-drawing-logic.js';
+import { createPathDrawingOptionsLogic, snapPointToGrid } from './path-drawing-logic.ts';
 
 describe('path drawing logic', () => {
 	it('uses one validated grid-snapping implementation', () => {

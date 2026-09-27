@@ -1,5 +1,25 @@
-<script>
-	let { tool, active = false, compact = false, dense = false, onclick } = $props();
+<script lang="ts">
+	import type { ToolInteractionTool } from './tool-interaction.ts';
+
+	type ToolButtonDefinition = ToolInteractionTool & {
+		label: string;
+		icon: string;
+		title?: string;
+	};
+
+	let {
+		tool,
+		active = false,
+		compact = false,
+		dense = false,
+		onclick
+	}: {
+		tool: ToolButtonDefinition;
+		active?: boolean;
+		compact?: boolean;
+		dense?: boolean;
+		onclick: () => void;
+	} = $props();
 </script>
 
 <button

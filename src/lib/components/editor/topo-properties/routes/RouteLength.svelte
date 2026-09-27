@@ -1,8 +1,14 @@
-<script>
-	import { calculateRouteLength } from '$lib/assets/js/topo-utils.js';
+<script lang="ts">
+	import { calculateRouteLength } from '$lib/assets/js/topo-utils.ts';
+	import type { Route } from '@vorstieg/fels-types/types';
 	import { _ } from 'svelte-i18n';
 
-	let { route, topoScale, onFieldChange } = $props();
+	type Props = {
+		route: Pick<Route, 'points3D' | 'length'>;
+		topoScale: number;
+		onFieldChange: (_field: string, _value: unknown) => void;
+	};
+	let { route, topoScale, onFieldChange }: Props = $props();
 </script>
 <div>
 
