@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it, vi } from 'vitest';
-import { restoreDraftSession, serializeDraftExtras } from './draft-serialization.js';
+import { restoreDraftSession, serializeDraftExtras } from './draft-serialization.ts';
 
 describe('serializeDraftExtras', () => {
 	it('serializes GLB data without mutating the original extras', async () => {
@@ -54,6 +54,7 @@ describe('restoreDraftSession', () => {
 		const cropBuffer = new ArrayBuffer(5);
 		const createObjectURL = vi.fn(() => 'blob:restored-crop');
 		const session = {
+			topo: {},
 			glbArrayBuffer: glbBuffer,
 			clustering: {
 				cropsBuffers: {

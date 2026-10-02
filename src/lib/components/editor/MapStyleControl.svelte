@@ -1,7 +1,18 @@
-<script>
-	let { mapStyle = $bindable('transport'), isExpanded = false, toolOptionsOpen = false } = $props();
+<script lang="ts">
+	type MapStyle = 'transport' | 'satellite' | 'terrain';
+	type Props = {
+		mapStyle?: MapStyle;
+		isExpanded?: boolean;
+		toolOptionsOpen?: boolean;
+	};
+
+	let {
+		mapStyle = $bindable('transport'),
+		isExpanded = false,
+		toolOptionsOpen = false
+	}: Props = $props();
 	let showMenu = $state(false);
-	const styles = ['transport', 'satellite', 'terrain'];
+	const styles: MapStyle[] = ['transport', 'satellite', 'terrain'];
 </script>
 
 <div
@@ -14,7 +25,9 @@
 			: 'calc(var(--info-panel-height, 0px) + var(--mobile-tool-dock-height, 7.5rem) + max(0.75rem, env(safe-area-inset-bottom)) + 3rem)'}
 >
 	{#if showMenu}
-		<div class="absolute right-0 bottom-12 flex min-w-32 flex-col gap-0.5 rounded-lg border border-black/10 bg-white p-1.5 shadow-panel">
+		<div
+			class="absolute right-0 bottom-12 flex min-w-32 flex-col gap-0.5 rounded-lg border border-black/10 bg-white p-1.5 shadow-panel"
+		>
 			{#each styles as style}
 				<button
 					type="button"

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { _ } from 'svelte-i18n';
@@ -6,16 +6,20 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { loadGlbIntoEditorState } from '$lib/assets/js/gltf-loader.ts';
-	import { draftsState } from '$lib/state/drafts.svelte.js';
-	import { createTopo2DEditorState, provideTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+	import { draftsState } from '$lib/state/drafts.svelte.ts';
+	import {
+		createTopo2DEditorState,
+		provideTopo2DEditorState
+	} from '$lib/state/topo-2d-editor-state.svelte.ts';
 	import Topo3DUploadForm from '$lib/components/editor/wizard/Topo3DUploadForm.svelte';
+	import { parse3DUploadProject } from '$lib/components/editor/wizard/parse-3d-upload-project.ts';
 
 	let isLoading = $state(false);
 	const topoSession = provideTopo2DEditorState(createTopo2DEditorState());
-	let zipFile = $state(null);
-	let glbFile = $state(null);
-	let projectFile = $state(null);
-	let cropFolderFiles = $state([]);
+	let zipFile = $state<File | null>(null);
+	let glbFile = $state<File | null>(null);
+	let projectFile = $state<File | null>(null);
+	let cropFolderFiles = $state<File[]>([]);
 
 	onMount(async () => {
 		const draftId = page.url.searchParams.get('draft');
@@ -35,7 +39,9 @@
 			if (zipFile) {
 				const zip = await JSZip.loadAsync(zipFile);
 				const entries = Object.values(zip.files);
-				const glbEntry = entries.find((file) => !file.dir && file.name.toLowerCase().endsWith('.glb'));
+				const glbEntry = entries.find(
+					(file) => !file.dir && file.name.toLowerCase().endsWith('.glb')
+				);
 				const projectEntry = entries.find(
 					(file) =>
 						!file.dir &&
@@ -44,18 +50,24 @@
 				);
 
 				if (glbEntry) {
-					glbFile = new File([await glbEntry.async('blob')], glbEntry.name.split('/').pop());
+					glbFile = new File(
+						[await glbEntry.async('blob')],
+						glbEntry.name.split('/').pop() ?? 'model.glb'
+					);
 				}
 				if (projectEntry) {
-					projectFile = new File([await projectEntry.async('blob')], projectEntry.name.split('/').pop());
+					projectFile = new File(
+						[await projectEntry.async('blob')],
+						projectEntry.name.split('/').pop() ?? 'project.json'
+					);
 				}
 
-				const cropsMap = {};
+				const cropsMap: Record<string, string> = {};
 				for (const entry of entries.filter(
 					(file) => !file.dir && /\.(jpe?g|png|webp)$/i.test(file.name)
 				)) {
 					const blobUrl = URL.createObjectURL(await entry.async('blob'));
-					const fileName = entry.name.split('/').pop().split('\\').pop();
+					const fileName = entry.name.split('/').pop()?.split('\\').pop() ?? entry.name;
 					cropsMap[fileName] = blobUrl;
 					cropsMap[fileName.toLowerCase()] = blobUrl;
 					cropsMap[entry.name] = blobUrl;
@@ -68,29 +80,21 @@
 			await loadGlbIntoEditorState(glbFile, topoSession);
 
 			if (projectFile) {
-				const project = JSON.parse(await projectFile.text());
-				topoSession.clustering.rawHits = (project.hits || []).map((hit) => ({
-					...hit,
-					crop: hit.crop || hit.hit_crop || hit.img,
-					edge_dist: hit.edge_dist ?? 0,
-					normal_dot: hit.normal_dot ?? 1.0,
-					cam_dist: hit.cam_dist ?? 1.0
-				}));
-				const cameras = {};
-				for (const hit of topoSession.clustering.rawHits) {
+				const project = parse3DUploadProject(JSON.parse(await projectFile.text()) as unknown);
+				topoSession.clustering.rawHits = project.hits;
+				const cameras: Record<string, [number, number, number]> = {};
+				for (const hit of project.hits) {
 					const match = hit.img?.match(/[fF](\d+)/);
 					const index = match ? parseInt(match[1]) : hit.img;
 					if (index && !cameras[index]) cameras[index] = hit.cam_pos;
 				}
 				topoSession.clustering.cameraPositions = cameras;
-				if (Array.isArray(project.gps)) {
-					const gpsData = {};
-					for (const gps of project.gps) {
-						const index = gps.frame_index ?? gps.img?.match(/[fF](\d+)/)?.[1];
-						if (index !== undefined) gpsData[index] = gps;
-					}
-					topoSession.clustering.gpsData = gpsData;
+				const gpsData: typeof topoSession.clustering.gpsData = {};
+				for (const gps of project.gps) {
+					const index = gps.frame_index ?? gps.img?.match(/[fF](\d+)/)?.[1];
+					if (index !== undefined) gpsData[index] = gps;
 				}
+				topoSession.clustering.gpsData = gpsData;
 				if (project.name) topoSession.topo.name = project.name;
 			}
 
@@ -104,7 +108,7 @@
 				topoSession.clustering.cropsMap = cropsMap;
 			}
 
-			if (topoSession.topo.coordinates[0] === 0 && topoSession.topo.coordinates[1] === 0) {
+			if (topoSession.topo.coordinates?.[0] === 0 && topoSession.topo.coordinates?.[1] === 0) {
 				const validGpsKeys = Object.keys(topoSession.clustering.gpsData)
 					.filter((key) => {
 						const gps = topoSession.clustering.gpsData[key];
@@ -112,24 +116,29 @@
 					})
 					.sort((a, b) => parseInt(a) - parseInt(b));
 				if (validGpsKeys.length) {
-					const gps = topoSession.clustering.gpsData[
-						validGpsKeys[Math.floor(validGpsKeys.length / 2)]
-					];
+					const gps =
+						topoSession.clustering.gpsData[validGpsKeys[Math.floor(validGpsKeys.length / 2)]];
 					topoSession.topo.coordinates = [gps.latitude, gps.longitude];
 					topoSession.topo.altitude = gps.abs_alt || gps.rel_alt || 0;
 				}
 			}
 
 			draftsState.load();
-			topoSession.ui.activeDraftId = await draftsState.save(topoSession.topo, topoSession.ui.activeDraftId, {
-				clustering: $state.snapshot(topoSession.clustering),
-			glbBlob: topoSession.transient.glbBlob
-			});
+			topoSession.ui.activeDraftId = await draftsState.save(
+				topoSession.topo,
+				topoSession.ui.activeDraftId,
+				{
+					clustering: $state.snapshot(topoSession.clustering),
+					glbBlob: topoSession.transient.glbBlob
+				}
+			);
 			topoSession.ui.lastSaved = new Date().toISOString();
-			goto(`${resolve('/topos/3d/editor')}?draft=${encodeURIComponent(topoSession.ui.activeDraftId)}`);
+			goto(
+				`${resolve('/topos/3d/editor', {})}?draft=${encodeURIComponent(topoSession.ui.activeDraftId)}`
+			);
 		} catch (error) {
 			console.error(error);
-			alert(error.message);
+			alert(error instanceof Error ? error.message : String(error));
 		} finally {
 			isLoading = false;
 		}
@@ -149,7 +158,7 @@
 					bind:projectFile
 					bind:cropFolderFiles
 					{isLoading}
-					onBack={() => goto(resolve('/topos/3d/select'))}
+					onBack={() => goto(resolve('/topos/3d/select', {}))}
 					onSubmit={processFiles}
 				/>
 			</div>

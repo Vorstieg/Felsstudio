@@ -1,17 +1,17 @@
-<script>
+<script lang="ts">
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
-	import { draftsState } from '$lib/state/drafts.svelte.js';
+	import { draftsState } from '$lib/state/drafts.svelte.ts';
 
-	let brokenDraftId = $state(null);
+	let brokenDraftId = $state<string | null>(null);
 
 	onMount(() => {
 		draftsState.load();
 	});
 
-	function handleSelect(wizardRoute) {
+	function handleSelect(wizardRoute: string) {
 		goto(`${base}/${wizardRoute}`);
 	}
 
@@ -92,7 +92,7 @@
 				<div class="flex justify-between items-center mb-4">
 					<p class="text-ui-label text-warm-gray-500">{$_('ui.resume_sessions')}</p>
 					<span class="text-micro-data text-warm-gray-300"
-					>{draftsState.drafts.length} {$_('ui.drafts_found')}</span
+						>{draftsState.drafts.length} {$_('ui.drafts_found')}</span
 					>
 				</div>
 				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -105,11 +105,9 @@
 								brokenDraftId = null;
 								const session = await draftsState.getById(draft.id);
 								if (session) {
-									const topo = session.topo || session;
-					const workspace = topo.editorMode === '2d'
-							? 'topos/2d/editor'
-							: 'topos/3d/editor';
-					goto(`${base}/${workspace}?draft=${encodeURIComponent(draft.id)}`);
+									const workspace =
+										session.topo.editorMode === '2d' ? 'topos/2d/editor' : 'topos/3d/editor';
+									goto(`${base}/${workspace}?draft=${encodeURIComponent(draft.id)}`);
 								} else {
 									brokenDraftId = draft.id;
 								}
@@ -122,7 +120,9 @@
 							}}
 						>
 							<div class="flex justify-between items-start mb-2">
-								<div class="w-6 h-6 rounded-sm bg-black/5 flex items-center justify-center text-near-black">
+								<div
+									class="w-6 h-6 rounded-sm bg-black/5 flex items-center justify-center text-near-black"
+								>
 									<i class="fa-solid fa-file-pen text-[10px]"></i>
 								</div>
 								<button
@@ -140,10 +140,11 @@
 								{draft.name || $_('ui.unnamed_topo')}
 							</h4>
 							<p class="text-micro-data text-warm-gray-400">
-								{$_('ui.modified')} {new Date(draft.updated).toLocaleString([], {
-								dateStyle: 'short',
-								timeStyle: 'short'
-							})}
+								{$_('ui.modified')}
+								{new Date(draft.updated).toLocaleString([], {
+									dateStyle: 'short',
+									timeStyle: 'short'
+								})}
 							</p>
 							{#if brokenDraftId === draft.id}
 								<div
@@ -159,7 +160,7 @@
 											draftsState.delete(draft.id);
 											brokenDraftId = null;
 										}}
-									>Remove
+										>Remove
 									</button>
 								</div>
 							{/if}

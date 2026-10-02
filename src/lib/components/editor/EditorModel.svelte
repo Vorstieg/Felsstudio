@@ -1,16 +1,31 @@
-<script>
+<script lang="ts">
 	import { T, useThrelte } from '@threlte/core';
 	import { MeshLineGeometry, MeshLineMaterial, interactivity } from '@threlte/extras';
 	import * as THREE from 'three';
 	import { CatmullRomCurve3, Vector3, TubeGeometry } from 'three';
 	import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
-	import { onMount } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 	import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh';
 	import CssObject from '../CssObject.svelte';
-	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
+	import { Topo3DInteractionManager } from './3d/InteractionManager.svelte.ts';
+	import { topoSymbols } from '@vorstieg/topo-renderer';
+	import type { Point3D } from '@vorstieg/fels-types/types';
+
+	type Point3 = [number, number, number];
+	type Props = {
+		gltfScene?: THREE.Group | null;
+		activeTool: string | null;
+		selectedIndicesMap?: Map<string, Set<number>>;
+		children?: Snippet;
+	};
 	const topoSession = getTopo2DEditorState();
-	import { Topo3DInteractionManager } from './3d/InteractionManager.svelte.js';
-import { topoSymbols } from '@vorstieg/topo-renderer';
+	const point3 = (value: unknown, fallback: Point3): Point3 =>
+		Array.isArray(value) &&
+		value.length >= 3 &&
+		value.slice(0, 3).every((n) => typeof n === 'number')
+			? [value[0], value[1], value[2]]
+			: fallback;
 
 	interactivity();
 
@@ -27,10 +42,13 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 		activeTool,
 		selectedIndicesMap = $bindable(new Map()),
 		children
-	} = $props();
+	}: Props = $props();
 
 	// --- Interaction Manager ---
 	const interaction = new Topo3DInteractionManager(topoSession);
+	type MeshHitEvent = Parameters<typeof interaction.handleMeshDblClick>[0];
+	type RouteHitEvent = Parameters<typeof interaction.handleRouteDblClick>[0];
+	type PropagationEvent = { stopPropagation(): void };
 	const topo3DFixpointTypes = new Set(
 		topoSymbols.filter((symbol) => symbol.type === 'fixpoint').map((symbol) => symbol.id)
 	);
@@ -42,13 +60,13 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 		const exporter = new GLTFExporter();
 		const sceneClone = gltfScene.clone();
 
-		const scaleArray = topoSession.topo.modelScale || [1, 1, 1];
+		const scaleArray = point3(topoSession.topo.modelScale, [1, 1, 1]);
 		sceneClone.scale.set(scaleArray[0], scaleArray[1], scaleArray[2]);
 
 		const offset = topoSession.topo.modelOffset || [0, 0, 0];
 		sceneClone.position.set(offset[0], offset[1], offset[2]);
 
-		const rot = topoSession.topo.modelRotation || [0, 0, 0];
+		const rot = point3(topoSession.topo.modelRotation, [0, 0, 0]);
 		sceneClone.rotation.set(rot[0], rot[1], rot[2]);
 
 		sceneClone.updateMatrixWorld(true);
@@ -56,6 +74,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 		exporter.parse(
 			sceneClone,
 			(glb) => {
+				if (!(glb instanceof ArrayBuffer)) return;
 				const blob = new Blob([glb], { type: 'application/octet-stream' });
 				const url = URL.createObjectURL(blob);
 				const a = document.createElement('a');
@@ -71,7 +90,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 
 	export const clearLassoSelection = () => {
 		gltfScene?.traverse((child) => {
-			if (child.isMesh && child.geometry && child.geometry.attributes.color) {
+			if (child instanceof THREE.Mesh && child.geometry?.attributes.color) {
 				const colorAttr = child.geometry.attributes.color;
 				for (let i = 0; i < colorAttr.count; i++) {
 					colorAttr.setXYZ(i, 1, 1, 1);
@@ -82,24 +101,24 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 		selectedIndicesMap = new Map();
 	};
 
-	let editorInternal = $state();
-
-	export function previewLassoCut(points) {
-		editorInternal?.previewLassoCut(points);
-	}
-
 	export function bakeTransforms() {
 		if (!gltfScene) return false;
 
-		const scaleArray = topoSession.topo.modelScale || [1, 1, 1];
+		const scaleArray = point3(topoSession.topo.modelScale, [1, 1, 1]);
 		const offset = topoSession.topo.modelOffset || [0, 0, 0];
-		const rot = topoSession.topo.modelRotation || [0, 0, 0];
+		const rot = point3(topoSession.topo.modelRotation, [0, 0, 0]);
 
 		// Only bake if there's an actual transformation
 		if (
-			scaleArray[0] === 1 && scaleArray[1] === 1 && scaleArray[2] === 1 &&
-			offset[0] === 0 && offset[1] === 0 && offset[2] === 0 &&
-			rot[0] === 0 && rot[1] === 0 && rot[2] === 0
+			scaleArray[0] === 1 &&
+			scaleArray[1] === 1 &&
+			scaleArray[2] === 1 &&
+			offset[0] === 0 &&
+			offset[1] === 0 &&
+			offset[2] === 0 &&
+			rot[0] === 0 &&
+			rot[1] === 0 &&
+			rot[2] === 0
 		) {
 			return false;
 		}
@@ -120,12 +139,12 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 
 		// Transform the geometry and flatten the scene graph
 		gltfScene.traverse((child) => {
-			if (child.isMesh && child.geometry) {
+			if (child instanceof THREE.Mesh && child.geometry) {
 				// 1. Bake the mesh's existing world transform into its geometry
 				child.geometry.applyMatrix4(child.matrixWorld);
 				// 2. Apply the new rotation/scale
 				child.geometry.applyMatrix4(bakeMatrix);
-				
+
 				// 3. Reset local transforms
 				child.position.set(0, 0, 0);
 				child.rotation.set(0, 0, 0);
@@ -135,7 +154,11 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 
 				child.geometry.computeVertexNormals();
 				if (child.geometry.boundsTree) child.geometry.computeBoundsTree();
-			} else if (child.isGroup || child.type === 'Object3D' || child.type === 'Scene') {
+			} else if (
+				child instanceof THREE.Group ||
+				child.type === 'Object3D' ||
+				child.type === 'Scene'
+			) {
 				// Reset group transforms as well, since they are now baked into the mesh children
 				child.position.set(0, 0, 0);
 				child.rotation.set(0, 0, 0);
@@ -144,14 +167,14 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 				child.updateMatrix();
 			}
 		});
-		
+
 		// Reattach to parent
 		if (parent) parent.add(gltfScene);
 
 		// Transform all routes
-		(topoSession.topo.routes || []).forEach(route => {
-			if (route.points) {
-				route.points.forEach(p => {
+		(topoSession.topo.routes || []).forEach((route) => {
+			if (route.points3D) {
+				route.points3D.forEach((p) => {
 					const vec = new THREE.Vector3(p[0], p[1], p[2]).applyMatrix4(bakeMatrix);
 					p[0] = Number(vec.x.toFixed(4));
 					p[1] = Number(vec.y.toFixed(4));
@@ -159,9 +182,9 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 				});
 			}
 			if (route.pitches) {
-				route.pitches.forEach(pitch => {
-					if (pitch.points) {
-						pitch.points.forEach(p => {
+				route.pitches.forEach((pitch) => {
+					if (pitch.points3D) {
+						pitch.points3D.forEach((p) => {
 							const vec = new THREE.Vector3(p[0], p[1], p[2]).applyMatrix4(bakeMatrix);
 							p[0] = Number(vec.x.toFixed(4));
 							p[1] = Number(vec.y.toFixed(4));
@@ -173,12 +196,14 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 		});
 
 		// Transform all fixpoints
-		(topoSession.topo.fixPoints || []).forEach(fp => {
-			if (fp.position) {
-				const vec = new THREE.Vector3(fp.position[0], fp.position[1], fp.position[2]).applyMatrix4(bakeMatrix);
-				fp.position[0] = Number(vec.x.toFixed(4));
-				fp.position[1] = Number(vec.y.toFixed(4));
-				fp.position[2] = Number(vec.z.toFixed(4));
+		(topoSession.topo.fixPoints || []).forEach((fp) => {
+			if (fp.position3D) {
+				const vec = new THREE.Vector3(...fp.position3D).applyMatrix4(bakeMatrix);
+				fp.position3D = [
+					Number(vec.x.toFixed(4)),
+					Number(vec.y.toFixed(4)),
+					Number(vec.z.toFixed(4))
+				];
 			}
 		});
 
@@ -199,6 +224,10 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 			exporter.parse(
 				exportClone,
 				(glb) => {
+					if (!(glb instanceof ArrayBuffer)) {
+						resolve(false);
+						return;
+					}
 					const blob = new Blob([glb], { type: 'application/octet-stream' });
 					topoSession.setModelFile(blob);
 					resolve(true);
@@ -213,19 +242,20 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 	}
 
 	export function applyLassoCut() {
-		if (selectedIndicesMap.size === 0) return;
+		if (!gltfScene || selectedIndicesMap.size === 0) return;
 
 		gltfScene.traverse((child) => {
-			if (child.isMesh && child.geometry && selectedIndicesMap.has(child.uuid)) {
+			if (child instanceof THREE.Mesh && child.geometry && selectedIndicesMap.has(child.uuid)) {
 				const geometry = child.geometry;
 				const position = geometry.attributes.position;
 				const color = geometry.attributes.color;
 				const index = geometry.index;
 				const meshSelection = selectedIndicesMap.get(child.uuid);
+				if (!meshSelection) return;
 
 				if (index) {
 					const oldIndices = index.array;
-					const newIndices = [];
+					const newIndices: number[] = [];
 					for (let i = 0; i < oldIndices.length; i += 3) {
 						const a = oldIndices[i],
 							b = oldIndices[i + 1],
@@ -238,8 +268,8 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 				} else {
 					const posArray = position.array;
 					const colArray = color ? color.array : null;
-					const newPositions = [];
-					const newColors = [];
+					const newPositions: number[] = [];
+					const newColors: number[] = [];
 					for (let i = 0; i < position.count; i += 3) {
 						const a = i,
 							b = i + 1,
@@ -295,14 +325,20 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 		selectedIndicesMap = new Map();
 
 		// Check if we need to bake existing transforms first
-		const scaleArray = topoSession.topo.modelScale || [1, 1, 1];
+		const scaleArray = point3(topoSession.topo.modelScale, [1, 1, 1]);
 		const offset = topoSession.topo.modelOffset || [0, 0, 0];
-		const rot = topoSession.topo.modelRotation || [0, 0, 0];
-		
+		const rot = point3(topoSession.topo.modelRotation, [0, 0, 0]);
+
 		if (
-			scaleArray[0] !== 1 || scaleArray[1] !== 1 || scaleArray[2] !== 1 ||
-			offset[0] !== 0 || offset[1] !== 0 || offset[2] !== 0 ||
-			rot[0] !== 0 || rot[1] !== 0 || rot[2] !== 0
+			scaleArray[0] !== 1 ||
+			scaleArray[1] !== 1 ||
+			scaleArray[2] !== 1 ||
+			offset[0] !== 0 ||
+			offset[1] !== 0 ||
+			offset[2] !== 0 ||
+			rot[0] !== 0 ||
+			rot[1] !== 0 ||
+			rot[2] !== 0
 		) {
 			bakeTransforms();
 			return;
@@ -319,6 +355,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 		exporter.parse(
 			exportClone,
 			(glb) => {
+				if (!(glb instanceof ArrayBuffer)) return;
 				const blob = new Blob([glb], { type: 'application/octet-stream' });
 				topoSession.setModelFile(blob);
 			},
@@ -330,13 +367,13 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 	export function selectFloatingGeometry() {
 		if (!gltfScene) return;
 		selectedIndicesMap = new Map();
-		const allMeshes = [];
+		const allMeshes: THREE.Mesh[] = [];
 		gltfScene.traverse((child) => {
-			if (child.isMesh && child.geometry) allMeshes.push(child);
+			if (child instanceof THREE.Mesh && child.geometry) allMeshes.push(child);
 		});
 		if (allMeshes.length === 0) return;
 
-		const globalNodeMap = new Map();
+		const globalNodeMap = new Map<string, number>();
 		let globalNodeCount = 0;
 		const vReusable = new THREE.Vector3();
 		const meshVertexData = allMeshes.map((mesh) => {
@@ -348,7 +385,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 				vReusable.fromBufferAttribute(pos, i).applyMatrix4(m);
 				const key = `${Math.round(vReusable.x * 100)},${Math.round(vReusable.y * 100)},${Math.round(vReusable.z * 100)}`;
 				if (!globalNodeMap.has(key)) globalNodeMap.set(key, globalNodeCount++);
-				vertexToGlobalNode[i] = globalNodeMap.get(key);
+				vertexToGlobalNode[i] = globalNodeMap.get(key)!;
 			}
 			return { mesh, vertexToGlobalNode };
 		});
@@ -363,7 +400,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 		const next = new Int32Array(totalFaces * 3);
 		const data = new Int32Array(totalFaces * 3);
 		let ptr = 0;
-		const allFaces = [];
+		const allFaces: Array<{ mIdx: number; fIdx: number; nodes: number[] }> = [];
 		meshVertexData.forEach(({ mesh, vertexToGlobalNode }, mIdx) => {
 			const index = mesh.geometry.index;
 			const pos = mesh.geometry.attributes.position;
@@ -386,10 +423,10 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 		});
 
 		const visited = new Uint8Array(allFaces.length);
-		const islands = [];
+		const islands: number[][] = [];
 		for (let i = 0; i < allFaces.length; i++) {
 			if (visited[i]) continue;
-			const island = [];
+			const island: number[] = [];
 			const queue = new Int32Array(allFaces.length);
 			let h = 0,
 				t = 0;
@@ -439,7 +476,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 				const indices = mesh.geometry.index ? mesh.geometry.index.array : null;
 				const colors = mesh.geometry.attributes.color;
 				if (!selectedIndicesMap.has(mesh.uuid)) selectedIndicesMap.set(mesh.uuid, new Set());
-				const selection = selectedIndicesMap.get(mesh.uuid);
+				const selection = selectedIndicesMap.get(mesh.uuid)!;
 				const i3 = face.fIdx * 3;
 				const vs = indices ? [indices[i3], indices[i3 + 1], indices[i3 + 2]] : [i3, i3 + 1, i3 + 2];
 				for (const vIdx of vs) {
@@ -454,11 +491,15 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 	// --- State Sync ---
 	let visualRoutes = $derived.by(() => {
 		return topoSession.topo.routes.flatMap((route) => {
-			const processPoints = (points, subId, label) => {
-				let normal = null;
+			const processPoints = (
+				points: Point3D[] | undefined,
+				subId: string | number,
+				label?: string
+			) => {
+				let normal: Vector3 | null = null;
 				let displacement = new Vector3(0, 0, 0);
-				if (route.orientation) {
-					normal = new Vector3(route.orientation[0], route.orientation[1], route.orientation[2]);
+				if (route.orientation3D) {
+					normal = new Vector3(...route.orientation3D);
 					displacement = normal.clone().multiplyScalar(0.05);
 				}
 				const vecPoints = (points || []).map((p) =>
@@ -478,31 +519,30 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 			if (route.type === 'multi-pitch' && route.pitches) {
 				return route.pitches.map((pitch, idx) =>
 					processPoints(
-						pitch.points || [],
+						pitch.points3D || [],
 						pitch.id || `${route.id}_p${idx}`,
 						`${route.id}.${idx + 1}`
 					)
 				);
-			} else return [processPoints(route.points, route.id)];
+			} else return [processPoints(route.points3D, route.id)];
 		});
 	});
 
 	let visualFixPoints = $derived.by(() => {
-		return topoSession.topo.fixPoints
-			.filter((pt) => Array.isArray(pt.position) && pt.position.length >= 3 && topo3DFixpointTypes.has(pt.type))
-			.map((pt) => ({
-				...pt,
-				rawPosition: [
-					pt.position[0],
-					pt.position[1],
-					pt.position[2]
-				],
-				isAssigned: topoSession.ui.selectedRouteId
-					? topoSession.topo.routes
-							.find((r) => r.id === topoSession.ui.selectedRouteId)
-							?.fixPoints?.includes(pt.id)
-					: false
-			}));
+		return topoSession.topo.fixPoints.flatMap((pt) => {
+			if (!pt.position3D || !topo3DFixpointTypes.has(pt.type)) return [];
+			return [
+				{
+					...pt,
+					rawPosition: pt.position3D,
+					isAssigned: topoSession.ui.selectedRouteId
+						? topoSession.topo.routes
+								.find((r) => r.id === topoSession.ui.selectedRouteId)
+								?.fixPoints?.includes(pt.id)
+						: false
+				}
+			];
+		});
 	});
 
 	let visualRawHits = $derived.by(() => {
@@ -511,7 +551,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 		if (!cluster) return [];
 		return cluster.members.map((h, i) => ({
 			id: `hit-${clusterId}-${i}`,
-			pos: [h.pos[0], h.pos[1], h.pos[2]],
+			pos: h.pos,
 			color: cluster.color
 		}));
 	});
@@ -520,14 +560,14 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 		if (!topoSession.clustering.showCameraTrail) return [];
 		return Object.entries(topoSession.clustering.cameraPositions).map(([idx, pos]) => ({
 			id: `cam-${idx}`,
-			pos: [pos[0], pos[1], pos[2]]
+			pos
 		}));
 	});
 
 	let visualClusters = $derived.by(() => {
 		return topoSession.clustering.clusters.map((c) => ({
 			...c,
-			anchor: [c.anchor[0], c.anchor[1], c.anchor[2]]
+			anchor: c.anchor
 		}));
 	});
 
@@ -543,7 +583,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 	$effect(() => {
 		if (gltfScene) {
 			gltfScene.traverse((child) => {
-				if (child.isMesh && child.geometry && !child.geometry.boundsTree) {
+				if (child instanceof THREE.Mesh && child.geometry && !child.geometry.boundsTree) {
 					child.geometry.computeBoundsTree();
 				}
 			});
@@ -551,7 +591,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 	});
 
 	onMount(() => {
-		const handleKey = (e) => interaction.handleKeyDown(e, activeTool);
+		const handleKey = (e: KeyboardEvent) => interaction.handleKeyDown(e, activeTool);
 		window.addEventListener('keydown', handleKey);
 		return () => window.removeEventListener('keydown', handleKey);
 	});
@@ -561,16 +601,16 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 
 <T.Group
 	position={topoSession.topo.modelOffset || [0, 0, 0]}
-	rotation={topoSession.topo.modelRotation || [0, 0, 0]}
-	scale={topoSession.topo.modelScale || [1, 1, 1]}
+	rotation={point3(topoSession.topo.modelRotation, [0, 0, 0])}
+	scale={point3(topoSession.topo.modelScale, [1, 1, 1])}
 >
 	{#if gltfScene}
 		<T
 			is={gltfScene}
-			onclick={(e) => interaction.handleMeshClick(e)}
-			ondblclick={(e) => interaction.handleMeshDblClick(e, activeTool)}
-			onpointermove={(e) => interaction.handleMeshPointerMove(e, activeTool)}
-			dispose={null}
+			onclick={() => interaction.handleMeshClick()}
+			ondblclick={(e: MeshHitEvent) => interaction.handleMeshDblClick(e, activeTool)}
+			onpointermove={(e: MeshHitEvent) => interaction.handleMeshPointerMove(e, activeTool)}
+			dispose={false}
 		/>
 	{/if}
 
@@ -635,7 +675,7 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 				<div
 					class={'route-label ' +
 						(topoSession.ui.selectedRouteId === route.parentId ? 'selected' : '')}
-					onclick={(e) => {
+					onclick={(e: PropagationEvent) => {
 						e.stopPropagation();
 						topoSession.ui.selectedRouteId =
 							topoSession.ui.selectedRouteId === route.parentId ? null : route.parentId;
@@ -690,13 +730,14 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 			{/if}
 			{#if route.curve}
 				<T.Mesh
-					onclick={(e) => {
+					onclick={(e: PropagationEvent) => {
 						e.stopPropagation();
 						topoSession.ui.selectedRouteId =
 							topoSession.ui.selectedRouteId === route.parentId ? null : route.parentId;
 					}}
-					ondblclick={(e) => interaction.handleRouteDblClick(e, route.parentId, activeTool)}
-					onpointermove={(e) => interaction.handleMeshPointerMove(e, activeTool)}
+					ondblclick={(e: RouteHitEvent) =>
+						interaction.handleRouteDblClick(e, route.parentId, activeTool)}
+					onpointermove={(e: MeshHitEvent) => interaction.handleMeshPointerMove(e, activeTool)}
 				>
 					<T is={TubeGeometry} args={[route.curve, route.rawPoints.length, 0.15, 4, false]} />
 					<T.MeshBasicMaterial transparent opacity={0} depthWrite={false} />
@@ -712,17 +753,17 @@ import { topoSymbols } from '@vorstieg/topo-renderer';
 			{@const isAnchor = cluster.class === 'anchor' || cluster.class === 'belay'}
 			<T.Group position={cluster.anchor} scale={isSelected || isLocked ? 1.5 : 1}>
 				<T.Mesh
-					onpointerenter={(e) => {
+					onpointerenter={(e: PropagationEvent) => {
 						e.stopPropagation();
 						topoSession.clustering.selectedClusterId = cluster.id;
 					}}
-					onpointerleave={(e) => {
+					onpointerleave={(e: PropagationEvent) => {
 						e.stopPropagation();
 						if (topoSession.clustering.selectedClusterId === cluster.id) {
 							topoSession.clustering.selectedClusterId = null;
 						}
 					}}
-					onclick={(e) => {
+					onclick={(e: PropagationEvent) => {
 						e.stopPropagation();
 						if (topoSession.clustering.lockedClusterId === cluster.id) {
 							topoSession.clustering.lockedClusterId = null;

@@ -1,12 +1,13 @@
-<script>
-	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+<script lang="ts">
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
+	import type { Topo2DEditorDocument } from '$lib/state/topo-2d-editor-initial-state.ts';
 	const editorState = getTopo2DEditorState();
 	let topo = $derived(editorState.topo);
 	import { isTouchDevice } from '$lib/assets/js/mobile-utils.ts';
 	import { _ } from 'svelte-i18n';
 
-	let fileInput = $state(null);
-	let cameraInput = $state(null);
+	let fileInput = $state<HTMLInputElement | null>(null);
+	let cameraInput = $state<HTMLInputElement | null>(null);
 	let urlInput = $state('');
 	let showUrlInput = $state(false);
 	let isDragging = $state(false);
@@ -19,10 +20,12 @@
 	 * The topo canvas is a stable coordinate system. A replacement image must not
 	 * redefine it, otherwise every existing route and outline appears stretched.
 	 */
-	function setBackgroundImage(imageData, imageAspectRatio) {
-		const update = (document) => {
+	function setBackgroundImage(imageData: string, imageAspectRatio: number) {
+		const update = (document: Topo2DEditorDocument) => {
 			const hasCanvasAspectRatio =
-				Number.isFinite(document.canvasAspectRatio) && document.canvasAspectRatio > 0;
+				typeof document.canvasAspectRatio === 'number' &&
+				Number.isFinite(document.canvasAspectRatio) &&
+				document.canvasAspectRatio > 0;
 			const hasBackground = Boolean(document.image2D);
 			const hasAnnotations = [
 				document.routes,
@@ -31,15 +34,9 @@
 				document.textLabels
 			].some((items) => Array.isArray(items) && items.length > 0);
 
-			if (!hasBackground && !hasAnnotations && !hasEstablishedCanvas) {
-				// A first image may define a genuinely blank topo's canvas.
+			if ((!hasBackground && !hasAnnotations && !hasEstablishedCanvas) || !hasCanvasAspectRatio) {
+				// A first image may define a blank topo's canvas.
 				document.canvasAspectRatio = imageAspectRatio;
-			} else if (!hasCanvasAspectRatio) {
-				const legacyAspectRatio = Number(document.imageAspectRatio);
-				document.canvasAspectRatio =
-					hasBackground && Number.isFinite(legacyAspectRatio) && legacyAspectRatio > 0
-						? legacyAspectRatio
-						: imageAspectRatio;
 			}
 
 			// This remains metadata about the image itself; only canvasAspectRatio is stable.
@@ -52,26 +49,28 @@
 		hasEstablishedCanvas = true;
 	}
 
-	function handleFileSelect(event) {
-		const file = event.target.files?.[0];
+	function handleFileSelect(event: Event & { currentTarget: HTMLInputElement }) {
+		const file = event.currentTarget.files?.[0];
 		if (!file) return;
 		loadImageFile(file);
-		event.target.value = '';
+		event.currentTarget.value = '';
 	}
 
-	function loadImageFile(file) {
+	function loadImageFile(file: File) {
 		if (!file.type.startsWith('image/')) {
 			alert($_('ui.select_image_file'));
 			return;
 		}
 
 		const reader = new FileReader();
-		reader.onload = (e) => {
+		reader.onload = () => {
+			if (typeof reader.result !== 'string') return;
+			const imageData = reader.result;
 			const img = new Image();
 			img.onload = () => {
-				setBackgroundImage(e.target.result, img.width / img.height);
+				setBackgroundImage(imageData, img.width / img.height);
 			};
-			img.src = e.target.result;
+			img.src = imageData;
 		};
 		reader.readAsDataURL(file);
 	}
@@ -86,6 +85,7 @@
 			canvas.width = img.width;
 			canvas.height = img.height;
 			const ctx = canvas.getContext('2d');
+			if (!ctx) return;
 			ctx.drawImage(img, 0, 0);
 			setBackgroundImage(canvas.toDataURL(), img.width / img.height);
 			showUrlInput = false;
@@ -97,14 +97,14 @@
 		img.src = urlInput;
 	}
 
-	function handleDrop(event) {
+	function handleDrop(event: DragEvent) {
 		event.preventDefault();
 		isDragging = false;
-		const file = event.dataTransfer.files?.[0];
+		const file = event.dataTransfer?.files?.[0];
 		if (file) loadImageFile(file);
 	}
 
-	function handleDragOver(event) {
+	function handleDragOver(event: DragEvent) {
 		event.preventDefault();
 		isDragging = true;
 	}
@@ -114,7 +114,7 @@
 	}
 
 	function removeImage() {
-		editorState.updateNestedPath('image2D', null);
+		editorState.updateTopoField('image2D', null);
 		showUrlInput = false;
 	}
 
@@ -149,7 +149,9 @@
 				const canvas = document.createElement('canvas');
 				canvas.width = video.videoWidth;
 				canvas.height = video.videoHeight;
-				canvas.getContext('2d').drawImage(video, 0, 0);
+				const context = canvas.getContext('2d');
+				if (!context) return;
+				context.drawImage(video, 0, 0);
 				setBackgroundImage(canvas.toDataURL(), canvas.width / canvas.height);
 				stream.getTracks().forEach((track) => track.stop());
 				document.body.removeChild(modal);
@@ -167,12 +169,14 @@
 
 			document.body.appendChild(modal);
 		} catch (err) {
-			alert($_('ui.camera_access_failed') + ': ' + err.message);
+			alert(
+				$_('ui.camera_access_failed') + ': ' + (err instanceof Error ? err.message : String(err))
+			);
 		}
 	}
 </script>
 
-{#if topo.image2D}
+{#if typeof topo.image2D === 'string' && topo.image2D}
 	<div class="panel p-2.5 mb-2 shadow-sm border border-black/15">
 		<div class="flex items-center justify-between mb-2">
 			<h4 class="text-ui-label text-near-black !m-0">{$_('ui.background_image')}</h4>
@@ -230,7 +234,10 @@
 					class="input-studio !w-auto !py-1 text-micro-data"
 					value={topo.backgroundFit ?? 'contain'}
 					onchange={(event) => {
-						editorState.updateNestedPath('backgroundFit', event.currentTarget.value);
+						editorState.updateTopoField(
+							'backgroundFit',
+							event.currentTarget.value === 'cover' ? 'cover' : 'contain'
+						);
 					}}
 				>
 					<option value="contain">{$_('ui.fit_contain')}</option>

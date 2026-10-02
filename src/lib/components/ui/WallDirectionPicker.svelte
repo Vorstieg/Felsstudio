@@ -1,14 +1,20 @@
-<script>
+<script lang="ts">
 	import { _ } from 'svelte-i18n';
 	import {
 		wallAzimuthForDirection,
 		wallDirectionForAzimuth,
 		wallDirections
-	} from '$lib/assets/js/wall-directions.js';
+	} from '$lib/assets/js/wall-directions.ts';
 
-	let { id = 'wall-azimuth', azimuth = 0, onChange } = $props();
+	type Props = {
+		id?: string;
+		azimuth?: number | string | null;
+		onChange?: (_azimuth: number) => void;
+	};
 
-	function update(directionId) {
+	let { id = 'wall-azimuth', azimuth = 0, onChange }: Props = $props();
+
+	function update(directionId: string) {
 		const nextAzimuth = wallAzimuthForDirection(directionId);
 		if (nextAzimuth != null) onChange?.(nextAzimuth);
 	}

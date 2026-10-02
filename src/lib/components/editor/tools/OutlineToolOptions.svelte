@@ -1,24 +1,28 @@
-<script>
+<script lang="ts">
 	import { _ } from 'svelte-i18n';
 	import {
 		OUTLINE_FILL_COLORS,
 		OUTLINE_MODES,
 		OUTLINE_PRESETS,
 		OUTLINE_STYLES
-	} from '$lib/components/editor/tools/OutlineTool.svelte.js';
+	} from '$lib/components/editor/tools/OutlineTool.svelte.ts';
 	import ToolOptions from './ToolOptions.svelte';
 	import PathDrawingOptions from './PathDrawingOptions.svelte';
-	import { createOutlineToolOptionsLogic } from './outline-tool-options-logic.js';
+	import { createOutlineToolOptionsLogic } from './outline-tool-options-logic.ts';
+	import type { OutlineTool } from './OutlineTool.svelte.ts';
+	import type { OutlinePresetId } from '$lib/assets/js/outline-geometry.ts';
+	type OutlineStyle = (typeof OUTLINE_STYLES)[number]['id'];
+	type OutlineMode = 'polyline' | 'rectangle' | 'circle' | 'freehand' | 'brush' | 'preset';
 
 	let {
 		outlineTool = null,
 		selectedOutlineStyle = $bindable('rock'),
 		onClose = () => {}
-	} = $props();
+	}: { outlineTool?: OutlineTool | null; selectedOutlineStyle?: OutlineStyle; onClose?: (() => void) | null } = $props();
 
 	const actions = createOutlineToolOptionsLogic(() => outlineTool);
 
-	function fillSwatchStyle(color) {
+	function fillSwatchStyle(color: (typeof OUTLINE_FILL_COLORS)[number]): string {
 		if (color.value == null) {
 			return 'background-color: #fff; background-image: linear-gradient(45deg, #d1d5db 25%, transparent 25%), linear-gradient(-45deg, #d1d5db 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d1d5db 75%), linear-gradient(-45deg, transparent 75%, #d1d5db 75%); background-size: 8px 8px; background-position: 0 0, 0 4px, 4px -4px, -4px 0; border: 1px solid #9ca3af;';
 		}
@@ -34,14 +38,17 @@
 				{#each OUTLINE_MODES as mode}
 					<button
 						type="button"
-						class="flex flex-col items-center gap-1 p-2 rounded-sm transition-none {outlineTool.mode === mode.id
+						class="flex flex-col items-center gap-1 p-2 rounded-sm transition-none {outlineTool.mode ===
+						mode.id
 							? 'bg-creator-blue text-white'
 							: 'bg-black/5 text-warm-gray-500 hover:bg-black/10'}"
-						onclick={() => actions.setMode(mode.id)}
+							onclick={() => actions.setMode(mode.id as OutlineMode)}
 						title={$_(mode.labelKey)}
 					>
 						<i class="fas {mode.icon} text-sm"></i>
-						<span class="text-[9px] font-medium leading-tight text-center max-w-full break-words">{$_(mode.labelKey)}</span>
+						<span class="text-[9px] font-medium leading-tight text-center max-w-full break-words"
+							>{$_(mode.labelKey)}</span
+						>
 					</button>
 				{/each}
 			</div>
@@ -54,10 +61,11 @@
 					{#each OUTLINE_PRESETS as preset}
 						<button
 							type="button"
-							class="flex min-h-13 flex-col items-center justify-center gap-1 rounded-sm p-1.5 transition-none {outlineTool.mode === 'preset' && outlineTool.preset === preset.id
+							class="flex min-h-13 flex-col items-center justify-center gap-1 rounded-sm p-1.5 transition-none {outlineTool.mode ===
+								'preset' && outlineTool.preset === preset.id
 								? 'bg-creator-blue text-white'
 								: 'bg-black/5 text-warm-gray-500 hover:bg-black/10'}"
-							onclick={() => actions.setPreset(preset.id)}
+							onclick={() => actions.setPreset(preset.id as OutlinePresetId)}
 							title={$_(preset.labelKey)}
 							aria-label={$_(preset.labelKey)}
 						>
@@ -71,7 +79,9 @@
 		{/if}
 
 		<div class="flex flex-col gap-2">
-			<label for="outline-line-style" class="text-xs font-medium text-warm-gray-600">{$_('ui.line_style')}</label>
+			<label for="outline-line-style" class="text-xs font-medium text-warm-gray-600"
+				>{$_('ui.line_style')}</label
+			>
 			<select
 				id="outline-line-style"
 				value={selectedOutlineStyle}
@@ -90,13 +100,18 @@
 				{#each OUTLINE_FILL_COLORS as color}
 					<button
 						type="button"
-						class="relative h-6 w-6 overflow-hidden rounded-sm transition-none {outlineTool.fillColor === color.value ? 'shadow-[inset_0_0_0_2px_var(--color-creator-blue)]' : ''}"
+						class="relative h-6 w-6 overflow-hidden rounded-sm transition-none {outlineTool.fillColor ===
+						color.value
+							? 'shadow-[inset_0_0_0_2px_var(--color-creator-blue)]'
+							: ''}"
 						style={fillSwatchStyle(color)}
-						onclick={() => actions.setFill(color.value, color.opacity)}
+							onclick={() => actions.setFill(color.value, color.opacity ?? undefined)}
 						title={$_(color.labelKey)}
 						aria-label={$_(color.labelKey)}
 					>
-						{#if color.value == null}<span class="absolute left-1/2 top-0 h-full w-0.5 -rotate-45 bg-red-500"></span>{/if}
+						{#if color.value == null}<span
+								class="absolute left-1/2 top-0 h-full w-0.5 -rotate-45 bg-red-500"
+							></span>{/if}
 					</button>
 				{/each}
 			</div>
@@ -116,30 +131,73 @@
 		{#if outlineTool.mode === 'freehand'}
 			<label class="flex items-center gap-2 text-xs font-medium text-warm-gray-600">
 				<span class="w-20">{$_('ui.smoothing')}</span>
-				<input type="range" min="0" max="8" step="0.5" value={outlineTool.freehandSmoothingPx} oninput={(event) => actions.setFreehandSmoothing(event.currentTarget.value)} class="min-w-0 flex-1" />
+				<input
+					type="range"
+					min="0"
+					max="8"
+					step="0.5"
+					value={outlineTool.freehandSmoothingPx}
+					oninput={(event) => actions.setFreehandSmoothing(event.currentTarget.value)}
+					class="min-w-0 flex-1"
+				/>
 				<span class="w-8 text-right">{outlineTool.freehandSmoothingPx}px</span>
 			</label>
 		{:else if outlineTool.mode === 'brush'}
 			<div class="flex flex-col gap-2">
 				<label class="flex items-center gap-2 text-xs font-medium text-warm-gray-600">
 					<span class="w-20">{$_('ui.brush_size')}</span>
-					<input type="range" min="8" max="120" step="2" value={outlineTool.brushSizePx} oninput={(event) => actions.setBrushSize(event.currentTarget.value)} class="min-w-0 flex-1" />
+					<input
+						type="range"
+						min="8"
+						max="120"
+						step="2"
+						value={outlineTool.brushSizePx}
+						oninput={(event) => actions.setBrushSize(event.currentTarget.value)}
+						class="min-w-0 flex-1"
+					/>
 					<span class="w-10 text-right">{outlineTool.brushSizePx}px</span>
 				</label>
 				<label class="flex items-center gap-2 text-xs font-medium text-warm-gray-600">
-					<input type="checkbox" checked={outlineTool.followPhotoEdges} onchange={(event) => actions.setFollowPhotoEdges(event.currentTarget.checked)} class="h-4 w-4 rounded border-black/20 text-creator-blue focus:ring-creator-blue" />
+					<input
+						type="checkbox"
+						checked={outlineTool.followPhotoEdges}
+						onchange={(event) => actions.setFollowPhotoEdges(event.currentTarget.checked)}
+						class="h-4 w-4 rounded border-black/20 text-creator-blue focus:ring-creator-blue"
+					/>
 					<span>{$_('ui.follow_photo_edges')}</span>
 				</label>
 				<p class="text-micro-data text-warm-gray-500">{$_('ui.brush_outline_hint')}</p>
-				{#if outlineTool.followPhotoEdges}<p class="text-micro-data text-warm-gray-500">{$_('ui.follow_photo_edges_hint')}</p>{/if}
+				{#if outlineTool.followPhotoEdges}<p class="text-micro-data text-warm-gray-500">
+						{$_('ui.follow_photo_edges_hint')}
+					</p>{/if}
 			</div>
 		{/if}
 
 		<div class="hidden flex-col gap-2 border-t border-black/10 pt-2 md:flex">
-			<div class="flex items-center gap-1.5 text-micro-data"><span>{$_('ui.set_vertex')}</span><kbd class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm">{$_('ui.click')}</kbd></div>
-			<div class="flex items-center gap-1.5 text-micro-data"><span>{$_('ui.close_shape')}</span><kbd class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm">C</kbd></div>
-			<div class="flex items-center gap-1.5 text-micro-data"><span>{$_('ui.undo_vertex')}</span><kbd class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm">Backspace</kbd></div>
-			<div class="flex items-center gap-1.5 text-micro-data"><span>{$_('ui.finalize')}</span><kbd class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm">Enter / N</kbd></div>
+			<div class="flex items-center gap-1.5 text-micro-data">
+				<span>{$_('ui.set_vertex')}</span><kbd
+					class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+					>{$_('ui.click')}</kbd
+				>
+			</div>
+			<div class="flex items-center gap-1.5 text-micro-data">
+				<span>{$_('ui.close_shape')}</span><kbd
+					class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+					>C</kbd
+				>
+			</div>
+			<div class="flex items-center gap-1.5 text-micro-data">
+				<span>{$_('ui.undo_vertex')}</span><kbd
+					class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+					>Backspace</kbd
+				>
+			</div>
+			<div class="flex items-center gap-1.5 text-micro-data">
+				<span>{$_('ui.finalize')}</span><kbd
+					class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+					>Enter / N</kbd
+				>
+			</div>
 		</div>
 	</ToolOptions>
 {/if}

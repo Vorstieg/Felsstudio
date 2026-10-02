@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 	getLatestForSource: vi.fn()
 }));
 
-vi.mock('$lib/state/drafts.svelte.js', () => ({
+vi.mock('$lib/state/drafts.svelte.ts', () => ({
 	draftsState: mocks,
 	isBlankTopoSession: (session) => !session?.topo?.routes?.length && !session?.glbBlob
 }));
@@ -35,10 +35,23 @@ describe('useTopoDraftAutosave', () => {
 		expect(mocks.save).toHaveBeenCalledWith(
 			expect.objectContaining({ routes: [{ id: 'route-1' }] }),
 			null,
-			{ selectedRouteId: 'route-1' }
+			{ glbBlob: null, selectedRouteId: 'route-1' }
 		);
 		expect(view.getByTestId('draft-id')).toHaveTextContent('draft-1');
 		expect(view.getByTestId('last-saved')).not.toHaveTextContent('');
+	});
+
+	it('persists the save session snapshot rather than the live document', async () => {
+		const savedRoutes = [{ id: 'snapshot-route' }];
+		const view = render(AutosaveHarness, { props: { blank: true, savedRoutes } });
+		await view.getByTestId('save').click();
+		await tick();
+
+		expect(mocks.save).toHaveBeenCalledWith(
+			expect.objectContaining({ routes: savedRoutes }),
+			null,
+			{ glbBlob: null, selectedRouteId: 'route-1' }
+		);
 	});
 
 	it('does not save a blank session', async () => {

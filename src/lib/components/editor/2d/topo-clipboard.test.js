@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it } from 'vitest';
-import { createTopoClipboard } from './topo-clipboard.js';
+import { createTopoClipboard } from './topo-clipboard.ts';
 import fixture from '../../../../../tests/fixtures/2d/mixed-topo.json';
 
 describe('createTopoClipboard', () => {

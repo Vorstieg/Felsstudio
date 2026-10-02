@@ -1,44 +1,48 @@
-<script>
-	import { normalizePath } from '$lib/components/editor/crag/crag-editor-paths.js';
+<script lang="ts">
+	import { normalizePath } from '$lib/components/editor/crag/crag-editor-paths.ts';
 
-	let { knownFolders = new Set(), selectedPath = $bindable('') } = $props();
+	type FolderItem = { path: string; depth: number; hasChildren: boolean };
+	type Props = { knownFolders?: Set<string>; selectedPath?: string };
+	let { knownFolders = new Set<string>(), selectedPath = $bindable('') }: Props = $props();
 
 	let search = $state('');
-	let expandedFolders = $state(new Set());
+	let expandedFolders = $state<Set<string>>(new Set());
 
 	const allFolders = $derived(
 		Array.from(knownFolders)
 			.filter(Boolean)
 			.sort((a, b) => a.localeCompare(b))
 	);
-	const selectedExists = $derived(!selectedPath || allFolders.includes(normalizePath(selectedPath)));
+	const selectedExists = $derived(
+		!selectedPath || allFolders.includes(normalizePath(selectedPath))
+	);
 	const visibleFolders = $derived(getVisibleFolders());
 
-	function pathBasename(path = '') {
+	function pathBasename(path = ''): string {
 		return normalizePath(path).split('/').filter(Boolean).at(-1) || '';
 	}
 
-	function getFolderName(path = '') {
+	function getFolderName(path = ''): string {
 		return pathBasename(path) || path;
 	}
 
-	function getFolderDepth(path = '') {
+	function getFolderDepth(path = ''): number {
 		return normalizePath(path).split('/').filter(Boolean).length - 1;
 	}
 
-	function hasChildFolders(path) {
+	function hasChildFolders(path: string): boolean {
 		const prefix = `${normalizePath(path)}/`;
 		return allFolders.some((option) => option.startsWith(prefix));
 	}
 
-	function toggleFolder(path) {
+	function toggleFolder(path: string): void {
 		const next = new Set(expandedFolders);
 		if (next.has(path)) next.delete(path);
 		else next.add(path);
 		expandedFolders = next;
 	}
 
-	function isFolderVisible(path) {
+	function isFolderVisible(path: string): boolean {
 		const parts = normalizePath(path).split('/').filter(Boolean);
 		for (let i = 1; i < parts.length; i++) {
 			if (!expandedFolders.has(parts.slice(0, i).join('/'))) return false;
@@ -46,11 +50,11 @@
 		return true;
 	}
 
-	function selectFolder(path) {
+	function selectFolder(path: string): void {
 		selectedPath = normalizePath(path);
 	}
 
-	function getVisibleFolders() {
+	function getVisibleFolders(): FolderItem[] {
 		const query = search.trim().toLowerCase();
 		if (query) {
 			return allFolders
@@ -91,31 +95,56 @@
 		/>
 
 		<div class="rounded-sm border border-black/15 bg-white p-1.5 shadow-panel">
-			<input bind:value={search} class="input-studio w-full font-mono mb-1.5" placeholder="Filter folders..." />
+			<input
+				bind:value={search}
+				class="input-studio w-full font-mono mb-1.5"
+				placeholder="Filter folders..."
+			/>
 			<div class="max-h-56 overflow-y-auto custom-scrollbar space-y-0.5">
 				{#each visibleFolders as item}
 					<button
 						type="button"
-						class="w-full flex items-center gap-0.5 rounded-sm hover:bg-black/5 text-left {item.path === selectedPath ? 'bg-creator-blue/10' : ''}"
+						class="w-full flex items-center gap-0.5 rounded-sm hover:bg-black/5 text-left {item.path ===
+						selectedPath
+							? 'bg-creator-blue/10'
+							: ''}"
 						style="padding-left: {item.depth * 0.75}rem"
-						onclick={() => { selectFolder(item.path); if (item.hasChildren) toggleFolder(item.path); }}
+						onclick={() => {
+							selectFolder(item.path);
+							if (item.hasChildren) toggleFolder(item.path);
+						}}
 						title={item.path}
 					>
 						<span class="w-5 h-6 flex items-center justify-center text-warm-gray-400">
 							{#if item.hasChildren}
-								<i class="fa-solid {expandedFolders.has(item.path) || search ? 'fa-chevron-down' : 'fa-chevron-right'} text-[9px]"></i>
+								<i
+									class="fa-solid {expandedFolders.has(item.path) || search
+										? 'fa-chevron-down'
+										: 'fa-chevron-right'} text-[9px]"
+								></i>
 							{:else}
 								<span class="text-[9px]">•</span>
 							{/if}
 						</span>
-						<span class="min-w-0 flex-1 px-1 py-1 text-micro-data font-mono transition-none {item.path === selectedPath ? 'text-creator-blue font-bold' : 'text-warm-gray-700'}">
-							<i class="fa-solid {item.hasChildren ? 'fa-folder' : 'fa-folder-open'} mr-1 text-[9px] text-warm-gray-400"></i>
+						<span
+							class="min-w-0 flex-1 px-1 py-1 text-micro-data font-mono transition-none {item.path ===
+							selectedPath
+								? 'text-creator-blue font-bold'
+								: 'text-warm-gray-700'}"
+						>
+							<i
+								class="fa-solid {item.hasChildren
+									? 'fa-folder'
+									: 'fa-folder-open'} mr-1 text-[9px] text-warm-gray-400"
+							></i>
 							<span class="truncate">{getFolderName(item.path)}</span>
 							<span class="block truncate text-[9px] font-normal opacity-60">{item.path}</span>
 						</span>
 					</button>
 				{:else}
-					<div class="px-1.5 py-2 text-center text-micro-data text-warm-gray-400">No folders found</div>
+					<div class="px-1.5 py-2 text-center text-micro-data text-warm-gray-400">
+						No folders found
+					</div>
 				{/each}
 			</div>
 		</div>

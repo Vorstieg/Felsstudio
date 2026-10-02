@@ -1,17 +1,27 @@
-<script>
-	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+<script lang="ts">
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
 
 	const editorState = getTopo2DEditorState();
 	let topo = $derived(editorState.topo);
+	let coordinates = $derived(topo.coordinates ?? [0, 0]);
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
 	import ImageUploader from '$lib/components/editor/ImageUploader.svelte';
 	import ClusteringMap from '$lib/components/editor/ClusteringMap.svelte';
 	import { _ } from 'svelte-i18n';
-	import { availableTopoTags } from '$lib/assets/js/topo-utils.js';
+	import { availableTopoTags } from '$lib/assets/js/topo-utils.ts';
 	import TopoJsonEditor from './TopoJsonEditor.svelte';
 	import { rockTypes } from '$lib/config.ts';
 	import WallDirectionPicker from '$lib/components/ui/WallDirectionPicker.svelte';
-	import { wallDirectionForAzimuth } from '$lib/assets/js/wall-directions.js';
+	import { wallDirectionForAzimuth } from '$lib/assets/js/wall-directions.ts';
+
+	type Props = {
+		showMapModal?: boolean;
+		showJsonEditor?: boolean;
+		topoJsonText?: string;
+		topoJsonError?: string;
+		onformatjson: () => void;
+		onapplyjson: () => void;
+	};
 
 	let {
 		showMapModal = $bindable(false),
@@ -19,13 +29,10 @@
 		topoJsonText = $bindable(''),
 		topoJsonError = '',
 		onformatjson,
-		onapplyjson,
-		mobile = false
-	} = $props();
+		onapplyjson
+	}: Props = $props();
 
-	function updateTopoField(field, value) {
-		editorState.updateNestedPath(field, value);
-	}
+	const updateTopoField = editorState.updateTopoField;
 
 </script>
 
@@ -82,12 +89,12 @@
 							<i class="fa-solid fa-map-location-dot opacity-60"></i>{$_('ui.open_map')}
 						</button>
 						<div class="flex-1 min-w-0 pr-1">
-							{#if topo.coordinates[0] !== 0}
+							{#if coordinates[0] !== 0}
 								<div
 									class="text-micro-data font-mono truncate leading-none text-near-black font-bold"
 								>
-									{topo.coordinates[1].toFixed(5)}
-									, {topo.coordinates[0].toFixed(5)}
+									{coordinates[1].toFixed(5)}
+									, {coordinates[0].toFixed(5)}
 								</div>
 								<div
 									class="text-[9px] text-warm-gray-400 font-bold uppercase mt-1 leading-none tracking-tight"
@@ -113,7 +120,7 @@
 					<WallDirectionPicker
 						id="wall-azimuth"
 						azimuth={topo.wallAzimuth}
-						onChange={(azimuth) => updateTopoField('wallAzimuth', azimuth)}
+					onChange={(azimuth: number) => updateTopoField('wallAzimuth', azimuth)}
 					/>
 				</div>
 			{/if}
@@ -122,7 +129,7 @@
 			<label for="description" class="text-ui-label block">{$_('ui.description')}</label>
 			<textarea
 				id="description"
-				value={topo.description || ''}
+				value={typeof topo.description === 'string' ? topo.description : ''}
 				oninput={(event) => updateTopoField('description', event.currentTarget.value)}
 				rows="2"
 				class="input-studio w-full resize-none"
@@ -134,7 +141,7 @@
 			<p class="text-ui-label block">{$_('ui.tags')}</p>
 			<TagSelector
 				selectedTags={topo.tags || []}
-				onChange={(value) => updateTopoField('tags', value)}
+				onChange={(value: string[]) => updateTopoField('tags', value)}
 				availableTags={availableTopoTags}
 			/>
 		</div>

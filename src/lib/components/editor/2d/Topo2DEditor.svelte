@@ -1,40 +1,51 @@
-<script>
+<script lang="ts">
 	import {
 		createTopo2DEditorState,
 		getTopo2DEditorState
-	} from '$lib/state/topo-2d-editor-state.svelte.js';
+	} from '$lib/state/topo-2d-editor-state.svelte.ts';
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { untrack } from 'svelte';
 	import { initializeIdCounters } from '$lib/assets/js/id-utils.ts';
-	import { createEditablePathResolver } from './editable-path.js';
-	import { createCanvasInput } from './create-canvas-input.svelte.js';
-	import { referenceFixpoint, snapRoutePointToAnchor } from './route-fixpoint-snap.js';
-	import { createTopoKeyboardController } from './create-topo-keyboard-controller.js';
-	import { createTopoInputController } from './create-topo-input-controller.js';
-	import { createTopoSelectionSnapshot } from './create-topo-selection-snapshot.js';
-	import { createTopoObjectInteractionController } from './create-topo-object-interaction-controller.js';
-	import { trackTopoRenderDependencies } from './track-topo-render-dependencies.svelte.js';
-	import { createTopoToolRegistry } from './create-topo-tool-registry.js';
-	import { renderTopo2D } from './render-topo-2d.js';
-	import { createTopoEditorActions } from './create-topo-editor-actions.js';
-	import { syncTopoToolLifecycle } from './sync-topo-tool-lifecycle.js';
+	import { createEditablePathResolver } from './editable-path.ts';
+	import { createCanvasInput } from './create-canvas-input.svelte.ts';
+	import { referenceFixpoint, snapRoutePointToAnchor } from './route-fixpoint-snap.ts';
+	import { createTopoKeyboardController } from './create-topo-keyboard-controller.ts';
+	import { createTopoInputController } from './create-topo-input-controller.ts';
+	import { createTopoSelectionSnapshot } from './create-topo-selection-snapshot.ts';
+	import { createTopoObjectInteractionController } from './create-topo-object-interaction-controller.ts';
+	import { trackTopoRenderDependencies } from './track-topo-render-dependencies.svelte.ts';
+	import { createTopoToolRegistry } from './create-topo-tool-registry.ts';
+	import { renderTopo2D } from './render-topo-2d.ts';
+	import { createTopoEditorActions } from './create-topo-editor-actions.ts';
+	import { syncTopoToolLifecycle } from './sync-topo-tool-lifecycle.ts';
+	import type { Route } from '@vorstieg/fels-types/types';
+	import type { InteractionId, InteractionPoint } from '$lib/state/topo-2d-editor-interactions.ts';
+	import type { Point2D } from '$lib/assets/js/path-geometry.ts';
+	import type { createTopo2DEditorState as createEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
 
-	let { editorState: providedEditorState = null } = $props();
+	type Editor = ReturnType<typeof createEditorState>;
+	function aspectRatio(value: unknown): number | null {
+		return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+	}
+
+	let { editorState: providedEditorState = null }: { editorState?: Editor | null } = $props();
 
 	// svelte-ignore state_referenced_locally
 	const editor = providedEditorState || getTopo2DEditorState() || createTopo2DEditorState();
-	const referenceFixpointInStore = (route, fixPointId) =>
+	let drawingTarget = $derived(editor.ui.drawingTarget);
+	const referenceFixpointInStore = (route: Route, fixPointId: InteractionId | null) =>
 		editor.mutateDocument(() => referenceFixpoint(route, fixPointId));
 	const clipboard = {
 		copy: () => editor.copySelection(),
-		paste: ({ canvasSize } = {}) => editor.pasteSelection(canvasSize),
+		paste: ({ canvasSize }: { canvasSize?: { baseWidth: number; baseHeight: number } } = {}) =>
+			editor.pasteSelection(canvasSize),
 		clear: editor.clearClipboard
 	};
-	let svgElement = $state(null);
-	let gElement = $state(null);
+	let svgElement = $state<SVGSVGElement | null>(null);
+	let gElement = $state<SVGGElement | null>(null);
 
-	function snapRoutePoint(point) {
+	function snapRoutePoint(point: InteractionPoint) {
 		return snapRoutePointToAnchor(point, editor.topo.fixPoints, {
 			enabled: editor.ui.snapRoutesToAnchors,
 			canvasSize: editor.viewport
@@ -50,7 +61,7 @@
 		referenceFixpoint: referenceFixpointInStore
 	});
 	// Track previous tool for lifecycle
-	let previousTool = $state(null);
+	let previousTool = $state<(typeof tools)[keyof typeof tools] | null>(null);
 
 	// `select` is the editor's idle tool. Normalize bound values as well, so
 	// consumers never have to handle a null active tool.
@@ -58,13 +69,35 @@
 		if (editor.ui.activeTool == null) editor.setActiveTool('select');
 	});
 
-	let currentTool = $derived(tools[editor.ui.activeTool] || tools.select);
+	const inputToolIds = [
+		'route',
+		'multipitch',
+		'outline',
+		'symbol',
+		'fixpoint',
+		'text',
+		'eraser',
+		'select'
+	] as const;
+	const draftToolIds = ['route', 'multipitch', 'outline'] as const;
+	function getTool<K extends keyof typeof tools>(id: K) {
+		return tools[id];
+	}
+	function getActiveTool() {
+		return getTool(editor.ui.activeTool as keyof typeof tools) ?? tools.select;
+	}
+	function getAllowedTool<K extends keyof typeof tools>(ids: readonly K[]) {
+		const id = editor.ui.activeTool as K;
+		return ids.includes(id) ? getTool(id) : null;
+	}
+	let currentTool = $derived(getActiveTool());
+	const getInputTool = () => getAllowedTool(inputToolIds);
+	const getDraftTool = () => getAllowedTool(draftToolIds);
 
 	// Sync selected options to their configured tool.
 	$effect(() => {
-		if (currentTool === tools.symbol || currentTool === tools.fixpoint) {
-			currentTool.selectedType = editor.ui.selectedSymbol;
-		}
+		tools.symbol.selectedType = editor.ui.selectedSymbol;
+		tools.fixpoint.selectedType = editor.ui.selectedSymbol;
 		if (tools.outline) {
 			tools.outline.selectedStyle = editor.ui.selectedOutlineStyle;
 		}
@@ -92,18 +125,25 @@
 
 	// Derived state for rendering
 	let currentRoutePoints = $derived(
-		currentTool === tools.route || currentTool === tools.multipitch ? currentTool.draftPoints : []
+		(currentTool === tools.route
+			? tools.route.draftPoints
+			: currentTool === tools.multipitch
+				? tools.multipitch.draftPoints
+				: []
+		).map(([x, y]): Point2D => [x, y])
 	);
 	let currentOutlinePoints = $derived(
-		currentTool === tools.outline ? currentTool.getPreviewPoints() : []
+		currentTool === tools.outline ? tools.outline.getPreviewPoints() : []
 	);
-	let brushPreview = $derived(currentTool === tools.outline ? currentTool.getBrushPreview() : null);
+	let brushPreview = $derived(
+		currentTool === tools.outline ? tools.outline.getBrushPreview() : null
+	);
 	$effect(() => {
 		editor.setDraftPending(
 			currentRoutePoints.length > 0 ||
-			currentOutlinePoints.length > 0 ||
-			Boolean(brushPreview?.points?.length) ||
-				(editor.ui.activeTool === 'multipitch' && editor.ui.drawingTarget?.type === 'newPitch')
+				currentOutlinePoints.length > 0 ||
+				Boolean(brushPreview?.points?.length) ||
+				(editor.ui.activeTool === 'multipitch' && drawingTarget?.type === 'newPitch')
 		);
 	});
 
@@ -113,7 +153,7 @@
 	const saveHistory = () => editor.saveHistory();
 	const inputController = createTopoInputController({
 		editor,
-		getCurrentTool: () => currentTool,
+		getCurrentTool: getInputTool,
 		textTool: tools.text,
 		getCanvasSize: () => editor.viewport,
 		getEditablePath: (target) => editablePaths.resolve(target),
@@ -126,7 +166,7 @@
 		}
 	});
 	const canvasInput = createCanvasInput({
-		getAspectRatio: () => editor.topo.canvasAspectRatio ?? editor.topo.imageAspectRatio ?? 1.5,
+		getAspectRatio: () => aspectRatio(editor.topo.canvasAspectRatio) ?? 1.5,
 		getGesturePolicy: inputController.getGesturePolicy,
 		onInput: inputController
 	});
@@ -143,7 +183,7 @@
 
 	const actions = createTopoEditorActions({
 		editor,
-		getCurrentTool: () => currentTool,
+		getCurrentTool: getDraftTool,
 		outlineEditTool: tools.outlineEdit
 	});
 
@@ -153,10 +193,6 @@
 	/* Canvas setup and input lifecycle live in createCanvasInput. */
 	onMount(() => {
 		if (!svgElement || !gElement) return;
-		// Migrate old topographies lazily: their current canvas appearance becomes permanent.
-		if (!editor.topo.canvasAspectRatio) {
-			editor.topo.canvasAspectRatio = editor.topo.imageAspectRatio || 1.5;
-		}
 		if (!editor.topo.backgroundFit) editor.topo.backgroundFit = 'contain';
 		canvasInput.setElements({ svg: svgElement, content: gElement });
 
@@ -171,28 +207,16 @@
 
 	// Canvas dimensions change only when its explicit logical aspect ratio changes.
 	$effect(() => {
-		if (editor.topo.canvasAspectRatio ?? editor.topo.imageAspectRatio) {
+		if (editor.topo.canvasAspectRatio) {
 			canvasInput.refreshDimensions();
 		}
 	});
 
-	function handleObjectMouseDown(event, { type, id, pitchId = null, variantId = null }) {
-		objectInteractionController.objectMouseDown(event, { type, id, pitchId, variantId });
-	}
-
-	function handleObjectClick(event, type, id) {
-		objectInteractionController.objectClick(event, type, id);
-	}
-
-	function handleTextMouseDown(event, label) {
-		objectInteractionController.textMouseDown(event, label);
-	}
-
-	function collectDraggingSelection(mouse) {
+	function collectDraggingSelection(mouse: InteractionPoint) {
 		return createTopoSelectionSnapshot({
 			getTopo: () => editor.topo,
 			selectedItems: editor.selectedItems,
-			drawingTarget: editor.ui.drawingTarget,
+			drawingTarget,
 			getEditablePath: (target) => editablePaths.resolve(target),
 			startMouse: mouse
 		});
@@ -219,13 +243,11 @@
 		getCurrentTool: () => currentTool,
 		finalize: actions.finalize,
 		cancel: actions.cancel,
-		getSelectedItems: () => editor.selectedItems,
 		getCanvasSize: () => editor.viewport,
 		clipboard,
-		getTopo: () => editor.topo,
 		selection: editor,
 		setActiveTool: (tool) => editor.setActiveTool(tool),
-		setDrawingTarget: (target) => editor.setDrawingTarget(target),
+		setDrawingTarget: editor.setDrawingTarget,
 		clearSelection: editor.clearSelection,
 		deleteSelection: editor.deleteSelection,
 		recordHistory: saveHistory,
@@ -239,7 +261,7 @@
 	});
 
 	onMount(() => {
-		const handleKeyUp = (event) => {
+		const handleKeyUp = (event: KeyboardEvent) => {
 			if (event.key === 'Shift') editor.setShiftPressed(false);
 		};
 		window.addEventListener('keydown', keyboard.handleKeyDown);
@@ -264,9 +286,9 @@
 			outlinePreview: {
 				baseWidth: editor.viewport.baseWidth,
 				baseHeight: editor.viewport.baseHeight,
-				mode: currentTool === tools.outline ? currentTool.mode : null,
-				fillColor: currentTool === tools.outline ? currentTool.fillColor : null,
-				fillOpacity: currentTool === tools.outline ? currentTool.fillOpacity : null
+				mode: currentTool === tools.outline ? tools.outline.mode : null,
+				fillColor: currentTool === tools.outline ? tools.outline.fillColor : null,
+				fillOpacity: currentTool === tools.outline ? tools.outline.fillOpacity : null
 			},
 			brushPreview,
 			canvasInput,
@@ -278,9 +300,9 @@
 			draftTools: { route: tools.route, multipitch: tools.multipitch },
 			textTool: tools.text,
 			basePath: base,
-			onObjectMouseDown: handleObjectMouseDown,
-			onObjectClick: handleObjectClick,
-			onTextMouseDown: handleTextMouseDown
+			onObjectMouseDown: objectInteractionController.objectMouseDown,
+			onObjectClick: objectInteractionController.objectClick,
+			onTextMouseDown: objectInteractionController.textMouseDown
 		});
 	}
 
@@ -296,20 +318,12 @@
 		});
 
 		// Map these as dependencies too
-		const _deps = {
+		void {
 			active: editor.ui.activeTool,
 			selectedRoute: editor.ui.selectedRouteId,
 			selectedPitch: editor.ui.selectedPitchId,
 			selectedVariant: editor.ui.selectedVariantId,
-			drawingTarget: editor.ui.drawingTarget
-				? [
-					editor.ui.drawingTarget.type,
-					editor.ui.drawingTarget.routeId,
-					editor.ui.drawingTarget.id,
-					editor.ui.drawingTarget.pitchId,
-					editor.ui.drawingTarget.variantId
-				]
-				: null,
+			drawingTarget,
 			selectedOutline: editor.ui.selectedOutlineId,
 			selectedFixpoint: editor.ui.selectedFixpointId,
 			selectedText: editor.ui.selectedTextLabelId,

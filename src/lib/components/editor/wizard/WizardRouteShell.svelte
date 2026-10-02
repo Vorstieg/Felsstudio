@@ -1,45 +1,33 @@
-<script>
+<script lang="ts">
 	import { _ } from 'svelte-i18n';
 	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
+	import { base } from '$app/paths';
 	import EntryPicker from '$lib/components/editor/wizard/EntryPicker.svelte';
 	import { createCragEditorSession } from '$lib/state/crag-session.svelte.ts';
-	import { getCragEditorPath, getTopoEditorPath } from '$lib/assets/js/editor-entry-paths.js';
+	import { getCragEditorPath, getCragEntryPath, getTopoEditorPath } from '$lib/assets/js/editor-entry-paths.ts';
+	import { fetchCragsFromManifest } from '$lib/assets/js/fetchCrags.ts';
 
-	let { workspace, titleKey, actionLabelKey, locations = [] } = $props();
+	type Location = Awaited<ReturnType<typeof fetchCragsFromManifest>>[number];
+	type Props = {
+		workspace: string;
+		titleKey: string;
+		actionLabelKey: string;
+		locations?: Location[];
+	};
+	type WorkspacePath = {
+		path: string;
+		isCragEditor: () => boolean;
+		isTopoWorkspace: () => boolean;
+	};
+
+	let { workspace, titleKey, actionLabelKey, locations = [] }: Props = $props();
 	const cragEditorState = createCragEditorSession();
 
 	let searchQuery = $state('');
-	let workSpaceWrapper = $derived(new WorkSpace(workspace));
+	class WorkSpace implements WorkspacePath {
+		path: string;
 
-	const filteredLocations = $derived(
-		locations.filter((l) => {
-			const query = searchQuery.toLowerCase();
-			if (query === '') return true;
-
-			const sectors = l.properties?.sectors ?? [];
-			const sectorMatch = sectors.some(
-				(sector) =>
-					(sector.name || '').toLowerCase().includes(query) ||
-					(sector.id || '').toLowerCase().includes(query) ||
-					(sector.type || []).includes(searchQuery)
-			);
-
-			return (
-				(l.properties?.name ?? '').toLowerCase().includes(query) ||
-				(l.properties?.path ?? '').toLowerCase().includes(query) ||
-				sectorMatch
-			);
-		})
-	);
-
-	function startNewEntry() {
-		if (workSpaceWrapper.isCragEditor()) cragEditorState.reset();
-		goto(resolve(workSpaceWrapper.path));
-	}
-
-	class WorkSpace {
-		constructor(path) {
+		constructor(path: string) {
 			this.path = path;
 		}
 
@@ -59,12 +47,29 @@
 			return this.is2DEditor() || this.is3DEditor();
 		}
 	}
+	let workSpaceWrapper = $derived(new WorkSpace(workspace));
 
-	function loadFromEntry(crag, sector = null) {
+	const filteredLocations = $derived(
+		locations.filter((l) => {
+			const query = searchQuery.toLowerCase();
+			if (query === '') return true;
+			return (
+				(l.properties?.name ?? '').toLowerCase().includes(query) ||
+				getCragEntryPath({ entryPath: l.entryPath }).toLowerCase().includes(query)
+			);
+		})
+	);
+
+	function startNewEntry() {
+		if (workSpaceWrapper.isCragEditor()) cragEditorState.reset();
+		goto(`${base}${workSpaceWrapper.path}`);
+	}
+
+	function loadFromEntry(crag: Location) {
 		const path = workSpaceWrapper.isCragEditor()
-			? getCragEditorPath(crag)
-			: getTopoEditorPath(workSpaceWrapper.path, crag, sector);
-		goto(resolve(path));
+			? getCragEditorPath({ entryPath: crag.entryPath })
+			: getTopoEditorPath(workSpaceWrapper.path, { entryPath: crag.entryPath });
+		goto(`${base}${path}`);
 	}
 </script>
 
@@ -74,7 +79,7 @@
 			<div class="p-4 border-b border-black/15 bg-white flex items-center justify-between">
 				<div class="flex items-center gap-3">
 					<button
-						onclick={() => goto(resolve("/"))}
+						onclick={() => goto('/')}
 						class="w-8 h-8 rounded border border-transparent hover:border-black/15 hover:bg-black/5 flex items-center justify-center text-near-black transition-none"
 						title={$_('ui.back_to_launcher')}
 					>

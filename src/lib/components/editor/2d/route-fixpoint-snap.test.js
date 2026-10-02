@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it } from 'vitest';
-import { referenceFixpoint, snapRoutePointToAnchor } from './route-fixpoint-snap.js';
+import { referenceFixpoint, snapRoutePointToAnchor } from './route-fixpoint-snap.ts';
 
 describe('route anchor snapping', () => {
 	const anchors = [

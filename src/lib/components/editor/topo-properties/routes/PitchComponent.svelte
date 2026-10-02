@@ -1,11 +1,37 @@
-<script>
+<script lang="ts">
+	import type { FixPoint, Grade, Pitch, Route, Variant } from '@vorstieg/fels-types/types';
 	import GradeSelector from '$lib/components/editor/topo-properties/routes/GradeSelector.svelte';
 	import RouteLength from '$lib/components/editor/topo-properties/routes/RouteLength.svelte';
 	import BoltCount from '$lib/components/editor/topo-properties/routes/BoltCount.svelte';
-	import { routeLineStyles } from '$lib/components/editor/topo-properties/topo-properties-utils.js';
+	import { routeLineStyles } from '$lib/components/editor/topo-properties/topo-properties-utils.ts';
 
 	import { _ } from 'svelte-i18n';
 
+	type EditablePitch = (Route | Pitch | Variant) & {
+		name?: string;
+		boltAmount?: number;
+		length?: number;
+		grade?: Grade;
+		lineStyle?: string;
+		type?: string;
+		fixPoints?: (string | number)[];
+	};
+	type DuplicateTarget = { id: string | number; name?: string };
+	type Props = {
+		pitch: EditablePitch;
+		kind?: 'single' | 'pitch' | 'variant';
+		index?: number;
+		topoScale?: number | null;
+		fixPoints?: FixPoint[] | null;
+		onDraw?: ((_pitch: EditablePitch) => void) | null;
+		onRemove?: ((_pitch: EditablePitch, _index: number) => void) | null;
+		onDuplicate?: ((_pitch: EditablePitch, _targetRouteId: string) => void) | null;
+		duplicateTargets?: DuplicateTarget[];
+		onMove?: ((_pitch: EditablePitch, _direction: -1 | 1) => void) | null;
+		canMoveUp?: boolean;
+		canMoveDown?: boolean;
+		onFieldChange: (_field: string, _value: unknown) => void;
+	};
 	let {
 		pitch = $bindable(),
 		kind = 'single',
@@ -20,7 +46,7 @@
 		canMoveUp = false,
 		canMoveDown = false,
 		onFieldChange
-	} = $props();
+	}: Props = $props();
 
 	function defaultLineStyle() {
 		switch (kind) {
@@ -130,7 +156,6 @@
 			onFieldChange={onFieldChange}
 		/>
 		<BoltCount
-			boltCount={pitch.boltAmount}
 			route={pitch}
 			fixPoints={fixPoints ?? []}
 			onFieldChange={onFieldChange}

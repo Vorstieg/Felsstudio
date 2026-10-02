@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTopo2DRenderModel } from './topo-2d-render-model.js';
+import { buildTopo2DRenderModel } from './topo-2d-render-model.ts';
 import fixture from '../../../../../tests/fixtures/2d/mixed-topo.json';
 
 function renderModel(overrides = {}) {
@@ -116,7 +116,7 @@ describe('buildTopo2DRenderModel', () => {
 			selectionSize: 0,
 			isSelected: () => false,
 			activeTool: 'routeEdit',
-			drawingTarget: { type: 'route', id: 'route-1' }
+			drawingTarget: { type: 'route', routeId: 'route-1' }
 		});
 
 		expect(model.routePointHandles).toHaveLength(3);

@@ -19,12 +19,22 @@ module.exports = {
 		$inspect: 'readonly'
 	},
 	rules: {
-		'no-unused-vars': 'off',
+		'no-unused-vars': ['error', { argsIgnorePattern: '^_', ignoreRestSiblings: true }],
 		'svelte/valid-compile': 'warn',
 		'no-useless-escape': 'off',
 		'no-undef': 'off'
 	},
 	overrides: [
+		{
+			files: ['*.svelte'],
+			parserOptions: {
+				parser: {
+					ts: '@typescript-eslint/parser',
+					typescript: '@typescript-eslint/parser',
+					js: 'espree'
+				}
+			}
+		},
 		{
 			files: ['*.ts', '*.svelte.ts'],
 			parser: '@typescript-eslint/parser',
@@ -35,7 +45,11 @@ module.exports = {
 			plugins: ['@typescript-eslint'],
 			extends: ['plugin:@typescript-eslint/recommended'],
 			rules: {
-				'@typescript-eslint/no-unused-vars': 'off',
+				'no-unused-vars': 'off',
+				'@typescript-eslint/no-unused-vars': [
+					'error',
+					{ argsIgnorePattern: '^_', ignoreRestSiblings: true }
+				],
 				'@typescript-eslint/no-explicit-any': 'off'
 			}
 		},

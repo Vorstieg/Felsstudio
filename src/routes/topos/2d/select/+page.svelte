@@ -1,7 +1,8 @@
-<script>
+<script lang="ts">
+	import type { PageProps } from './$types';
 	import WizardRouteShell from '$lib/components/editor/wizard/WizardRouteShell.svelte';
 
-	let { data } = $props();
+	let { data }: PageProps = $props();
 </script>
 
 <WizardRouteShell

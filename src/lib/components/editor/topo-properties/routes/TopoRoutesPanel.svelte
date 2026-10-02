@@ -1,11 +1,22 @@
-<script>
-	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
-	import { getGradeValue } from '$lib/assets/js/topo-utils.js';
+<script lang="ts">
+	import type { Route } from '@vorstieg/fels-types/types';
+	import type { TopoDrawingTarget } from '$lib/state/topo-drawing-target.ts';
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
+	import { getGradeValue } from '$lib/assets/js/topo-utils.ts';
+	import { _ } from 'svelte-i18n';
+	import { snapToBiggestHeight } from '$lib/assets/js/resize.ts';
+	import SelectedRoutePanel from '$lib/components/editor/topo-properties/routes/SelectedRoutePanel.svelte';
+
+	type RouteId = Route['id'];
+	type Props = {
+		routes?: Route[];
+		drawingTarget?: TopoDrawingTarget | null;
+		activeTool?: string;
+		mobile?: boolean;
+		onPathSelect?: ((_route: Route, _pathId: RouteId) => void) | null;
+	};
 
 	const editorState = getTopo2DEditorState();
-	import { _ } from 'svelte-i18n';
-	import { snapToBiggestHeight } from '$lib/assets/js/resize.js';
-	import SelectedRoutePanel from '$lib/components/editor/topo-properties/routes/SelectedRoutePanel.svelte';
 
 	let {
 		routes = [],
@@ -13,9 +24,9 @@
 		activeTool = $bindable('route'),
 		mobile = false,
 		onPathSelect = null
-	} = $props();
+	}: Props = $props();
 
-	function selectRoute(route) {
+	function selectRoute(route: Route) {
 		if (editorState.ui.selectedRouteId === route.id) {
 			if (
 				editorState.ui.selectedPitchId != null ||
@@ -34,23 +45,23 @@
 		editorState.selectObject('route', route.id);
 		drawingTarget =
 			!hasRouteType(route, 'multi-pitch') && !isTrackOnlyRoute(route)
-				? { type: 'route', id: route.id }
+			? { type: 'route', routeId: route.id }
 				: null;
-		if (mobile) snapToBiggestHeight();
+		if (mobile) snapToBiggestHeight?.();
 	}
 
-	function deleteRoute(route) {
+	function deleteRoute(route: Route) {
 		const wasSelected = editorState.ui.selectedRouteId === route.id;
 		editorState.removeRoute(route.id);
 		if (wasSelected) drawingTarget = null;
 	}
 
-	function hasRouteType(route, type) {
+	function hasRouteType(route: Pick<Route, 'type'>, type: string) {
 		return Array.isArray(route.type) ? route.type.includes(type) : route.type === type;
 	}
 
-	function isTrackOnlyRoute(route) {
-		return route.geometryMode === 'track' || hasRouteType(route, 'alpine-tour');
+	function isTrackOnlyRoute(route: Route) {
+		return (route as Route & { geometryMode?: string }).geometryMode === 'track' || hasRouteType(route, 'alpine-tour');
 	}
 </script>
 

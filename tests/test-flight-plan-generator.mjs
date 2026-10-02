@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { generateFlightPlan } from '../src/lib/assets/js/flight-plan-generator.js';
+import { generateFlightPlan } from '../src/lib/assets/js/flight-plan-generator.ts';
 
 test('generates valid deterministic flight plans', () => {
 	const sector = {

@@ -1,19 +1,27 @@
-<script>
+<script lang="ts">
 	import { untrack } from 'svelte';
-	import { useTopoDraftAutosave } from './use-topo-draft-autosave.svelte.js';
+	import type { Route } from '@vorstieg/fels-types/types';
+	import type { DraftSession } from '$lib/state/draft-serialization.ts';
+	import { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
+	import { useTopoDraftAutosave } from './use-topo-draft-autosave.svelte.ts';
 
+	type Props = {
+		blank?: boolean;
+		draftId?: string | null;
+		entryPath?: string | null;
+		loadEntrySession?: ((_path: string) => boolean | void | Promise<boolean | void>) | null;
+		restoreSession?: ((_draft: DraftSession, _id: string) => void) | null;
+		savedRoutes?: Route[] | null;
+	};
 	let {
 		blank = false,
 		draftId = null,
 		entryPath = null,
 		loadEntrySession = null,
-		restoreSession = null
-	} = $props();
-	let session = $state({
-		topo: { editorMode: '2d', routes: [] },
-		ui: { activeDraftId: null, lastSaved: null },
-		getSaveSession: () => ({ topo: session.topo, glbBlob: null })
-	});
+		restoreSession = null,
+		savedRoutes = null
+	}: Props = $props();
+	const session = createTopo2DEditorState();
 	$effect(() => {
 		session.topo.routes = blank ? [] : [{ id: 'route-1' }];
 	});
@@ -29,15 +37,14 @@
 		draftId: initial.draftId,
 		entryPath: initial.entryPath,
 		loadEntrySession: initial.loadEntrySession,
-		restoreSession:
-			initial.restoreSession ||
-			((draft, id) => {
-				session.topo = draft.topo;
-				session.ui.activeDraftId = id;
-			}),
+		restoreSession: initial.restoreSession || ((draft, id) => session.loadSession(draft, id)),
 		getWorkspace: () => '2d-create',
 		getSaveSignature: () => `${session.topo.routes.length}`,
-		getExtra: () => ({ selectedRouteId: 'route-1' }),
+		getSaveSession: () => ({
+			topo: { ...session.topo, routes: savedRoutes ?? session.topo.routes },
+			glbBlob: null,
+			selectedRouteId: 'route-1'
+		}),
 		session
 	});
 </script>

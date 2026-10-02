@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { syncTopoToolLifecycle } from './sync-topo-tool-lifecycle.js';
+import { syncTopoToolLifecycle } from './sync-topo-tool-lifecycle.ts';
 
 describe('syncTopoToolLifecycle', () => {
 	it('deactivates the previous tool and clears selection for drawing tools', () => {

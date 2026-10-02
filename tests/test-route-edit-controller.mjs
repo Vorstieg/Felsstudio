@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { createRouteEditController } from '../src/lib/components/editor/crag/route-editing.js';
+import { createRouteEditController } from '../src/lib/components/editor/crag/route-editing.ts';
 
 function createController(initialSelection = null, initialDraft = null) {
 	let selection = initialSelection;

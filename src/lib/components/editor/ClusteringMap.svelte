@@ -1,13 +1,13 @@
-<script>
+<script lang="ts">
 	import { onDestroy } from 'svelte';
 	import maplibregl from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
-	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
 	import { loadMapStyle } from '$lib/map-style.ts';
 	const topoSession = getTopo2DEditorState();
 
-	let mapContainer = $state();
-	let map;
+	let mapContainer = $state<HTMLDivElement | undefined>();
+	let map: maplibregl.Map | null = null;
 
 	$effect(() => {
 		const gpsData = topoSession.clustering.gpsData;
@@ -20,7 +20,7 @@
 
 		if (validGpsKeys.length > 0 && mapContainer) {
 			if (!map) {
-				const center = [
+				const center: [number, number] = [
 					gpsData[validGpsKeys[Math.floor(validGpsKeys.length / 2)]].longitude,
 					gpsData[validGpsKeys[Math.floor(validGpsKeys.length / 2)]].latitude
 				];
@@ -29,20 +29,22 @@
 					.catch(() => 'https://demotiles.maplibre.org/style.json')
 					.then((style) => {
 						if (map || !mapContainer) return;
-						map = new maplibregl.Map({
+						const currentMap = new maplibregl.Map({
 							container: mapContainer,
 							style,
 							center,
 							zoom: 18,
 							attributionControl: false
 						});
+						map = currentMap;
 
-						map.on('load', () => {
-							const points = validGpsKeys.map((key) => [
+						currentMap.on('load', () => {
+							if (map !== currentMap) return;
+							const points: [number, number][] = validGpsKeys.map((key) => [
 								gpsData[key].longitude,
 								gpsData[key].latitude
 							]);
-							map.addSource('drone-path', {
+							currentMap.addSource('drone-path', {
 								type: 'geojson',
 								data: {
 									type: 'Feature',
@@ -50,19 +52,19 @@
 									geometry: { type: 'LineString', coordinates: points }
 								}
 							});
-							map.addLayer({
+							currentMap.addLayer({
 								id: 'drone-path-line',
 								type: 'line',
 								source: 'drone-path',
 								layout: { 'line-join': 'round', 'line-cap': 'round' },
 								paint: { 'line-color': '#00ffff', 'line-width': 3, 'line-opacity': 0.7 }
 							});
-							new maplibregl.Marker({ color: '#ff0000' }).setLngLat(center).addTo(map);
+							new maplibregl.Marker({ color: '#ff0000' }).setLngLat(center).addTo(currentMap);
 							const bounds = points.reduce(
 								(bounds, point) => bounds.extend(point),
 								new maplibregl.LngLatBounds(points[0], points[0])
 							);
-							map.fitBounds(bounds, { padding: 20 });
+							currentMap.fitBounds(bounds, { padding: 20 });
 						});
 					});
 			}

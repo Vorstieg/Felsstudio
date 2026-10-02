@@ -1,7 +1,21 @@
-<script>
+<script lang="ts">
 	import { _ } from 'svelte-i18n';
 	import { topoSymbols } from '@vorstieg/topo-renderer';
 	import ToolBar from '$lib/components/editor/tools/ToolBar.svelte';
+
+	type Props = {
+		activeTool?: string;
+		toolOptionsOpen?: boolean;
+		selectedSymbol?: string;
+		hasPendingChanges?: boolean;
+		onFinishRoute?: (() => void) | null;
+		onCancelAction?: (() => void) | null;
+		onUndo?: (() => void) | null;
+		onRedo?: (() => void) | null;
+		onExport?: (() => void | Promise<void>) | null;
+		status?: 'idle' | 'success' | 'error';
+		errorMessage?: string;
+	};
 
 	let {
 		activeTool = $bindable('route'),
@@ -15,15 +29,15 @@
 		onExport = null,
 		status = 'idle',
 		errorMessage = ''
-	} = $props();
+	}: Props = $props();
 
 	const fixpoints = topoSymbols.filter((symbol) => symbol.type === 'fixpoint');
 	const features = topoSymbols.filter((symbol) => symbol.type === 'feature');
 
-	function selectSymbolTool(_id, symbols, { isActive } = {}) {
+	function selectSymbolTool(symbols: typeof topoSymbols, { isActive }: { isActive: boolean }) {
 		if (isActive) return;
 		if (!symbols.some((symbol) => symbol.id === selectedSymbol)) {
-			selectedSymbol = symbols[0].id;
+			selectedSymbol = symbols[0]?.id ?? selectedSymbol;
 		}
 	}
 
@@ -37,14 +51,14 @@
 			icon: 'fa-circle-dot',
 			label: $_('ui.fixpoints'),
 			hasOptions: true,
-			onSelect: (context) => selectSymbolTool('fixpoint', fixpoints, context)
+			onSelect: (context: { isActive: boolean }) => selectSymbolTool(fixpoints, context)
 		},
 		{
 			id: 'symbol',
 			icon: 'fa-icons',
 			label: $_('ui.symbol'),
 			hasOptions: true,
-			onSelect: (context) => selectSymbolTool('symbol', features, context)
+			onSelect: (context: { isActive: boolean }) => selectSymbolTool(features, context)
 		},
 		{ id: 'text', icon: 'fa-font', label: $_('ui.text'), hasOptions: true },
 		{ id: 'eraser', icon: 'fa-eraser', label: $_('ui.delete') }

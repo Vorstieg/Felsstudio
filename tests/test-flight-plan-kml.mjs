@@ -10,7 +10,7 @@ import {
 	exportFlightPlanWaylinesWpml,
 	flightPlanKmlFilename,
 	flightPlanKmzFilename
-} from '../src/lib/assets/js/flight-plan-kml.js';
+} from '../src/lib/assets/js/flight-plan-kml.ts';
 
 test('exports valid KML and KMZ flight plans', async () => {
 	const plan = {

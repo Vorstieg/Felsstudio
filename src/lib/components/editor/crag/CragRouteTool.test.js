@@ -1,184 +1,217 @@
 // @vitest-environment node
+import { expect, test } from 'vitest';
+import { createCragEditorSession, createFelsEntry } from '$lib/state/crag-session.svelte.ts';
+import { createCragRouteTool } from './CragRouteTool.svelte.ts';
 
-import assert from 'node:assert/strict';
-import { test } from 'vitest';
-import { createCragEditorSession } from '$lib/state/crag-session.svelte.ts';
-import { createCragRouteTool } from './CragRouteTool.svelte.js';
-
-function createTool() {
+test('adds a route to the active workspace topo document', () => {
 	const state = createCragEditorSession();
-	state.crag.id = 'crag-1';
-	state.crag.path = 'crags/crag-1';
-	state.crag.name = 'Test Crag';
+	state.workspace = {
+		entry: createFelsEntry('crag', { id: 'wall', name: 'Wall' }),
+		path: 'crags',
+		topo: null,
+		access: null,
+		dirtyPaths: [],
+		childEntries: []
+	};
+	state.activeWorkspaceEntryPath = 'crags/wall';
 	let selection = null;
-	let routeDraft = null;
-	const activeTools = [];
-
 	const tool = createCragRouteTool({
 		state,
 		getSelection: () => selection,
 		selectObject: (value) => (selection = value),
-		getRouteDraft: () => routeDraft,
-		cancelTrackEdit: () => (routeDraft = null),
-		startRouteDraft: (value) => (routeDraft = value),
-		startRoutingDraft: () => activeTools.push('track'),
-		editRoutePathTrack: () => activeTools.push('track-edit'),
-		setActiveTool: (value) => activeTools.push(value)
+		getRouteDraft: () => null,
+		cancelTrackEdit: () => {},
+		startRouteDraft: () => {},
+		startRoutingDraft: () => {},
+		editRoutePathTrack: () => {},
+		setActiveTool: () => {}
 	});
-
-	return { state, tool, selection: () => selection, routeDraft: () => routeDraft, activeTools };
-}
-
-test('creates, selects, and updates routes through the session', () => {
-	const { state, tool, selection } = createTool();
-
 	tool.addRoute();
-
-	const document = state.routeDocuments[0];
-	const route = document.data.routes[0];
-	assert.equal(route.type, 'sports-climbing');
-	assert.deepEqual(selection(), { type: 'route', key: `${document.path}:${route.id}` });
-
-	tool.updateRoute(document.path, route.id, 'name', 'First route');
-	assert.equal(state.routeDocuments[0].data.routes[0].name, 'First route');
+	expect(state.getActiveWorkspaceEntry().topo.routes).toHaveLength(1);
+	expect(state.getActiveWorkspaceEntry().dirtyPaths).toContain('crags/wall/wall-topo.json');
 });
 
-test('manages route paths, access copies, and route-specific metadata', () => {
-	const { state, tool, activeTools } = createTool();
-	tool.addRoute();
-	const document = state.routeDocuments[0];
-	const route = document.data.routes[0];
-
-	tool.addRoutePath(document.path, route.id);
-	const createdPath = document.data.paths.features[0];
-	assert.equal(route.pathRefs[0].pathId, createdPath.id);
-	assert.deepEqual(activeTools, ['track']);
-
-	tool.updateRoutePath(document.path, route.id, createdPath.id, 'label', 'Main line');
-	assert.equal(route.pathRefs[0].label, 'Main line');
-
-	assert.equal(
-		tool.updateRoutePathFeature(
-			document.path,
-			createdPath.id,
-			'description',
-			'Approach path, not marked. Hohe Trittsicherheit erforderlich.'
-		),
-		true
-	);
-	assert.equal(
-		createdPath.properties.description,
-		'Approach path, not marked. Hohe Trittsicherheit erforderlich.'
-	);
-	assert.equal(
-		tool.updateRoutePathFeature(document.path, createdPath.id, 'accessFeatureId', 'hut-1'),
-		true
-	);
-	assert.equal(createdPath.properties.accessFeatureId, 'hut-1');
-	assert.equal(
-		tool.updateRoutePathFeature(document.path, createdPath.id, 'accessFeatureId', ''),
-		true
-	);
-	assert.equal(createdPath.properties.accessFeatureId, undefined);
-
-	state.access.features = [
-		{
-			id: 'approach-1',
-			properties: { kind: 'approach', name: 'Approach' },
-			geometry: {
-				type: 'LineString',
-				coordinates: [
-					[0, 0],
-					[1, 1]
-				]
-			}
-		}
-	];
-	assert.equal(tool.createRoutePathFromAccess(document.path, route.id, 'approach-1'), true);
-	assert.equal(document.data.paths.features.length, 2);
-	assert.equal(route.pathRefs.length, 2);
-});
-
-test('moves an approach track into a topo document without attaching it to a route', () => {
-	const { state, tool } = createTool();
-	tool.addRoute();
-	const document = state.routeDocuments[0];
-	state.access.features = [
-		{
-			id: 'approach-1',
-			properties: { kind: 'approach', name: 'Trailhead approach' },
-			geometry: {
-				type: 'LineString',
-				coordinates: [
-					[11, 47],
-					[11.001, 47.001]
-				]
-			}
-		}
-	];
-
-	assert.equal(tool.moveApproachTrackToTopoPaths(document.path, 'approach-1'), true);
-	assert.equal(state.access.features.length, 0);
-	assert.equal(document.data.paths.features.length, 1);
-	assert.equal(document.data.paths.features[0].properties.name, 'Trailhead approach');
-	assert.deepEqual(document.data.routes[0].pathRefs, []);
-	assert.equal(document.dirty, true);
-
-	assert.equal(state.undo(), true);
-	assert.equal(state.access.features.length, 1);
-	assert.equal(state.routeDocuments[0].data.paths.features.length, 0);
-
-	assert.equal(state.redo(), true);
-	assert.equal(state.access.features.length, 0);
-	assert.equal(state.routeDocuments[0].data.paths.features.length, 1);
-});
-
-test('deletes and restores a route path with its route references', () => {
-	const { state, tool } = createTool();
-	tool.addRoute();
-	const document = state.routeDocuments[0];
-	const route = document.data.routes[0];
-	tool.addRoutePath(document.path, route.id);
-	const pathId = document.data.paths.features[0].id;
-
-	assert.equal(tool.deleteRoutePath(document.path, pathId), true);
-	assert.equal(document.data.paths.features.length, 0);
-	assert.equal(route.pathRefs.length, 0);
-
-	assert.equal(tool.undoDeleteRoutePath(), true);
-	assert.equal(document.data.paths.features[0].id, pathId);
-	assert.deepEqual(route.pathRefs, [{ pathId, role: 'main' }]);
-});
-
-test('splits a route path and exits track cutting mode', () => {
-	const { state, tool, activeTools } = createTool();
-	tool.addRoute();
-	const document = state.routeDocuments[0];
-	const route = document.data.routes[0];
-	tool.addRoutePath(document.path, route.id);
-	const pathId = document.data.paths.features[0].id;
-	state.updateRouteDocument(document.path, (data) => {
-		data.paths.features[0].geometry.coordinates = [
-			[0, 0],
-			[1, 1],
-			[2, 2]
-		];
-	});
-
-	assert.equal(
-		tool.splitRoutePath(
-			{ documentPath: document.path, pathId, routeId: route.id },
-			[
-				[0, 0],
-				[1, 1]
-			],
-			[
-				[1, 1],
-				[2, 2]
+test('moving an approach track to topo paths is one undoable edit', () => {
+	const state = createCragEditorSession();
+	state.workspace = {
+		entry: createFelsEntry('crag', { id: 'wall', name: 'Wall' }),
+		path: 'crags',
+		topo: { id: 'wall', routes: [], paths: { type: 'FeatureCollection', features: [] } },
+		access: {
+			type: 'FeatureCollection',
+			features: [
+				{
+					type: 'Feature',
+					id: 'approach-1',
+					properties: { kind: 'approach' },
+					geometry: {
+						type: 'LineString',
+						coordinates: [
+							[0, 0],
+							[1, 1]
+						]
+					}
+				}
 			]
-		),
-		true
+		},
+		dirtyPaths: [],
+		childEntries: []
+	};
+	state.activeWorkspaceEntryPath = 'crags/wall';
+	const tool = createCragRouteTool({
+		state,
+		getSelection: () => null,
+		selectObject: () => {}
+	});
+	expect(tool.moveApproachTrackToTopoPaths('crags/wall/wall-topo.json', 'approach-1')).toBe(true);
+	expect(state.history.entries).toHaveLength(1);
+	expect(state.workspace.topo.paths.features).toHaveLength(1);
+	expect(state.workspace.access.features).toHaveLength(0);
+	expect(state.workspace.dirtyPaths).toEqual(
+		expect.arrayContaining(['crags/wall/wall-topo.json', 'crags/wall/wall-access.json'])
 	);
-	assert.equal(document.data.paths.features.length, 2);
-	assert.equal(activeTools.at(-1), 'position');
+	expect(state.undo()).toBe(true);
+	expect(state.workspace.topo.paths.features).toHaveLength(0);
+	expect(state.workspace.access.features).toHaveLength(1);
+	expect(state.undo()).toBe(false);
+});
+
+test('adding a path and attaching it to a route is one undo step', () => {
+	const state = createCragEditorSession();
+	state.workspace = {
+		entry: createFelsEntry('crag', { id: 'wall', name: 'Wall' }),
+		path: 'crags',
+		topo: {
+			id: 'wall',
+			routes: [{ id: 'route-1', pathRefs: [] }],
+			paths: { type: 'FeatureCollection', features: [] }
+		},
+		access: null,
+		dirtyPaths: [],
+		childEntries: []
+	};
+	state.activeWorkspaceEntryPath = 'crags/wall';
+	const tool = createCragRouteTool({
+		state,
+		startRouteDraft: () => {},
+		startRoutingDraft: () => {}
+	});
+	tool.addRoutePath('crags/wall/wall-topo.json', 'route-1');
+	expect(state.history.entries).toHaveLength(1);
+	expect(state.workspace.topo.paths.features).toHaveLength(1);
+	expect(state.workspace.topo.routes[0].pathRefs).toHaveLength(1);
+	expect(state.undo()).toBe(true);
+	expect(state.workspace.topo.paths.features).toHaveLength(0);
+	expect(state.workspace.topo.routes[0].pathRefs).toEqual([]);
+});
+
+test('assigning, copying, and deleting route paths each create one undo step', () => {
+	const state = createCragEditorSession();
+	state.workspace = {
+		entry: createFelsEntry('crag', { id: 'wall', name: 'Wall' }),
+		path: 'crags',
+		topo: {
+			id: 'wall',
+			routes: [{ id: 'route-1', pathRefs: [] }],
+			paths: {
+				type: 'FeatureCollection',
+				features: [
+					{
+						type: 'Feature',
+						id: 'path-1',
+						properties: {},
+						geometry: {
+							type: 'LineString',
+							coordinates: [
+								[0, 0],
+								[1, 1]
+							]
+						}
+					}
+				]
+			}
+		},
+		access: {
+			type: 'FeatureCollection',
+			features: [
+				{
+					type: 'Feature',
+					id: 'approach-1',
+					properties: { kind: 'approach' },
+					geometry: {
+						type: 'LineString',
+						coordinates: [
+							[0, 0],
+							[2, 2]
+						]
+					}
+				}
+			]
+		},
+		dirtyPaths: [],
+		childEntries: []
+	};
+	state.activeWorkspaceEntryPath = 'crags/wall';
+	const tool = createCragRouteTool({ state, getRouteDraft: () => null, getSelection: () => null });
+	const path = 'crags/wall/wall-topo.json';
+	expect(tool.assignExistingRoutePath(path, 'route-1', 'path-1')).toBe(true);
+	expect(state.history.entries).toHaveLength(1);
+	expect(tool.assignExistingRoutePath(path, 'route-1', 'path-1')).toBe(false);
+	expect(state.history.entries).toHaveLength(1);
+	expect(state.undo()).toBe(true);
+	expect(state.workspace.topo.routes[0].pathRefs).toEqual([]);
+
+	expect(tool.createRoutePathFromAccess(path, 'route-1', 'approach-1')).toBe(true);
+	expect(state.history.entries).toHaveLength(1);
+	expect(state.workspace.topo.paths.features).toHaveLength(2);
+	expect(state.undo()).toBe(true);
+	expect(state.workspace.topo.paths.features).toHaveLength(1);
+
+	expect(tool.deleteRoutePath(path, 'path-1')).toBe(true);
+	expect(state.history.entries).toHaveLength(1);
+	expect(state.workspace.topo.paths.features).toHaveLength(0);
+	expect(state.undo()).toBe(true);
+	expect(state.workspace.topo.paths.features).toHaveLength(1);
+});
+
+test('updates route, path reference, and path feature through typed patches', () => {
+	const state = createCragEditorSession();
+	state.workspace = {
+		entry: createFelsEntry('crag', { id: 'wall', name: 'Wall' }),
+		path: 'crags',
+		topo: {
+			id: 'wall',
+			routes: [{ id: 'route-1', name: 'Old', pathRefs: [{ pathId: 'path-1', role: 'main' }] }],
+			paths: {
+				type: 'FeatureCollection',
+				features: [
+					{
+						type: 'Feature',
+						id: 'path-1',
+						properties: { name: 'Old path' },
+						geometry: {
+							type: 'LineString',
+							coordinates: [
+								[0, 0],
+								[1, 1]
+							]
+						}
+					}
+				]
+			}
+		},
+		access: null,
+		dirtyPaths: [],
+		childEntries: []
+	};
+	state.activeWorkspaceEntryPath = 'crags/wall';
+	const tool = createCragRouteTool({ state });
+	const path = 'crags/wall/wall-topo.json';
+	tool.updateRoute(path, 'route-1', { name: 'New' });
+	tool.updateRoutePath(path, 'route-1', 'path-1', { label: 'North' });
+	tool.updateRoutePathFeature(path, 'path-1', { name: 'New path', description: '' });
+	const topo = state.getActiveWorkspaceEntry().topo;
+	expect(topo.routes[0].name).toBe('New');
+	expect(topo.routes[0].pathRefs[0].label).toBe('North');
+	expect(topo.paths.features[0].properties).toEqual({ name: 'New path' });
 });

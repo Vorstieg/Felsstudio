@@ -1,40 +1,48 @@
-<script>
+<script lang="ts">
 	import { _ } from 'svelte-i18n';
+	import type { Snippet } from 'svelte';
 
 	let {
 		title,
 		open = true,
 		onClose = null,
 		children
+	}: {
+		title: string;
+		open?: boolean;
+		onClose?: (() => void) | null;
+		children?: Snippet;
 	} = $props();
 
-	let panel = $state();
-	let trigger = $state();
+	let panel = $state<HTMLDivElement | undefined>();
+	let trigger = $state<HTMLElement | null>();
 
-	function close(event) {
+	function close(event: MouseEvent) {
 		event?.preventDefault?.();
 		event?.stopPropagation?.();
 		onClose?.();
 		requestAnimationFrame(() => trigger?.focus?.());
 	}
 
-	function observeOptionsSurface(node) {
+	function observeOptionsSurface(node: HTMLDivElement) {
 		const updateHeight = () => {
 			document.documentElement.style.setProperty('--mobile-tool-options-height', `${node.offsetHeight}px`);
 		};
 		const observer = new ResizeObserver(updateHeight);
 		observer.observe(node);
 		updateHeight();
-		return () => {
-			observer.disconnect();
-			document.documentElement.style.removeProperty('--mobile-tool-options-height');
+		return {
+			destroy() {
+				observer.disconnect();
+				document.documentElement.style.removeProperty('--mobile-tool-options-height');
+			}
 		};
 	}
 
 	$effect(() => {
 		if (open) {
-			trigger = document.activeElement;
-			setTimeout(() => panel?.querySelector('button, input, select, textarea')?.focus());
+			trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+			setTimeout(() => panel?.querySelector<HTMLElement>('button, input, select, textarea')?.focus());
 		}
 	});
 

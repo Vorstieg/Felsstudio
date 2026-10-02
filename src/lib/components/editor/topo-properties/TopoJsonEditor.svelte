@@ -1,5 +1,12 @@
-<script>
-	let { id = 'topo-json-editor', text = $bindable(''), error = '', onformat, onapply } = $props();
+<script lang="ts">
+	type Props = {
+		id?: string;
+		text?: string;
+		error?: string;
+		onformat: () => void;
+		onapply: () => void;
+	};
+	let { id = 'topo-json-editor', text = $bindable(''), error = '', onformat, onapply }: Props = $props();
 </script>
 
 <div class="rounded-sm border border-black/15 bg-near-black p-2 shadow-sm">

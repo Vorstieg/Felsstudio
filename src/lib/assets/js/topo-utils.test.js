@@ -7,7 +7,7 @@ import {
 	convertRouteType,
 	createGrade,
 	getDefaultGeometryMode
-} from './topo-utils.js';
+} from './topo-utils.ts';
 
 describe('topo utilities', () => {
 	it.each([
@@ -35,7 +35,7 @@ describe('topo utilities', () => {
 		expect(
 			calculateRouteLength(
 				{
-					points: [
+					points3D: [
 						[0, 0, 0],
 						[3, 4, 0]
 					]
@@ -43,7 +43,7 @@ describe('topo utilities', () => {
 				2
 			)
 		).toBe(10);
-		expect(calculateRouteLength({ points: [[0, 0, 0]] })).toBe(0);
+		expect(calculateRouteLength({ points3D: [[0, 0, 0]] })).toBe(0);
 	});
 
 	it('counts only bolt fixpoints referenced by the route', () => {
@@ -67,7 +67,7 @@ describe('topo utilities', () => {
 				[0.1, 0.2],
 				[0.8, 0.9]
 			],
-			points: [
+			points3D: [
 				[0, 0, 0],
 				[1, 1, 0]
 			]
@@ -85,13 +85,13 @@ describe('topo utilities', () => {
 				[0.1, 0.2],
 				[0.8, 0.9]
 			],
-			points: [
+			points3D: [
 				[0, 0, 0],
 				[1, 1, 0]
 			]
 		});
 		expect(route.length).toBe(0);
-		expect(route.points).toEqual([]);
+		expect(route.points3D).toEqual([]);
 
 		convertRouteType(route, 'sport');
 
@@ -104,7 +104,7 @@ describe('topo utilities', () => {
 				[0.1, 0.2],
 				[0.8, 0.9]
 			],
-			points: [
+			points3D: [
 				[0, 0, 0],
 				[1, 1, 0]
 			]

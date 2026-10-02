@@ -4,7 +4,7 @@
 		"allowJs": true,
 		"checkJs": false,
 		"strict": true,
-		"noImplicitAny": false,
+		"noImplicitAny": true,
 		"resolveJsonModule": true,
 		"moduleResolution": "bundler",
 		"skipLibCheck": true,

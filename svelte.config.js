@@ -3,6 +3,8 @@ import { mdsvex } from 'mdsvex';
 import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import rehypeSlug from 'rehype-slug';
 
+const isVitest = process.env.VITEST === 'true';
+
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
 	// Ensures both .svelte and .md files are treated as components (can be imported and used anywhere, or used as pages)
@@ -19,6 +21,8 @@ const config = {
 	],
 
 	kit: {
+		// Keep Vitest's SvelteKit sync output separate from the dev server's watched files.
+		outDir: isVitest ? '.svelte-kit-test' : '.svelte-kit',
 		adapter: adapter({
 			fallback: '404.html'
 		}),

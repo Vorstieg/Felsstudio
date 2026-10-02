@@ -2,7 +2,7 @@
 
 import { select } from 'd3-selection';
 import { describe, expect, it, vi } from 'vitest';
-import { renderTextLabelsLayer } from './render-text-labels-layer.js';
+import { renderTextLabelsLayer } from './render-text-labels-layer.ts';
 
 function renderLayer(label, overrides = {}) {
 	const svg = select(document.body).append('svg');

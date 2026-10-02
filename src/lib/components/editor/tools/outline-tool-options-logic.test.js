@@ -4,7 +4,7 @@ import {
 	createOutlineToolOptionsLogic,
 	createSelectedOutlineCurveLogic,
 	createSelectedOutlineStyleLogic
-} from './outline-tool-options-logic.js';
+} from './outline-tool-options-logic.ts';
 
 function createOutlineTool() {
 	return {

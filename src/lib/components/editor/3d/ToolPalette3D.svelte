@@ -1,6 +1,19 @@
-<script>
+<script lang="ts">
 	import ToolBar from '$lib/components/editor/tools/ToolBar.svelte';
 	import { _ } from 'svelte-i18n';
+	import type { Topo2DEditorClustering } from '$lib/state/topo-2d-editor-initial-state.ts';
+	import type { TopoDrawingTarget } from '$lib/state/topo-drawing-target.ts';
+
+	type Point2D = [number, number];
+	type Props = {
+		activeTool?: string | null;
+		drawingTarget?: TopoDrawingTarget | null;
+		lassoPoints: Point2D[];
+		saveStatus: 'idle' | 'success' | 'error';
+		saveError: string;
+		combinedExport: () => void | Promise<void>;
+		clustering: Topo2DEditorClustering;
+	};
 
 	let {
 		activeTool = $bindable(null),
@@ -10,7 +23,7 @@
 		saveError,
 		combinedExport,
 		clustering = $bindable()
-	} = $props();
+	}: Props = $props();
 
 </script>
 <ToolBar

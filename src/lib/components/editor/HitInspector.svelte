@@ -1,5 +1,6 @@
-<script>
-	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+<script lang="ts">
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
+	import type { ClusteringHit } from '$lib/state/clustering-types.ts';
 	const topoSession = getTopo2DEditorState();
 	import { _ } from 'svelte-i18n';
 
@@ -7,10 +8,15 @@
 		topoSession.clustering.clusters.find((c) => c.id === topoSession.clustering.lockedClusterId)
 	);
 
-	let activeHitIdx = $state(null);
-	let hoveredHitIdx = $state(null);
+	let activeHitIdx = $state<number | null>(null);
+	let hoveredHitIdx = $state<number | null>(null);
 
-	let previewHit = $derived(selectedCluster?.members[hoveredHitIdx] ?? selectedCluster?.members[activeHitIdx] ?? selectedCluster?.members[0] ?? null);
+	let previewHit = $derived(
+		(selectedCluster && hoveredHitIdx !== null ? selectedCluster.members[hoveredHitIdx] : null) ??
+			(selectedCluster && activeHitIdx !== null ? selectedCluster.members[activeHitIdx] : null) ??
+			selectedCluster?.members[0] ??
+			null
+	);
 
 	function close() {
 		topoSession.clustering.lockedClusterId = null;
@@ -19,7 +25,7 @@
 		hoveredHitIdx = null;
 	}
 
-	function getCropSrc(hit) {
+	function getCropSrc(hit: ClusteringHit): string | null {
 		if (!hit?.crop) return null;
 
 		if (topoSession.clustering.cropsMap) {
@@ -27,18 +33,23 @@
 			const cropKeyLower = cropKey.toLowerCase();
 
 			if (topoSession.clustering.cropsMap[cropKey]) return topoSession.clustering.cropsMap[cropKey];
-			if (topoSession.clustering.cropsMap[cropKeyLower]) return topoSession.clustering.cropsMap[cropKeyLower];
+			if (topoSession.clustering.cropsMap[cropKeyLower])
+				return topoSession.clustering.cropsMap[cropKeyLower];
 
 			// Try matching just the filename in case the map keys are just filenames
-			const fileName = cropKey.split('/').pop().split('\\').pop();
+			const fileName = cropKey.split('/').pop()?.split('\\').pop() ?? cropKey;
 			const fileNameLower = fileName.toLowerCase();
 
-			if (topoSession.clustering.cropsMap[fileName]) return topoSession.clustering.cropsMap[fileName];
-			if (topoSession.clustering.cropsMap[fileNameLower]) return topoSession.clustering.cropsMap[fileNameLower];
+			if (topoSession.clustering.cropsMap[fileName])
+				return topoSession.clustering.cropsMap[fileName];
+			if (topoSession.clustering.cropsMap[fileNameLower])
+				return topoSession.clustering.cropsMap[fileNameLower];
 
 			// Try matching with crops/ prefix
-			if (topoSession.clustering.cropsMap['crops/' + fileName]) return topoSession.clustering.cropsMap['crops/' + fileName];
-			if (topoSession.clustering.cropsMap['crops/' + fileNameLower]) return topoSession.clustering.cropsMap['crops/' + fileNameLower];
+			if (topoSession.clustering.cropsMap['crops/' + fileName])
+				return topoSession.clustering.cropsMap['crops/' + fileName];
+			if (topoSession.clustering.cropsMap['crops/' + fileNameLower])
+				return topoSession.clustering.cropsMap['crops/' + fileNameLower];
 
 			// Ultimate Fuzzy Fallback: if any key in the map contains our filename, return it!
 			for (const [key, blobUrl] of Object.entries(topoSession.clustering.cropsMap)) {
@@ -48,7 +59,11 @@
 			}
 		}
 
-		if (hit.crop.startsWith('http') || hit.crop.startsWith('data:') || hit.crop.startsWith('blob:')) {
+		if (
+			hit.crop.startsWith('http') ||
+			hit.crop.startsWith('data:') ||
+			hit.crop.startsWith('blob:')
+		) {
 			return hit.crop;
 		}
 
@@ -57,7 +72,7 @@
 		return null;
 	}
 
-	function handleKeyDown(e) {
+	function handleKeyDown(e: KeyboardEvent) {
 		if (!selectedCluster || !selectedCluster.members.length) return;
 
 		const key = e.key;
@@ -65,7 +80,8 @@
 		if (key === 'ArrowLeft') {
 			e.preventDefault();
 			let currentIdx = activeHitIdx ?? 0;
-			currentIdx = (currentIdx - 1 + selectedCluster.members.length) % selectedCluster.members.length;
+			currentIdx =
+				(currentIdx - 1 + selectedCluster.members.length) % selectedCluster.members.length;
 			activeHitIdx = currentIdx;
 			hoveredHitIdx = null;
 		} else if (key === 'ArrowRight') {
@@ -83,25 +99,45 @@
 {#if previewHit}
 	<!-- Big Zoomed Crop Popup -->
 	<div
-		class="fixed bottom-20 left-2 z-[100] panel p-2 animate-in fade-in slide-in-from-bottom-2 pointer-events-none w-80 shadow-modal bg-white border-black/15">
-		<img src={getCropSrc(previewHit)} alt="Zoomed crop"
-				 class="w-full aspect-square object-contain rounded-sm bg-black/5 mb-2 border border-black/15" />
+		class="fixed bottom-20 left-2 z-[100] panel p-2 animate-in fade-in slide-in-from-bottom-2 pointer-events-none w-80 shadow-modal bg-white border-black/15"
+	>
+		<img
+			src={getCropSrc(previewHit)}
+			alt="Zoomed crop"
+			class="w-full aspect-square object-contain rounded-sm bg-black/5 mb-2 border border-black/15"
+		/>
 
 		<div class="grid grid-cols-2 gap-x-3 gap-y-2">
-			<div class="flex flex-col"><span
-				class="text-ui-label uppercase tracking-tighter">{$_('ui.confidence')}</span><span
-				class="text-creator-blue font-bold text-[11px]">{(previewHit.conf * 100).toFixed(1)}%</span></div>
-			<div class="flex flex-col text-right"><span
-				class="text-ui-label uppercase tracking-tighter">{$_('ui.cam_dist')}</span><span
-				class="text-near-black font-bold text-[11px] font-mono">{previewHit.cam_dist.toFixed(2)}m</span></div>
-			<div class="flex flex-col"><span class="text-ui-label uppercase tracking-tighter">{$_('ui.angle_cos')}</span><span
-				class="text-near-black font-bold text-[11px] font-mono">{previewHit.normal_dot.toFixed(3)}</span></div>
-			<div class="flex flex-col text-right"><span
-				class="text-ui-label uppercase tracking-tighter">{$_('ui.edge_dist')}</span><span
-				class="text-near-black font-bold text-[11px] font-mono">{previewHit.edge_dist.toFixed(3)}</span></div>
-			<div class="col-span-2 pt-1.5 border-t border-black/10 flex flex-col"><span
-				class="text-ui-label uppercase tracking-tighter">{$_('ui.source_image')}</span><span
-				class="text-warm-gray-400 text-[10px] truncate font-mono" title={previewHit.img}>{previewHit.img}</span></div>
+			<div class="flex flex-col">
+				<span class="text-ui-label uppercase tracking-tighter">{$_('ui.confidence')}</span><span
+					class="text-creator-blue font-bold text-[11px]"
+					>{(previewHit.conf * 100).toFixed(1)}%</span
+				>
+			</div>
+			<div class="flex flex-col text-right">
+				<span class="text-ui-label uppercase tracking-tighter">{$_('ui.cam_dist')}</span><span
+					class="text-near-black font-bold text-[11px] font-mono"
+					>{previewHit.cam_dist.toFixed(2)}m</span
+				>
+			</div>
+			<div class="flex flex-col">
+				<span class="text-ui-label uppercase tracking-tighter">{$_('ui.angle_cos')}</span><span
+					class="text-near-black font-bold text-[11px] font-mono"
+					>{previewHit.normal_dot.toFixed(3)}</span
+				>
+			</div>
+			<div class="flex flex-col text-right">
+				<span class="text-ui-label uppercase tracking-tighter">{$_('ui.edge_dist')}</span><span
+					class="text-near-black font-bold text-[11px] font-mono"
+					>{previewHit.edge_dist.toFixed(3)}</span
+				>
+			</div>
+			<div class="col-span-2 pt-1.5 border-t border-black/10 flex flex-col">
+				<span class="text-ui-label uppercase tracking-tighter">{$_('ui.source_image')}</span><span
+					class="text-warm-gray-400 text-[10px] truncate font-mono"
+					title={previewHit.img}>{previewHit.img}</span
+				>
+			</div>
 		</div>
 	</div>
 {/if}
@@ -109,44 +145,69 @@
 {#if selectedCluster}
 	<!-- Standard Inspection Mode -->
 	<div
-		class="fixed bottom-2 left-2 right-2 z-50 flex items-center h-16 panel shadow-panel bg-white p-1 animate-in slide-in-from-bottom-2 border-black/15">
-		<div class="flex items-center gap-2.5 px-3 border-r border-black/15 h-8 flex-shrink-0 min-w-[140px]">
-			<div class="w-2 h-2 rounded-sm shadow-sm border border-white/20"
-					 style="background-color: {selectedCluster.color}"></div>
+		class="fixed bottom-2 left-2 right-2 z-50 flex items-center h-16 panel shadow-panel bg-white p-1 animate-in slide-in-from-bottom-2 border-black/15"
+	>
+		<div
+			class="flex items-center gap-2.5 px-3 border-r border-black/15 h-8 flex-shrink-0 min-w-[140px]"
+		>
+			<div
+				class="w-2 h-2 rounded-sm shadow-sm border border-white/20"
+				style="background-color: {selectedCluster.color}"
+			></div>
 			<div class="flex flex-col justify-center">
-				<h2 class="text-section-title leading-none uppercase !text-[12px]">{selectedCluster.class}</h2>
-				<p
-					class="text-ui-label uppercase tracking-tighter mt-0.5">{selectedCluster.members.length} {$_('ui.observations')}</p>
+				<h2 class="text-section-title leading-none uppercase !text-[12px]">
+					{selectedCluster.class}
+				</h2>
+				<p class="text-ui-label uppercase tracking-tighter mt-0.5">
+					{selectedCluster.members.length}
+					{$_('ui.observations')}
+				</p>
 			</div>
 		</div>
 
 		<div class="flex-1 flex items-center gap-1 overflow-x-auto custom-scrollbar px-3 h-full">
 			{#each selectedCluster.members as hit, i}
 				<button
-					class="flex-shrink-0 h-10 w-10 rounded-sm border transition-none overflow-hidden bg-black/5 cursor-pointer {activeHitIdx === i ? 'border-creator-blue ring-1 ring-creator-blue' : 'border-black/10 hover:border-black/30'}"
-					onclick={() => activeHitIdx = activeHitIdx === i ? null : i}
-					onmouseenter={() => hoveredHitIdx = i}
-					onmouseleave={() => hoveredHitIdx = null}
+					class="flex-shrink-0 h-10 w-10 rounded-sm border transition-none overflow-hidden bg-black/5 cursor-pointer {activeHitIdx ===
+					i
+						? 'border-creator-blue ring-1 ring-creator-blue'
+						: 'border-black/10 hover:border-black/30'}"
+					onclick={() => (activeHitIdx = activeHitIdx === i ? null : i)}
+					onmouseenter={() => (hoveredHitIdx = i)}
+					onmouseleave={() => (hoveredHitIdx = null)}
 				>
-					<img src={getCropSrc(hit)} alt="Detection"
-							 class="w-full h-full object-cover grayscale-[0.4] hover:grayscale-0" />
+					<img
+						src={getCropSrc(hit)}
+						alt="Detection"
+						class="w-full h-full object-cover grayscale-[0.4] hover:grayscale-0"
+					/>
 				</button>
 			{/each}
 		</div>
 
 		<div class="flex items-center gap-6 px-5 border-l border-black/15 h-8 flex-shrink-0">
 			<div class="flex items-center gap-6">
-				<div class="flex flex-col leading-none"><span
-					class="text-ui-label uppercase mb-0.5 tracking-tighter">{$_('ui.spread')}</span><span
-					class="text-near-black font-bold font-mono text-[10px]">{selectedCluster.spread_val.toFixed(2)}m</span></div>
-				<div class="flex flex-col leading-none"><span
-					class="text-ui-label uppercase mb-0.5 tracking-tighter">{$_('ui.angle')}</span><span
-					class="text-near-black font-bold font-mono text-[10px]">{selectedCluster.avg_angle.toFixed(3)}</span></div>
+				<div class="flex flex-col leading-none">
+					<span class="text-ui-label uppercase mb-0.5 tracking-tighter">{$_('ui.spread')}</span
+					><span class="text-near-black font-bold font-mono text-[10px]"
+						>{selectedCluster.spread_val.toFixed(2)}m</span
+					>
+				</div>
+				<div class="flex flex-col leading-none">
+					<span class="text-ui-label uppercase mb-0.5 tracking-tighter">{$_('ui.angle')}</span><span
+						class="text-near-black font-bold font-mono text-[10px]"
+						>{selectedCluster.avg_angle.toFixed(3)}</span
+					>
+				</div>
 			</div>
 			<div class="w-px h-5 bg-black/15"></div>
-			<button onclick={close} aria-label="Close inspector"
-							class="w-8 h-8 flex items-center justify-center rounded-sm bg-black/5 hover:bg-rose-600 hover:text-white transition-none text-warm-gray-500 border border-black/10 shadow-sm cursor-pointer">
-				<i class="fa-solid fa-xmark text-sm"></i></button>
+			<button
+				onclick={close}
+				aria-label="Close inspector"
+				class="w-8 h-8 flex items-center justify-center rounded-sm bg-black/5 hover:bg-rose-600 hover:text-white transition-none text-warm-gray-500 border border-black/10 shadow-sm cursor-pointer"
+			>
+				<i class="fa-solid fa-xmark text-sm"></i></button
+			>
 		</div>
 	</div>
 {/if}

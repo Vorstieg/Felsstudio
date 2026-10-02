@@ -1,0 +1,362 @@
+let snapToBiggestHeight: (() => void) | undefined;
+let snapToSmallestHeight: (() => void) | undefined;
+
+type PointerEvent = MouseEvent | TouchEvent;
+type SheetRect = { top: number; height: number };
+
+export function resize(element: HTMLElement) {
+	// The sheet owns its visible drag handle. Reusing it prevents an empty,
+	// dynamically appended node from becoming a second visual layer when the
+	// panel is resized or remounted.
+	const grabber = element.querySelector<HTMLElement>('.grabber');
+
+	let active: Element | null = null;
+	let initialRect: SheetRect | null = null;
+	let initialPos: { y: number } | null = null;
+	let lastY: number | null = null;
+	let targetHeights: number[] = [];
+	let minHeight = 0;
+	let maxTop = 0;
+
+	function getEventY(event: PointerEvent): number {
+		return 'changedTouches' in event ? (event.changedTouches[0]?.pageY ?? 0) : event.pageY;
+	}
+
+	function calculateTargetHeights() {
+		const screenHeight = window.innerHeight;
+		// Keep the inspector in a clearly collapsed or expanded state. The old
+		// 50% detent was easy to hit accidentally and obscured half the editor.
+		// The collapsed detent must also fit the handle. At 5% of a short
+		// landscape viewport it was only a few pixels tall, making the sheet look
+		// like it had disappeared after a resize or a drawing action.
+		const collapsedHeight = Math.max(30, screenHeight * 0.05);
+		targetHeights = [collapsedHeight, screenHeight * 0.9];
+
+		minHeight = collapsedHeight;
+		maxTop = screenHeight - minHeight;
+
+		// If it hasn't been explicitly dragged yet, keep the CSS variable in sync with window.innerHeight
+		if (isMobile() && (!element.style.height || element.style.height === '')) {
+			setPanelHeight(targetHeights[0]);
+		}
+	}
+
+	function repositionForViewportResize() {
+		if (!isMobile()) return;
+
+		const currentHeight = parseFloat(element.style.height);
+		const wasExpanded =
+			Number.isFinite(currentHeight) &&
+			Math.abs(currentHeight - targetHeights[1]) < Math.abs(currentHeight - targetHeights[0]);
+
+		calculateTargetHeights();
+		const nextHeight = targetHeights[wasExpanded ? 1 : 0];
+		element.style.top = `${window.innerHeight - nextHeight}px`;
+		element.style.height = `${nextHeight}px`;
+		element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+		setPanelHeight(nextHeight);
+	}
+
+	function setPanelHeight(height: number) {
+		document.body.style.setProperty('--info-panel-height', `${height}px`);
+		document.body.style.setProperty(
+			'--mobile-toolbar-visibility',
+			height >= window.innerHeight * 0.75 ? 'hidden' : 'visible'
+		);
+	}
+
+	function calculateClosestHeight(currentHeight: number, direction: number): number {
+		let closestHeight: number | undefined;
+
+		if (direction < 0) {
+			// Moving up
+			closestHeight = targetHeights.find((h) => h > currentHeight);
+			if (!closestHeight) {
+				closestHeight = targetHeights[targetHeights.length - 1];
+			}
+		} else if (direction > 0) {
+			// Moving down
+			closestHeight = targetHeights
+				.slice()
+				.reverse()
+				.find((h) => h < currentHeight);
+			if (!closestHeight) {
+				closestHeight = targetHeights[0];
+			}
+		}
+
+		return closestHeight ?? targetHeights[0];
+	}
+
+	function isMobile() {
+		// DetailsComponent uses its sheet layout up to the expanded breakpoint.
+		// This includes phones held in landscape, which are commonly wider than
+		// 640px while still needing the draggable bottom sheet.
+		return window.innerWidth <= 1024;
+	}
+
+	function snapToClosestHeight() {
+		if (!isMobile()) return; // Guard for desktop
+
+		const currentHeight = parseFloat(element.style.height);
+
+		let direction = 0;
+		if (lastY !== null && initialPos !== null) {
+			direction = lastY - initialPos.y;
+		}
+
+		const closestHeight = calculateClosestHeight(currentHeight, direction);
+
+		element.style.transition =
+			'top 0.2s ease-out, height 0.2s ease-out, border-radius 0.2s ease-out';
+		document.body.style.setProperty('--info-panel-transition', 'bottom 0.2s ease-out');
+
+		if (closestHeight === window.innerHeight) {
+			// Full height
+			element.style.top = `0`;
+			element.style.borderRadius = `0`;
+			element.style.height = `${closestHeight}px`;
+		} else {
+			// Partial height
+			element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+			element.style.top = `${window.innerHeight - closestHeight}px`;
+			element.style.height = `${closestHeight}px`;
+		}
+
+		setPanelHeight(closestHeight);
+
+		// Ensure no inline margin overrides class styles on mobile (we want 0)
+		element.style.marginInline = '';
+
+		setTimeout(() => {
+			element.style.transition = '';
+			document.body.style.setProperty('--info-panel-transition', 'none');
+		}, 200);
+	}
+
+	function resetState() {
+		if (active) active.classList.remove('selected');
+		active = null;
+		initialRect = null;
+		initialPos = null;
+		lastY = null;
+	}
+
+	function onMousedown(event: PointerEvent) {
+		if (!isMobile()) return;
+		if (!(event.target instanceof Element)) return;
+
+		active = event.target;
+		const rect = element.getBoundingClientRect();
+		initialRect = { top: rect.top, height: rect.height };
+		initialPos = { y: getEventY(event) };
+		lastY = initialPos.y;
+		active.classList.add('selected');
+		element.style.transition = 'border-radius 0.2s ease-out';
+		document.body.style.setProperty('--info-panel-transition', 'none');
+
+		// On interaction, ensure we are in partial-height style (rounded top only)
+		element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+		// Remove inline margin to respect CSS class (w-auto left-0 right-0 -> 0 margin)
+		element.style.marginInline = '';
+
+		setTimeout(() => {
+			element.style.transition = '';
+			document.body.style.setProperty('--info-panel-transition', 'none');
+		}, 200);
+	}
+
+	function onMouseup() {
+		if (!active) return;
+		snapToClosestHeight();
+		resetState();
+	}
+
+	function onMove(event: PointerEvent) {
+		if (!active || !initialPos || !initialRect) return;
+
+		const currentY = getEventY(event);
+		const delta = initialPos.y - currentY;
+		let newTop = initialRect.top - delta;
+
+		// Clamp newTop between 0 and maxTop
+		newTop = Math.max(0, Math.min(newTop, maxTop));
+
+		// Calculate height to fill the rest of the screen to the bottom
+		let newHeight = window.innerHeight - newTop;
+
+		// Clamp height to minHeight (redundant if maxTop is correct, but safe)
+		newHeight = Math.max(minHeight, newHeight);
+
+		element.style.top = `${newTop}px`;
+		element.style.height = `${newHeight}px`;
+		setPanelHeight(newHeight);
+		lastY = currentY;
+	}
+
+	let contentDragActive = false;
+	let contentInitialY: number | null = null;
+	let scrollContainer: HTMLElement | null = null;
+	let initialScrollTop = 0;
+
+	function findScrollContainer(target: EventTarget | null): HTMLElement | null {
+		let curr = target instanceof HTMLElement ? target : null;
+		while (curr && curr !== element && curr !== document.body) {
+			const overflowY = window.getComputedStyle(curr).overflowY;
+			if (overflowY === 'auto' || overflowY === 'scroll') {
+				if (curr.scrollHeight > curr.clientHeight) {
+					return curr;
+				}
+			}
+			curr = curr.parentElement;
+		}
+		return null;
+	}
+
+	function onContentTouchStart(event: TouchEvent) {
+		if (!isMobile() || active) return;
+		if (!(event.target instanceof Element)) return;
+		if (event.target.closest('.grabber')) return;
+
+		contentInitialY = getEventY(event);
+		scrollContainer = findScrollContainer(event.target);
+		initialScrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+		contentDragActive = false;
+	}
+
+	function onContentTouchMove(event: TouchEvent) {
+		if (!isMobile() || contentInitialY === null || active === event.target) return;
+		if (!(event.target instanceof Element)) return;
+		if (event.target.closest('.grabber')) return;
+
+		const currentY = getEventY(event);
+		const deltaY = currentY - contentInitialY;
+		const currentHeight = parseFloat(element.style.height || '0');
+		const maxHeight = targetHeights[targetHeights.length - 1];
+
+		if (!contentDragActive) {
+			let shouldDragPanel = false;
+
+			if (deltaY < -5) {
+				// Swipe UP (scroll down)
+				if (Math.abs(currentHeight - maxHeight) > 5) {
+					shouldDragPanel = true;
+				}
+			} else if (deltaY > 5) {
+				// Swipe DOWN (scroll up)
+				if (initialScrollTop <= 0) {
+					shouldDragPanel = true;
+				}
+			}
+
+			if (shouldDragPanel) {
+				contentDragActive = true;
+				active = element;
+				const rect = element.getBoundingClientRect();
+				initialRect = { top: rect.top, height: rect.height };
+				initialPos = { y: contentInitialY };
+				lastY = contentInitialY;
+
+				element.style.transition = 'border-radius 0.2s ease-out';
+				document.body.style.setProperty('--info-panel-transition', 'none');
+				element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+				element.style.marginInline = '';
+			}
+		}
+
+		if (contentDragActive) {
+			if (event.cancelable) event.preventDefault();
+			onMove(event);
+		}
+	}
+
+	function onContentTouchEnd() {
+		if (contentDragActive) {
+			onMouseup();
+			contentDragActive = false;
+		}
+		contentInitialY = null;
+		scrollContainer = null;
+	}
+
+	calculateTargetHeights();
+	// Initialize the CSS variable so floating buttons start at the exact correct pixel height, not the CSS fallback
+	if (isMobile()) {
+		setPanelHeight(targetHeights[0]);
+		element.style.top = `${window.innerHeight - targetHeights[0]}px`;
+		element.style.height = `${targetHeights[0]}px`;
+		element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+	}
+
+	grabber?.addEventListener('mousedown', onMousedown);
+	grabber?.addEventListener('touchstart', onMousedown);
+
+	window.addEventListener('mousemove', onMove, { passive: false });
+	window.addEventListener('touchmove', onMove, { passive: false });
+	window.addEventListener('mouseup', onMouseup);
+	window.addEventListener('touchend', onMouseup);
+	window.addEventListener('resize', repositionForViewportResize);
+
+	element.addEventListener('touchstart', onContentTouchStart, { passive: true });
+	element.addEventListener('touchmove', onContentTouchMove, { passive: false });
+	element.addEventListener('touchend', onContentTouchEnd);
+
+	snapToBiggestHeight = () => {
+		if (!isMobile()) return;
+
+		element.style.transition =
+			'top 0.2s ease-out, height 0.2s ease-out, border-radius 0.2s ease-out';
+		document.body.style.setProperty('--info-panel-transition', 'bottom 0.2s ease-out');
+		element.style.marginInline = ''; // Clear inline margin
+		const biggestHeight = targetHeights[targetHeights.length - 1];
+		element.style.top = `${window.innerHeight - biggestHeight}px`;
+		element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+		element.style.height = `${biggestHeight}px`;
+		setPanelHeight(biggestHeight);
+
+		setTimeout(() => {
+			element.style.transition = '';
+			document.body.style.setProperty('--info-panel-transition', 'none');
+		}, 200);
+	};
+
+	snapToSmallestHeight = () => {
+		if (!isMobile()) return;
+
+		element.style.transition =
+			'top 0.2s ease-out, height 0.2s ease-out, border-radius 0.2s ease-out';
+		document.body.style.setProperty('--info-panel-transition', 'bottom 0.2s ease-out');
+		element.style.marginInline = '';
+		const smallestHeight = targetHeights[0];
+		element.style.top = `${window.innerHeight - smallestHeight}px`;
+		element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+		element.style.height = `${smallestHeight}px`;
+		setPanelHeight(smallestHeight);
+
+		setTimeout(() => {
+			element.style.transition = '';
+			document.body.style.setProperty('--info-panel-transition', 'none');
+		}, 200);
+	};
+
+	return {
+		destroy() {
+			window.removeEventListener('mousemove', onMove);
+			window.removeEventListener('touchmove', onMove);
+			window.removeEventListener('mouseup', onMouseup);
+			window.removeEventListener('touchend', onMouseup);
+			window.removeEventListener('resize', repositionForViewportResize);
+			grabber?.removeEventListener('mousedown', onMousedown);
+			grabber?.removeEventListener('touchstart', onMousedown);
+
+			element.removeEventListener('touchstart', onContentTouchStart);
+			element.removeEventListener('touchmove', onContentTouchMove);
+			element.removeEventListener('touchend', onContentTouchEnd);
+
+			document.body.style.removeProperty('--info-panel-height');
+			document.body.style.removeProperty('--mobile-toolbar-visibility');
+		}
+	};
+}
+
+export { snapToBiggestHeight, snapToSmallestHeight };

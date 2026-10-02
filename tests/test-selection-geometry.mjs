@@ -10,7 +10,7 @@ test('selects geometry according to marquee direction', async () => {
 		appType: 'custom'
 	});
 	const { createSelectionRegion, getRegionSelection, getRoutePointRegionSelection } =
-		await vite.ssrLoadModule('/src/lib/components/editor/2d/selection-geometry.js');
+		await vite.ssrLoadModule('/src/lib/components/editor/2d/selection-geometry.ts');
 
 	const topo = {
 		routes: [

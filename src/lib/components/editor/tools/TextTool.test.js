@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it, vi } from 'vitest';
-import { TextTool } from './TextTool.svelte.js';
+import { TextTool } from './TextTool.svelte.ts';
 
 function setup(labels = []) {
 	const topo = { textLabels: labels };

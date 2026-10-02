@@ -1,15 +1,17 @@
-<script>
+<script lang="ts">
 	import { _ } from 'svelte-i18n';
 	import { topoSymbols } from '@vorstieg/topo-renderer';
-	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
-	import { createAiFixpoint } from './topo-properties-utils.js';
+	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
+	import { createAiFixpoint } from './topo-properties-utils.ts';
+	import type { TopoCluster } from '$lib/state/clustering-types.ts';
+	import type { FixPoint } from '@vorstieg/fels-types/types';
 	const editorState = getTopo2DEditorState();
 	let topo = $derived(editorState.topo);
 	const ui = editorState.ui;
 
-	let { aiSuggestions = [], mobile = false } = $props();
+	let { aiSuggestions = [], mobile = false }: { aiSuggestions?: TopoCluster[]; mobile?: boolean } = $props();
 
-	function toggleCluster(cluster) {
+	function toggleCluster(cluster: TopoCluster) {
 		if (editorState.clustering.lockedClusterId === cluster.id) {
 			editorState.clustering.lockedClusterId = null;
 		} else {
@@ -18,17 +20,17 @@
 		editorState.clustering.selectedClusterId = cluster.id;
 	}
 
-	function addAiBolt(cluster) {
+	function addAiBolt(cluster: TopoCluster) {
 		editorState.addFixpoint(createAiFixpoint(cluster));
 		editorState.clustering.selectedClusterId = null;
 	}
 
-	function removeFixpoint(point) {
+	function removeFixpoint(point: FixPoint) {
 		const pointId = point?.id;
 		editorState.removeFixpoint(pointId);
 	}
 
-	function updateFixpointType(point, type) {
+	function updateFixpointType(point: FixPoint, type: string) {
 		editorState.updateFixpoint(point.id, { type });
 	}
 </script>

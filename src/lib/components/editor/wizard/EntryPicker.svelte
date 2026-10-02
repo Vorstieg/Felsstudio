@@ -1,5 +1,19 @@
-<script>
+<script lang="ts">
 	import { _ } from 'svelte-i18n';
+	import { fetchCragsFromManifest } from '$lib/assets/js/fetchCrags.ts';
+
+	type Location = Awaited<ReturnType<typeof fetchCragsFromManifest>>[number];
+	type WorkspacePath = {
+		isCragEditor: () => boolean;
+	};
+	type Props = {
+		workSpaceWrapper: WorkspacePath;
+		filteredLocations?: Location[];
+		isLoading?: boolean;
+		searchQuery?: string;
+		startNewEntry: () => void;
+		loadFromEntry: (_location: Location) => void;
+	};
 
 	let {
 		workSpaceWrapper,
@@ -8,9 +22,7 @@
 		searchQuery = $bindable(''),
 		startNewEntry,
 		loadFromEntry
-	} = $props();
-	let expandedCragId = $state(null);
-
+	}: Props = $props();
 </script>
 
 {#if workSpaceWrapper.isCragEditor()}
@@ -39,58 +51,29 @@
 			<div class="flex flex-col items-center gap-2">
 				<i class="fa-solid fa-spinner fa-spin text-creator-blue text-xl"></i>
 				<span class="text-micro-data font-bold text-near-black uppercase tracking-widest"
-				>{$_('ui.initializing')}</span
+					>{$_('ui.initializing')}</span
 				>
 			</div>
 		</div>
 	{/if}
 
 	{#each filteredLocations as crag}
-		{@const sectors = crag.properties.sectors || []}
-		{@const showSectorChoices = workSpaceWrapper.isTopoWorkspace() && sectors.length > 0}
 		<div class="bg-white rounded border border-transparent hover:border-black/15 transition-none">
 			<button
 				class="w-full p-2.5 text-left hover:bg-black/5 rounded transition-none group flex items-center justify-between disabled:opacity-50"
-				onclick={() =>showSectorChoices ? expandedCragId = crag.properties.id: loadFromEntry(crag)}
+				onclick={() => loadFromEntry(crag)}
 				disabled={isLoading}
 			>
 				<div>
 					<div class="text-body-text font-bold group-hover:text-creator-blue transition-none">
 						{crag.properties.name}
 					</div>
-					<div class="text-micro-data text-warm-gray-400">{crag.properties.path}</div>
+					<div class="text-micro-data text-warm-gray-400">{crag.entryPath}</div>
 				</div>
 				<i
-					class="fa-solid {showSectorChoices && expandedCragId === crag.properties.id
-							? 'fa-chevron-down'
-							: 'fa-chevron-right'} text-warm-gray-300 text-[10px] group-hover:text-creator-blue transition-none"
+					class="fa-solid fa-chevron-right text-warm-gray-300 text-[10px] group-hover:text-creator-blue transition-none"
 				></i>
 			</button>
-
-			{#if showSectorChoices && expandedCragId === crag.properties.id}
-				<div class="border-t border-black/10 p-1.5 space-y-1 bg-warm-white/70">
-					<button
-						class="w-full px-2 py-1.5 rounded-sm text-left text-body-text bg-white border border-black/10 hover:border-creator-blue hover:text-creator-blue transition-none disabled:opacity-50"
-						onclick={() => loadFromEntry(crag)}
-						disabled={isLoading}
-					>
-						<span class="font-bold">{crag.properties.name}</span>
-						<span class="block text-micro-data text-warm-gray-400">Whole crag</span>
-					</button>
-					{#each sectors as sector}
-						<button
-							class="w-full px-2 py-1.5 rounded-sm text-left text-body-text bg-white border border-black/10 hover:border-creator-blue hover:text-creator-blue transition-none disabled:opacity-50"
-							onclick={() => loadFromEntry(crag, sector)}
-							disabled={isLoading}
-						>
-							<span class="font-bold">{sector.name || sector.id}</span>
-							<span class="block text-micro-data text-warm-gray-400"
-							>{sector.assets?.topos?.[0] || 'No topo asset'}</span
-							>
-						</button>
-					{/each}
-				</div>
-			{/if}
 		</div>
 	{:else}
 		<div class="text-center py-6 text-body-text text-warm-gray-500">

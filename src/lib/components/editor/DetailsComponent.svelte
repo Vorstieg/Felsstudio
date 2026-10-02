@@ -1,19 +1,35 @@
-<script>
+<script lang="ts">
 	import { onMount } from 'svelte';
+	import type { Snippet } from 'svelte';
+
+	type Tab = { id: string; label: string; icon?: string; count?: number };
+	type Props = {
+		title?: string;
+		subtitle?: string;
+		tabs?: Tab[];
+		activeTab?: string;
+		onTabChange?: (_tab: string) => void;
+		width?: string;
+		shadow?: boolean;
+		visualSuperseded?: boolean;
+		footer?: Snippet;
+		headerActions?: Snippet;
+		children?: Snippet<[{ mobile: boolean }]>;
+	};
 
 	let {
 		title = 'Properties',
 		subtitle = '',
 		tabs = [],
-		activeTab = $bindable(),
-		onTabChange = (tab) => (activeTab = tab),
+		activeTab = $bindable(''),
+		onTabChange = (tab: string) => (activeTab = tab),
 		width = '20rem',
 		shadow = true,
 		visualSuperseded = false,
 		footer,
 		headerActions,
 		children
-	} = $props();
+	}: Props = $props();
 
 	// Resolve the initial layout from the browser width so desktop does not
 	// briefly render the mobile bottom-sheet variant during hydration.
@@ -27,8 +43,8 @@
 	});
 </script>
 
-<script module>
-	import { resize } from '$lib/assets/js/resize.js';
+<script module lang="ts">
+	import { resize } from '$lib/assets/js/resize.ts';
 </script>
 
 {#snippet tabBar(mobile = false)}

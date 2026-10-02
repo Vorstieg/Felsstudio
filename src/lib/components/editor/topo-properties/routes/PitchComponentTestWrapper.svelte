@@ -1,9 +1,17 @@
-<script>
-	import { provideTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.js';
+<script lang="ts">
+	import type { ComponentProps } from 'svelte';
+	import {
+		createTopo2DEditorState,
+		provideTopo2DEditorState
+	} from '$lib/state/topo-2d-editor-state.svelte.ts';
 	import PitchComponent from './PitchComponent.svelte';
 
-	let { pitch, onFieldChange = null } = $props();
-	provideTopo2DEditorState({ topo: { scale: 1, fixPoints: [] } });
+	type PitchProps = ComponentProps<typeof PitchComponent>;
+	let {
+		pitch,
+		onFieldChange = () => {}
+	}: { pitch: PitchProps['pitch']; onFieldChange?: PitchProps['onFieldChange'] } = $props();
+	provideTopo2DEditorState(createTopo2DEditorState());
 </script>
 
 <PitchComponent {pitch} {onFieldChange} />
