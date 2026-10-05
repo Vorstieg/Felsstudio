@@ -1,3 +1,4 @@
+import { select } from 'd3-selection';
 import { getOutlineLineStyle } from '@vorstieg/topo-renderer';
 import {
 	getOutlinePoints,
@@ -79,75 +80,78 @@ export function renderOutlinesLayer({
 			? `M ${straightPoints.replaceAll(' ', ' L ')}${closed ? ' Z' : ''}`
 			: null;
 	};
-	// 1.5 Rock Outlines Rendering
-	// Hit Area
-	const outlineSelection = outlinesLayer
-		.selectAll<SVGPathElement, OutlineRecord>('path.outline-hit-area')
-		.data(renderModel.outlines.items, (d) => d.id);
-
-	outlineSelection
-		.join(
-			(enter) =>
-				enter
-					.append('path')
-					.attr('class', 'outline-hit-area hit-area cursor-pointer')
-					.attr('fill', 'none')
-					.attr('stroke', 'transparent')
-					.on('mousedown', handleOutlineDown)
-					.on('touchstart', handleOutlineTouch)
-					.on('click', (e, d) => handleObjectClick(e, 'outline', d.id)),
-			(update) => update,
-			(exit) => exit.remove()
-		)
-		.attr('d', getOutlinePath)
-		.attr('data-testid', (outline) => `topo-object-outline-${outline.id}`)
-		.attr('stroke-width', getHitAreaSize(8))
-		.style('pointer-events', canInteract ? 'auto' : 'none');
-
-	// Main Path
-	const outlineMainSelection = outlinesLayer
-		.selectAll<SVGPathElement, OutlineRecord>('path.rock-outline')
-		.data(outlines, (d) => d.id);
-
-	outlineMainSelection
-		.join(
-			(enter) =>
-				enter.append('path').attr('class', 'cursor-move rock-outline').attr('fill', 'none'),
-			(update) => update,
-			(exit) => exit.remove()
-		)
-		.attr('d', getOutlinePath)
-		.attr('data-testid', (outline) => `topo-object-outline-${outline.id}`)
-		.attr('stroke', (d) =>
-			isSelected('outline', d.id) ? '#3b82f6' : getOutlineLineStyle(d.lineStyle).stroke
-		)
-		.attr('stroke-width', (d) => {
-			const style = getOutlineLineStyle(d.lineStyle);
-			return isSelected('outline', d.id) ? style.width + 1 : style.width;
+	// Remove flat paths left by the previous renderer during an in-place update.
+	// They would otherwise remain above the grouped outlines and hide their borders.
+	outlinesLayer
+		.selectAll<SVGPathElement, unknown>('path')
+		.filter(function () {
+			return this.parentNode === outlinesLayer.node();
 		})
-		.attr('stroke-dasharray', (d) => getOutlineLineStyle(d.lineStyle).dash)
-		.attr('stroke-linecap', 'round')
-		.attr('stroke-linejoin', 'round')
-		// Keep the visible stroke out of hit testing so clicks directly on the
-		// outline reach the wider hit area rendered immediately below it.
-		.style('pointer-events', 'none');
+		.remove();
 
-	// Filled shapes (for closed outlines with fill)
-	const outlineFillSelection = outlinesLayer
-		.selectAll<SVGPathElement, OutlineRecord>('path.outline-fill')
-		.data(renderModel.outlines.fills, (d) => d.id);
-
-	outlineFillSelection
-		.join(
-			(enter) => enter.append('path').attr('class', 'outline-fill'),
-			(update) => update,
-			(exit) => exit.remove()
-		)
-		.attr('d', getOutlinePath)
-		.attr('fill', (d) => d.fillColor || 'none')
-		.attr('fill-opacity', (d) => d.fillOpacity || 0.3)
-		.attr('stroke', 'none')
-		.style('pointer-events', 'none');
+	const groups = outlinesLayer
+		.selectAll<SVGGElement, OutlineRecord>('g.outline-group')
+		.data(outlines, (outline) => outline.id)
+		.join('g')
+		.attr('class', 'outline-group');
+	groups.each(function (outline) {
+		const points = getOutlinePoints(outline, { baseWidth, baseHeight });
+		const parts = [
+			...(isClosedShape(points) ? ['background'] : []),
+			...(outline.fillColor && points.length > 2 ? ['fill'] : []),
+			'stroke',
+			'hit'
+		];
+		const path = getOutlinePath(outline);
+		const style = getOutlineLineStyle(outline.lineStyle);
+		const selected = isSelected('outline', outline.id);
+		const paths = select(this)
+			.selectAll<SVGPathElement, string>('path')
+			.data(parts, (part) => part)
+			.join('path')
+			.attr('class', (part) =>
+				part === 'background'
+					? 'outline-background'
+					: part === 'fill'
+						? 'outline-fill'
+						: part === 'stroke'
+							? 'cursor-move rock-outline'
+							: 'outline-hit-area hit-area cursor-pointer'
+			)
+			.attr('d', path)
+			.attr('fill', (part) =>
+				part === 'background' ? '#fff' : part === 'fill' ? outline.fillColor || 'none' : 'none'
+			)
+			.attr('fill-opacity', (part) => (part === 'fill' ? (outline.fillOpacity ?? 0.3) : null))
+			.attr('stroke', (part) =>
+				part === 'stroke'
+					? selected
+						? '#3b82f6'
+						: style.stroke
+					: part === 'hit'
+						? 'transparent'
+						: 'none'
+			)
+			.attr('stroke-width', (part) =>
+				part === 'stroke'
+					? style.width + (selected ? 1 : 0)
+					: part === 'hit'
+						? getHitAreaSize(8)
+						: null
+			)
+			.attr('stroke-dasharray', (part) => (part === 'stroke' ? style.dash : null))
+			.attr('stroke-linecap', (part) => (part === 'stroke' ? 'round' : null))
+			.attr('stroke-linejoin', (part) => (part === 'stroke' ? 'round' : null))
+			.attr('data-testid', (part) =>
+				part === 'stroke' || part === 'hit' ? `topo-object-outline-${outline.id}` : null
+			)
+			.style('pointer-events', (part) => (part === 'hit' && canInteract ? 'auto' : 'none'));
+		paths
+			.filter((part) => part === 'hit')
+			.on('mousedown', (event) => handleOutlineDown(event, outline))
+			.on('touchstart', (event) => handleOutlineTouch(event, outline))
+			.on('click', (event) => handleObjectClick(event, 'outline', outline.id));
+	});
 
 	outlineEditTool?.render({
 		layers,

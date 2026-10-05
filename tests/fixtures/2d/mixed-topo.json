@@ -77,12 +77,7 @@
 		{
 			"id": "outline-polyline",
 			"shape": {
-				"type": "polyline",
-				"points2D": [
-					[0.08, 0.2],
-					[0.18, 0.12],
-					[0.3, 0.2]
-				]
+				"type": "polyline"
 			},
 			"points2D": [
 				[0.08, 0.2],
@@ -96,14 +91,7 @@
 			"id": "outline-preset",
 			"shape": {
 				"type": "polyline",
-				"preset": "slab",
-				"points2D": [
-					[0.55, 0.35],
-					[0.685, 0.35],
-					[0.82, 0.435],
-					[0.685, 0.52],
-					[0.55, 0.52]
-				]
+				"preset": "slab"
 			},
 			"points2D": [
 				[0.55, 0.35],

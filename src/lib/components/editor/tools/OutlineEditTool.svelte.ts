@@ -112,7 +112,10 @@ export class OutlineEditTool extends EditablePathEditTool {
 		// Keep freehand/brush metadata (including edge tracking), but make the
 		// simplified vertices authoritative for both rendering and export.
 		const changes = {
-			shape: { ...(outline.shape || { type: 'polyline' }), points2D: simplified },
+			shape:
+				outline.shape?.type === 'freehand' || outline.shape?.type === 'brush'
+					? outline.shape
+					: { type: 'polyline' },
 			points2D: simplified,
 			closed: isClosedShape(simplified)
 		};

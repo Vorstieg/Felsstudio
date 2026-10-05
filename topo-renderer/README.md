@@ -2,6 +2,10 @@
 
 Shared SVG rendering primitives, normalized 2D geometry, topo symbols, and symbol assets for Vorstieg topo JSON.
 
+## Development
+
+The entry point is written in TypeScript. Run `npm run build` in this directory to generate the JavaScript and declaration files in `dist/`. The package build also runs during `npm install` and before publishing.
+
 ## Installation
 
 Configure the GitHub Packages registry for the `@vorstieg` scope:

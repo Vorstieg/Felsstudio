@@ -55,9 +55,8 @@ function isPresetOutline(outline: OutlineRecord) {
 function detachPresetForVertexEdit(outline: OutlineRecord, canvasSize: Editor['viewport']) {
 	if (!isPresetOutline(outline)) return;
 
-	const points2D: Path2D = outlinePoints(outline, canvasSize).map((point) => [point[0], point[1]]);
-	outline.points2D = points2D;
-	outline.shape = { type: 'polyline', points2D };
+	outline.points2D = outlinePoints(outline, canvasSize).map((point) => [point[0], point[1]]);
+	outline.shape = { type: 'polyline' };
 }
 
 /**

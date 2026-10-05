@@ -216,6 +216,7 @@ test('supports outline and path geometry workflows', async () => {
 		shape: presetShape,
 		points2D: presetShape.points2D
 	});
+	assert.equal('points2D' in presetOutline.shape, false, 'stored preset has one vertex array');
 	assert.equal(isPresetOutline(presetOutline), true);
 	assert.equal(presetOutline.closed, false, 'pillar bases remain open');
 	assert.deepEqual(
@@ -248,8 +249,7 @@ test('supports outline and path geometry workflows', async () => {
 	const convertedPreset = structuredClone(presetOutline);
 	setOutlinePoint(convertedPreset, 1, [0.65, 0.3]);
 	assert.deepEqual(convertedPreset.shape, {
-		type: OUTLINE_SHAPE_TYPES.POLYLINE,
-		points2D: convertedPreset.points2D
+		type: OUTLINE_SHAPE_TYPES.POLYLINE
 	});
 	assert.equal(
 		isPresetOutline(convertedPreset),
@@ -269,6 +269,7 @@ test('supports outline and path geometry workflows', async () => {
 		presetOutline.points2D,
 		'export contains compatible points'
 	);
+	assert.equal('points2D' in exportedPreset.shape, false, 'shape does not duplicate vertices');
 	assert.deepEqual(
 		exportedPreset.curve,
 		{ enabled: false, tension: 0.45 },
@@ -282,6 +283,7 @@ test('supports outline and path geometry workflows', async () => {
 	assert.equal(semanticallyResized.closed, false);
 	assert.equal(semanticallyResized.shape.semantic.width, 0.9);
 	assert.equal(semanticallyResized.shape.semantic.height, 0.4);
+	assert.equal('points2D' in semanticallyResized.shape, false, 'semantic edits keep one vertex array');
 	assert.notDeepEqual(semanticallyResized.points2D[0], semanticallyResized.points2D.at(-1));
 
 	const leanedPillar = updatePresetOutline(presetOutline, { lean: 0.25, taper: -0.2 });

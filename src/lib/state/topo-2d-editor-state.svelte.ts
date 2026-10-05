@@ -643,7 +643,7 @@ export function createTopo2DEditorState({ topo }: { topo?: Partial<Topo2DEditorD
 			const outline = readTopo().outlines.find((entry) => entry.id === outlineId);
 			if (!outline) return false;
 			outline.points2D = [...(outline.points2D || []), [point.x, point.y]];
-			outline.shape = { type: 'polyline', points2D: outline.points2D };
+			outline.shape = { type: 'polyline' };
 			return true;
 		};
 		return recordHistory ? commit('Append outline point', mutate) : mutate();

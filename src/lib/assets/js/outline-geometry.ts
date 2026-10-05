@@ -15,7 +15,6 @@ export type OutlineShape = {
 	type: string;
 	preset?: OutlinePresetId;
 	semantic?: OutlineSemantic;
-	points2D?: Path2D;
 	start2D?: Point2D;
 	end2D?: Point2D;
 	center2D?: Point2D;
@@ -46,9 +45,8 @@ export const DEFAULT_OUTLINE_CURVE_TENSION = 0.45;
 export const PILLAR_OUTLINE_CURVE_TENSION = 0.3;
 
 /**
- * A preset deliberately remains a polyline on disk.  `preset` and `semantic`
- * preserve its origin for the editor, while every existing renderer can still
- * render `shape.points2D` without knowing about presets.
+ * A preset remains a polyline on disk. `preset` and `semantic` preserve its
+ * origin while the rendered vertices live in the outline's top-level points2D.
  */
 export const OUTLINE_PRESETS = [
 	{
@@ -164,7 +162,7 @@ export function createPresetShape(
 	start2D: Point2D,
 	end2D: Point2D,
 	{ semantic = {} }: { semantic?: OutlineSemantic } = {}
-): OutlineShape | null {
+): (OutlineShape & { points2D: Path2D }) | null {
 	if (!getOutlinePreset(presetId)) return null;
 	return {
 		type: OUTLINE_SHAPE_TYPES.POLYLINE,
@@ -340,7 +338,6 @@ export function updatePresetOutline(
 		}
 	});
 
-	updatedShape.points2D = points;
 	updatedShape.semantic = semantic;
 	updated.points2D = points.map((point) => [...point]);
 	updated.closed = isClosedShape(points);
@@ -412,7 +409,7 @@ export function convertPresetToPolyline(
 ): OutlineRecord {
 	if (!outline.shape || !isPresetOutline(outline)) return outline;
 	const points2D = getOutlinePoints(outline, canvasSize);
-	outline.shape = { type: OUTLINE_SHAPE_TYPES.POLYLINE, points2D };
+	outline.shape = { type: OUTLINE_SHAPE_TYPES.POLYLINE };
 	outline.points2D = points2D;
 	outline.closed = isClosedShape(points2D);
 	return outline;
@@ -567,8 +564,7 @@ export function simplifyClosedPoints(
 ): Path2D {
 	if (!isClosedPath(points) || points.length <= 4 || tolerancePx <= 0) return points || [];
 
-	const polygon = points.slice(0, -1);
-	let simplified = polygon;
+	let simplified = points.slice(0, -1);
 	// A second pass catches runs of very short, nearly straight brush vertices
 	// exposed after the first pass, while remaining deliberately conservative.
 	for (let pass = 0; pass < 2 && simplified.length > 3; pass += 1) {
@@ -606,10 +602,8 @@ export function translateOutline(
 			outline.shape.center2D[0] + deltaX,
 			outline.shape.center2D[1] + deltaY
 		];
-	} else if (outline.shape?.points2D) {
-		outline.shape.points2D = translatePath(outline.shape.points2D, [deltaX, deltaY]);
-	} else if (outline.points2D) {
-		outline.points2D = translatePath(outline.points2D, [deltaX, deltaY]);
+	} else {
+		outline.points2D = translatePath(getOutlinePoints(outline, canvasSize), [deltaX, deltaY]);
 	}
 
 	outline.points2D = getOutlinePoints(outline, canvasSize);
@@ -627,27 +621,18 @@ export function setOutlinePoint(
 	});
 	if (!points[pointIndex]) return;
 
-	if (isPresetOutline(outline)) {
-		// A direct vertex edit deliberately makes the resulting path fully manual.
-		outline.shape = {
-			type: OUTLINE_SHAPE_TYPES.POLYLINE,
-			points2D: points
-		};
-	} else if (outline.shape?.type === OUTLINE_SHAPE_TYPES.RECTANGLE) {
-		outline.shape = {
-			type: OUTLINE_SHAPE_TYPES.POLYLINE,
-			points2D: points
-		};
-	} else if (outline.shape?.type === OUTLINE_SHAPE_TYPES.CIRCLE) {
+	if (outline.shape?.type === OUTLINE_SHAPE_TYPES.CIRCLE) {
 		const center = outline.shape.center2D;
 		if (!center) return;
 		outline.shape.radius2D =
 			distancePx(center, point, canvasSize) / normalizeCanvasSize(canvasSize).baseWidth;
-	} else if (outline.shape?.points2D) {
-		outline.shape.points2D = points;
+		outline.points2D = getOutlinePoints(outline, canvasSize);
+	} else {
+		// A direct vertex edit turns a preset or rectangle into a manual path.
+		if (isPresetOutline(outline) || outline.shape?.type === OUTLINE_SHAPE_TYPES.RECTANGLE)
+			outline.shape = { type: OUTLINE_SHAPE_TYPES.POLYLINE };
+		outline.points2D = points;
 	}
-
-	outline.points2D = getOutlinePoints(outline, canvasSize);
 }
 
 export function insertOutlinePoint(
@@ -660,10 +645,7 @@ export function insertOutlinePoint(
 	const points = insertPathVertex(currentPoints, insertIndex, point, {
 		closed: isClosedPath(currentPoints)
 	});
-	outline.shape = {
-		type: OUTLINE_SHAPE_TYPES.POLYLINE,
-		points2D: points
-	};
+	outline.shape = { type: OUTLINE_SHAPE_TYPES.POLYLINE };
 	outline.points2D = points;
 }
 
@@ -676,10 +658,7 @@ export function removeOutlinePoint(
 	const points = removePathVertex(currentPoints, pointIndex, {
 		closed: isClosedPath(currentPoints)
 	});
-	outline.shape = {
-		type: OUTLINE_SHAPE_TYPES.POLYLINE,
-		points2D: points
-	};
+	outline.shape = { type: OUTLINE_SHAPE_TYPES.POLYLINE };
 	outline.points2D = points;
 }
 
@@ -710,15 +689,18 @@ export function createOutlineRecord({
 	canvasSize?: OutlineCanvasSize;
 }): OutlineRecord {
 	const semanticShape =
-		shape ||
+		(shape ? { ...shape } : null) ||
 		(type === OUTLINE_SHAPE_TYPES.CIRCLE || type === OUTLINE_SHAPE_TYPES.RECTANGLE
 			? null
-			: { type, points2D });
+			: { type });
+	const initialPoints = points2D;
+	// Preview shapes carry vertices for the drawing UI; persisted shapes do not.
+	if (semanticShape && 'points2D' in semanticShape) delete semanticShape.points2D;
 	const outline = {
 		id,
 		lineStyle,
 		shape: semanticShape,
-		points2D,
+		points2D: initialPoints,
 		fillColor,
 		fillOpacity,
 		curve: {
@@ -727,7 +709,7 @@ export function createOutlineRecord({
 				? Math.min(1, Math.max(0, Number(curve.tension)))
 				: DEFAULT_OUTLINE_CURVE_TENSION
 		},
-		closed: isClosedShape(points2D)
+		closed: isClosedShape(initialPoints)
 	};
 
 	outline.points2D = getOutlinePoints(outline, canvasSize);

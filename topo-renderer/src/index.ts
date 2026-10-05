@@ -1,6 +1,35 @@
 import { select } from 'd3-selection';
+import type {
+	FelsTopoDocument,
+	FixPoint,
+	Outline,
+	Pitch,
+	Point2D,
+	Route,
+	TextLabel,
+	Variant
+} from '@vorstieg/fels-types/types';
 
 export { fixpointSymbols, topoSymbols } from './symbols.js';
+
+type CanvasSize = { baseWidth?: number; baseHeight?: number };
+type RoutePath = Route | Pitch | Variant;
+type SymbolMeta = { id: string; width?: number; height?: number; icon?: string };
+type LineStyle = { stroke: string; width: number; dash: string | null };
+type RenderTopoSvgOptions = {
+	gElement: SVGGElement | null;
+	topo?: Partial<FelsTopoDocument>;
+	routes?: Route[];
+	baseWidth: number;
+	baseHeight: number;
+	selectedRouteId?: string | number | null;
+	hoveredRouteId?: string | number | null;
+	onRouteSelect?: (route: Route) => void;
+	onRouteHover?: (id: string | number | null) => void;
+	getHitAreaSize?: (size: number) => number;
+	symbols?: SymbolMeta[];
+	symbolHref?: (type: string) => string;
+};
 
 export const TEXT_LABEL_DEFAULTS = Object.freeze({
 	fontSize2D: 24,
@@ -9,10 +38,12 @@ export const TEXT_LABEL_DEFAULTS = Object.freeze({
 	textAlign2D: 'center'
 });
 
-export function getTextLabelStyle(label = {}) {
-	const textAlign2D = ['left', 'center', 'right'].includes(label.textAlign2D)
-		? label.textAlign2D
-		: TEXT_LABEL_DEFAULTS.textAlign2D;
+export function getTextLabelStyle(label: Partial<TextLabel> = {}) {
+	const alignment = label.textAlign2D;
+	const textAlign2D =
+		alignment === 'left' || alignment === 'center' || alignment === 'right'
+			? alignment
+			: TEXT_LABEL_DEFAULTS.textAlign2D;
 	return {
 		fontSize2D: Number.isFinite(Number(label.fontSize2D))
 			? Number(label.fontSize2D)
@@ -24,15 +55,15 @@ export function getTextLabelStyle(label = {}) {
 	};
 }
 
-export function renderTextLabelLines(textSelection, label) {
+export function renderTextLabelLines(textSelection: any, label: TextLabel) {
 	const lines = String(label?.text ?? '').split('\n');
 	textSelection
 		.selectAll('tspan')
 		.data(lines)
 		.join('tspan')
 		.attr('x', 0)
-		.attr('dy', (_, index) => (index === 0 ? 0 : '1.2em'))
-		.text((line) => line);
+		.attr('dy', (_: string, index: number) => (index === 0 ? 0 : '1.2em'))
+		.text((line: string) => line);
 }
 
 export const ROUTE_LINE_STYLES = {
@@ -52,31 +83,31 @@ export const OUTLINE_LINE_STYLES = {
 };
 
 export function getRouteLineStyle(styleId = 'red') {
-	return ROUTE_LINE_STYLES[styleId] || ROUTE_LINE_STYLES.red;
+	return (ROUTE_LINE_STYLES as Record<string, LineStyle>)[styleId] || ROUTE_LINE_STYLES.red;
 }
 
 export function getOutlineLineStyle(styleId = 'rock') {
-	return OUTLINE_LINE_STYLES[styleId] || OUTLINE_LINE_STYLES.rock;
+	return (OUTLINE_LINE_STYLES as Record<string, LineStyle>)[styleId] || OUTLINE_LINE_STYLES.rock;
 }
 
-export function normalizeCanvasSize(canvasSize = {}) {
+export function normalizeCanvasSize(canvasSize: CanvasSize = {}) {
 	return {
 		baseWidth: Math.max(canvasSize?.baseWidth || 1, 1),
 		baseHeight: Math.max(canvasSize?.baseHeight || 1, 1)
 	};
 }
 
-export function normalizedToSvgPoint([x, y], canvasSize = {}) {
+export function normalizedToSvgPoint([x, y]: Point2D, canvasSize: CanvasSize = {}): Point2D {
 	const { baseWidth, baseHeight } = normalizeCanvasSize(canvasSize);
 	return [x * baseWidth, y * baseHeight];
 }
 
-export function svgToNormalizedPoint([x, y], canvasSize = {}) {
+export function svgToNormalizedPoint([x, y]: Point2D, canvasSize: CanvasSize = {}): Point2D {
 	const { baseWidth, baseHeight } = normalizeCanvasSize(canvasSize);
 	return [x / baseWidth, y / baseHeight];
 }
 
-export function pointsToSvg(points = [], canvasSize = {}) {
+export function pointsToSvg(points: Point2D[] = [], canvasSize: CanvasSize = {}) {
 	const { baseWidth, baseHeight } = normalizeCanvasSize(canvasSize);
 	return points.map((point) => `${point[0] * baseWidth},${point[1] * baseHeight}`).join(' ');
 }
@@ -86,8 +117,16 @@ export function pointsToSvg(points = [], canvasSize = {}) {
  * It is a rendering-only conversion and leaves the supplied vertices intact.
  */
 export function pointsToSmoothSvgPath(
-	points = [],
-	{ closed = false, tension = 0.45, baseWidth = 1, baseHeight = 1 } = {}
+	points: Point2D[] = [],
+	{
+		closed = false,
+		tension = 0.45,
+		baseWidth = 1,
+		baseHeight = 1
+	}: CanvasSize & {
+		closed?: boolean;
+		tension?: number;
+	} = {}
 ) {
 	if (!Array.isArray(points) || points.length < 3) return null;
 	const hasRepeatedClosingPoint =
@@ -98,12 +137,12 @@ export function pointsToSmoothSvgPath(
 		1,
 		Math.max(0, Number.isFinite(Number(tension)) ? Number(tension) : 0.45)
 	);
-	const svgVertices = vertices.map(([x, y]) => [x * baseWidth, y * baseHeight]);
-	const pointAt = (index) => {
+	const svgVertices: Point2D[] = vertices.map(([x, y]) => [x * baseWidth, y * baseHeight]);
+	const pointAt = (index: number): Point2D => {
 		if (closed) return svgVertices[(index + svgVertices.length) % svgVertices.length];
 		return svgVertices[Math.max(0, Math.min(index, svgVertices.length - 1))];
 	};
-	const format = ([x, y]) => `${x},${y}`;
+	const format = ([x, y]: Point2D) => `${x},${y}`;
 	let path = `M ${format(svgVertices[0])}`;
 	const segmentCount = closed ? svgVertices.length : svgVertices.length - 1;
 	for (let index = 0; index < segmentCount; index++) {
@@ -112,14 +151,25 @@ export function pointsToSmoothSvgPath(
 		const p2 = pointAt(index + 1);
 		const p3 = pointAt(index + 2);
 		const controlScale = amount / 6;
-		const c1 = [p1[0] + (p2[0] - p0[0]) * controlScale, p1[1] + (p2[1] - p0[1]) * controlScale];
-		const c2 = [p2[0] - (p3[0] - p1[0]) * controlScale, p2[1] - (p3[1] - p1[1]) * controlScale];
+		const c1: Point2D = [
+			p1[0] + (p2[0] - p0[0]) * controlScale,
+			p1[1] + (p2[1] - p0[1]) * controlScale
+		];
+		const c2: Point2D = [
+			p2[0] - (p3[0] - p1[0]) * controlScale,
+			p2[1] - (p3[1] - p1[1]) * controlScale
+		];
 		path += ` C ${format(c1)} ${format(c2)} ${format(p2)}`;
 	}
 	return closed ? `${path} Z` : path;
 }
 
-function rectanglePoints(start, end, shape, size) {
+function rectanglePoints(
+	start: Point2D | undefined,
+	end: Point2D | undefined,
+	shape: NonNullable<Outline['shape']>,
+	size: Required<CanvasSize>
+): Point2D[] {
 	if (!start || !end) return [];
 	let [x1, y1] = start;
 	let [x2, y2] = end;
@@ -156,37 +206,39 @@ function rectanglePoints(start, end, shape, size) {
 	];
 }
 
-function circlePoints(shape, size) {
-	if (!shape.center2D || !Number.isFinite(shape.radius2D)) return [];
+function circlePoints(shape: NonNullable<Outline['shape']>, size: Required<CanvasSize>): Point2D[] {
+	const { center2D, radius2D } = shape;
+	if (!center2D || radius2D == null || !Number.isFinite(radius2D)) return [];
 	const segments = shape.segments || 48;
-	const radiusY = shape.radius2D * (size.baseWidth / size.baseHeight);
-	const points = Array.from({ length: segments }, (_, index) => {
+	const radiusY = radius2D * (size.baseWidth / size.baseHeight);
+	const points: Point2D[] = Array.from({ length: segments }, (_, index) => {
 		const angle = (index / segments) * Math.PI * 2;
-		return [
-			shape.center2D[0] + shape.radius2D * Math.cos(angle),
-			shape.center2D[1] + radiusY * Math.sin(angle)
-		];
+		return [center2D[0] + radius2D * Math.cos(angle), center2D[1] + radiusY * Math.sin(angle)];
 	});
 	return [...points, points[0]];
 }
 
-export function getOutlinePoints(outline, size) {
-	size = normalizeCanvasSize(size);
+export function getOutlinePoints(
+	outline: Outline | null | undefined,
+	size: CanvasSize = {}
+): Point2D[] {
+	const normalizedSize = normalizeCanvasSize(size);
 	const shape = outline?.shape;
 	if (!shape?.type) return outline?.points2D || [];
-	if (shape.type === 'rectangle') return rectanglePoints(shape.start2D, shape.end2D, shape, size);
-	if (shape.type === 'circle') return circlePoints(shape, size);
-	return shape.points2D || outline?.points2D || [];
+	if (shape.type === 'rectangle')
+		return rectanglePoints(shape.start2D, shape.end2D, shape, normalizedSize);
+	if (shape.type === 'circle') return circlePoints(shape, normalizedSize);
+	return outline?.points2D || [];
 }
 
-export function isClosedShape(points = []) {
+export function isClosedShape(points: Point2D[] = []) {
 	if (points.length < 3) return false;
 	const first = points[0];
 	const last = points.at(-1);
 	return first?.[0] === last?.[0] && first?.[1] === last?.[1];
 }
 
-export function getOutlineBounds(outline, canvasSize = {}) {
+export function getOutlineBounds(outline: Outline, canvasSize: CanvasSize = {}) {
 	const points = getOutlinePoints(outline, canvasSize);
 	if (!points.length) return null;
 	const xs = points.map((point) => point[0]);
@@ -199,32 +251,40 @@ export function getOutlineBounds(outline, canvasSize = {}) {
 	};
 }
 
-export function formatPitchLabel(pitch, pitchIndex) {
-	const number = pitch.pitchNumber || pitchIndex + 1;
-	const details = [Number(pitch.length) > 0 ? `${pitch.length}m` : '', pitch.grade || '']
+function gradeLabel(grade: unknown) {
+	const value = grade && typeof grade === 'object' && 'value' in grade ? grade.value : grade;
+	return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
+}
+
+export function formatPitchLabel(pitch: object, pitchIndex: number) {
+	const { pitchNumber, length, grade } = pitch as Partial<Pitch>;
+	const number = pitchNumber || pitchIndex + 1;
+	const details = [Number(length) > 0 ? `${length}m` : '', gradeLabel(grade)]
 		.filter(Boolean)
 		.join(' / ');
 	return details ? `${number}.SL / ${details}` : `${number}.SL`;
 }
 
-export function formatVariantLabel(variant, variantIndex) {
-	const details = [Number(variant.length) > 0 ? `${variant.length}m` : '', variant.grade || '']
+export function formatVariantLabel(variant: object, variantIndex: number) {
+	const { name: variantName, length, grade } = variant as Partial<Variant>;
+	const details = [Number(length) > 0 ? `${length}m` : '', gradeLabel(grade)]
 		.filter(Boolean)
 		.join(' / ');
-	const name = variant.name || `Variant ${variantIndex + 1}`;
+	const name =
+		typeof variantName === 'string' && variantName ? variantName : `Variant ${variantIndex + 1}`;
 	return details ? `${name} / ${details}` : name;
 }
 
-function isMultiPitch(route) {
+function isMultiPitch(route: Route) {
 	return Array.isArray(route.type)
 		? route.type.includes('multi-pitch')
 		: route.type === 'multi-pitch';
 }
 
 /** Turns topo JSON into the individual lines rendered by a topo viewer. */
-export function getRenderableRoutes(routes = []) {
+export function getRenderableRoutes(routes: Route[] = []) {
 	return routes.flatMap((route, routeIndex) => {
-		const makeLine = (item, kind, index, label) =>
+		const makeLine = (item: RoutePath, kind: string, index: number, label: string | number) =>
 			item?.points2D?.length
 				? [
 						{
@@ -267,12 +327,12 @@ export function renderTopoSvg({
 	getHitAreaSize = (size) => size,
 	symbols = [],
 	symbolHref = (type) => `/icons/topo-symbols/${type}.svg`
-}) {
+}: RenderTopoSvgOptions) {
 	if (!gElement) return;
 	const size = { baseWidth, baseHeight };
 	const mainG = select(gElement);
-	const layer = (className) => {
-		let result = mainG.select(`g.${className}`);
+	const layer = (className: string) => {
+		let result = mainG.select<SVGGElement>(`g.${className}`);
 		if (result.empty()) result = mainG.append('g').attr('class', className);
 		return result;
 	};
@@ -299,7 +359,7 @@ export function renderTopoSvg({
 		...outline,
 		key: outline.id || index
 	}));
-	const outlinePath = (outline) => {
+	const outlinePath = (outline: Outline) => {
 		const points = getOutlinePoints(outline, size);
 		const closed = isClosedShape(points);
 		const curvedPath = outline.curve?.enabled
@@ -311,29 +371,43 @@ export function renderTopoSvg({
 			? `M ${straightPoints.replaceAll(' ', ' L ')}${closed ? ' Z' : ''}`
 			: null;
 	};
-	outlinesLayer
-		.selectAll('path.outline-fill')
-		.data(
-			outlines.filter((outline) => outline.fillColor && getOutlinePoints(outline, size).length > 2),
-			(outline) => outline.key
-		)
-		.join('path')
-		.attr('class', 'outline-fill')
-		.attr('d', outlinePath)
-		.attr('fill', (outline) => outline.fillColor)
-		.attr('fill-opacity', (outline) => outline.fillOpacity ?? 0.3);
-	outlinesLayer
-		.selectAll('path.rock-outline')
+	const outlineGroups = outlinesLayer
+		.selectAll<SVGGElement, (typeof outlines)[number]>('g.outline-group')
 		.data(outlines, (outline) => outline.key)
-		.join('path')
-		.attr('class', 'rock-outline')
-		.attr('fill', 'none')
-		.attr('d', outlinePath)
-		.attr('stroke', (outline) => getOutlineLineStyle(outline.lineStyle).stroke)
-		.attr('stroke-width', (outline) => getOutlineLineStyle(outline.lineStyle).width)
-		.attr('stroke-dasharray', (outline) => getOutlineLineStyle(outline.lineStyle).dash)
-		.attr('stroke-linecap', 'round')
-		.attr('stroke-linejoin', 'round');
+		.join('g')
+		.attr('class', 'outline-group');
+	outlineGroups.each(function (outline) {
+		const points = getOutlinePoints(outline, size);
+		const parts = [
+			...(isClosedShape(points) ? ['background'] : []),
+			...(outline.fillColor && points.length > 2 ? ['fill'] : []),
+			'stroke'
+		];
+		const path = outlinePath(outline);
+		const style = getOutlineLineStyle(outline.lineStyle);
+		select(this)
+			.selectAll<SVGPathElement, string>('path')
+			.data(parts, (part) => part)
+			.join('path')
+			.attr('class', (part) =>
+				part === 'background'
+					? 'outline-background'
+					: part === 'fill'
+						? 'outline-fill'
+						: 'rock-outline'
+			)
+			.attr('d', path)
+			.attr('fill', (part) =>
+				part === 'background' ? '#fff' : part === 'fill' ? (outline.fillColor ?? 'none') : 'none'
+			)
+			.attr('fill-opacity', (part) => (part === 'fill' ? (outline.fillOpacity ?? 0.3) : null))
+			.attr('stroke', (part) => (part === 'stroke' ? style.stroke : 'none'))
+			.attr('stroke-width', (part) => (part === 'stroke' ? style.width : null))
+			.attr('stroke-dasharray', (part) => (part === 'stroke' ? style.dash : null))
+			.attr('stroke-linecap', (part) => (part === 'stroke' ? 'round' : null))
+			.attr('stroke-linejoin', (part) => (part === 'stroke' ? 'round' : null))
+			.attr('pointer-events', (part) => (part === 'stroke' ? null : 'none'));
+	});
 
 	const lines = getRenderableRoutes(routes).map((line) => ({
 		...line,
@@ -343,7 +417,7 @@ export function renderTopoSvg({
 			: null
 	}));
 	const groups = routesLayer
-		.selectAll('g.route-group')
+		.selectAll<SVGGElement, (typeof lines)[number]>('g.route-group')
 		.data(lines, (line) => line.key)
 		.join((enter) => {
 			const group = enter.append('g').attr('class', 'route-group');
@@ -394,12 +468,12 @@ export function renderTopoSvg({
 			.text(line.label);
 	});
 
+	const positionedSymbols = (topo.fixPoints || []).filter(
+		(symbol): symbol is FixPoint & { position2D: Point2D } => Boolean(symbol.position2D)
+	);
 	symbolsLayer
-		.selectAll('g.symbol-group')
-		.data(
-			(topo.fixPoints || []).filter((symbol) => symbol.position2D),
-			(symbol) => symbol.id
-		)
+		.selectAll<SVGGElement, (typeof positionedSymbols)[number]>('g.symbol-group')
+		.data(positionedSymbols, (symbol, index) => symbol.id ?? index)
 		.join((enter) => {
 			const group = enter.append('g').attr('class', 'symbol-group');
 			group.append('image');
@@ -421,12 +495,12 @@ export function renderTopoSvg({
 				.attr('href', meta?.icon || symbolHref(symbol.type));
 		});
 
+	const positionedLabels = (topo.textLabels || []).filter(
+		(label): label is TextLabel & { position2D: Point2D } => Boolean(label.position2D)
+	);
 	const textGroups = textLayer
-		.selectAll('g.text-label-group')
-		.data(
-			(topo.textLabels || []).filter((label) => label.position2D),
-			(label) => label.id
-		)
+		.selectAll<SVGGElement, (typeof positionedLabels)[number]>('g.text-label-group')
+		.data(positionedLabels, (label, index) => label.id ?? index)
 		.join('g')
 		.attr('class', 'text-label-group')
 		.attr(

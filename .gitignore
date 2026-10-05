@@ -2,6 +2,7 @@ node_modules
 .svelte-kit
 .svelte-kit-test
 build
+topo-renderer/dist
 vite.config.js.timestamp-*.mjs
 .env
 .env.*

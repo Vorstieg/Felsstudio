@@ -30,6 +30,7 @@ import type { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.sv
 type Editor = ReturnType<typeof createTopo2DEditorState>;
 type OutlineMode = 'polyline' | 'rectangle' | 'circle' | 'freehand' | 'brush' | 'preset';
 type PreviewShape = OutlineShape & {
+	points2D?: Path2D;
 	fromCenter?: boolean;
 	square?: boolean;
 	segments?: number;
@@ -434,7 +435,7 @@ export class OutlineTool {
 
 		const outlineId = generateOutlineId();
 		const points2D = $state.snapshot(this.currentPoints);
-		const shape =
+		const shape: PreviewShape | null =
 			this.previewShape ||
 			(this.mode === OUTLINE_SHAPE_TYPES.POLYLINE
 				? {
