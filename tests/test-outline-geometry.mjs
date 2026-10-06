@@ -283,7 +283,11 @@ test('supports outline and path geometry workflows', async () => {
 	assert.equal(semanticallyResized.closed, false);
 	assert.equal(semanticallyResized.shape.semantic.width, 0.9);
 	assert.equal(semanticallyResized.shape.semantic.height, 0.4);
-	assert.equal('points2D' in semanticallyResized.shape, false, 'semantic edits keep one vertex array');
+	assert.equal(
+		'points2D' in semanticallyResized.shape,
+		false,
+		'semantic edits keep one vertex array'
+	);
 	assert.notDeepEqual(semanticallyResized.points2D[0], semanticallyResized.points2D.at(-1));
 
 	const leanedPillar = updatePresetOutline(presetOutline, { lean: 0.25, taper: -0.2 });
