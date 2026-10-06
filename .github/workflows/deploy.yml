@@ -34,12 +34,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          registry-url: https://npm.pkg.github.com
+          scope: '@vorstieg'
       - name: Deploy to production
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_USERCONFIG: ${{ runner.temp }}/felsstudio-npmrc
         run: |
           cd /home/vorstieg/felsstudio
           git pull origin main
+          printf '%s\n' '@vorstieg:registry=https://npm.pkg.github.com' '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' > "$NPM_CONFIG_USERCONFIG"
+          trap 'rm -f "$NPM_CONFIG_USERCONFIG"' EXIT
           npm ci
           npm run build
           PM2_HOME=/home/vorstieg/.pm2 pm2 restart felsstudio
