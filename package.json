@@ -73,7 +73,7 @@
 		"@threlte/extras": "^9.0.1",
 		"@turf/turf": "^7.3.4",
 		"@vorstieg/fels-types": "0.1.3",
-		"@vorstieg/topo-renderer": "file:topo-renderer",
+		"@vorstieg/topo-renderer": "0.1.3",
 		"d3-selection": "^3.0.0",
 		"d3-zoom": "^3.0.0",
 		"jszip": "^3.10.1",
