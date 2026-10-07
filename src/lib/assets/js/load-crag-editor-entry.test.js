@@ -140,11 +140,9 @@ describe('getHierarchySourceRefs', () => {
 			{ name: 'route-notes.pdf', path: 'wall/route-notes.pdf', type: 'file' }
 		]);
 		expect(session?.workspace?.topo).toMatchObject({ routes: [{ id: 'existing-route' }] });
-		expect(session?.workspace?.access).toMatchObject({
-			version: 1,
-			features: [expect.objectContaining({ properties: { kind: 'parking' } })]
-		});
-		expect(session?.workspace?.access?.features[0].id).toMatch(/^parking-/);
+		expect(session?.workspace?.topo).toBe(files['/wall/wall-topo.json']);
+		expect(session?.workspace?.access).toBe(files['/wall/wall-access.json']);
+		expect(session?.workspace?.dirtyPaths).toEqual([]);
 		expect(session?.workspace?.images).toEqual([
 			{ name: 'wall-image-overhang.jpg', path: 'wall/wall-image-overhang.jpg' }
 		]);
@@ -174,7 +172,7 @@ describe('getHierarchySourceRefs', () => {
 		]);
 	});
 
-	it('repairs an empty child entry file as a visible, saveable entry', async () => {
+	it('reports an empty child entry file without fabricating a replacement', async () => {
 		const files = {
 			'/wall/wall.json': {
 				type: 'Feature',
@@ -188,15 +186,11 @@ describe('getHierarchySourceRefs', () => {
 			return files[path];
 		};
 
-		const session = await loadCragEditorEntry('wall', reader, async (path) =>
-			path === 'wall' ? [{ name: 'north', type: 'dir' }] : []
-		);
-
-		expect(session?.workspace?.childEntries[0]).toMatchObject({
-			entry: { properties: { id: 'north', name: 'north', kind: 'area' } },
-			sourcePath: 'wall/north',
-			dirtyPaths: ['wall/north/north.json']
-		});
+		await expect(
+			loadCragEditorEntry('wall', reader, async (path) =>
+				path === 'wall' ? [{ name: 'north', type: 'dir' }] : []
+			)
+		).rejects.toThrow(SyntaxError);
 	});
 
 	it('does not replace child metadata when its read fails for another reason', async () => {

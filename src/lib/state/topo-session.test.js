@@ -15,7 +15,27 @@ describe('createTopo2DEditorState', () => {
 		expect(second.ui.selectedRouteId).toBeNull();
 	});
 
-	it('loads a draft through one normalized path and clears stale selection', () => {
+	it.each(['constructor', 'load', 'loadSession'])(
+		'preserves supplied topo data through %s',
+		(method) => {
+			const topo = {
+				routes: [],
+				fixPoints: [],
+				outlines: [],
+				textLabels: [],
+				coordinates: [16, 48],
+				customMetadata: { source: 'guide' }
+			};
+			const editor = createTopo2DEditorState(method === 'constructor' ? { topo } : {});
+			if (method === 'load') editor.load(topo);
+			if (method === 'loadSession') editor.loadSession({ topo });
+			expect(editor.topo).toEqual(topo);
+			expect(editor.topo).not.toHaveProperty('imageAspectRatio');
+			expect(editor.topo).not.toBe(topo);
+		}
+	);
+
+	it('loads a draft without rewriting its documents and clears stale selection', () => {
 		const session = createTopo2DEditorState();
 		session.ui.selectedRouteId = 'stale';
 
@@ -27,7 +47,8 @@ describe('createTopo2DEditorState', () => {
 			'draft-1'
 		);
 
-		expect(session.topo).not.toHaveProperty('name');
+		expect(session.topo).toEqual({ name: 'Loaded', routes: [{ id: 'route-2' }] });
+		expect(session.clustering).toEqual({ rawHits: [{ id: 1 }] });
 		expect(session.ui.name).toBe('');
 		expect(session.topo.routes).toEqual([{ id: 'route-2' }]);
 		expect(session.ui.selectedRouteId).toBeNull();

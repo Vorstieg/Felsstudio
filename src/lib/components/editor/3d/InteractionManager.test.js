@@ -106,11 +106,17 @@ describe('Topo3DInteractionManager', () => {
 			{
 				id: 0,
 				points: [],
-				pointsData: [{ point: new Vector3(4, 5, 6), normal: new Vector3(0, 1, 0) }]
+				pointsData: [
+					{ point: new Vector3(1, 2, 3), normal: new Vector3(0, 1, 0) },
+					{ point: new Vector3(4, 5, 6), normal: new Vector3(0, 1, 0) }
+				]
 			}
 		];
 		manager.finalizeRouteOrPitch('route');
-		expect(state.topo.routes[0].points3D).toEqual([[4, 5, 6]]);
+		expect(state.topo.routes[0].points3D).toEqual([
+			[1, 2, 3],
+			[4, 5, 6]
+		]);
 		expect(state.topo.routes[0].orientation3D).toEqual([0, 1, 0]);
 		expect(state.topo.routes[0]).not.toHaveProperty('points');
 	});
@@ -128,13 +134,19 @@ describe('Topo3DInteractionManager', () => {
 			{
 				id: 0,
 				points: [],
-				pointsData: [{ point: new Vector3(4, 5, 6), normal: new Vector3(0, 1, 0) }]
+				pointsData: [
+					{ point: new Vector3(1, 2, 3), normal: new Vector3(0, 1, 0) },
+					{ point: new Vector3(4, 5, 6), normal: new Vector3(0, 1, 0) }
+				]
 			}
 		];
 
 		manager.finalizeRouteOrPitch('multipitch');
 
-		expect(state.topo.routes[0].pitches[0].points3D).toEqual([[4, 5, 6]]);
+		expect(state.topo.routes[0].pitches[0].points3D).toEqual([
+			[1, 2, 3],
+			[4, 5, 6]
+		]);
 		expect(state.topo.routes[0].pitches[0]).not.toHaveProperty('points');
 	});
 });

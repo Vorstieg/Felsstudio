@@ -50,34 +50,3 @@ export function createAccessFeature<
 		properties: { ...properties, kind } as P & { kind: K }
 	};
 }
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === 'object';
-}
-
-export function normalizeAccessCollection(data: unknown): AccessCollection {
-	if (!isRecord(data) || data.type !== 'FeatureCollection' || !Array.isArray(data.features)) {
-		return createAccessCollection();
-	}
-	return createAccessCollection(
-		data.features
-			.filter(
-				(feature): feature is Record<string, unknown> =>
-					isRecord(feature) && feature.type === 'Feature' && Boolean(feature.geometry)
-			)
-			.map((feature) => ({
-				...feature,
-				type: 'Feature' as const,
-				geometry: feature.geometry,
-				id: String(
-					feature.id ||
-						createAccessId(
-							isRecord(feature.properties) && typeof feature.properties.kind === 'string'
-								? feature.properties.kind
-								: 'access'
-						)
-				),
-				properties: isRecord(feature.properties) ? { ...feature.properties } : {}
-			}))
-	);
-}

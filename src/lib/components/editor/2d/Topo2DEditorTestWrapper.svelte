@@ -9,7 +9,7 @@
 	let {
 		topo,
 		activeTool = 'select'
-	}: { topo: Partial<Topo2DEditorDocument>; activeTool?: string } = $props();
+	}: { topo: Topo2DEditorDocument; activeTool?: string } = $props();
 	const editorState = provideTopo2DEditorState(createTopo2DEditorState());
 	// svelte-ignore state_referenced_locally
 	editorState.loadSession({ topo });

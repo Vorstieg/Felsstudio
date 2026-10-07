@@ -63,7 +63,7 @@ describe('draft persistence', () => {
 				id: '2d-topo-1',
 				name: 'Rote Wand',
 				editorMode: '2d',
-				sourceEntryPath: 'lower-austria/rote-wand/rote-wand',
+				sourceEntryPath: '/lower-austria/rote-wand/rote-wand/',
 				sourceTopoFileName: 'lower-austria/rote-wand/rote-wand-topo.json'
 			})
 		]);
@@ -152,10 +152,10 @@ describe('draft persistence', () => {
 		};
 		vi.spyOn(draftsState, 'getById').mockImplementation(async (id) => sessions[id] || null);
 
-		const result = await draftsState.getLatestForSource(
-			'2d',
-			'/lower-austria/rote-wand/rote-wand/'
-		);
+		expect(
+			await draftsState.getLatestForSource('2d', '/lower-austria/rote-wand/rote-wand/')
+		).toBeNull();
+		const result = await draftsState.getLatestForSource('2d', 'lower-austria/rote-wand/rote-wand');
 
 		expect(result).toEqual({
 			id: 'matching-newer',

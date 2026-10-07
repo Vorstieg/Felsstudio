@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it } from 'vitest';
-import { createTopo2DEditorState } from './topo-2d-editor-state.svelte.ts';
+import { createInitialTopo, createTopo2DEditorState } from './topo-2d-editor-state.svelte.ts';
 
 const document = () => ({
 	routes: [{ id: 'route-1', points2D: [[0, 0]], pitches: [] }],
@@ -107,7 +107,7 @@ describe('createTopo2DEditorState', () => {
 	});
 
 	it('updates typed document fields and records the change for undo', () => {
-		const editor = createTopo2DEditorState({ topo: { routes: [] } });
+		const editor = createTopo2DEditorState({ topo: createInitialTopo() });
 		expect(editor.topo.fixPoints).toEqual([]);
 		expect(editor.topo.textLabels).toEqual([]);
 		editor.updateTopoField('author', 'A. Climber');

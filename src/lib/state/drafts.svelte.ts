@@ -37,14 +37,6 @@ type DraftsStore = {
 	getById(id: string): Promise<DraftSession | null | undefined>;
 };
 
-function normalizeSourceEntryPath(path: string | null | undefined): string | null {
-	return path ? String(path).replace(/^\/+|\/+$/g, '') : null;
-}
-
-function getSourceEntryPath(session: DraftSession | null | undefined): string | null {
-	return normalizeSourceEntryPath(session?.entryPath || null);
-}
-
 export function isBlankTopoSession(session: DraftSession | null | undefined): boolean {
 	if (!session) return true;
 	const topo = session.topo;
@@ -83,7 +75,7 @@ export const draftsState = $state<DraftsStore>({
 			name: extra.name || 'Unnamed Topo',
 			editorMode,
 			updated: timestamp,
-			sourceEntryPath: normalizeSourceEntryPath(extra.entryPath || null),
+			sourceEntryPath: extra.entryPath ?? null,
 			sourceTopoFileName: extra.topoFileName || null
 		};
 
@@ -141,15 +133,14 @@ export const draftsState = $state<DraftsStore>({
 	},
 
 	async getLatestForSource(editorMode, sourceEntryPath) {
-		const normalizedSource = normalizeSourceEntryPath(sourceEntryPath);
-		if (!normalizedSource) return null;
+		if (!sourceEntryPath) return null;
 
 		const sortedDrafts = [...this.drafts]
 			.filter((draft) => {
-				const metadataSource = normalizeSourceEntryPath(draft.sourceEntryPath);
+				const metadataSource = draft.sourceEntryPath;
 				return (
 					(!editorMode || !draft.editorMode || draft.editorMode === editorMode) &&
-					(!metadataSource || metadataSource === normalizedSource)
+					(!metadataSource || metadataSource === sourceEntryPath)
 				);
 			})
 			.sort((a, b) => new Date(b.updated).getTime() - new Date(a.updated).getTime());
@@ -157,10 +148,9 @@ export const draftsState = $state<DraftsStore>({
 		for (const draft of sortedDrafts) {
 			const session = await this.getById(draft.id);
 			const sessionMode = session?.editorMode || draft.editorMode;
-			const metadataSource = normalizeSourceEntryPath(draft.sourceEntryPath);
-			const sessionSource = getSourceEntryPath(session);
-			const sourceMatches =
-				metadataSource === normalizedSource || sessionSource === normalizedSource;
+			const metadataSource = draft.sourceEntryPath;
+			const sessionSource = session?.entryPath;
+			const sourceMatches = metadataSource === sourceEntryPath || sessionSource === sourceEntryPath;
 			if (
 				session &&
 				!isBlankTopoSession(session) &&

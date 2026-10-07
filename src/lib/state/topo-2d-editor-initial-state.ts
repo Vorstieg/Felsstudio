@@ -26,41 +26,6 @@ export type Topo2DEditorDocument = Pick<
 	textLabels: TextLabel[];
 };
 
-/** Keep only fields in the shared topo contract when loading external topo JSON. */
-export function selectTopoDocumentFields(value: unknown): Partial<Topo2DEditorDocument> {
-	if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-	const data = value as Record<string, unknown>;
-	const coordinates = data.coordinates;
-	return {
-		...(typeof data.id === 'string' ? { id: data.id } : {}),
-		...(typeof data.description === 'string' ? { description: data.description } : {}),
-		...(Array.isArray(data.tags) ? { tags: data.tags as string[] } : {}),
-		...(typeof data.image2D === 'string' || data.image2D === null ? { image2D: data.image2D } : {}),
-		...(data.backgroundFit === 'contain' || data.backgroundFit === 'cover'
-			? { backgroundFit: data.backgroundFit }
-			: {}),
-		...(typeof data.wallAzimuth === 'number' ? { wallAzimuth: data.wallAzimuth } : {}),
-		...(typeof data.imageAspectRatio === 'number'
-			? { imageAspectRatio: data.imageAspectRatio }
-			: {}),
-		...(typeof data.date === 'string' ? { date: data.date } : {}),
-		...(typeof data.updated === 'string' ? { updated: data.updated } : {}),
-		...(typeof data.author === 'string' ? { author: data.author } : {}),
-		...(Array.isArray(coordinates) &&
-		coordinates.length === 3 &&
-		coordinates.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate))
-			? { coordinates: coordinates as [number, number, number] }
-			: {}),
-		...(data.paths && typeof data.paths === 'object'
-			? { paths: data.paths as FelsTopoDocument['paths'] }
-			: {}),
-		routes: Array.isArray(data.routes) ? (data.routes as Route[]) : [],
-		fixPoints: Array.isArray(data.fixPoints) ? (data.fixPoints as FixPoint[]) : [],
-		outlines: Array.isArray(data.outlines) ? (data.outlines as OutlineRecord[]) : [],
-		textLabels: Array.isArray(data.textLabels) ? (data.textLabels as TextLabel[]) : []
-	};
-}
-
 export interface Topo2DEditorDrafts {
 	route: { points: number[][]; fixPointIds: Array<string | number>; mode: string };
 	multipitch: {

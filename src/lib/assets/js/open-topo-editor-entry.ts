@@ -3,7 +3,6 @@ import { draftsState } from '$lib/state/drafts.svelte.ts';
 import { Topo } from '$lib/assets/js/topo-paths.ts';
 import { initializeIdCounters } from '$lib/assets/js/id-utils.ts';
 import { loadGlbIntoEditorState } from '$lib/assets/js/gltf-loader.ts';
-import { normalizeTopoPaths } from '$lib/assets/js/topo-document-paths.ts';
 import { splitEntryPath } from '$lib/assets/js/editor-entry-paths.ts';
 import type { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
 import type { DraftClustering } from '$lib/state/draft-serialization.ts';
@@ -11,7 +10,6 @@ import type {
 	Topo2DEditorClustering,
 	Topo2DEditorDocument
 } from '$lib/state/topo-2d-editor-initial-state.ts';
-import { selectTopoDocumentFields } from '$lib/state/topo-2d-editor-initial-state.ts';
 
 type TopoEditorSession = ReturnType<typeof createTopo2DEditorState>;
 
@@ -36,14 +34,10 @@ export async function persistTopoSessionImmediately(
 		)
 	};
 	const { topo, ...extras } = topoSession.getSaveSession();
-	topoSession.ui.activeDraftId = await draftsState.save(
-		topo,
-		topoSession.ui.activeDraftId,
-		{
-			...extras,
-			clustering: draftClustering
-		}
-	);
+	topoSession.ui.activeDraftId = await draftsState.save(topo, topoSession.ui.activeDraftId, {
+		...extras,
+		clustering: draftClustering
+	});
 	topoSession.ui.lastSaved = new Date().toISOString();
 	return topoSession.ui.activeDraftId;
 }
@@ -62,9 +56,7 @@ export async function loadTopoEditorEntry({
 	const topo = new Topo(splitPath.path, splitPath.id);
 	let name = splitPath.id;
 	try {
-		const cragData = await readJson<{ properties?: { name?: string } }>(
-			topo.getCragPath()
-		);
+		const cragData = await readJson<{ properties?: { name?: string } }>(topo.getCragPath());
 		name = cragData.properties?.name ?? name;
 	} catch {
 		/* crag file may not exist */
@@ -73,10 +65,7 @@ export async function loadTopoEditorEntry({
 
 	if (workspace.startsWith('/topos/2d')) {
 		try {
-			const loaded = selectTopoDocumentFields(normalizeTopoPaths(
-				await readJson<Topo2DEditorDocument>(topo.getTopoPath())
-			).data);
-			topoSession.topo = { ...topoSession.topo, ...loaded };
+			topoSession.topo = await readJson<Topo2DEditorDocument>(topo.getTopoPath());
 		} catch {
 			/* no topo yet */
 		}
@@ -104,10 +93,7 @@ export async function loadTopoEditorEntry({
 		}
 	} else {
 		try {
-			const topoData = selectTopoDocumentFields(normalizeTopoPaths(
-				await readJson<Topo2DEditorDocument>(topo.getTopoPath())
-			).data);
-			topoSession.topo = { ...topoSession.topo, ...topoData };
+			topoSession.topo = await readJson<Topo2DEditorDocument>(topo.getTopoPath());
 			initializeIdCounters(topoSession.topo);
 		} catch {
 			/* no topo yet */

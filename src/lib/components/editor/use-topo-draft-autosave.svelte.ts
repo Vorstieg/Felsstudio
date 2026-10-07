@@ -73,11 +73,10 @@ export function useTopoDraftAutosave({
 			do {
 				saveAgain = false;
 				const { topo, ...extras } = saveSession;
-					topoSession.ui.activeDraftId = await draftsState.save(
-						topo,
-						topoSession.ui.activeDraftId,
-						{ ...extras, editorMode }
-				);
+				topoSession.ui.activeDraftId = await draftsState.save(topo, topoSession.ui.activeDraftId, {
+					...extras,
+					editorMode
+				});
 				setDraftParamInUrl(topoSession.ui.activeDraftId);
 				topoSession.ui.lastSaved = new Date().toISOString();
 				onPersisted?.();

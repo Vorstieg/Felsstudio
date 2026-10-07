@@ -1,9 +1,7 @@
-import type { EntryKind, FelsEntry, FelsTopoDocument } from '@vorstieg/fels-types/types';
+import type { FelsEntry, FelsTopoDocument } from '@vorstieg/fels-types/types';
 import type { AccessCollection, FelsEntryWorkspace, LoadedCragEditorEntry } from '$lib/types/crag';
 import { listDir, readJson } from '$lib/api/felslager.ts';
 import { getCragEditorPath, splitEntryPath } from '$lib/assets/js/editor-entry-paths.ts';
-import { normalizeTopoPaths } from '$lib/assets/js/topo-document-paths.ts';
-import { normalizeAccessCollection } from '$lib/assets/js/access-geojson.ts';
 import {
 	workspaceEntryPath,
 	workspaceNodePath,
@@ -27,35 +25,8 @@ export function getHierarchySourceRefs(entryPath: string) {
 	return parts.map((id, index) => ({ path: parts.slice(0, index).join('/'), id }));
 }
 
-function emptyEntry(id: string, kind: EntryKind): FelsEntry {
-	const date = new Date().toISOString().slice(0, 10);
-	return {
-		type: 'Feature',
-		properties: {
-			id,
-			name: id,
-			kind,
-			type: [],
-			tags: [],
-			security: '',
-			rock_type: '',
-			description_de: '',
-			description_en: '',
-			equipment: [],
-			topo: { site: '', link: '' },
-			date,
-			updated: date
-		},
-		geometry: { type: 'Point', coordinates: [16.37, 48.21] }
-	};
-}
-
 function isMissingFileError(error: unknown): boolean {
 	return error instanceof Error && /Failed to read .*: 404(?:\s|$)/.test(error.message);
-}
-
-function isRepairableEntryError(error: unknown): boolean {
-	return error instanceof SyntaxError || isMissingFileError(error);
 }
 
 async function loadOptionalFiles(path: string, id: string, reader: typeof readJson) {
@@ -72,11 +43,9 @@ async function loadOptionalFiles(path: string, id: string, reader: typeof readJs
 		readOptional<FelsTopoDocument>(topoPaths.topo),
 		readOptional<AccessCollection>(topoPaths.access)
 	]);
-	const normalized = topoDocument ? normalizeTopoPaths(topoDocument) : null;
 	return {
-		topo: normalized?.data || null,
-		access: accessDocument ? (normalizeAccessCollection(accessDocument) as AccessCollection) : null,
-		topoChanged: normalized?.changed || false
+		topo: topoDocument,
+		access: accessDocument
 	};
 }
 
@@ -86,35 +55,28 @@ async function loadWorkspaceNode(
 	reader: typeof readJson,
 	{
 		allowMissing = false,
-		loadFeature = true,
-		fallbackKind
-	}: { allowMissing?: boolean; loadFeature?: boolean; fallbackKind?: EntryKind } = {}
+		loadFeature = true
+	}: { allowMissing?: boolean; loadFeature?: boolean } = {}
 ): Promise<FelsEntryWorkspace> {
 	let raw: FelsEntry | null;
-	let invalid = false;
 	if (!loadFeature) raw = null;
 	else
 		try {
 			raw = await reader<FelsEntry>(workspaceDocumentPaths(path, id).entry);
-			invalid = !raw || !raw.properties;
 		} catch (error) {
-			if (!allowMissing || !isRepairableEntryError(error)) throw error;
-			// A listed child folder can have no entry JSON or an empty/malformed JSON file.
-			invalid = Boolean(fallbackKind);
+			if (!allowMissing || !isMissingFileError(error)) throw error;
 			raw = null;
 		}
 	const { type: _type, properties: _properties, geometry: _geometry, ...entryExtras } = raw || {};
-	const entry =
-		raw && !invalid ? raw : invalid && fallbackKind ? emptyEntry(id, fallbackKind) : null;
 	return {
-		entry,
+		entry: raw,
 		id,
 		path,
 		childEntries: [],
 		topo: null,
 		access: null,
-		dirtyPaths: invalid && fallbackKind ? [workspaceDocumentPaths(path, id).entry] : [],
-		sourcePath: raw || invalid ? workspaceEntryPath(path, id) : undefined,
+		dirtyPaths: [],
+		sourcePath: raw ? workspaceEntryPath(path, id) : undefined,
 		removedPaths: [],
 		images: [],
 		entryExtras,
@@ -160,11 +122,6 @@ export async function loadFelsEntryWorkspaceDetails(
 		const optional = await loadOptionalFiles(node.path, id, reader);
 		if (!node.topo) node.topo = optional.topo;
 		if (!node.access) node.access = optional.access;
-		if (
-			optional.topoChanged &&
-			!node.dirtyPaths.includes(workspaceDocumentPaths(node.path, id).topo)
-		)
-			node.dirtyPaths.push(workspaceDocumentPaths(node.path, id).topo);
 		node.documentsLoaded = true;
 	}
 	const folder = workspaceEntryPath(node.path, id);
@@ -203,15 +160,12 @@ export async function loadFelsEntryWorkspaceDetails(
 			const existing = existingChildren.get(workspaceEntryPath(folder, item.name));
 			if (existing?.entry) return existing;
 			const child = await loadWorkspaceNode(folder, item.name, reader, {
-				allowMissing: true,
-				fallbackKind: 'area'
+				allowMissing: true
 			});
 			const childOptional = await loadOptionalFiles(folder, item.name, reader);
 			child.topo = childOptional.topo;
 			child.access = childOptional.access;
 			child.documentsLoaded = true;
-			if (childOptional.topoChanged)
-				child.dirtyPaths.push(workspaceDocumentPaths(folder, item.name).topo);
 			return child;
 		})
 	);

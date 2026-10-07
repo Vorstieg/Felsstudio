@@ -15,8 +15,7 @@ import {
 	createInitialTopo,
 	createInitialTopo2DEditorDrafts,
 	createInitialTopo2DEditorTransientState,
-	createInitialTopo2DEditorUi,
-	selectTopoDocumentFields
+	createInitialTopo2DEditorUi
 } from './topo-2d-editor-initial-state.ts';
 import type {
 	Topo2DEditorClustering,
@@ -46,23 +45,8 @@ type ClipboardItem =
 	| { type: 'text'; item: TextLabel };
 type HistoryOptions = { recordHistory?: boolean };
 type RouteTarget = { type: 'pitch'; pitchId: Id } | { type: 'variant'; variantId: Id } | null;
-type SessionInput = Partial<Topo2DEditorDocument> & {
-	topo?: Partial<Topo2DEditorDocument>;
-	editorMode?: '2d' | '3d';
-	has3DTopoAvailable?: boolean;
-	entryPath?: string;
-	topoFileName?: string;
-	name?: string;
-	modelOffset?: [number, number, number];
-	modelRotation?: [number, number, number];
-	modelScale?: [number, number, number];
-	scale?: number;
-	canvasAspectRatio?: number;
-	clustering?: Partial<Topo2DEditorClustering>;
-	glbBlob?: Blob | File | null;
-};
 type WrappedSessionInput = {
-	topo: Partial<Topo2DEditorDocument>;
+	topo: Topo2DEditorDocument;
 	editorMode?: '2d' | '3d';
 	has3DTopoAvailable?: boolean;
 	entryPath?: string;
@@ -73,7 +57,7 @@ type WrappedSessionInput = {
 	modelScale?: [number, number, number];
 	scale?: number;
 	canvasAspectRatio?: number;
-	clustering?: Partial<Topo2DEditorClustering>;
+	clustering?: Topo2DEditorClustering;
 	glbBlob?: Blob | File | null;
 };
 type EditableTopoFields = {
@@ -203,14 +187,11 @@ function drawingTargetExists(topo: Topo2DEditorDocument, drawingTarget: TopoDraw
 export function createTopo2DEditorState({
 	topo
 }: {
-	topo?: Partial<Topo2DEditorDocument>;
+	topo?: Topo2DEditorDocument;
 } = {}) {
 	const initialUi = createInitialTopo2DEditorUi();
 	const state = $state({
-		topo: {
-			...createInitialTopo(),
-			...selectTopoDocumentFields(topo || {})
-		},
+		topo: topo ? clone(topo) : createInitialTopo(),
 		ui: initialUi,
 		interaction: null,
 		drafts: createDrafts(),
@@ -240,7 +221,7 @@ export function createTopo2DEditorState({
 		state.transient.modelRevision++;
 	}
 	function loadSession(session: WrappedSessionInput | null, id: string | null = null) {
-		const document = selectTopoDocumentFields(session?.topo || createInitialTopo());
+		const document = session?.topo || createInitialTopo();
 		if (state.transient.modelUrl) URL.revokeObjectURL(state.transient.modelUrl);
 		state.transient = createTransientState();
 		state.ui = createUi();
@@ -254,14 +235,8 @@ export function createTopo2DEditorState({
 		state.ui.modelScale = session?.modelScale || [1, 1, 1];
 		state.ui.scale = session?.scale || 1;
 		state.ui.canvasAspectRatio = session?.canvasAspectRatio || document.imageAspectRatio || 1.5;
-		writeTopo({ ...createInitialTopo(), ...clone(document) });
-		state.topo.routes = [...(document.routes || [])];
-		state.topo.fixPoints = [...(document.fixPoints || [])];
-		state.topo.outlines = [...(document.outlines || [])];
-		state.topo.textLabels = [...(document.textLabels || [])];
-		state.clustering = session?.clustering
-			? { ...createInitialClustering(), ...session.clustering }
-			: createInitialClustering();
+		writeTopo(clone(document));
+		state.clustering = session?.clustering ? clone(session.clustering) : createInitialClustering();
 		if (session?.glbBlob) setModelFile(session.glbBlob);
 		state.ui.activeDraftId = id;
 		state.selection = new Set();
@@ -611,39 +586,9 @@ export function createTopo2DEditorState({
 			return pasted;
 		});
 	}
-	function load(nextTopo: SessionInput | null) {
-		const {
-			topo: wrappedTopo,
-			editorMode,
-			has3DTopoAvailable,
-			entryPath,
-			topoFileName,
-			name,
-			modelOffset,
-			modelRotation,
-			modelScale,
-			scale,
-			canvasAspectRatio,
-			clustering: _clustering,
-			glbBlob: _glbBlob,
-			...topoFields
-		} = nextTopo || {};
-		const document = wrappedTopo || topoFields;
-		writeTopo({
-			...createInitialTopo(),
-			...selectTopoDocumentFields(document)
-		});
+	function load(nextTopo: Topo2DEditorDocument | null) {
+		writeTopo(nextTopo ? clone(nextTopo) : createInitialTopo());
 		Object.assign(state.ui, createUi());
-		state.ui.editorMode = editorMode || '3d';
-		state.ui.has3DTopoAvailable = Boolean(has3DTopoAvailable);
-		state.ui.entryPath = entryPath || null;
-		state.ui.topoFileName = topoFileName || null;
-		state.ui.name = name || '';
-		state.ui.modelOffset = modelOffset || [0, 0, 0];
-		state.ui.modelRotation = modelRotation || [0, 0, 0];
-		state.ui.modelScale = modelScale || [1, 1, 1];
-		state.ui.scale = scale || 1;
-		state.ui.canvasAspectRatio = canvasAspectRatio || document.imageAspectRatio || 1.5;
 		state.selection = new Set();
 		state.selectedItems = new Set();
 		state.selectedSymbolInstance = null;

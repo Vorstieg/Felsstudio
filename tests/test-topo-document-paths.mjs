@@ -5,7 +5,6 @@ import { test } from 'vitest';
 import {
 	assignTopoPath,
 	deleteTopoPath,
-	normalizeTopoPaths,
 	routesUsingTopoPath,
 	splitTopoPath,
 	unassignTopoPath,
@@ -36,23 +35,21 @@ test('manages and validates topo document paths', () => {
 			{ id: 'route-2', pathRefs: [] }
 		]
 	};
-	const normalized = normalizeTopoPaths(document);
-	assert.equal(normalized.changed, false);
-	assert.equal(normalized.data.paths.features.length, 1);
-	assert.deepEqual(normalized.data.routes[0].pathRefs[0].role, 'approach');
-	const pathId = normalized.data.paths.features[0].id;
-	assert.equal(assignTopoPath(normalized.data, 'route-2', pathId, { role: 'descent' }), true);
-	assert.equal(assignTopoPath(normalized.data, 'route-2', pathId), false);
-	assert.equal(routesUsingTopoPath(normalized.data, pathId).length, 2);
-	assert.deepEqual(validateTopoPaths(normalized.data), []);
-	assert.equal(unassignTopoPath(normalized.data, 'route-1', pathId), true);
-	assert.equal(routesUsingTopoPath(normalized.data, pathId).length, 1);
-	assert.equal(deleteTopoPath(normalized.data, pathId), true);
-	assert.equal(normalized.data.paths.features.length, 0);
-	assert.equal(normalized.data.routes[1].pathRefs.length, 0);
-	assert.deepEqual(validateTopoPaths(normalized.data), []);
+	assert.equal(document.paths.features.length, 1);
+	assert.deepEqual(document.routes[0].pathRefs[0].role, 'approach');
+	const pathId = document.paths.features[0].id;
+	assert.equal(assignTopoPath(document, 'route-2', pathId, { role: 'descent' }), true);
+	assert.equal(assignTopoPath(document, 'route-2', pathId), false);
+	assert.equal(routesUsingTopoPath(document, pathId).length, 2);
+	assert.deepEqual(validateTopoPaths(document), []);
+	assert.equal(unassignTopoPath(document, 'route-1', pathId), true);
+	assert.equal(routesUsingTopoPath(document, pathId).length, 1);
+	assert.equal(deleteTopoPath(document, pathId), true);
+	assert.equal(document.paths.features.length, 0);
+	assert.equal(document.routes[1].pathRefs.length, 0);
+	assert.deepEqual(validateTopoPaths(document), []);
 
-	const shared = normalizeTopoPaths({
+	const shared = {
 		paths: {
 			type: 'FeatureCollection',
 			features: [
@@ -75,7 +72,7 @@ test('manages and validates topo document paths', () => {
 			{ id: 'a', pathRefs: [{ pathId: 'shared', role: 'approach' }] },
 			{ id: 'b', pathRefs: [{ pathId: 'shared', role: 'descent' }] }
 		]
-	}).data;
+	};
 	assert.deepEqual(
 		splitTopoPath(
 			shared,
@@ -96,7 +93,7 @@ test('manages and validates topo document paths', () => {
 	assert.equal(shared.routes[1].pathRefs.length, 2);
 	assert.deepEqual(validateTopoPaths(shared), []);
 
-	const routeSpecific = normalizeTopoPaths({
+	const routeSpecific = {
 		paths: {
 			type: 'FeatureCollection',
 			features: [
@@ -119,7 +116,7 @@ test('manages and validates topo document paths', () => {
 			{ id: 'a', pathRefs: [{ pathId: 'shared' }] },
 			{ id: 'b', pathRefs: [{ pathId: 'shared' }] }
 		]
-	}).data;
+	};
 	splitTopoPath(
 		routeSpecific,
 		'shared',
@@ -145,8 +142,16 @@ test('manages and validates topo document paths', () => {
 	);
 	assert.deepEqual(validateTopoPaths(routeSpecific), []);
 
-	const invalid = normalizeTopoPaths({
+	const invalid = {
 		routes: [{ id: 'broken', pathRefs: [{ pathId: 'missing' }] }]
-	}).data;
+	};
 	assert.match(validateTopoPaths(invalid).join('\n'), /missing/);
+});
+
+test('path lookup and validation do not repair the document', () => {
+	const document = { routes: [{ id: 'route-1' }] };
+	const before = structuredClone(document);
+	assert.deepEqual(validateTopoPaths(document), []);
+	assert.deepEqual(routesUsingTopoPath(document, 'missing'), []);
+	assert.deepEqual(document, before);
 });

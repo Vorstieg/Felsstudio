@@ -2,10 +2,7 @@
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import type { Route } from '@vorstieg/fels-types/types';
-	import {
-		selectTopoDocumentFields,
-		type Topo2DEditorDocument
-	} from '$lib/state/topo-2d-editor-initial-state.ts';
+	import type { Topo2DEditorDocument } from '$lib/state/topo-2d-editor-initial-state.ts';
 	import type { TopoDrawingTarget } from '$lib/state/topo-drawing-target.ts';
 	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
 	const editorState = getTopo2DEditorState();
@@ -148,16 +145,8 @@
 			return;
 		}
 
-		const topoFields = selectTopoDocumentFields(parsed);
 		const currentMode = editorState.ui.editorMode;
-		const nextTopo: Partial<Topo2DEditorDocument> = {
-			...topoFields,
-			coordinates: topoFields.coordinates ?? [0, 0, 0],
-			image2D: topoFields.image2D ?? null,
-			imageAspectRatio: topoFields.imageAspectRatio ?? 1.5,
-			backgroundFit: topoFields.backgroundFit ?? 'contain'
-		};
-		editorState.load(nextTopo);
+		editorState.load(parsed as Topo2DEditorDocument);
 		editorState.ui.editorMode = currentMode;
 		editorState.clearSelection();
 		drawingTarget = null;

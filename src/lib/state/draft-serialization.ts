@@ -3,9 +3,12 @@ import type {
 	Topo2DEditorDocument
 } from './topo-2d-editor-initial-state.ts';
 
-export type DraftTopoData = Partial<Topo2DEditorDocument>;
+export type DraftTopoData = Topo2DEditorDocument;
 
-export type DraftClustering = Partial<Topo2DEditorClustering> & {
+export type DraftClustering = Topo2DEditorClustering;
+
+type StoredClustering = Omit<Topo2DEditorClustering, 'cropsMap'> & {
+	cropsMap?: Topo2DEditorClustering['cropsMap'];
 	cropsBuffers?: Record<string, SerializedCrop>;
 };
 
@@ -34,7 +37,11 @@ export type DraftSession = DraftEditorExtras & {
 	updated?: string;
 };
 
-export type StoredTopoDraft = DraftEditorExtras & {
+type StoredDraftExtras = Omit<DraftEditorExtras, 'clustering'> & {
+	clustering?: StoredClustering;
+};
+
+export type StoredTopoDraft = StoredDraftExtras & {
 	topo: DraftTopoData;
 	id: string;
 	updated: string;
@@ -50,16 +57,17 @@ type SerializedCrop = { buffer: ArrayBuffer; type: string };
 export async function serializeDraftExtras(
 	extras: DraftEditorExtras = {},
 	{ fetchImpl = globalThis.fetch }: { fetchImpl?: typeof fetch } = {}
-): Promise<DraftEditorExtras> {
-	const serialized: DraftEditorExtras = { ...extras };
+): Promise<StoredDraftExtras> {
+	const serialized: StoredDraftExtras = { ...extras };
 
 	if (typeof Blob !== 'undefined' && serialized.glbBlob instanceof Blob) {
 		serialized.glbArrayBuffer = await serialized.glbBlob.arrayBuffer();
 		delete serialized.glbBlob;
 	}
 
+	const clustering = serialized.clustering;
 	const cropsMap = serialized.clustering?.cropsMap;
-	if (!cropsMap || Object.keys(cropsMap).length === 0) return serialized;
+	if (!clustering || !cropsMap || Object.keys(cropsMap).length === 0) return serialized;
 
 	const buffersByUrl = new Map<string, SerializedCrop>();
 	for (const url of new Set(Object.values(cropsMap))) {
@@ -83,14 +91,14 @@ export async function serializeDraftExtras(
 			.filter((entry): entry is [string, SerializedCrop] => entry[1] !== undefined)
 	);
 
-	serialized.clustering = { ...serialized.clustering, cropsBuffers };
+	serialized.clustering = { ...clustering, cropsBuffers };
 	delete serialized.clustering.cropsMap;
 	return serialized;
 }
 
 /** Restore resources that were serialized for IndexedDB. */
 export function restoreDraftSession(
-	session: DraftSession | null | undefined,
+	session: StoredTopoDraft | null | undefined,
 	{ createObjectURL = URL.createObjectURL }: { createObjectURL?: typeof URL.createObjectURL } = {}
 ): DraftSession | null | undefined {
 	if (!session) return session;
@@ -100,17 +108,19 @@ export function restoreDraftSession(
 		delete session.glbArrayBuffer;
 	}
 
-	const cropsBuffers = session.clustering?.cropsBuffers;
-	if (cropsBuffers && Object.keys(cropsBuffers).length > 0) {
+	const clustering = session.clustering;
+	const cropsBuffers = clustering?.cropsBuffers;
+	if (clustering && cropsBuffers && Object.keys(cropsBuffers).length > 0) {
 		const cropsMap: Record<string, string> = {};
 		for (const [key, { buffer, type }] of Object.entries(cropsBuffers)) {
 			if (buffer instanceof ArrayBuffer) {
 				cropsMap[key] = createObjectURL(new Blob([buffer], { type: type || 'image/jpeg' }));
 			}
 		}
-		session.clustering = { ...session.clustering, cropsMap };
+		session.clustering = { ...clustering, cropsMap };
 		delete session.clustering.cropsBuffers;
 	}
 
-	return session;
+	// Resource decoding above restores the in-memory clustering representation.
+	return session as DraftSession;
 }
