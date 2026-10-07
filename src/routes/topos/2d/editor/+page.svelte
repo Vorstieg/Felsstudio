@@ -154,6 +154,12 @@
 		getSaveSignature: () =>
 			JSON.stringify({
 				document: editorState.getSaveSnapshot(),
+				name: editorState.ui.name,
+				modelOffset: editorState.ui.modelOffset,
+				modelRotation: editorState.ui.modelRotation,
+				modelScale: editorState.ui.modelScale,
+				scale: editorState.ui.scale,
+				canvasAspectRatio: editorState.ui.canvasAspectRatio,
 				historyIndex: editorState.history.index,
 				historyLength: editorState.history.entries.length
 			}),
@@ -173,12 +179,7 @@
 
 			let topoToSave = editorState.getSaveSnapshot();
 
-			// Remove internal UI fields before saving
-			delete topoToSave._entryPath;
-			delete topoToSave._topoFileName;
-			delete topoToSave.name;
-
-			const fileName = editorState.topo._topoFileName;
+			const fileName = editorState.ui.topoFileName;
 			if (typeof fileName !== 'string' || !fileName)
 				throw new Error('Topo file path is unavailable');
 			await writeJson(fileName, topoToSave);

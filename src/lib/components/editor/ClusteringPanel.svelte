@@ -73,10 +73,11 @@
 				if (gpsKeys.length > 0) {
 					const firstGps = topoSession.clustering.gpsData[gpsKeys[0]];
 					if (firstGps.latitude && firstGps.longitude) {
-						topoSession.topo.coordinates = [firstGps.latitude, firstGps.longitude];
-						if (firstGps.abs_alt || firstGps.rel_alt) {
-							topoSession.topo.altitude = firstGps.abs_alt || firstGps.rel_alt;
-						}
+						topoSession.topo.coordinates = [
+							firstGps.longitude,
+							firstGps.latitude,
+							firstGps.abs_alt || firstGps.rel_alt || 0
+						];
 					}
 				}
 			}

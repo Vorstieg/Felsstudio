@@ -91,7 +91,7 @@ describe('topo utilities', () => {
 			]
 		});
 		expect(route.length).toBe(0);
-		expect(route.points3D).toEqual([]);
+		expect(route).not.toHaveProperty('points3D');
 
 		convertRouteType(route, 'sport');
 

@@ -98,6 +98,22 @@
 	let element = $state<HTMLDivElement | null>(null);
 	let loadedGltfScene = $state<Group | null>(null);
 	let showMapModal = $state(false);
+	let mapCoordinates = $state<[number, number]>([0, 0]);
+	let mapAltitude = $state(0);
+	let mapModalWasOpen = false;
+	$effect(() => {
+		if (showMapModal && !mapModalWasOpen) {
+			const [longitude = 0, latitude = 0, elevation = 0] = topoSession.topo.coordinates || [];
+			mapCoordinates = [longitude, latitude];
+			mapAltitude = elevation;
+		}
+		mapModalWasOpen = showMapModal;
+	});
+
+	function closeMapModal() {
+		topoSession.topo.coordinates = [mapCoordinates[0], mapCoordinates[1], mapAltitude];
+		showMapModal = false;
+	}
 
 	// --- Camera Focus Logic (Svelte Native Animation) ---
 	const cameraPosStore = tweened<Point3>([0, 1, 5], {
@@ -122,7 +138,7 @@
 			lastSelectedClusterId = clusterId;
 			const cluster = topoSession.clustering.clusters.find((c) => c.id === clusterId);
 			if (cluster && cluster.members.length > 0) {
-				const offset = topoSession.topo.modelOffset || [0, 0, 0];
+				const offset = topoSession.ui.modelOffset || [0, 0, 0];
 
 				// Calculate Anchor (Target)
 				const anchor: Point3 = [
@@ -190,8 +206,9 @@
 
 	function restoreSession(session: DraftSession, id: string) {
 		topoSession.loadSession(session, id);
+		topoSession.ui.editorMode = session.editorMode === '2d' ? '2d' : '3d';
 		topoSession.ui.workspace =
-			session.topo.editorMode === '2d' ? 'topos/2d/editor' : 'topos/3d/editor';
+			topoSession.ui.editorMode === '2d' ? 'topos/2d/editor' : 'topos/3d/editor';
 	}
 
 	useTopoDraftAutosave({
@@ -238,11 +255,13 @@
 				textLabels: topoSession.topo.textLabels,
 				image2D: topoSession.topo.image2D,
 				imageAspectRatio: topoSession.topo.imageAspectRatio,
-				canvasAspectRatio: topoSession.topo.canvasAspectRatio,
+				canvasAspectRatio: topoSession.ui.canvasAspectRatio,
 				backgroundFit: topoSession.topo.backgroundFit,
-				name: topoSession.topo.name,
-				crag_id: topoSession.topo.crag_id,
-				sector_id: topoSession.topo.sector_id,
+				name: topoSession.ui.name,
+				modelOffset: topoSession.ui.modelOffset,
+				modelRotation: topoSession.ui.modelRotation,
+				modelScale: topoSession.ui.modelScale,
+				scale: topoSession.ui.scale,
 				clustering: topoSession.clustering,
 				glbBlob: topoSession.transient.glbBlob,
 				modelRevision: topoSession.transient.modelRevision
@@ -335,7 +354,7 @@
 				if (g.latitude !== 0 && g.longitude !== 0) {
 					pairs.push({
 						glb: camPositions[fIdx],
-						gps: [g.latitude, g.longitude, g.abs_alt || g.rel_alt || 0]
+						gps: [g.longitude, g.latitude, g.abs_alt || g.rel_alt || 0]
 					});
 				}
 			}
@@ -363,7 +382,7 @@
 			weightSum += w;
 			for (let i = 0; i < 3; i++) estGps[i] += n.p.gps[i] * w;
 		});
-		return estGps.map((v) => v / weightSum);
+		return estGps.map((v) => v / weightSum) as Point3;
 	}
 
 	async function combinedExport() {
@@ -380,11 +399,6 @@
 
 			const topoToSave: Topo2DEditorDocument = JSON.parse(JSON.stringify(topoSession.topo));
 
-			// Remove internal UI fields before saving
-			delete topoToSave._entryPath;
-			delete topoToSave._topoFileName;
-			delete topoToSave.name;
-
 			if (workspace === '3d-create') {
 				// Convert visible clusters to fixPoints
 				const confirmedBolts = topoSession.clustering.clusters.map((c) => ({
@@ -400,15 +414,12 @@
 
 				if (topoToSave.coordinates?.[0] === 0 && topoToSave.coordinates[1] === 0) {
 					const originGps = estimateGpsOrigin();
-					if (originGps) {
-						topoToSave.coordinates = [originGps[0], originGps[1]];
-						topoToSave.altitude = originGps[2];
-					}
+					if (originGps) topoToSave.coordinates = originGps;
 				}
 			}
 
 			// Save topo JSON to Felslager
-			const topoFileName = topoSession.topo._topoFileName;
+			const topoFileName = topoSession.ui.topoFileName;
 			if (typeof topoFileName !== 'string' || !topoFileName) {
 				throw new Error('Topo file path is unavailable');
 			}
@@ -650,13 +661,11 @@
 
 {#if showMapModal}
 	<MapModal
-		bind:coordinates={topoSession.topo.coordinates}
-		bind:altitude={topoSession.topo.altitude}
+		bind:coordinates={mapCoordinates}
+		bind:altitude={mapAltitude}
 		gltfScene={loadedGltfScene}
-		bind:modelRotation={topoSession.topo.modelRotation}
-		bind:modelScale={topoSession.topo.modelScale}
-		onClose={() => {
-			showMapModal = false;
-		}}
+		bind:modelRotation={topoSession.ui.modelRotation}
+		bind:modelScale={topoSession.ui.modelScale}
+		onClose={closeMapModal}
 	/>
 {/if}

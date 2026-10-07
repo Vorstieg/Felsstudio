@@ -187,7 +187,7 @@
 		<PitchComponent
 			pitch={route}
 			kind="single"
-			topoScale={editorState.topo.scale} fixPoints={editorState.topo.fixPoints}
+			topoScale={editorState.ui.scale} fixPoints={editorState.topo.fixPoints}
 			onFieldChange={(field, value) => updateRoute({ [field]: value })}
 		/>
 	{/if}
@@ -277,7 +277,7 @@
 					{pitch}
 					index={idx}
 					kind="pitch"
-					topoScale={editorState.topo.scale} fixPoints={editorState.topo.fixPoints}
+					topoScale={editorState.ui.scale} fixPoints={editorState.topo.fixPoints}
 					onDraw={(pitch) => drawPitch(route, pitch)}
 					onDuplicate={(pitch, targetRouteId) => duplicatePitch(route, pitch, targetRouteId)}
 					duplicateTargets={duplicatePitchTargets(route)}
@@ -304,7 +304,7 @@
 						pitch={variant}
 						index={idx}
 						kind="variant"
-						topoScale={editorState.topo.scale} fixPoints={editorState.topo.fixPoints}
+						topoScale={editorState.ui.scale} fixPoints={editorState.topo.fixPoints}
 						onDraw={(variant) => drawVariant(route, variant)}
 						onRemove={(variant) => removeVariant(route, variant)}
 						onFieldChange={(field, value) => updateVariant(variant.id,{ [field]: value })}

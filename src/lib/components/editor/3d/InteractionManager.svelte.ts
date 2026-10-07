@@ -1,4 +1,5 @@
 import { Matrix3, Vector3, Raycaster } from 'three';
+import { isLinePath } from '$lib/assets/js/path-geometry.ts';
 import type { Camera, Group, Object3D } from 'three';
 import { generateRouteId, generateSymbolId, generateId } from '$lib/assets/js/id-utils.ts';
 import type { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
@@ -352,10 +353,16 @@ export class Topo3DInteractionManager {
 				allPointsWithNormals.push({ point: snapPoint, normal: new Vector3(0, 1, 0) });
 			}
 
-			const finalPoints = allPointsWithNormals.map((p) => {
+			const finalPoints = allPointsWithNormals.map((p): Point3 => {
 				const localPoint = scene.worldToLocal(p.point.clone());
-				return localPoint.toArray().map((c) => Number(c.toFixed(4)));
+				return [
+					Number(localPoint.x.toFixed(4)),
+					Number(localPoint.y.toFixed(4)),
+					Number(localPoint.z.toFixed(4))
+				];
 			});
+
+			if (!isLinePath(finalPoints)) return;
 
 			if (activeTool === 'multipitch') {
 				const route = this.state.topo.routes.find(
@@ -368,7 +375,7 @@ export class Topo3DInteractionManager {
 						: null;
 					if (!pitch && pitches.length > 0) pitch = pitches[pitches.length - 1];
 					if (pitch) {
-						pitch.points3D = finalPoints as Point3[];
+						pitch.points3D = finalPoints;
 						pitch.endNodeId = pointId;
 					}
 				}
@@ -380,7 +387,7 @@ export class Topo3DInteractionManager {
 				const newRoute = {
 					id: generateRouteId(),
 					name: 'New Route',
-					points3D: finalPoints as Point3[],
+					points3D: finalPoints,
 					orientation3D: [averageNormal.x, averageNormal.y, averageNormal.z] as Point3,
 					tags: [],
 					fixPoints: []
@@ -414,7 +421,6 @@ export class Topo3DInteractionManager {
 						id: generateId('pitch'),
 						pitchNumber: (route.pitches?.length || 0) + 1,
 						startNodeId: pointId,
-						points3D: [],
 						type: 'climb'
 					};
 					route.pitches = [...(route.pitches || []), newPitch];
@@ -478,10 +484,16 @@ export class Topo3DInteractionManager {
 		});
 		if (allPointsWithNormals.length === 0) return;
 
-		const finalPoints = allPointsWithNormals.map((p) => {
+		const finalPoints = allPointsWithNormals.map((p): Point3 => {
 			const localPoint = scene.worldToLocal(p.point.clone());
-			return localPoint.toArray().map((c) => Number(c.toFixed(4)));
+			return [
+				Number(localPoint.x.toFixed(4)),
+				Number(localPoint.y.toFixed(4)),
+				Number(localPoint.z.toFixed(4))
+			];
 		});
+
+		if (!isLinePath(finalPoints)) return;
 
 		let route = this.state.topo.routes.find(
 			(r) => r.id === (this.localDrawingState?.routeId || this.state.ui.selectedRouteId)
@@ -505,7 +517,7 @@ export class Topo3DInteractionManager {
 		const currentPitch = {
 			id: generateId('pitch'),
 			pitchNumber: pitches.length + 1,
-			points3D: finalPoints as Point3[],
+			points3D: finalPoints,
 			type: 'pitch',
 			endNodeId: anchorId
 		};
@@ -515,7 +527,6 @@ export class Topo3DInteractionManager {
 			id: generateId('pitch'),
 			pitchNumber: pitches.length + 1,
 			startNodeId: anchorId,
-			points3D: [],
 			type: 'climb'
 		};
 		pitches.push(nextPitch);
@@ -541,10 +552,16 @@ export class Topo3DInteractionManager {
 				if (segment.pointsData?.length > 0) allPointsWithNormals.push(...segment.pointsData);
 			});
 			if (allPointsWithNormals.length > 0) {
-				const finalPoints = allPointsWithNormals.map((p) => {
+				const finalPoints = allPointsWithNormals.map((p): Point3 => {
 					const localPoint = scene.worldToLocal(p.point.clone());
-					return localPoint.toArray().map((c) => Number(c.toFixed(4)));
+					return [
+						Number(localPoint.x.toFixed(4)),
+						Number(localPoint.y.toFixed(4)),
+						Number(localPoint.z.toFixed(4))
+					];
 				});
+				if (!isLinePath(finalPoints)) return;
+
 				const averageNormal = new Vector3();
 				allPointsWithNormals.forEach((pd) => averageNormal.add(pd.normal));
 				averageNormal.normalize();
@@ -576,7 +593,7 @@ export class Topo3DInteractionManager {
 					pitches.push({
 						id: generateId('pitch'),
 						pitchNumber: pitches.length + 1,
-						points3D: finalPoints as Point3[],
+						points3D: finalPoints,
 						type: 'climb',
 						endNodeId: endId
 					});
@@ -584,7 +601,7 @@ export class Topo3DInteractionManager {
 					const newRoute = {
 						id: generateRouteId(),
 						name: 'New Route',
-						points3D: finalPoints as Point3[],
+						points3D: finalPoints,
 						orientation3D: [averageNormal.x, averageNormal.y, averageNormal.z] as Point3,
 						tags: [],
 						fixPoints: []

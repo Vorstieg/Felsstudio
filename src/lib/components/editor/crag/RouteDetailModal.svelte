@@ -70,7 +70,6 @@
 				{
 					id: generateId('pitch'),
 					pitchNumber: (route.pitches?.length || 0) + 1,
-					points2D: [],
 					points: [],
 					grade: null,
 					length: 0,

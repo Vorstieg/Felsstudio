@@ -3,16 +3,14 @@
 
 	const editorState = getTopo2DEditorState();
 	let topo = $derived(editorState.topo);
-	let coordinates = $derived(topo.coordinates ?? [0, 0]);
+	let coordinates = $derived(topo.coordinates ?? [0, 0, 0]);
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
 	import ImageUploader from '$lib/components/editor/ImageUploader.svelte';
 	import ClusteringMap from '$lib/components/editor/ClusteringMap.svelte';
 	import { _ } from 'svelte-i18n';
 	import { availableTopoTags } from '$lib/assets/js/topo-utils.ts';
 	import TopoJsonEditor from './TopoJsonEditor.svelte';
-	import { rockTypes } from '$lib/config.ts';
 	import WallDirectionPicker from '$lib/components/ui/WallDirectionPicker.svelte';
-	import { wallDirectionForAzimuth } from '$lib/assets/js/wall-directions.ts';
 
 	type Props = {
 		showMapModal?: boolean;
@@ -33,7 +31,16 @@
 	}: Props = $props();
 
 	const updateTopoField = editorState.updateTopoField;
-
+	const has3DTopo = $derived(
+		editorState.ui.has3DTopoAvailable ||
+			Boolean(editorState.transient.glbBlob) ||
+			topo.routes.some(
+				(route) =>
+					Boolean(route.points3D?.length) ||
+					Boolean(route.pitches?.some((pitch) => pitch.points3D?.length)) ||
+					Boolean(route.variants?.some((variant) => variant.points3D?.length))
+			)
+	);
 </script>
 
 <div class="space-y-3">
@@ -45,6 +52,17 @@
 				onformat={onformatjson}
 				onapply={onapplyjson}
 			/>
+		{/if}
+
+		{#if editorState.ui.editorMode === '2d' && !has3DTopo}
+			<div class="space-y-0.5">
+				<label for="wall-azimuth" class="text-ui-label block">{$_('topo.wall_direction')}</label>
+				<WallDirectionPicker
+					id="wall-azimuth"
+					azimuth={topo.wallAzimuth}
+					onChange={(azimuth: number) => updateTopoField('wallAzimuth', azimuth)}
+				/>
+			</div>
 		{/if}
 
 		<div class="space-y-0.5">
@@ -59,21 +77,7 @@
 			/>
 		</div>
 
-		<div class="space-y-0.5">
-			<label for="rock" class="text-ui-label block">{$_('ui.rock_type')}</label>
-			<select
-				id="rock"
-				value={topo.rock || ''}
-				onchange={(event) => updateTopoField('rock', event.currentTarget.value)}
-				class="input-studio w-full appearance-none"
-			>
-				{#each rockTypes as rockType}
-					<option value={rockType}>{$_(`rock_types.${rockType}`)}</option>
-				{/each}
-			</select>
-		</div>
-
-		{#if topo.editorMode === '3d'}
+		{#if editorState.ui.editorMode === '3d'}
 			<div class="space-y-0.5">
 				<p class="text-ui-label block">{$_('ui.location')}</p>
 				{#if Object.keys(editorState.clustering.gpsData || {}).length > 0}
@@ -99,9 +103,7 @@
 								<div
 									class="text-[9px] text-warm-gray-400 font-bold uppercase mt-1 leading-none tracking-tight"
 								>
-									{wallDirectionForAzimuth(topo.wallAzimuth).id} / {topo.altitude
-									? topo.altitude.toFixed(0)
-									: 0}m
+									{coordinates[2] ? coordinates[2].toFixed(0) : 0}m
 								</div>
 							{:else}
 								<div class="text-micro-data text-warm-gray-400 italic">
@@ -113,17 +115,6 @@
 				{/if}
 			</div>
 		{/if}
-
-			{#if topo.editorMode === '2d'}
-				<div class="space-y-0.5">
-					<label for="wall-azimuth" class="text-ui-label block">{$_('topo.wall_direction')}</label>
-					<WallDirectionPicker
-						id="wall-azimuth"
-						azimuth={topo.wallAzimuth}
-					onChange={(azimuth: number) => updateTopoField('wallAzimuth', azimuth)}
-					/>
-				</div>
-			{/if}
 
 		<div class="space-y-0.5">
 			<label for="description" class="text-ui-label block">{$_('ui.description')}</label>
@@ -146,7 +137,7 @@
 			/>
 		</div>
 
-		{#if topo.editorMode === '2d'}
+		{#if editorState.ui.editorMode === '2d'}
 			<div class="pt-2 border-t border-black/15">
 				<ImageUploader />
 			</div>

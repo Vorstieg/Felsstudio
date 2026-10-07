@@ -1,6 +1,7 @@
 import { generateId, generateRouteId } from '$lib/assets/js/id-utils.ts';
 import { createGrade } from '$lib/assets/js/topo-utils.ts';
-import type { Pitch, Route } from '@vorstieg/fels-types/types';
+import type { Path2D, Pitch, Route } from '@vorstieg/fels-types/types';
+import { isLinePath } from '$lib/assets/js/path-geometry.ts';
 import type { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
 import type { InteractionPoint, InteractionId } from '$lib/state/topo-2d-editor-interactions.ts';
 import type { TopoDrawingTarget } from '$lib/state/topo-drawing-target.ts';
@@ -11,7 +12,11 @@ type DrawingTarget = TopoDrawingTarget | null;
 type SnapResult = { point: InteractionPoint; anchorId: InteractionId | null };
 type RouteMode = 'route' | 'multipitch' | 'alpine-tour' | 'via-ferrata';
 type Point2D = NonNullable<Route['points2D']>[number];
-const asPath2D = (points: number[][]): Point2D[] => points.map(([x, y]): Point2D => [x, y]);
+const asPath2D = (points: number[][]): Path2D => {
+	const path = points.map(([x, y]): Point2D => [x, y]);
+	if (!isLinePath(path)) throw new Error('Route needs at least 2 points');
+	return path;
+};
 type RouteToolOptions = {
 	snapPoint?: (point: InteractionPoint) => SnapResult;
 	referenceFixpoint?: (route: Route, fixPointId: InteractionId | null) => void;
@@ -211,7 +216,7 @@ export class RouteTool {
 		);
 	}
 
-	createPitch(pitchNumber: number, points2D: Point2D[]): Pitch {
+	createPitch(pitchNumber: number, points2D: Path2D): Pitch {
 		return {
 			id: generateId('pitch'),
 			pitchNumber,
@@ -224,7 +229,7 @@ export class RouteTool {
 		};
 	}
 
-	createRoute(mode: RouteMode, points2D: Point2D[]): Route {
+	createRoute(mode: RouteMode, points2D: Path2D): Route {
 		const baseRoute = {
 			id: generateRouteId(),
 			points: [],

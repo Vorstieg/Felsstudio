@@ -33,7 +33,8 @@
 		isLoading = true;
 		const seededTopo = { ...topoSession.topo };
 		topoSession.reset();
-		topoSession.topo = { ...topoSession.topo, ...seededTopo, editorMode: '3d' };
+		topoSession.topo = { ...topoSession.topo, ...seededTopo };
+		topoSession.ui.editorMode = '3d';
 
 		try {
 			if (zipFile) {
@@ -95,7 +96,7 @@
 					if (index !== undefined) gpsData[index] = gps;
 				}
 				topoSession.clustering.gpsData = gpsData;
-				if (project.name) topoSession.topo.name = project.name;
+				if (project.name) topoSession.ui.name = project.name;
 			}
 
 			if (cropFolderFiles.length) {
@@ -118,18 +119,22 @@
 				if (validGpsKeys.length) {
 					const gps =
 						topoSession.clustering.gpsData[validGpsKeys[Math.floor(validGpsKeys.length / 2)]];
-					topoSession.topo.coordinates = [gps.latitude, gps.longitude];
-					topoSession.topo.altitude = gps.abs_alt || gps.rel_alt || 0;
+					topoSession.topo.coordinates = [
+						gps.longitude,
+						gps.latitude,
+						gps.abs_alt || gps.rel_alt || 0
+					];
 				}
 			}
 
 			draftsState.load();
+			const { topo, ...extras } = topoSession.getSaveSession();
 			topoSession.ui.activeDraftId = await draftsState.save(
-				topoSession.topo,
+				topo,
 				topoSession.ui.activeDraftId,
 				{
-					clustering: $state.snapshot(topoSession.clustering),
-					glbBlob: topoSession.transient.glbBlob
+					...extras,
+					clustering: $state.snapshot(topoSession.clustering)
 				}
 			);
 			topoSession.ui.lastSaved = new Date().toISOString();

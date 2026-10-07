@@ -38,14 +38,16 @@ describe('draft persistence', () => {
 	it('saves the full session and lightweight metadata separately', async () => {
 		const topo = {
 			id: 'topo-1',
-			editorMode: '2d',
-			name: 'Rote Wand',
-			_entryPath: '/lower-austria/rote-wand/rote-wand/',
-			_topoFileName: 'lower-austria/rote-wand/rote-wand-topo.json',
 			routes: [{ id: 'route-1', name: 'Direkter Einstieg' }]
 		};
 
-		const draftId = await draftsState.save(topo, null, { selectedRouteId: 'route-1' });
+		const draftId = await draftsState.save(topo, null, {
+			editorMode: '2d',
+			entryPath: '/lower-austria/rote-wand/rote-wand/',
+			topoFileName: 'lower-austria/rote-wand/rote-wand-topo.json',
+			selectedRouteId: 'route-1',
+			name: 'Rote Wand'
+		});
 
 		expect(draftId).toBe('2d-topo-1');
 		expect(mocks.topoStore.set).toHaveBeenCalledOnce();
@@ -77,7 +79,7 @@ describe('draft persistence', () => {
 		const blob = Object.assign(new Blob(['glb-data'], { type: 'model/gltf-binary' }), {
 			arrayBuffer: async () => new TextEncoder().encode('glb-data').buffer
 		});
-		await draftsState.save({ editorMode: '3d', name: 'Model' }, 'draft-3d', { glbBlob: blob });
+		await draftsState.save({}, 'draft-3d', { editorMode: '3d', name: 'Model', glbBlob: blob });
 
 		const saved = mocks.topoStore.set.mock.calls[0][0];
 		expect(saved.glbBlob).toBeUndefined();
@@ -92,9 +94,9 @@ describe('draft persistence', () => {
 			{ id: 'two-d', editorMode: '2d', updated: '2026-01-01T00:00:00.000Z' }
 		];
 		const sessions = {
-			blank: { topo: { editorMode: '2d', routes: [] } },
-			'three-d': { topo: { editorMode: '3d', name: '3D wall' } },
-			'two-d': { topo: { editorMode: '2d', name: '2D wall' } }
+			blank: { editorMode: '2d', topo: { routes: [] } },
+			'three-d': { editorMode: '3d', name: '3D wall', topo: {} },
+			'two-d': { editorMode: '2d', name: '2D wall', topo: {} }
 		};
 		vi.spyOn(draftsState, 'getById').mockImplementation(async (id) => sessions[id] || null);
 
@@ -131,17 +133,21 @@ describe('draft persistence', () => {
 		];
 		const sessions = {
 			'matching-newer': {
-				topo: {
-					editorMode: '2d',
-					name: 'Rote Wand draft',
-					_entryPath: 'lower-austria/rote-wand/rote-wand'
-				}
+				editorMode: '2d',
+				entryPath: 'lower-austria/rote-wand/rote-wand',
+				name: 'Rote Wand draft',
+				topo: {}
 			},
 			'other-source': {
-				topo: { editorMode: '2d', name: 'Other', _entryPath: 'lower-austria/other/other' }
+				editorMode: '2d',
+				entryPath: 'lower-austria/other/other',
+				name: 'Other',
+				topo: {}
 			},
 			'matching-blank': {
-				topo: { editorMode: '2d', _entryPath: 'lower-austria/rote-wand/rote-wand', routes: [] }
+				editorMode: '2d',
+				entryPath: 'lower-austria/rote-wand/rote-wand',
+				topo: { routes: [] }
 			}
 		};
 		vi.spyOn(draftsState, 'getById').mockImplementation(async (id) => sessions[id] || null);

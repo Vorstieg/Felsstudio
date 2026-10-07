@@ -2,7 +2,10 @@
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import type { Route } from '@vorstieg/fels-types/types';
-	import type { Topo2DEditorDocument } from '$lib/state/topo-2d-editor-initial-state.ts';
+	import {
+		selectTopoDocumentFields,
+		type Topo2DEditorDocument
+	} from '$lib/state/topo-2d-editor-initial-state.ts';
 	import type { TopoDrawingTarget } from '$lib/state/topo-drawing-target.ts';
 	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
 	const editorState = getTopo2DEditorState();
@@ -145,28 +148,17 @@
 			return;
 		}
 
-		const data = parsed as Record<string, unknown>;
-		const currentMode = topo.editorMode;
-		const nextTopo = {
-			...data,
-			routes: Array.isArray(data.routes) ? data.routes : [],
-			fixPoints: Array.isArray(data.fixPoints) ? data.fixPoints : [],
-			outlines: Array.isArray(data.outlines) ? data.outlines : [],
-			textLabels: Array.isArray(data.textLabels) ? data.textLabels : [],
-			tags: Array.isArray(data.tags) ? data.tags : [],
-			coordinates: Array.isArray(data.coordinates) ? data.coordinates : [0, 0],
-			modelOffset: Array.isArray(data.modelOffset) ? data.modelOffset : [0, 0, 0],
-			scale: data.scale ?? 1,
-			image2D: data.image2D ?? null,
-			imageAspectRatio: data.imageAspectRatio ?? 1.5,
-			canvasAspectRatio:
-				Number.isFinite(Number(data.canvasAspectRatio)) && Number(data.canvasAspectRatio) > 0
-					? Number(data.canvasAspectRatio)
-					: 1.5,
-			backgroundFit: data.backgroundFit === 'cover' ? 'cover' : 'contain',
-			editorMode: data.editorMode || currentMode
+		const topoFields = selectTopoDocumentFields(parsed);
+		const currentMode = editorState.ui.editorMode;
+		const nextTopo: Partial<Topo2DEditorDocument> = {
+			...topoFields,
+			coordinates: topoFields.coordinates ?? [0, 0, 0],
+			image2D: topoFields.image2D ?? null,
+			imageAspectRatio: topoFields.imageAspectRatio ?? 1.5,
+			backgroundFit: topoFields.backgroundFit ?? 'contain'
 		};
-		editorState.load(nextTopo as unknown as Partial<Topo2DEditorDocument>);
+		editorState.load(nextTopo);
+		editorState.ui.editorMode = currentMode;
 		editorState.clearSelection();
 		drawingTarget = null;
 		topoJsonError = '';

@@ -106,7 +106,9 @@
 								const session = await draftsState.getById(draft.id);
 								if (session) {
 									const workspace =
-										session.topo.editorMode === '2d' ? 'topos/2d/editor' : 'topos/3d/editor';
+										(session.editorMode || draft.editorMode) === '2d'
+											? 'topos/2d/editor'
+											: 'topos/3d/editor';
 									goto(`${base}/${workspace}?draft=${encodeURIComponent(draft.id)}`);
 								} else {
 									brokenDraftId = draft.id;

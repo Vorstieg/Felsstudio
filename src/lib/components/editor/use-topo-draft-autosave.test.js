@@ -35,7 +35,7 @@ describe('useTopoDraftAutosave', () => {
 		expect(mocks.save).toHaveBeenCalledWith(
 			expect.objectContaining({ routes: [{ id: 'route-1' }] }),
 			null,
-			{ glbBlob: null, selectedRouteId: 'route-1' }
+			{ glbBlob: null, selectedRouteId: 'route-1', editorMode: '2d' }
 		);
 		expect(view.getByTestId('draft-id')).toHaveTextContent('draft-1');
 		expect(view.getByTestId('last-saved')).not.toHaveTextContent('');
@@ -50,7 +50,7 @@ describe('useTopoDraftAutosave', () => {
 		expect(mocks.save).toHaveBeenCalledWith(
 			expect.objectContaining({ routes: savedRoutes }),
 			null,
-			{ glbBlob: null, selectedRouteId: 'route-1' }
+			{ glbBlob: null, selectedRouteId: 'route-1', editorMode: '2d' }
 		);
 	});
 
@@ -65,7 +65,8 @@ describe('useTopoDraftAutosave', () => {
 	it('loads an explicit draft instead of loading from the entry path', async () => {
 		const loadEntrySession = vi.fn();
 		mocks.getById.mockResolvedValue({
-			topo: { editorMode: '2d', routes: [{ id: 'draft-route' }] }
+			editorMode: '2d',
+			topo: { routes: [{ id: 'draft-route' }] }
 		});
 
 		const view = render(AutosaveHarness, {
@@ -82,7 +83,7 @@ describe('useTopoDraftAutosave', () => {
 		const loadEntrySession = vi.fn();
 		mocks.getLatestForSource.mockResolvedValue({
 			id: 'matching-draft',
-			session: { topo: { editorMode: '2d', routes: [{ id: 'source-draft-route' }] } }
+			session: { editorMode: '2d', topo: { routes: [{ id: 'source-draft-route' }] } }
 		});
 
 		render(AutosaveHarness, {

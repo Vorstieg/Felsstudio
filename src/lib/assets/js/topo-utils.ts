@@ -154,14 +154,14 @@ export function convertRouteType(route: EditableRoute, newType: string): void {
 				grade: route.grade,
 				length: route.length,
 				description: route.description,
-				points2D: route.points2D || [],
-				points3D: route.points3D || [],
+				points2D: route.points2D,
+				points3D: route.points3D,
 				type: 'pitch'
 			}
 		];
 		route.length = 0;
-		route.points2D = [];
-		route.points3D = [];
+		delete route.points2D;
+		delete route.points3D;
 	} else if (!willBeMultiPitch && wasMultiPitch) {
 		if (route.pitches?.length) {
 			const first = route.pitches[0];

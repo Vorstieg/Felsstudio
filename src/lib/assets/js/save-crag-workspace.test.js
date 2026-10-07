@@ -89,7 +89,7 @@ describe('saveCragWorkspace', () => {
 	});
 	it('updates topo identifiers and asset paths when an entry is renamed', async () => {
 		const root = node('new', '', 'old');
-		root.topo = { id: 'old', crag_id: 'old', sector_id: '', routes: [] };
+		root.topo = { id: 'old', routes: [] };
 		root.entry.properties.assets = {
 			models: ['old/old.glb']
 		};
@@ -108,14 +108,12 @@ describe('saveCragWorkspace', () => {
 			models: ['new/new.glb']
 		});
 		expect(writes.find(([path]) => path.endsWith('/new/new-topo.json'))[1]).toMatchObject({
-			id: 'new',
-			crag_id: 'new',
-			sector_id: ''
+			id: 'new'
 		});
 	});
 	it('updates a sector topo when it moves under another crag', async () => {
 		const sector = node('north', 'other', 'wall/north');
-		sector.topo = { id: 'wall:north', crag_id: 'wall', sector_id: 'north', routes: [] };
+		sector.topo = { id: 'wall:north', routes: [] };
 		const root = node('other', '', 'other', [sector]);
 		const writes = [];
 		await saveCragWorkspace(root, {
@@ -124,9 +122,7 @@ describe('saveCragWorkspace', () => {
 			remove: async () => {}
 		});
 		expect(writes.find(([path]) => path.endsWith('/north/north-topo.json'))[1]).toMatchObject({
-			id: 'other:north',
-			crag_id: 'other',
-			sector_id: 'north'
+			id: 'other:north'
 		});
 	});
 

@@ -3,6 +3,11 @@ export type Point2D = [x: number, y: number];
 export type Path2D = Point2D[];
 export type PathOptions = { closed?: boolean };
 
+/** Narrow a completed line to the shared document's two-point minimum. */
+export function isLinePath<T>(points: T[]): points is [T, T, ...T[]] {
+	return points.length >= 2;
+}
+
 export function clonePath(points: Path2D = []): Path2D {
 	return points.map((point) => [...point]);
 }

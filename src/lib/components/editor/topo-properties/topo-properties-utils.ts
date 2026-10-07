@@ -56,7 +56,6 @@ export function createVariant(
 	return {
 		id: generateId('variant'),
 		name: `Variant ${(route.variants?.length ?? 0) + 1}`,
-		points2D: [],
 		points: [],
 		grade: null,
 		length: 0,

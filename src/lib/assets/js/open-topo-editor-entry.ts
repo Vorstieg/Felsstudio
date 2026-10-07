@@ -11,6 +11,7 @@ import type {
 	Topo2DEditorClustering,
 	Topo2DEditorDocument
 } from '$lib/state/topo-2d-editor-initial-state.ts';
+import { selectTopoDocumentFields } from '$lib/state/topo-2d-editor-initial-state.ts';
 
 type TopoEditorSession = ReturnType<typeof createTopo2DEditorState>;
 
@@ -34,12 +35,13 @@ export async function persistTopoSessionImmediately(
 			)
 		)
 	};
+	const { topo, ...extras } = topoSession.getSaveSession();
 	topoSession.ui.activeDraftId = await draftsState.save(
-		topoSession.topo,
+		topo,
 		topoSession.ui.activeDraftId,
 		{
-			clustering: draftClustering,
-			glbBlob: topoSession.transient.glbBlob
+			...extras,
+			clustering: draftClustering
 		}
 	);
 	topoSession.ui.lastSaved = new Date().toISOString();
@@ -60,7 +62,9 @@ export async function loadTopoEditorEntry({
 	const topo = new Topo(splitPath.path, splitPath.id);
 	let name = splitPath.id;
 	try {
-		const cragData = await readJson<{ properties?: { name?: string } }>(topo.getCragPath());
+		const cragData = await readJson<{ properties?: { name?: string } }>(
+			topo.getCragPath()
+		);
 		name = cragData.properties?.name ?? name;
 	} catch {
 		/* crag file may not exist */
@@ -69,14 +73,21 @@ export async function loadTopoEditorEntry({
 
 	if (workspace.startsWith('/topos/2d')) {
 		try {
-			topoSession.topo = {
-				...topoSession.topo,
-				...normalizeTopoPaths(await readJson<Topo2DEditorDocument>(topo.getTopoPath())).data
-			};
+			const loaded = selectTopoDocumentFields(normalizeTopoPaths(
+				await readJson<Topo2DEditorDocument>(topo.getTopoPath())
+			).data);
+			topoSession.topo = { ...topoSession.topo, ...loaded };
 		} catch {
 			/* no topo yet */
 		}
-		topoSession.topo.editorMode = '2d';
+		topoSession.ui.editorMode = '2d';
+		try {
+			const modelResponse = await fetch(fileUrl(topo.getGlbPath()));
+			topoSession.ui.has3DTopoAvailable = modelResponse.ok;
+			await modelResponse.body?.cancel();
+		} catch {
+			topoSession.ui.has3DTopoAvailable = false;
+		}
 
 		const imgNames = [`${name}.jpg`, `${name}.png`, 'topo.jpg'];
 		for (const imgName of imgNames) {
@@ -93,16 +104,16 @@ export async function loadTopoEditorEntry({
 		}
 	} else {
 		try {
-			const topoData = normalizeTopoPaths(
+			const topoData = selectTopoDocumentFields(normalizeTopoPaths(
 				await readJson<Topo2DEditorDocument>(topo.getTopoPath())
-			).data;
+			).data);
 			topoSession.topo = { ...topoSession.topo, ...topoData };
 			initializeIdCounters(topoSession.topo);
 		} catch {
 			/* no topo yet */
 		}
 
-		topoSession.topo.editorMode = '3d';
+		topoSession.ui.editorMode = '3d';
 		const glbUrl = fileUrl(topo.getGlbPath());
 		try {
 			const res = await fetch(glbUrl);
@@ -116,8 +127,8 @@ export async function loadTopoEditorEntry({
 		}
 	}
 
-	topoSession.topo._entryPath = topo._getPath();
-	topoSession.topo._topoFileName = topo.getTopoPath();
+	topoSession.ui.entryPath = topo._getPath();
+	topoSession.ui.topoFileName = topo.getTopoPath();
 
 	return { loadedTopo, topo };
 }

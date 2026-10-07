@@ -47,18 +47,18 @@ const remapAssets = (
 };
 const remapTopoIds = (topo: FelsTopoDocument | null, oldPath: string, newPath: string): boolean => {
 	if (!topo) return false;
-	const before = [topo.id, topo.crag_id, topo.sector_id];
+	const before = topo.id;
 	const oldParts = oldPath.split('/');
 	const newParts = newPath.split('/');
 	const oldId = oldParts.at(-1);
 	const newId = newParts.at(-1);
-	const oldCragId = topo.sector_id ? oldParts.at(-2) : oldId;
-	const newCragId = topo.sector_id ? newParts.at(-2) : newId;
-	if (topo.crag_id === oldCragId) topo.crag_id = newCragId;
-	if (topo.sector_id === oldId) topo.sector_id = newId;
 	if (topo.id === oldId) topo.id = newId;
-	else if (topo.id === `${oldCragId}:${oldId}`) topo.id = `${newCragId}:${newId}`;
-	return before.some((value, index) => value !== [topo.id, topo.crag_id, topo.sector_id][index]);
+	else if (topo.id?.endsWith(`:${oldId}`)) {
+		const oldParent = oldParts.at(-2);
+		const newParent = newParts.at(-2);
+		if (oldParent && newParent) topo.id = `${newParent}:${newId}`;
+	}
+	return topo.id !== before;
 };
 /** Persist the workspace one completed operation at a time so a failed save can resume. */
 export async function saveCragWorkspace(

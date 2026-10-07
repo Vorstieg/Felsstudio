@@ -1,4 +1,5 @@
 import type { Path2D, Point2D } from './path-geometry.ts';
+import { isLinePath } from './path-geometry.ts';
 
 export type OutlineCanvasSize = { baseWidth?: number; baseHeight?: number };
 export type OutlinePresetId = 'slab' | 'pillar' | 'wall' | 'ramp' | 'arete' | 'corner' | 'roof';
@@ -742,5 +743,13 @@ import {
 
 export const pointsToSvg = sharedPointsToSvg;
 export const pointsToSmoothSvgPath = sharedPointsToSmoothSvgPath;
-export const getOutlinePoints: (outline: OutlineRecord, canvasSize?: OutlineCanvasSize) => Path2D =
-	getSharedOutlinePoints;
+export function getOutlinePoints(outline: OutlineRecord, canvasSize?: OutlineCanvasSize): Path2D {
+	// Polyline drafts may contain fewer than two points; shape geometry is handled by the renderer.
+	if (outline.shape?.type !== 'rectangle' && outline.shape?.type !== 'circle') {
+		return outline.points2D;
+	}
+	return getSharedOutlinePoints(
+		{ ...outline, points2D: isLinePath(outline.points2D) ? outline.points2D : undefined },
+		canvasSize
+	);
+}

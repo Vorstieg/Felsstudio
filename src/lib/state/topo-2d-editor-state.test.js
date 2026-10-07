@@ -132,7 +132,7 @@ describe('createTopo2DEditorState', () => {
 
 	it('cleans fixpoint references and keeps transient state out of save snapshots', () => {
 		const editor = createTopo2DEditorState({ topo: document() });
-		editor.topo.name = 'Previous topo name';
+		editor.ui.name = 'Previous topo name';
 		editor.topo.routes[0].fixPoints = ['symbol-1'];
 		editor.topo.routes[0].pitches = [
 			{ id: 'pitch-1', startNodeId: 'symbol-1', endNodeId: 'symbol-1' }

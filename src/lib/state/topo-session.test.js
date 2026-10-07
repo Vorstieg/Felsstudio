@@ -27,7 +27,8 @@ describe('createTopo2DEditorState', () => {
 			'draft-1'
 		);
 
-		expect(session.topo.name).toBe('Loaded');
+		expect(session.topo).not.toHaveProperty('name');
+		expect(session.ui.name).toBe('');
 		expect(session.topo.routes).toEqual([{ id: 'route-2' }]);
 		expect(session.ui.selectedRouteId).toBeNull();
 		expect(session.ui.activeDraftId).toBe('draft-1');

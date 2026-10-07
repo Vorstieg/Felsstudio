@@ -4,28 +4,62 @@ import type { OutlineRecord } from '$lib/assets/js/outline-geometry.ts';
 import type { ClusteringHit, TopoCluster } from './clustering-types.ts';
 import type { TopoDrawingTarget } from './topo-drawing-target.ts';
 
-export type Topo2DEditorDocument = Omit<
+export type Topo2DEditorDocument = Pick<
 	FelsTopoDocument,
-	'coordinates' | 'routes' | 'fixPoints' | 'textLabels'
+	| 'id'
+	| 'description'
+	| 'tags'
+	| 'image2D'
+	| 'backgroundFit'
+	| 'wallAzimuth'
+	| 'imageAspectRatio'
+	| 'date'
+	| 'updated'
+	| 'author'
+	| 'coordinates'
+	| 'paths'
 > & {
-	name?: string;
-	crag_id?: string;
-	sector_id?: string;
-	coordinates?: [number, number];
-	modelOffset?: [number, number, number];
-	modelRotation?: [number, number, number];
-	modelScale?: [number, number, number];
-	wallAzimuth?: number;
-	altitude?: number;
-	scale?: number;
-	canvasAspectRatio?: number;
 	backgroundFit?: 'contain' | 'cover';
-	editorMode?: '2d' | '3d';
 	routes: Route[];
 	fixPoints: FixPoint[];
 	outlines: OutlineRecord[];
 	textLabels: TextLabel[];
 };
+
+/** Keep only fields in the shared topo contract when loading external topo JSON. */
+export function selectTopoDocumentFields(value: unknown): Partial<Topo2DEditorDocument> {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+	const data = value as Record<string, unknown>;
+	const coordinates = data.coordinates;
+	return {
+		...(typeof data.id === 'string' ? { id: data.id } : {}),
+		...(typeof data.description === 'string' ? { description: data.description } : {}),
+		...(Array.isArray(data.tags) ? { tags: data.tags as string[] } : {}),
+		...(typeof data.image2D === 'string' || data.image2D === null ? { image2D: data.image2D } : {}),
+		...(data.backgroundFit === 'contain' || data.backgroundFit === 'cover'
+			? { backgroundFit: data.backgroundFit }
+			: {}),
+		...(typeof data.wallAzimuth === 'number' ? { wallAzimuth: data.wallAzimuth } : {}),
+		...(typeof data.imageAspectRatio === 'number'
+			? { imageAspectRatio: data.imageAspectRatio }
+			: {}),
+		...(typeof data.date === 'string' ? { date: data.date } : {}),
+		...(typeof data.updated === 'string' ? { updated: data.updated } : {}),
+		...(typeof data.author === 'string' ? { author: data.author } : {}),
+		...(Array.isArray(coordinates) &&
+		coordinates.length === 3 &&
+		coordinates.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate))
+			? { coordinates: coordinates as [number, number, number] }
+			: {}),
+		...(data.paths && typeof data.paths === 'object'
+			? { paths: data.paths as FelsTopoDocument['paths'] }
+			: {}),
+		routes: Array.isArray(data.routes) ? (data.routes as Route[]) : [],
+		fixPoints: Array.isArray(data.fixPoints) ? (data.fixPoints as FixPoint[]) : [],
+		outlines: Array.isArray(data.outlines) ? (data.outlines as OutlineRecord[]) : [],
+		textLabels: Array.isArray(data.textLabels) ? (data.textLabels as TextLabel[]) : []
+	};
+}
 
 export interface Topo2DEditorDrafts {
 	route: { points: number[][]; fixPointIds: Array<string | number>; mode: string };
@@ -52,6 +86,16 @@ export interface Topo2DEditorDrafts {
 
 export interface Topo2DEditorUi {
 	workspace: string | null;
+	editorMode: '2d' | '3d';
+	has3DTopoAvailable: boolean;
+	entryPath: string | null;
+	topoFileName: string | null;
+	name: string;
+	modelOffset: [number, number, number];
+	modelRotation: [number, number, number];
+	modelScale: [number, number, number];
+	scale: number;
+	canvasAspectRatio: number;
 	activeTool: string;
 	selectedSymbol: string;
 	selectedOutlineStyle: string;
@@ -121,11 +165,7 @@ export interface Topo2DEditorTransientState {
 
 export function createInitialTopo(): Topo2DEditorDocument {
 	return {
-		name: '',
-		crag_id: '',
-		sector_id: '',
 		description: '',
-		rock: 'granite',
 		tags: [],
 		routes: [],
 		fixPoints: [],
@@ -133,16 +173,10 @@ export function createInitialTopo(): Topo2DEditorDocument {
 		textLabels: [],
 		date: '',
 		updated: '',
-		modelOffset: [0, 0, 0],
-		coordinates: [0, 0],
-		wallAzimuth: 0,
-		altitude: 0,
-		scale: 1,
+		coordinates: [0, 0, 0],
 		image2D: null,
 		imageAspectRatio: 1.5,
-		canvasAspectRatio: 1.5,
-		backgroundFit: 'contain',
-		editorMode: '3d'
+		backgroundFit: 'contain'
 	};
 }
 
@@ -202,6 +236,16 @@ export function createInitialTopo2DEditorDrafts(): Topo2DEditorDrafts {
 export function createInitialTopo2DEditorUi(): Topo2DEditorUi {
 	return {
 		workspace: null,
+		editorMode: '3d',
+		has3DTopoAvailable: false,
+		entryPath: null,
+		topoFileName: null,
+		name: '',
+		modelOffset: [0, 0, 0],
+		modelRotation: [0, 0, 0],
+		modelScale: [1, 1, 1],
+		scale: 1,
+		canvasAspectRatio: 1.5,
 		activeTool: 'select',
 		selectedSymbol: 'bolt',
 		selectedOutlineStyle: 'rock',

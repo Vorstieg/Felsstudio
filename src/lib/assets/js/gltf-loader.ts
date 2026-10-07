@@ -4,9 +4,7 @@ import { Box3, Group, Vector3 } from 'three';
 
 type TopoModelSession = {
 	setModelFile(file: File | Blob): void;
-	topo: {
-		modelOffset?: number[];
-	};
+	ui: { modelOffset: [number, number, number] };
 };
 
 export function createGltfLoader(): GLTFLoader {
@@ -33,7 +31,7 @@ export async function loadGlbIntoEditorState(
 				if (!box.isEmpty()) {
 					const center = new Vector3();
 					box.getCenter(center);
-					session.topo.modelOffset = center.negate().toArray();
+					session.ui.modelOffset = center.negate().toArray() as [number, number, number];
 				}
 				resolve(gltf.scene);
 			},

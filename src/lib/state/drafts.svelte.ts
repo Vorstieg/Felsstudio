@@ -41,17 +41,15 @@ function normalizeSourceEntryPath(path: string | null | undefined): string | nul
 	return path ? String(path).replace(/^\/+|\/+$/g, '') : null;
 }
 
-function getSourceEntryPath(topo: DraftTopoData | null | undefined): string | null {
-	return normalizeSourceEntryPath(topo?._entryPath || topo?.entryPath || null);
+function getSourceEntryPath(session: DraftSession | null | undefined): string | null {
+	return normalizeSourceEntryPath(session?.entryPath || null);
 }
 
 export function isBlankTopoSession(session: DraftSession | null | undefined): boolean {
 	if (!session) return true;
 	const topo = session.topo;
 	return (
-		!topo?.name &&
-		!topo?.crag_id &&
-		!topo?.sector_id &&
+		!session.name &&
 		!topo?.description &&
 		!topo?.image2D &&
 		(topo?.routes || []).length === 0 &&
@@ -73,7 +71,7 @@ export const draftsState = $state<DraftsStore>({
 
 	async save(topo, id = null, extra = {}) {
 		const timestamp = new Date().toISOString();
-		const editorMode = topo.editorMode || 'topo';
+		const editorMode = extra.editorMode || 'topo';
 		const draftId =
 			id || (topo.id ? `${editorMode}-${topo.id}` : `draft-${editorMode}-${Date.now()}`);
 
@@ -82,11 +80,11 @@ export const draftsState = $state<DraftsStore>({
 		// Metadata only for localStorage
 		const metadata = {
 			id: draftId,
-			name: topo.name || 'Unnamed Topo',
+			name: extra.name || 'Unnamed Topo',
 			editorMode,
 			updated: timestamp,
-			sourceEntryPath: getSourceEntryPath(topo),
-			sourceTopoFileName: topo._topoFileName || null
+			sourceEntryPath: normalizeSourceEntryPath(extra.entryPath || null),
+			sourceTopoFileName: extra.topoFileName || null
 		};
 
 		if (draftIndex >= 0) {
@@ -133,7 +131,7 @@ export const draftsState = $state<DraftsStore>({
 
 		for (const draft of sortedDrafts) {
 			const session = await this.getById(draft.id);
-			const sessionMode = session?.topo.editorMode || draft.editorMode;
+			const sessionMode = session?.editorMode || draft.editorMode;
 			if (session && !isBlankTopoSession(session) && (!editorMode || sessionMode === editorMode)) {
 				return { id: draft.id, session, metadata: draft };
 			}
@@ -158,9 +156,9 @@ export const draftsState = $state<DraftsStore>({
 
 		for (const draft of sortedDrafts) {
 			const session = await this.getById(draft.id);
-			const sessionMode = session?.topo.editorMode || draft.editorMode;
+			const sessionMode = session?.editorMode || draft.editorMode;
 			const metadataSource = normalizeSourceEntryPath(draft.sourceEntryPath);
-			const sessionSource = getSourceEntryPath(session?.topo);
+			const sessionSource = getSourceEntryPath(session);
 			const sourceMatches =
 				metadataSource === normalizedSource || sessionSource === normalizedSource;
 			if (

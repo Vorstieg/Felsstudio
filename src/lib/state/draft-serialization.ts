@@ -3,22 +3,7 @@ import type {
 	Topo2DEditorDocument
 } from './topo-2d-editor-initial-state.ts';
 
-export type DraftTopoData = {
-	id?: string;
-	name?: string;
-	editorMode?: '2d' | '3d';
-	crag_id?: string;
-	sector_id?: string;
-	description?: string;
-	image2D?: string | null;
-	routes?: Topo2DEditorDocument['routes'];
-	fixPoints?: Topo2DEditorDocument['fixPoints'];
-	outlines?: Topo2DEditorDocument['outlines'];
-	textLabels?: Topo2DEditorDocument['textLabels'];
-	_entryPath?: string;
-	entryPath?: string;
-	_topoFileName?: string;
-};
+export type DraftTopoData = Partial<Topo2DEditorDocument>;
 
 export type DraftClustering = Partial<Topo2DEditorClustering> & {
 	cropsBuffers?: Record<string, SerializedCrop>;
@@ -26,6 +11,16 @@ export type DraftClustering = Partial<Topo2DEditorClustering> & {
 
 /** Data supplied by the editor alongside its topo document. */
 export type DraftEditorExtras = {
+	editorMode?: '2d' | '3d';
+	name?: string;
+	modelOffset?: [number, number, number];
+	modelRotation?: [number, number, number];
+	modelScale?: [number, number, number];
+	scale?: number;
+	canvasAspectRatio?: number;
+	has3DTopoAvailable?: boolean;
+	entryPath?: string;
+	topoFileName?: string;
 	clustering?: DraftClustering;
 	glbBlob?: Blob | null;
 	glbArrayBuffer?: ArrayBuffer;

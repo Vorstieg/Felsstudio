@@ -166,7 +166,7 @@
 		}
 	});
 	const canvasInput = createCanvasInput({
-		getAspectRatio: () => aspectRatio(editor.topo.canvasAspectRatio) ?? 1.5,
+		getAspectRatio: () => aspectRatio(editor.ui.canvasAspectRatio) ?? 1.5,
 		getGesturePolicy: inputController.getGesturePolicy,
 		onInput: inputController
 	});
@@ -207,7 +207,7 @@
 
 	// Canvas dimensions change only when its explicit logical aspect ratio changes.
 	$effect(() => {
-		if (editor.topo.canvasAspectRatio) {
+		if (editor.ui.canvasAspectRatio) {
 			canvasInput.refreshDimensions();
 		}
 	});

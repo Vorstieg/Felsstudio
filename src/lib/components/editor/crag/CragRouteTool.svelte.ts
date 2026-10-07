@@ -113,8 +113,6 @@ export function createCragRouteTool({
 			node,
 			data: {
 				id: sectorId ? `${crag?.properties.id}:${sectorId}` : crag?.properties.id,
-				crag_id: crag?.properties.id,
-				sector_id: sectorId || '',
 				name: sectorId || crag?.properties.name,
 				routes: [],
 				paths: { type: 'FeatureCollection', features: [] }

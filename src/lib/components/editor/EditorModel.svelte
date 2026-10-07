@@ -60,13 +60,13 @@
 		const exporter = new GLTFExporter();
 		const sceneClone = gltfScene.clone();
 
-		const scaleArray = point3(topoSession.topo.modelScale, [1, 1, 1]);
+		const scaleArray = point3(topoSession.ui.modelScale, [1, 1, 1]);
 		sceneClone.scale.set(scaleArray[0], scaleArray[1], scaleArray[2]);
 
-		const offset = topoSession.topo.modelOffset || [0, 0, 0];
+		const offset = topoSession.ui.modelOffset || [0, 0, 0];
 		sceneClone.position.set(offset[0], offset[1], offset[2]);
 
-		const rot = point3(topoSession.topo.modelRotation, [0, 0, 0]);
+		const rot = point3(topoSession.ui.modelRotation, [0, 0, 0]);
 		sceneClone.rotation.set(rot[0], rot[1], rot[2]);
 
 		sceneClone.updateMatrixWorld(true);
@@ -104,9 +104,9 @@
 	export function bakeTransforms() {
 		if (!gltfScene) return false;
 
-		const scaleArray = point3(topoSession.topo.modelScale, [1, 1, 1]);
-		const offset = topoSession.topo.modelOffset || [0, 0, 0];
-		const rot = point3(topoSession.topo.modelRotation, [0, 0, 0]);
+		const scaleArray = point3(topoSession.ui.modelScale, [1, 1, 1]);
+		const offset = topoSession.ui.modelOffset || [0, 0, 0];
+		const rot = point3(topoSession.ui.modelRotation, [0, 0, 0]);
 
 		// Only bake if there's an actual transformation
 		if (
@@ -208,9 +208,9 @@
 		});
 
 		// Reset state transformations
-		topoSession.topo.modelRotation = [0, 0, 0];
-		topoSession.topo.modelScale = [1, 1, 1];
-		topoSession.topo.modelOffset = [0, 0, 0];
+		topoSession.ui.modelRotation = [0, 0, 0];
+		topoSession.ui.modelScale = [1, 1, 1];
+		topoSession.ui.modelOffset = [0, 0, 0];
 
 		// Persist new GLB blob
 		const exporter = new GLTFExporter();
@@ -325,9 +325,9 @@
 		selectedIndicesMap = new Map();
 
 		// Check if we need to bake existing transforms first
-		const scaleArray = point3(topoSession.topo.modelScale, [1, 1, 1]);
-		const offset = topoSession.topo.modelOffset || [0, 0, 0];
-		const rot = point3(topoSession.topo.modelRotation, [0, 0, 0]);
+		const scaleArray = point3(topoSession.ui.modelScale, [1, 1, 1]);
+		const offset = topoSession.ui.modelOffset || [0, 0, 0];
+		const rot = point3(topoSession.ui.modelRotation, [0, 0, 0]);
 
 		if (
 			scaleArray[0] !== 1 ||
@@ -573,7 +573,7 @@
 
 	$effect(() => {
 		interaction.gltfScene = gltfScene;
-		interaction.modelPosition = topoSession.topo.modelOffset || [0, 0, 0];
+		interaction.modelPosition = topoSession.ui.modelOffset || [0, 0, 0];
 		interaction.visualRoutes = visualRoutes;
 		interaction.visualFixPoints = visualFixPoints;
 		interaction.visualClusters = visualClusters;
@@ -600,9 +600,9 @@
 </script>
 
 <T.Group
-	position={topoSession.topo.modelOffset || [0, 0, 0]}
-	rotation={point3(topoSession.topo.modelRotation, [0, 0, 0])}
-	scale={point3(topoSession.topo.modelScale, [1, 1, 1])}
+	position={topoSession.ui.modelOffset || [0, 0, 0]}
+	rotation={point3(topoSession.ui.modelRotation, [0, 0, 0])}
+	scale={point3(topoSession.ui.modelScale, [1, 1, 1])}
 >
 	{#if gltfScene}
 		<T

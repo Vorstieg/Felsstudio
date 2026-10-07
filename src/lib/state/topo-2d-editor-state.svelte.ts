@@ -15,7 +15,8 @@ import {
 	createInitialTopo,
 	createInitialTopo2DEditorDrafts,
 	createInitialTopo2DEditorTransientState,
-	createInitialTopo2DEditorUi
+	createInitialTopo2DEditorUi,
+	selectTopoDocumentFields
 } from './topo-2d-editor-initial-state.ts';
 import type {
 	Topo2DEditorClustering,
@@ -47,22 +48,41 @@ type HistoryOptions = { recordHistory?: boolean };
 type RouteTarget = { type: 'pitch'; pitchId: Id } | { type: 'variant'; variantId: Id } | null;
 type SessionInput = Partial<Topo2DEditorDocument> & {
 	topo?: Partial<Topo2DEditorDocument>;
+	editorMode?: '2d' | '3d';
+	has3DTopoAvailable?: boolean;
+	entryPath?: string;
+	topoFileName?: string;
+	name?: string;
+	modelOffset?: [number, number, number];
+	modelRotation?: [number, number, number];
+	modelScale?: [number, number, number];
+	scale?: number;
+	canvasAspectRatio?: number;
 	clustering?: Partial<Topo2DEditorClustering>;
 	glbBlob?: Blob | File | null;
 };
 type WrappedSessionInput = {
 	topo: Partial<Topo2DEditorDocument>;
+	editorMode?: '2d' | '3d';
+	has3DTopoAvailable?: boolean;
+	entryPath?: string;
+	topoFileName?: string;
+	name?: string;
+	modelOffset?: [number, number, number];
+	modelRotation?: [number, number, number];
+	modelScale?: [number, number, number];
+	scale?: number;
+	canvasAspectRatio?: number;
 	clustering?: Partial<Topo2DEditorClustering>;
 	glbBlob?: Blob | File | null;
 };
 type EditableTopoFields = {
 	author: string;
-	rock: string;
-	wallAzimuth: number;
 	description: string;
 	tags: string[];
 	image2D: string | null;
 	backgroundFit: 'contain' | 'cover';
+	wallAzimuth: number;
 };
 type EditorData = {
 	topo: Topo2DEditorDocument;
@@ -180,10 +200,18 @@ function drawingTargetExists(topo: Topo2DEditorDocument, drawingTarget: TopoDraw
 /**
  * Creates the single store for one topo editing surface.
  */
-export function createTopo2DEditorState({ topo }: { topo?: Partial<Topo2DEditorDocument> } = {}) {
+export function createTopo2DEditorState({
+	topo
+}: {
+	topo?: Partial<Topo2DEditorDocument>;
+} = {}) {
+	const initialUi = createInitialTopo2DEditorUi();
 	const state = $state({
-		topo: { ...createInitialTopo(), ...(topo ? clone(topo) : {}) },
-		ui: createUi(),
+		topo: {
+			...createInitialTopo(),
+			...selectTopoDocumentFields(topo || {})
+		},
+		ui: initialUi,
 		interaction: null,
 		drafts: createDrafts(),
 		clipboard: [],
@@ -203,10 +231,7 @@ export function createTopo2DEditorState({ topo }: { topo?: Partial<Topo2DEditorD
 		state.topo = next;
 	};
 	const snapshot = () => {
-		const document = clone(readTopo());
-		// The display name belongs to the sector/crag entry, not its topo file.
-		delete document.name;
-		return document;
+		return clone(readTopo());
 	};
 	function setModelFile(file: Blob | File | null) {
 		if (state.transient.modelUrl) URL.revokeObjectURL(state.transient.modelUrl);
@@ -215,10 +240,20 @@ export function createTopo2DEditorState({ topo }: { topo?: Partial<Topo2DEditorD
 		state.transient.modelRevision++;
 	}
 	function loadSession(session: WrappedSessionInput | null, id: string | null = null) {
-		const document = session?.topo || createInitialTopo();
+		const document = selectTopoDocumentFields(session?.topo || createInitialTopo());
 		if (state.transient.modelUrl) URL.revokeObjectURL(state.transient.modelUrl);
 		state.transient = createTransientState();
 		state.ui = createUi();
+		state.ui.editorMode = session?.editorMode || '3d';
+		state.ui.has3DTopoAvailable = Boolean(session?.has3DTopoAvailable);
+		state.ui.entryPath = session?.entryPath || null;
+		state.ui.topoFileName = session?.topoFileName || null;
+		state.ui.name = session?.name || '';
+		state.ui.modelOffset = session?.modelOffset || [0, 0, 0];
+		state.ui.modelRotation = session?.modelRotation || [0, 0, 0];
+		state.ui.modelScale = session?.modelScale || [1, 1, 1];
+		state.ui.scale = session?.scale || 1;
+		state.ui.canvasAspectRatio = session?.canvasAspectRatio || document.imageAspectRatio || 1.5;
 		writeTopo({ ...createInitialTopo(), ...clone(document) });
 		state.topo.routes = [...(document.routes || [])];
 		state.topo.fixPoints = [...(document.fixPoints || [])];
@@ -236,7 +271,21 @@ export function createTopo2DEditorState({ topo }: { topo?: Partial<Topo2DEditorD
 		saveHistory();
 	}
 	function getSaveSession() {
-		return { topo: state.topo, clustering: state.clustering, glbBlob: state.transient.glbBlob };
+		return {
+			topo: state.topo,
+			clustering: state.clustering,
+			glbBlob: state.transient.glbBlob,
+			editorMode: state.ui.editorMode,
+			has3DTopoAvailable: state.ui.has3DTopoAvailable,
+			entryPath: state.ui.entryPath || undefined,
+			topoFileName: state.ui.topoFileName || undefined,
+			name: state.ui.name,
+			modelOffset: state.ui.modelOffset,
+			modelRotation: state.ui.modelRotation,
+			modelScale: state.ui.modelScale,
+			scale: state.ui.scale,
+			canvasAspectRatio: state.ui.canvasAspectRatio
+		};
 	}
 	function clearSelection() {
 		state.selection = new Set();
@@ -563,9 +612,38 @@ export function createTopo2DEditorState({ topo }: { topo?: Partial<Topo2DEditorD
 		});
 	}
 	function load(nextTopo: SessionInput | null) {
-		const document = nextTopo?.topo || nextTopo || {};
-		writeTopo({ ...createInitialTopo(), ...clone(document) });
+		const {
+			topo: wrappedTopo,
+			editorMode,
+			has3DTopoAvailable,
+			entryPath,
+			topoFileName,
+			name,
+			modelOffset,
+			modelRotation,
+			modelScale,
+			scale,
+			canvasAspectRatio,
+			clustering: _clustering,
+			glbBlob: _glbBlob,
+			...topoFields
+		} = nextTopo || {};
+		const document = wrappedTopo || topoFields;
+		writeTopo({
+			...createInitialTopo(),
+			...selectTopoDocumentFields(document)
+		});
 		Object.assign(state.ui, createUi());
+		state.ui.editorMode = editorMode || '3d';
+		state.ui.has3DTopoAvailable = Boolean(has3DTopoAvailable);
+		state.ui.entryPath = entryPath || null;
+		state.ui.topoFileName = topoFileName || null;
+		state.ui.name = name || '';
+		state.ui.modelOffset = modelOffset || [0, 0, 0];
+		state.ui.modelRotation = modelRotation || [0, 0, 0];
+		state.ui.modelScale = modelScale || [1, 1, 1];
+		state.ui.scale = scale || 1;
+		state.ui.canvasAspectRatio = canvasAspectRatio || document.imageAspectRatio || 1.5;
 		state.selection = new Set();
 		state.selectedItems = new Set();
 		state.selectedSymbolInstance = null;
@@ -629,7 +707,10 @@ export function createTopo2DEditorState({ topo }: { topo?: Partial<Topo2DEditorD
 						? route?.variants?.find((entry) => entry.id === target.variantId)
 						: route;
 			if (!path) return false;
-			path.points2D = [...(path.points2D || []), [point.x, point.y]];
+			// Drawing an existing pitch or variant can temporarily leave it with just one point.
+			path.points2D = [...(path.points2D || []), [point.x, point.y]] as NonNullable<
+				Route['points2D']
+			>;
 			return path;
 		};
 		return recordHistory ? commit('Append route point', mutate) : mutate();

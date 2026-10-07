@@ -23,9 +23,9 @@
 	function setBackgroundImage(imageData: string, imageAspectRatio: number) {
 		const update = (document: Topo2DEditorDocument) => {
 			const hasCanvasAspectRatio =
-				typeof document.canvasAspectRatio === 'number' &&
-				Number.isFinite(document.canvasAspectRatio) &&
-				document.canvasAspectRatio > 0;
+				typeof editorState.ui.canvasAspectRatio === 'number' &&
+				Number.isFinite(editorState.ui.canvasAspectRatio) &&
+				editorState.ui.canvasAspectRatio > 0;
 			const hasBackground = Boolean(document.image2D);
 			const hasAnnotations = [
 				document.routes,
@@ -36,10 +36,10 @@
 
 			if ((!hasBackground && !hasAnnotations && !hasEstablishedCanvas) || !hasCanvasAspectRatio) {
 				// A first image may define a blank topo's canvas.
-				document.canvasAspectRatio = imageAspectRatio;
+				editorState.ui.canvasAspectRatio = imageAspectRatio;
 			}
 
-			// This remains metadata about the image itself; only canvasAspectRatio is stable.
+			// imageAspectRatio is the canonical persisted canvas ratio.
 			document.imageAspectRatio = imageAspectRatio;
 			if (!document.backgroundFit) document.backgroundFit = 'contain';
 			document.image2D = imageData;
