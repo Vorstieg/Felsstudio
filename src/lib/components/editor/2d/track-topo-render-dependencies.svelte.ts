@@ -1,5 +1,5 @@
 import { getOutlinePoints } from '$lib/assets/js/outline-geometry.ts';
-import type { Path2D, Point2D } from '$lib/assets/js/path-geometry.ts';
+import type { Point2D } from '@vorstieg/fels-types/types';
 import type { TopoRenderContext } from './topo-render-context.ts';
 
 type RenderDependencies = Pick<
@@ -34,7 +34,7 @@ export function trackTopoRenderDependencies({
 			const offset = route.labelOffset2D as unknown as Point2D;
 			void [offset[0], offset[1]];
 		}
-		for (const point of (route.points2D || []) as unknown as Path2D) void [point[0], point[1]];
+		for (const point of (route.points2D || []) as unknown as Point2D[]) void [point[0], point[1]];
 		for (const pitch of route.pitches || []) {
 			void pitch.lineStyle;
 			void pitch.grade;
@@ -47,7 +47,7 @@ export function trackTopoRenderDependencies({
 				const offset = pitch.labelOffset2D as unknown as Point2D;
 				void [offset[0], offset[1]];
 			}
-			for (const point of (pitch.points2D || []) as unknown as Path2D) void [point[0], point[1]];
+			for (const point of (pitch.points2D || []) as unknown as Point2D[]) void [point[0], point[1]];
 		}
 		for (const variant of route.variants || []) {
 			void variant.name;
@@ -58,7 +58,8 @@ export function trackTopoRenderDependencies({
 				const offset = variant.labelOffset2D as unknown as Point2D;
 				void [offset[0], offset[1]];
 			}
-			for (const point of (variant.points2D || []) as unknown as Path2D) void [point[0], point[1]];
+			for (const point of (variant.points2D || []) as unknown as Point2D[])
+				void [point[0], point[1]];
 		}
 	}
 	for (const outline of topo.outlines) {

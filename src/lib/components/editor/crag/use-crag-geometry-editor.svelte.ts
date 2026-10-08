@@ -8,17 +8,17 @@ import type {
 	LayerSpecification
 } from 'maplibre-gl';
 import type { Feature, Geometry } from 'geojson';
-import type { Point2D } from '$lib/assets/js/path-geometry.ts';
 import type { CragEditorSession, MetadataTarget } from '$lib/types/crag';
-import type { PointOrAreaGeometry } from '@vorstieg/fels-types/types';
+import type { Point2D, PointOrAreaGeometry } from '@vorstieg/fels-types/types';
 import { getTouchTargetSize } from '$lib/assets/js/mobile-utils.ts';
-import { getEditablePath, getPathMidpoints } from '$lib/assets/js/path-geometry.ts';
 import {
-	getGeometryPath,
-	insertGeometryVertex,
-	moveGeometryVertex,
-	removeGeometryVertex
-} from '$lib/assets/js/geometry-path-adapters.ts';
+	getEditablePath,
+	getPathMidpoints,
+	insertPathVertex,
+	movePathVertex,
+	removePathVertex
+} from '$lib/assets/js/path-geometry.ts';
+import { getGeometryPath, editGeometryPath } from '$lib/assets/js/geometry-path-adapters.ts';
 import { getGeometryCenter, translateGeometryTo } from '$lib/assets/js/sector-utils.ts';
 import { initMapPointDragHandlers } from '$lib/components/editor/map-point-drag-handlers.ts';
 
@@ -325,7 +325,9 @@ export function useCragGeometryEditor({
 				dragState = drag;
 				previewGeometry =
 					drag.kind === 'midpoint'
-						? insertGeometryVertex(drag.geometry, drag.vertexIndex, coordinate)
+						? editGeometryPath(drag.geometry, (path, closed) =>
+								insertPathVertex(path, drag.vertexIndex, coordinate, { closed })
+							)
 						: drag.geometry;
 				if (drag.kind === 'midpoint' || drag.kind === 'vertex')
 					selectedVertex = { targetKey: targetKey(drag.target), vertexIndex: drag.vertexIndex };
@@ -337,7 +339,9 @@ export function useCragGeometryEditor({
 				previewGeometry =
 					drag.kind === 'point' || drag.kind === 'center'
 						? translateGeometryTo(drag.geometry, coordinate)
-						: moveGeometryVertex(previewGeometry, drag.vertexIndex, coordinate);
+						: editGeometryPath(previewGeometry, (path, closed) =>
+								movePathVertex(path, drag.vertexIndex, coordinate, { closed })
+							);
 				syncDrawing();
 			},
 			onDragEnd: () => {
@@ -360,12 +364,13 @@ export function useCragGeometryEditor({
 		if (getActiveTool() !== 'geometry' || !selectedVertex) return false;
 		if (selectedVertex.targetKey !== targetKey(target)) return false;
 		const geometry = activeGeometry();
-		if (
-			geometry?.type !== 'Polygon' ||
-			getEditablePath(getGeometryPath(geometry), { closed: true }).length <= 3
-		)
+		const path = getGeometryPath(geometry);
+		if (geometry?.type !== 'Polygon' || getEditablePath(path, { closed: true }).length <= 3)
 			return false;
-		const next = removeGeometryVertex(geometry, selectedVertex.vertexIndex);
+		const { vertexIndex } = selectedVertex;
+		const next = editGeometryPath(geometry, (path, closed) =>
+			removePathVertex(path, vertexIndex, { closed })
+		);
 		state.commitGeometry(target, next, 'Delete polygon vertex');
 		selectedVertex = null;
 		syncDrawing();

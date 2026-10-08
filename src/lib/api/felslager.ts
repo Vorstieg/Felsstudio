@@ -5,7 +5,7 @@ import type { ApiListEntry, ApiListOptions } from '$lib/types/api';
  * Wraps all interactions with the Felslager file-system API.
  */
 
-const BASE_URL = import.meta.env.VITE_FELSLAGER_URL || 'https://felslager.vorstieg.eu/api/fs';
+const BASE_URL = import.meta.env.VITE_FELSLAGER_URL || 'https://lager.felsverzeichnis.at/api/fs';
 const CRED_KEY = 'felslager_auth';
 
 // --- Credential Management (sessionStorage) ---

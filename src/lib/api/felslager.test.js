@@ -32,7 +32,7 @@ describe('Felslager API client', () => {
 			{ name: 'a.json' }
 		]);
 		expect(fetch).toHaveBeenCalledWith(
-			'https://felslager.vorstieg.eu/api/fs/entries/?recursive=true'
+			'https://lager.felsverzeichnis.at/api/fs/entries/?recursive=true'
 		);
 	});
 
@@ -44,7 +44,7 @@ describe('Felslager API client', () => {
 
 		await expect(writeJson('/entries/test.json', data)).resolves.toBe(response);
 		expect(fetch).toHaveBeenCalledWith(
-			'https://felslager.vorstieg.eu/api/fs/entries/test.json',
+			'https://lager.felsverzeichnis.at/api/fs/entries/test.json',
 			expect.objectContaining({
 				method: 'PUT',
 				headers: {
@@ -87,12 +87,12 @@ describe('Felslager API client', () => {
 
 		expect(fetch).toHaveBeenNthCalledWith(
 			1,
-			'https://felslager.vorstieg.eu/api/fs/entries/test.json',
+			'https://lager.felsverzeichnis.at/api/fs/entries/test.json',
 			expect.objectContaining({ method: 'DELETE' })
 		);
 		expect(fetch).toHaveBeenNthCalledWith(
 			2,
-			'https://felslager.vorstieg.eu/api/fs/entries/test.json',
+			'https://lager.felsverzeichnis.at/api/fs/entries/test.json',
 			expect.objectContaining({
 				method: 'MOVE',
 				headers: expect.objectContaining({ Destination: 'archive%2Fmy%20file.json' })
@@ -102,13 +102,13 @@ describe('Felslager API client', () => {
 
 	it('builds public file URLs using the same path normalization', () => {
 		expect(fileUrl('//images//wall.png')).toBe(
-			'https://felslager.vorstieg.eu/api/fs/images/wall.png'
+			'https://lager.felsverzeichnis.at/api/fs/images/wall.png'
 		);
 	});
 
 	it('encodes individual public file path segments', () => {
 		expect(fileUrl('europe/austria/tyrol/ötztaler-alpen/wildspitze/my photo #1.jpg')).toBe(
-			'https://felslager.vorstieg.eu/api/fs/europe/austria/tyrol/%C3%B6tztaler-alpen/wildspitze/my%20photo%20%231.jpg'
+			'https://lager.felsverzeichnis.at/api/fs/europe/austria/tyrol/%C3%B6tztaler-alpen/wildspitze/my%20photo%20%231.jpg'
 		);
 	});
 });

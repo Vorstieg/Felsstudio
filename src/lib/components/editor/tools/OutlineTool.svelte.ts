@@ -10,7 +10,7 @@ import {
 	OUTLINE_SHAPE_TYPES,
 	PILLAR_OUTLINE_CURVE_TENSION,
 	createCirclePoints,
-	createOutlineRecord,
+	createOutline,
 	createPresetShape,
 	createRectanglePoints,
 	distancePx,
@@ -18,7 +18,7 @@ import {
 	simplifyPoints
 } from '$lib/assets/js/outline-geometry.ts';
 import { snapPointToGrid } from './path-drawing-logic.ts';
-import type { Point2D, Path2D } from '$lib/assets/js/path-geometry.ts';
+import type { Point2D } from '@vorstieg/fels-types/types';
 import type {
 	OutlineCanvasSize,
 	OutlinePresetId,
@@ -30,7 +30,7 @@ import type { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.sv
 type Editor = ReturnType<typeof createTopo2DEditorState>;
 type OutlineMode = 'polyline' | 'rectangle' | 'circle' | 'freehand' | 'brush' | 'preset';
 type PreviewShape = OutlineShape & {
-	points2D?: Path2D;
+	points2D?: Point2D[];
 	fromCenter?: boolean;
 	square?: boolean;
 	segments?: number;
@@ -78,7 +78,7 @@ function toPair(point: InteractionPoint): Point2D {
 
 export class OutlineTool {
 	id = 'outline';
-	currentPoints = $state<Path2D>([]);
+	currentPoints = $state<Point2D[]>([]);
 	selectedStyle = 'rock';
 	mode = $state<OutlineMode>('polyline');
 	preset = $state<OutlinePresetId>('slab');
@@ -99,10 +99,10 @@ export class OutlineTool {
 	// When enabled, the brush assist may use visible image edges inside the painted area.
 	// The outline falls back to the painted-area contour if no reliable edge is found.
 	followPhotoEdges = $state(true);
-	brushPoints = $state<Path2D>([]);
-	brushOutlinePoints = $state<Path2D>([]);
+	brushPoints = $state<Point2D[]>([]);
+	brushOutlinePoints = $state<Point2D[]>([]);
 	brushGeneration = 0;
-	temporaryPoints: Path2D = [];
+	temporaryPoints: Point2D[] = [];
 	state: Editor;
 	saveHistory: () => void;
 	getCanvasSize: () => OutlineCanvasSize;
@@ -325,7 +325,7 @@ export class OutlineTool {
 		});
 	}
 
-	async findBrushImageEdge(strokePoints: Path2D) {
+	async findBrushImageEdge(strokePoints: Point2D[]) {
 		const imageSrc = this.getImageSrc?.();
 		if (!imageSrc || typeof Image === 'undefined') return null;
 		try {
@@ -444,7 +444,7 @@ export class OutlineTool {
 					}
 				: null);
 
-		const outline = createOutlineRecord({
+		const outline = createOutline({
 			id: outlineId,
 			lineStyle: this.selectedStyle || 'rock',
 			type: this.mode,
@@ -460,14 +460,6 @@ export class OutlineTool {
 		this.addOutline(outline);
 
 		this.resetDrawingState();
-	}
-
-	isClosedShape(points: Path2D) {
-		if (points.length < 3) return false;
-
-		const first = points[0];
-		const last = points[points.length - 1];
-		return first?.[0] === last?.[0] && first?.[1] === last?.[1];
 	}
 
 	cancel() {

@@ -7,7 +7,7 @@ import type {
 	Topo2DInteraction,
 	SelectionSnapshot
 } from '$lib/state/topo-2d-editor-interactions.ts';
-import type { Point2D } from '$lib/assets/js/path-geometry.ts';
+import type { Point2D } from '@vorstieg/fels-types/types';
 
 type Editor = ReturnType<typeof createTopo2DEditorState>;
 

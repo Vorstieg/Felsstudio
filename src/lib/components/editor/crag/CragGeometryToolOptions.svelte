@@ -1,7 +1,7 @@
 <script lang="ts">
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
 	import type { FelsProperties } from '@vorstieg/fels-types/types';
-	import type { Point2D } from '$lib/assets/js/path-geometry.ts';
+	import type { Point2D } from '@vorstieg/fels-types/types';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.ts';
 	import {

@@ -1,10 +1,10 @@
 import { getOutlinePoints } from '$lib/assets/js/outline-geometry.ts';
-import type { OutlineCanvasSize, OutlineRecord } from '$lib/assets/js/outline-geometry.ts';
-import type { Path2D, Point2D } from '$lib/assets/js/path-geometry.ts';
+import type { OutlineCanvasSize, OutlineDraft } from '$lib/assets/js/outline-geometry.ts';
+import type { Point2D } from '@vorstieg/fels-types/types';
 import type { TopoDrawingTarget } from '$lib/state/topo-drawing-target.ts';
 
 type EntityId = string | number;
-type SelectionPath = { id?: EntityId; points2D?: Path2D };
+type SelectionPath = { id?: EntityId; points2D?: Point2D[] };
 type SelectionRoute = SelectionPath & {
 	id: EntityId;
 	pitches?: SelectionPath[];
@@ -12,7 +12,7 @@ type SelectionRoute = SelectionPath & {
 };
 type SelectionTopo = {
 	routes: SelectionRoute[];
-	outlines: OutlineRecord[];
+	outlines: OutlineDraft[];
 	fixPoints?: Array<{ id: EntityId; position2D?: Point2D }>;
 	textLabels?: Array<{ id: EntityId; position2D?: Point2D }>;
 };
@@ -63,7 +63,7 @@ function segmentsIntersect(a: Point2D, b: Point2D, c: Point2D, d: Point2D) {
 	return abC * abD <= 0 && cdA * cdB <= 0;
 }
 
-function touchesRegion(points: Path2D, region: SelectionRegion) {
+function touchesRegion(points: Point2D[], region: SelectionRegion) {
 	if (points.some((point) => isInside(point, region))) return true;
 	const corners: Point2D[] = [
 		[region.left, region.top],
@@ -84,7 +84,7 @@ function touchesRegion(points: Path2D, region: SelectionRegion) {
 	});
 }
 
-function matchesPath(points: Path2D | undefined, region: SelectionRegion) {
+function matchesPath(points: Point2D[] | undefined, region: SelectionRegion) {
 	if (!points?.length) return false;
 	return region.containsOnly
 		? points.every((point) => isInside(point, region))
@@ -128,7 +128,7 @@ export function getRoutePointRegionSelection(
 	const route = (topo.routes || []).find((item) => String(item.id) === String(routeId));
 	if (!route) return [];
 
-	let paths: Array<{ points?: Path2D; pitchId?: EntityId; variantId?: EntityId }> = [];
+	let paths: Array<{ points?: Point2D[]; pitchId?: EntityId; variantId?: EntityId }> = [];
 	if (drawingTarget?.routeId != null && String(drawingTarget.routeId) === String(route.id)) {
 		if (drawingTarget.type === 'pitch') {
 			const pitch = (route.pitches || []).find(

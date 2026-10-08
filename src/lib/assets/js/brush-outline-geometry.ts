@@ -1,4 +1,4 @@
-import type { Path2D, Point2D } from './path-geometry.ts';
+import type { Point2D } from '@vorstieg/fels-types/types';
 
 export type BrushCanvasSize = { baseWidth?: number; baseHeight?: number };
 export type BrushOutlineOptions = {
@@ -43,12 +43,12 @@ function equalPoints(a: Point2D | undefined, b: Point2D | undefined, epsilon = 1
 }
 
 function cleanStroke(
-	points: Path2D,
+	points: Point2D[],
 	canvasSize: BrushCanvasSize,
 	minimumSpacingPx: number
-): Path2D {
+): Point2D[] {
 	if (!Array.isArray(points)) return [];
-	const cleaned: Path2D = [];
+	const cleaned: Point2D[] = [];
 	for (const point of points) {
 		if (!Array.isArray(point) || !Number.isFinite(point[0]) || !Number.isFinite(point[1])) continue;
 		const pixelPoint = toPixels(point, canvasSize);
@@ -69,7 +69,7 @@ function pointLineDistance(point: Point2D, start: Point2D, end: Point2D) {
 	);
 }
 
-function signedArea(points: Path2D) {
+function signedArea(points: Point2D[]) {
 	let area = 0;
 	for (let index = 0; index < points.length; index++) {
 		const next = points[(index + 1) % points.length];
@@ -101,7 +101,7 @@ function segmentsIntersect(a: Point2D, b: Point2D, c: Point2D, d: Point2D) {
 
 /** Returns whether a normalised, closed polygon is safe to turn into an outline. */
 export function isValidBrushOutline(
-	points: Path2D,
+	points: Point2D[],
 	canvasSize: BrushCanvasSize = {},
 	{ minAreaPx = 4 }: BrushValidationOptions = {}
 ): boolean {
@@ -139,7 +139,7 @@ function parseKey(value: string): Point2D {
 	return [x, y];
 }
 
-function simplifyClosed(points: Path2D, tolerance: number): Path2D {
+function simplifyClosed(points: Point2D[], tolerance: number): Point2D[] {
 	if (points.length < 4 || tolerance <= 0) return points;
 	let result = [...points];
 	// Two linear passes remove raster stair-steps without rounding every
@@ -154,7 +154,7 @@ function simplifyClosed(points: Path2D, tolerance: number): Path2D {
 	return result.length >= 3 ? result : points;
 }
 
-function reduceByDistance(points: Path2D, minimumDistance: number): Path2D {
+function reduceByDistance(points: Point2D[], minimumDistance: number): Point2D[] {
 	if (points.length < 4 || minimumDistance <= 0) return points;
 	const reduced = [points[0]];
 	for (let index = 1; index < points.length; index++) {
@@ -166,7 +166,7 @@ function reduceByDistance(points: Path2D, minimumDistance: number): Path2D {
 
 // A tiny, single-pass corner softening removes the remaining grid feel without
 // adding vertices or turning the painted boundary into a spline.
-function softenCorners(points: Path2D, amount = 0.12): Path2D {
+function softenCorners(points: Point2D[], amount = 0.12): Point2D[] {
 	if (points.length < 3) return points;
 	return points.map((point, index) => {
 		const previous = points[(index - 1 + points.length) % points.length];
@@ -197,7 +197,7 @@ function addCircleDab(
 	}
 }
 
-function traceLargestMaskBoundary(mask: Set<string>, origin: Point2D, cellSize: number): Path2D {
+function traceLargestMaskBoundary(mask: Set<string>, origin: Point2D, cellSize: number): Point2D[] {
 	const edges = new Map<string, Point2D[]>();
 	const addEdge = (start: Point2D, end: Point2D) => {
 		const startKey = key(...start);
@@ -214,7 +214,7 @@ function traceLargestMaskBoundary(mask: Set<string>, origin: Point2D, cellSize: 
 		if (!mask.has(key(x, y + 1))) addEdge([x + 1, y + 1], [x, y + 1]);
 		if (!mask.has(key(x - 1, y))) addEdge([x, y + 1], [x, y]);
 	}
-	const loops: Path2D[] = [];
+	const loops: Point2D[][] = [];
 	while (edges.size) {
 		const firstKey = edges.keys().next().value!;
 		const first = parseKey(firstKey);
@@ -275,14 +275,14 @@ function traceLargestMaskBoundary(mask: Set<string>, origin: Point2D, cellSize: 
  * is traced. This also preserves blobs made by scribbling back and forth.
  */
 export function createBrushMaskOutline(
-	strokePoints: Path2D,
+	strokePoints: Point2D[],
 	{
 		brushRadiusPx = DEFAULT_BRUSH_RADIUS_PX,
 		canvasSize = {},
 		simplifyTolerancePx = DEFAULT_BRUSH_SIMPLIFY_TOLERANCE_PX,
 		maskCellSizePx = 2
 	}: BrushOutlineOptions = {}
-): Path2D {
+): Point2D[] {
 	if (!Number.isFinite(brushRadiusPx) || brushRadiusPx <= 0) return [];
 	const cellSize = Math.max(Number(maskCellSizePx) || 2, 0.5);
 	const stroke = cleanStroke(strokePoints, canvasSize, Math.max(cellSize / 2, 0.25));

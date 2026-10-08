@@ -28,7 +28,7 @@ test('supports outline and path geometry workflows', async () => {
 		applyPresetSemanticHandle,
 		applyPresetSemanticHandleDrag,
 		convertPresetToPolyline,
-		createOutlineRecord,
+		createOutline,
 		createPresetPoints,
 		createPresetShape,
 		getPresetSemanticHandles,
@@ -211,7 +211,7 @@ test('supports outline and path geometry workflows', async () => {
 	assert.equal(presetShape.preset, 'pillar');
 	assert.deepEqual(presetShape.semantic, { version: 1, taper: 0.2 });
 
-	const presetOutline = createOutlineRecord({
+	const presetOutline = createOutline({
 		id: 'outline-preset',
 		shape: presetShape,
 		points2D: presetShape.points2D
@@ -229,7 +229,7 @@ test('supports outline and path geometry workflows', async () => {
 		['width', 'height', 'lean', 'taper']
 	);
 
-	const curvedOutline = createOutlineRecord({
+	const curvedOutline = createOutline({
 		id: 'outline-curved',
 		points2D: open,
 		curve: { enabled: true, tension: 3 }

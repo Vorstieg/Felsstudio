@@ -1,6 +1,7 @@
+import { isClosedPath } from '$lib/assets/js/path-geometry.ts';
 import { EditablePathEditTool } from './EditablePathEditTool.svelte.ts';
 import type { CanvasInput } from '../2d/create-canvas-input.svelte.ts';
-import type { OutlineRecord, OutlineCanvasSize } from '$lib/assets/js/outline-geometry.ts';
+import type { OutlineDraft, OutlineCanvasSize } from '$lib/assets/js/outline-geometry.ts';
 import type {
 	EditablePathTarget,
 	InteractionId,
@@ -21,7 +22,6 @@ import {
 	applyPresetSemanticHandleDrag,
 	DEFAULT_OUTLINE_CURVE_TENSION,
 	getOutlinePoints,
-	isClosedShape,
 	simplifyClosedPoints,
 	simplifyPoints
 } from '$lib/assets/js/outline-geometry.ts';
@@ -61,11 +61,11 @@ export class OutlineEditTool extends EditablePathEditTool {
 		this.deleteOutlines = (...args) => editor.deleteOutlines(...args);
 	}
 
-	getOutline(id: InteractionId): OutlineRecord | null {
+	getOutline(id: InteractionId): OutlineDraft | null {
 		return this.getTopo().outlines.find((outline) => String(outline.id) === String(id)) || null;
 	}
 
-	updateCurve(id: InteractionId, changes: Partial<NonNullable<OutlineRecord['curve']>>) {
+	updateCurve(id: InteractionId, changes: Partial<NonNullable<OutlineDraft['curve']>>) {
 		const outline = this.getOutline(id);
 		if (!outline) return false;
 		const curve = {
@@ -79,7 +79,7 @@ export class OutlineEditTool extends EditablePathEditTool {
 		return true;
 	}
 
-	updateProperties(id: InteractionId, changes: Partial<OutlineRecord>) {
+	updateProperties(id: InteractionId, changes: Partial<OutlineDraft>) {
 		const outline = this.getOutline(id);
 		if (!outline) return false;
 		this.updateOutline(outline.id, changes, { recordHistory: false });
@@ -102,10 +102,10 @@ export class OutlineEditTool extends EditablePathEditTool {
 
 		const points = getOutlinePoints(outline, this.getCanvasSize());
 		if (points.length <= 2) return null;
-		const simplified = isClosedShape(points)
+		const simplified = isClosedPath(points)
 			? simplifyClosedPoints(points, tolerance, this.getCanvasSize())
 			: simplifyPoints(points, tolerance, this.getCanvasSize());
-		if (simplified.length >= points.length || simplified.length < (isClosedShape(points) ? 4 : 2)) {
+		if (simplified.length >= points.length || simplified.length < (isClosedPath(points) ? 4 : 2)) {
 			return { changed: false, pointCount: points.length, tolerance };
 		}
 
@@ -117,7 +117,7 @@ export class OutlineEditTool extends EditablePathEditTool {
 					? outline.shape
 					: { type: 'polyline' },
 			points2D: simplified,
-			closed: isClosedShape(simplified)
+			closed: isClosedPath(simplified)
 		};
 		this.updateOutline(outline.id, changes, { recordHistory: false });
 		this.saveHistory();
@@ -195,14 +195,14 @@ export class OutlineEditTool extends EditablePathEditTool {
 		return true;
 	}
 
-	handleOutlineDown(event: MouseEvent, outline: OutlineRecord, canvasInput: CanvasInput) {
+	handleOutlineDown(event: MouseEvent, outline: OutlineDraft, canvasInput: CanvasInput) {
 		return this.handleItemDown(event, outline, canvasInput, {
 			type: 'outline',
 			remove: (ids) => this.delete(ids)
 		});
 	}
 
-	handleTouchOutlineDown(event: TouchEvent, outline: OutlineRecord, canvasInput: CanvasInput) {
+	handleTouchOutlineDown(event: TouchEvent, outline: OutlineDraft, canvasInput: CanvasInput) {
 		return this.handleTouchItemDown(event, outline, canvasInput, {
 			type: 'outline',
 			remove: (ids) => this.delete(ids)

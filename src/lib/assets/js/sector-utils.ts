@@ -1,6 +1,4 @@
-import { pointsEqual, translatePath } from '$lib/assets/js/path-geometry.ts';
-import type { Path2D, Point2D } from '$lib/assets/js/path-geometry.ts';
-import type { PointOrAreaGeometry } from '@vorstieg/fels-types/types';
+import type { Point2D, PointOrAreaGeometry, Position } from '@vorstieg/fels-types/types';
 
 export function getGeometryCenter(
 	geometry: PointOrAreaGeometry | null | undefined
@@ -15,7 +13,8 @@ export function getGeometryCenter(
 		if (ring.length === 0) return null;
 		const openRing =
 			ring.length > 1 &&
-			pointsEqual([ring[0][0], ring[0][1]], [ring[ring.length - 1][0], ring[ring.length - 1][1]])
+			ring[0][0] === ring[ring.length - 1][0] &&
+			ring[0][1] === ring[ring.length - 1][1]
 				? ring.slice(0, -1)
 				: ring;
 		const sums = openRing.reduce<Point2D>(
@@ -34,14 +33,14 @@ export function translateGeometryTo<T extends PointOrAreaGeometry | null | undef
 	const currentCenter = getGeometryCenter(geometry);
 	if (!geometry || !currentCenter || !center) return geometry;
 	const delta: Point2D = [center[0] - currentCenter[0], center[1] - currentCenter[1]];
-	if (geometry.type === 'Point') return { ...geometry, coordinates: center } as T;
+	if (geometry.type === 'Point') return { ...geometry, coordinates: center };
 	if (geometry.type === 'Polygon') {
 		return {
 			...geometry,
 			coordinates: geometry.coordinates.map((ring) =>
-				translatePath(ring as unknown as Path2D, delta)
+				ring.map(([x, y, ...rest]): Position => [x + delta[0], y + delta[1], ...rest])
 			)
-		} as T;
+		};
 	}
 	return geometry;
 }

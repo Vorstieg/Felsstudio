@@ -1,5 +1,5 @@
 import type { Selection } from 'd3-selection';
-import type { Path2D } from '$lib/assets/js/path-geometry.ts';
+import type { Point2D } from '@vorstieg/fels-types/types';
 import type { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
 import type { CanvasInput } from './create-canvas-input.svelte.ts';
 import type { TopoLayerStack } from './create-topo-layer-stack.ts';
@@ -37,8 +37,8 @@ export type TopoRenderContext = {
 	activeTool: string;
 	baseWidth: number;
 	baseHeight: number;
-	currentRoutePoints: Path2D;
-	currentOutlinePoints: Path2D;
+	currentRoutePoints: Point2D[];
+	currentOutlinePoints: Point2D[];
 	selectedOutlineStyle: string;
 	outlinePreview: OutlinePreview;
 	brushPreview: BrushPreview;
@@ -60,8 +60,8 @@ export type RenderTopo2DInput = {
 	editor: Editor;
 	baseWidth: number;
 	baseHeight: number;
-	currentRoutePoints: Path2D;
-	currentOutlinePoints: Path2D;
+	currentRoutePoints: Point2D[];
+	currentOutlinePoints: Point2D[];
 	outlinePreview: OutlinePreview;
 	brushPreview: BrushPreview;
 	canvasInput: CanvasInput;

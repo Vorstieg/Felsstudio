@@ -14,10 +14,10 @@ describe('translateGeometryTo', () => {
 					[0, 0]
 				],
 				[
-					[1, 1],
+					[1, 1, 42],
 					[2, 1],
 					[2, 2],
-					[1, 1]
+					[1, 1, 42]
 				]
 			]
 		};
@@ -32,11 +32,11 @@ describe('translateGeometryTo', () => {
 			[10, 20]
 		]);
 		expect(translated.coordinates[1]).toEqual([
-			[11, 21],
+			[11, 21, 42],
 			[12, 21],
 			[12, 22],
-			[11, 21]
+			[11, 21, 42]
 		]);
-		expect(geometry.coordinates[1][0]).toEqual([1, 1]);
+		expect(geometry.coordinates[1][0]).toEqual([1, 1, 42]);
 	});
 });

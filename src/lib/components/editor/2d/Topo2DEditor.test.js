@@ -42,6 +42,17 @@ describe('Topo2DEditor', () => {
 		expect(screen.getByTestId('topo-object-text-text-1')).toBeInTheDocument();
 	});
 
+	it('renders a loaded topo without optional object collections', async () => {
+		const topo = structuredClone(fixture);
+		delete topo.outlines;
+		delete topo.fixPoints;
+		delete topo.textLabels;
+		render(Topo2DEditorTestWrapper, { topo });
+
+		expect(await screen.findByTestId('topo-object-route-route-1-main')).toBeInTheDocument();
+		expect(screen.queryByTestId('topo-object-outline-outline-polyline')).not.toBeInTheDocument();
+	});
+
 	it('renders editable vertices and midpoints after selecting a single-pitch route', async () => {
 		render(Topo2DEditorTestWrapper, { topo: structuredClone(fixture), activeTool: 'routeEdit' });
 		const canvas = screen.getByTestId('topo-2d-canvas');

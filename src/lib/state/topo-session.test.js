@@ -35,7 +35,7 @@ describe('createTopo2DEditorState', () => {
 		}
 	);
 
-	it('loads a draft without rewriting its documents and clears stale selection', () => {
+	it('loads a draft with empty collection defaults and clears stale selection', () => {
 		const session = createTopo2DEditorState();
 		session.ui.selectedRouteId = 'stale';
 
@@ -47,7 +47,13 @@ describe('createTopo2DEditorState', () => {
 			'draft-1'
 		);
 
-		expect(session.topo).toEqual({ name: 'Loaded', routes: [{ id: 'route-2' }] });
+		expect(session.topo).toEqual({
+			name: 'Loaded',
+			routes: [{ id: 'route-2' }],
+			outlines: [],
+			fixPoints: [],
+			textLabels: []
+		});
 		expect(session.clustering).toEqual({ rawHits: [{ id: 1 }] });
 		expect(session.ui.name).toBe('');
 		expect(session.topo.routes).toEqual([{ id: 'route-2' }]);

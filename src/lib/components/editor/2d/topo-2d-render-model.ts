@@ -1,16 +1,13 @@
+import { getPathMidpoints } from '$lib/assets/js/path-geometry.ts';
 import { formatPitchLabel, formatVariantLabel } from '@vorstieg/topo-renderer';
-import type { Path2D, Point2D } from '$lib/assets/js/path-geometry.ts';
-import {
-	getOutlineMidpoints,
-	getOutlinePoints,
-	getPresetSemanticHandles
-} from '$lib/assets/js/outline-geometry.ts';
-import type { OutlineCanvasSize, OutlineRecord } from '$lib/assets/js/outline-geometry.ts';
+import type { Point2D } from '@vorstieg/fels-types/types';
+import { getOutlinePoints, getPresetSemanticHandles } from '$lib/assets/js/outline-geometry.ts';
+import type { OutlineCanvasSize, OutlineDraft } from '$lib/assets/js/outline-geometry.ts';
 import { getTouchTargetSize } from '$lib/assets/js/mobile-utils.ts';
 import type { TopoDrawingTarget } from '$lib/state/topo-drawing-target.ts';
 
 type EntityId = string | number;
-type PathObject = { id: EntityId; points2D?: Path2D; curve?: unknown; [key: string]: unknown };
+type PathObject = { id: EntityId; points2D?: Point2D[]; curve?: unknown; [key: string]: unknown };
 type RenderRoute = PathObject & {
 	type?: string | string[];
 	pitches?: PathObject[];
@@ -18,7 +15,7 @@ type RenderRoute = PathObject & {
 };
 type RenderTopo = {
 	routes: RenderRoute[];
-	outlines: OutlineRecord[];
+	outlines: OutlineDraft[];
 	fixPoints?: Array<{ id: EntityId; position2D?: Point2D }>;
 	textLabels?: Array<{ id: EntityId; position2D?: Point2D }>;
 };
@@ -26,7 +23,7 @@ type RenderPath = {
 	routeId: EntityId;
 	pitchId: EntityId | null;
 	variantId: EntityId | null;
-	points?: Path2D;
+	points?: Point2D[];
 };
 export type Topo2DRenderModelInput = {
 	topo: RenderTopo;
@@ -38,8 +35,8 @@ export type Topo2DRenderModelInput = {
 	isInteractionActive: boolean;
 	baseWidth: number;
 	baseHeight: number;
-	currentRoutePoints: Path2D;
-	currentOutlinePoints: Path2D;
+	currentRoutePoints: Point2D[];
+	currentOutlinePoints: Point2D[];
 	ui?: Record<string, unknown>;
 };
 export type RoutePointTarget = {
@@ -48,7 +45,7 @@ export type RoutePointTarget = {
 	variantId: EntityId | null;
 	index: number;
 };
-type SvgPathData = { points: Path2D; pointsStr: string };
+type SvgPathData = { points: Point2D[]; pointsStr: string };
 type RouteRenderLine = SvgPathData & {
 	id: EntityId;
 	pitchId: EntityId | null;
@@ -64,8 +61,8 @@ type RouteRenderLine = SvgPathData & {
 };
 export type Topo2DRenderModel = {
 	outlines: {
-		items: OutlineRecord[];
-		fills: OutlineRecord[];
+		items: OutlineDraft[];
+		fills: OutlineDraft[];
 		handles: Array<{
 			outlineId: EntityId;
 			index: number;
@@ -110,7 +107,7 @@ export type Topo2DRenderModel = {
 };
 
 function toSvgPoints(
-	points: Path2D,
+	points: Point2D[],
 	{ baseWidth, baseHeight }: Required<Pick<OutlineCanvasSize, 'baseWidth' | 'baseHeight'>>
 ): string {
 	return points.map((point) => `${point[0] * baseWidth},${point[1] * baseHeight}`).join(' ');
@@ -177,7 +174,7 @@ export function buildTopo2DRenderModel({
 		});
 		const midpointSize = 3;
 		const midpointHitSize = getTouchTargetSize(3);
-		getOutlineMidpoints(outline, canvasSize).forEach((midpoint) => {
+		getPathMidpoints(getOutlinePoints(outline, canvasSize)).forEach((midpoint) => {
 			outlineMidpoints.push({
 				outlineId: outline.id,
 				insertIndex: midpoint.insertIndex,
@@ -216,7 +213,7 @@ export function buildTopo2DRenderModel({
 			routeObject,
 			labelOnly = false
 		}: {
-			points?: Path2D;
+			points?: Point2D[];
 			label?: string | number | null;
 			pitchId?: EntityId | null;
 			variantId?: EntityId | null;

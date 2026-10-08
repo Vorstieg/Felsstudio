@@ -1,18 +1,17 @@
 import {
 	getOutlinePoints,
-	insertOutlinePoint,
-	removeOutlinePoint,
+	editOutlinePath,
 	setOutlinePoint,
 	translateOutline
 } from '$lib/assets/js/outline-geometry.ts';
-import type { OutlineRecord } from '$lib/assets/js/outline-geometry.ts';
+import type { OutlineDraft } from '$lib/assets/js/outline-geometry.ts';
 import {
 	insertPathVertex,
 	movePathVertex,
 	removePathVertex,
 	translatePath
 } from '$lib/assets/js/path-geometry.ts';
-import type { Path2D, Point2D } from '$lib/assets/js/path-geometry.ts';
+import type { Point2D } from '@vorstieg/fels-types/types';
 import type { Pitch, Route, Variant } from '@vorstieg/fels-types/types';
 import type { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
 import type { EditablePathTarget, InteractionId } from '$lib/state/topo-2d-editor-interactions.ts';
@@ -24,39 +23,19 @@ type RouteTarget = Extract<EditablePathTarget, { routeId: InteractionId }>;
 export type EditablePath = {
 	target: EditablePathTarget;
 	type: 'outline' | 'route';
-	getPoints: () => Path2D;
-	snapshot: () => OutlineRecord | Path2D;
+	getPoints: () => Point2D[];
+	snapshot: () => OutlineDraft | Point2D[];
 	canRemovePoint: () => boolean;
 	movePoint: (index: number, point: Point2D) => void;
 	insertPoint: (index: number, point: Point2D) => void;
 	removePoint: (index: number) => void;
-	translateFrom: (snapshot: OutlineRecord | Path2D, delta: Point2D) => void;
+	translateFrom: (snapshot: OutlineDraft | Point2D[], delta: Point2D) => void;
 };
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
-const outlinePoints = (outline: OutlineRecord, canvasSize: Editor['viewport']): Path2D =>
-	getOutlinePoints(outline, canvasSize) as Path2D;
-
-function setRoutePoints(path: RoutePath, points: Path2D) {
+function setRoutePoints(path: RoutePath, points: Point2D[]) {
 	// The editor may hold an in-progress path before it reaches the document's two-point minimum.
 	path.points2D = points as NonNullable<Route['points2D']>;
-}
-
-/**
- * A preset is only a convenient starting shape. Once somebody edits one of
- * its vertices, retain the rendered points but detach the record from the
- * preset so subsequent edits behave like an ordinary polyline.
- *
- */
-function isPresetOutline(outline: OutlineRecord) {
-	return Boolean(outline.shape?.preset);
-}
-
-function detachPresetForVertexEdit(outline: OutlineRecord, canvasSize: Editor['viewport']) {
-	if (!isPresetOutline(outline)) return;
-
-	outline.points2D = outlinePoints(outline, canvasSize).map((point) => [point[0], point[1]]);
-	outline.shape = { type: 'polyline' };
 }
 
 /**
@@ -93,23 +72,24 @@ export function createEditablePathResolver(editor: Editor) {
 			return {
 				target,
 				type: 'outline',
-				getPoints: () => outlinePoints(getOutline(), getCanvasSize()),
+				getPoints: () => getOutlinePoints(getOutline(), getCanvasSize()),
 				snapshot: () => clone(getOutline()),
-				canRemovePoint: () => outlinePoints(getOutline(), getCanvasSize()).length > 2,
+				canRemovePoint: () => getOutlinePoints(getOutline(), getCanvasSize()).length > 2,
 				movePoint: (index, point) => {
 					const outline = getOutline();
-					detachPresetForVertexEdit(outline, getCanvasSize());
 					setOutlinePoint(outline, index, point, getCanvasSize());
 				},
 				insertPoint: (index, point) => {
 					const outline = getOutline();
-					detachPresetForVertexEdit(outline, getCanvasSize());
-					insertOutlinePoint(outline, index, point, getCanvasSize());
+					editOutlinePath(
+						outline,
+						(points) => insertPathVertex(points, index, point),
+						getCanvasSize()
+					);
 				},
 				removePoint: (index) => {
 					const outline = getOutline();
-					detachPresetForVertexEdit(outline, getCanvasSize());
-					removeOutlinePoint(outline, index, getCanvasSize());
+					editOutlinePath(outline, (points) => removePathVertex(points, index), getCanvasSize());
 				},
 				translateFrom: (snapshot, delta) => {
 					if (Array.isArray(snapshot)) throw new Error('Expected an outline snapshot');

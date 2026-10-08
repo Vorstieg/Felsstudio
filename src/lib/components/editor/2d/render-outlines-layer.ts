@@ -1,13 +1,13 @@
+import { isClosedPath } from '$lib/assets/js/path-geometry.ts';
 import { select } from 'd3-selection';
 import { getOutlineLineStyle } from '@vorstieg/topo-renderer';
 import {
 	getOutlinePoints,
-	isClosedShape,
 	pointsToSmoothSvgPath,
 	pointsToSvg
 } from '$lib/assets/js/outline-geometry.ts';
 import { getHitAreaSize } from '$lib/assets/js/mobile-utils.ts';
-import type { OutlineRecord } from '$lib/assets/js/outline-geometry.ts';
+import type { OutlineDraft } from '$lib/assets/js/outline-geometry.ts';
 import type { TopoRenderContext } from './topo-render-context.ts';
 
 type OutlineLayerInput = Pick<
@@ -46,14 +46,14 @@ export function renderOutlinesLayer({
 	const outlines = topo.outlines;
 	const canInteract =
 		activeTool === 'select' || activeTool === 'eraser' || activeTool === outlineEditTool?.id;
-	const handleOutlineDown = (event: MouseEvent, outline: OutlineRecord) => {
+	const handleOutlineDown = (event: MouseEvent, outline: OutlineDraft) => {
 		if (['select', 'eraser', outlineEditTool?.id].includes(activeTool)) {
 			outlineEditTool?.handleOutlineDown(event, outline, canvasInput);
 		} else {
 			handleObjectMouseDown(event, { type: 'outline', id: outline.id });
 		}
 	};
-	const handleOutlineTouch = (event: TouchEvent, outline: OutlineRecord) => {
+	const handleOutlineTouch = (event: TouchEvent, outline: OutlineDraft) => {
 		if (['select', 'eraser', outlineEditTool?.id].includes(activeTool)) {
 			outlineEditTool?.handleTouchOutlineDown(event, outline, canvasInput);
 		} else if (event.touches.length === 1) {
@@ -63,9 +63,9 @@ export function renderOutlinesLayer({
 			handleObjectMouseDown(event.touches[0], { type: 'outline', id: outline.id });
 		}
 	};
-	const getOutlinePath = (outline: OutlineRecord) => {
+	const getOutlinePath = (outline: OutlineDraft) => {
 		const points = getOutlinePoints(outline, { baseWidth, baseHeight });
-		const closed = isClosedShape(points);
+		const closed = isClosedPath(points);
 		const curvedPath = outline.curve?.enabled
 			? pointsToSmoothSvgPath(points, {
 					closed,
@@ -90,14 +90,14 @@ export function renderOutlinesLayer({
 		.remove();
 
 	const groups = outlinesLayer
-		.selectAll<SVGGElement, OutlineRecord>('g.outline-group')
+		.selectAll<SVGGElement, OutlineDraft>('g.outline-group')
 		.data(outlines, (outline) => outline.id)
 		.join('g')
 		.attr('class', 'outline-group');
 	groups.each(function (outline) {
 		const points = getOutlinePoints(outline, { baseWidth, baseHeight });
 		const parts = [
-			...(isClosedShape(points) ? ['background'] : []),
+			...(isClosedPath(points) ? ['background'] : []),
 			...(outline.fillColor && points.length > 2 ? ['fill'] : []),
 			'stroke',
 			'hit'

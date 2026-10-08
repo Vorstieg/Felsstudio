@@ -6,7 +6,7 @@ import {
 } from './selection-geometry.ts';
 import type { Route } from '@vorstieg/fels-types/types';
 import type { OutlineCanvasSize } from '$lib/assets/js/outline-geometry.ts';
-import type { Point2D } from '$lib/assets/js/path-geometry.ts';
+import type { Point2D } from '@vorstieg/fels-types/types';
 import type { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
 import type {
 	EditablePathTarget,

@@ -11,6 +11,38 @@ const document = () => ({
 });
 
 describe('createTopo2DEditorState', () => {
+	it.each(['constructor', 'load', 'loadSession'])(
+		'initializes absent collections through %s without changing the input',
+		(method) => {
+			const topo = { id: 'minimal-topo', routes: document().routes, outlines: null };
+			const original = structuredClone(topo);
+			const editor = createTopo2DEditorState(method === 'constructor' ? { topo } : {});
+			if (method === 'load') editor.load(topo);
+			if (method === 'loadSession') editor.loadSession({ topo });
+
+			expect(editor.topo).toMatchObject({
+				id: 'minimal-topo',
+				routes: topo.routes,
+				outlines: [],
+				fixPoints: [],
+				textLabels: []
+			});
+			editor.addOutline({
+				id: 'outline-1',
+				points2D: [
+					[0, 0],
+					[1, 1]
+				]
+			});
+			expect(editor.topo.outlines).toHaveLength(1);
+			expect(editor.undo()).toBe(true);
+			expect(editor.topo.outlines).toEqual([]);
+			expect(editor.redo()).toBe(true);
+			expect(editor.topo.outlines).toHaveLength(1);
+			expect(topo).toEqual(original);
+		}
+	);
+
 	it('creates independent stores with an initial clean history', () => {
 		const first = createTopo2DEditorState({ topo: document() });
 		const second = createTopo2DEditorState({ topo: document() });

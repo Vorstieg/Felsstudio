@@ -1,10 +1,10 @@
 import { getOutlineLineStyle } from '@vorstieg/topo-renderer';
-import type { Path2D } from '$lib/assets/js/path-geometry.ts';
+import type { Point2D } from '@vorstieg/fels-types/types';
 import type { TopoRenderContext } from './topo-render-context.ts';
 
 type BrushRenderPreview = {
-	points: Path2D;
-	contourPoints: Path2D;
+	points: Point2D[];
+	contourPoints: Point2D[];
 	radiusPx: number;
 	stroke?: string;
 	contourFill?: string;
@@ -27,7 +27,7 @@ export function renderCurrentLayer({
 	const outlineStyle = getOutlineLineStyle(selectedOutlineStyle);
 	const brushPoints = brushPreview?.points || [];
 	const brushContourPoints = brushPreview?.contourPoints || [];
-	const toSvgPoints = (points: Path2D) =>
+	const toSvgPoints = (points: Point2D[]) =>
 		points
 			.map(
 				(point) => `${point[0] * outlinePreview.baseWidth},${point[1] * outlinePreview.baseHeight}`

@@ -1,6 +1,6 @@
 import { Vector3 } from 'three';
 import type { FixPoint, FelsTopoDocument, Route, TextLabel } from '@vorstieg/fels-types/types';
-import type { OutlineRecord } from '$lib/assets/js/outline-geometry.ts';
+import type { OutlineDraft } from '$lib/assets/js/outline-geometry.ts';
 import type { ClusteringHit, TopoCluster } from './clustering-types.ts';
 import type { TopoDrawingTarget } from './topo-drawing-target.ts';
 
@@ -22,7 +22,7 @@ export type Topo2DEditorDocument = Pick<
 	backgroundFit?: 'contain' | 'cover';
 	routes: Route[];
 	fixPoints: FixPoint[];
-	outlines: OutlineRecord[];
+	outlines: OutlineDraft[];
 	textLabels: TextLabel[];
 };
 
@@ -36,7 +36,7 @@ export interface Topo2DEditorDrafts {
 	outline: {
 		points: number[][];
 		temporaryPoints: number[][];
-		preview: OutlineRecord['shape'] | null;
+		preview: OutlineDraft['shape'] | null;
 		brushPoints: number[][];
 		brushOutlinePoints: number[][];
 		mode: string | null;
@@ -128,20 +128,24 @@ export interface Topo2DEditorTransientState {
 	targetControlsTarget: Vector3;
 }
 
-export function createInitialTopo(): Topo2DEditorDocument {
-	return {
+export function createInitialTopo(
+	topo: Partial<Topo2DEditorDocument> = {
 		description: '',
 		tags: [],
-		routes: [],
-		fixPoints: [],
-		outlines: [],
-		textLabels: [],
 		date: '',
 		updated: '',
 		coordinates: [0, 0, 0],
 		image2D: null,
 		imageAspectRatio: 1.5,
 		backgroundFit: 'contain'
+	}
+): Topo2DEditorDocument {
+	return {
+		...topo,
+		routes: topo.routes ?? [],
+		fixPoints: topo.fixPoints ?? [],
+		outlines: topo.outlines ?? [],
+		textLabels: topo.textLabels ?? []
 	};
 }
 

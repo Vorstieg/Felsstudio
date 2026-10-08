@@ -1,5 +1,13 @@
-import type { Path2D, Point2D } from './path-geometry.ts';
-import { isLinePath } from './path-geometry.ts';
+import type { Outline, Point2D } from '@vorstieg/fels-types/types';
+import {
+	closePath,
+	isClosedPath,
+	isLinePath,
+	movePathVertex,
+	translatePath
+} from './path-geometry.ts';
+import { getOutlinePoints as getSharedOutlinePoints } from '@vorstieg/topo-renderer';
+export { pointsToSvg, pointsToSmoothSvgPath } from '@vorstieg/topo-renderer';
 
 export type OutlineCanvasSize = { baseWidth?: number; baseHeight?: number };
 export type OutlinePresetId = 'slab' | 'pillar' | 'wall' | 'ramp' | 'arete' | 'corner' | 'roof';
@@ -12,24 +20,10 @@ export type OutlineSemantic = {
 	notchDepth?: number;
 	[key: string]: number | undefined;
 };
-export type OutlineShape = {
-	type: string;
-	preset?: OutlinePresetId;
-	semantic?: OutlineSemantic;
-	start2D?: Point2D;
-	end2D?: Point2D;
-	center2D?: Point2D;
-	radius2D?: number;
-};
-export type OutlineRecord = {
-	id: string;
-	lineStyle?: string;
-	shape?: OutlineShape | null;
-	points2D: Path2D;
-	fillColor?: string | null;
-	fillOpacity?: number;
-	curve?: { enabled: boolean; tension: number };
-	closed?: boolean;
+export type OutlineShape = NonNullable<Outline['shape']>;
+/** Editor drafts can contain fewer than the document path's two required points. */
+export type OutlineDraft = {
+	[K in keyof Outline]: K extends 'points2D' ? Point2D[] : Outline[K];
 };
 
 export const OUTLINE_SHAPE_TYPES = {
@@ -145,17 +139,13 @@ export const OUTLINE_PRESETS = [
 
 export const PRESET_SEMANTIC_VERSION = 1;
 
-export function getOutlinePreset(presetId: string): (typeof OUTLINE_PRESETS)[number] | null {
-	return OUTLINE_PRESETS.find((preset) => preset.id === presetId) || null;
-}
-
 /** Maps a unit-template to a drag gesture, preserving drag direction for mirrored formations. */
-export function createPresetPoints(presetId: string, start2D: Point2D, end2D: Point2D): Path2D {
-	const preset = getOutlinePreset(presetId);
-	if (!preset || !start2D || !end2D) return [];
+export function createPresetPoints(presetId: string, start2D: Point2D, end2D: Point2D): Point2D[] {
+	const preset = OUTLINE_PRESETS.find((preset) => preset.id === presetId);
+	if (!preset) return [];
 	const width = end2D[0] - start2D[0];
 	const height = end2D[1] - start2D[1];
-	return preset.points.map(([x, y]) => [start2D[0] + x * width, start2D[1] + y * height]);
+	return preset.points.map(([x, y]): Point2D => [start2D[0] + x * width, start2D[1] + y * height]);
 }
 
 export function createPresetShape(
@@ -163,24 +153,24 @@ export function createPresetShape(
 	start2D: Point2D,
 	end2D: Point2D,
 	{ semantic = {} }: { semantic?: OutlineSemantic } = {}
-): (OutlineShape & { points2D: Path2D }) | null {
-	if (!getOutlinePreset(presetId)) return null;
+): (OutlineShape & { points2D: Point2D[] }) | null {
+	const points2D = createPresetPoints(presetId, start2D, end2D);
+	if (!points2D.length) return null;
 	return {
 		type: OUTLINE_SHAPE_TYPES.POLYLINE,
 		preset: presetId,
 		semantic: { version: PRESET_SEMANTIC_VERSION, ...semantic },
-		points2D: createPresetPoints(presetId, start2D, end2D)
+		points2D
 	};
 }
 
-export function isPresetShape(shape?: OutlineShape | null): boolean {
-	return Boolean(
-		shape?.type === OUTLINE_SHAPE_TYPES.POLYLINE && getOutlinePreset(shape.preset ?? '')
+export function isPresetOutline(
+	outline: OutlineDraft | null | undefined
+): outline is OutlineDraft & { shape: OutlineShape } {
+	return (
+		outline?.shape?.type === OUTLINE_SHAPE_TYPES.POLYLINE &&
+		OUTLINE_PRESETS.some((preset) => preset.id === outline.shape?.preset)
 	);
-}
-
-export function isPresetOutline(outline?: OutlineRecord | null): boolean {
-	return isPresetShape(outline?.shape);
 }
 
 /**
@@ -189,44 +179,40 @@ export function isPresetOutline(outline?: OutlineRecord | null): boolean {
  * exported topo JSON.
  */
 export function getPresetSemanticHandles(
-	outline: OutlineRecord,
+	outline: OutlineDraft,
 	canvasSize: OutlineCanvasSize = {}
 ): Array<{ id: string; kind: string; point: Point2D }> {
-	if (!outline?.shape || !isPresetOutline(outline)) return [];
+	if (!isPresetOutline(outline)) return [];
 	const points = getOutlinePoints(outline, canvasSize);
 	if (!points.length) return [];
-	const xs = points.map(([x]) => x);
-	const ys = points.map(([, y]) => y);
-	const minX = Math.min(...xs);
-	const maxX = Math.max(...xs);
-	const minY = Math.min(...ys);
-	const maxY = Math.max(...ys);
-	const centerX = (minX + maxX) / 2;
-	const centerY = (minY + maxY) / 2;
+	const { maxX, minY, maxY, centerX, centerY } = getPresetBounds(points);
 	const handles: Array<{ id: string; kind: string; point: Point2D }> = [
 		{ id: 'width', kind: 'scale-width', point: [maxX, centerY] },
 		{ id: 'height', kind: 'scale-height', point: [centerX, minY] }
 	];
-	if (['pillar', 'slab', 'wall', 'ramp', 'corner'].includes(outline.shape.preset ?? '')) {
+	if (PRESET_SEMANTICS.lean.includes(outline.shape.preset ?? '')) {
 		handles.push({ id: 'lean', kind: 'lean', point: [centerX, minY] });
 	}
-	if (['pillar', 'wall'].includes(outline.shape.preset ?? '')) {
+	if (PRESET_SEMANTICS.taper.includes(outline.shape.preset ?? '')) {
 		handles.push({ id: 'taper', kind: 'taper', point: [centerX, maxY] });
 	}
-	if (outline.shape.preset === 'roof') {
+	if (PRESET_SEMANTICS.notchDepth.includes(outline.shape.preset ?? '')) {
 		handles.push({ id: 'notch', kind: 'notch-depth', point: [centerX, centerY] });
 	}
 	return handles;
 }
 
-function getPresetBounds(points: Path2D = []) {
-	if (!points.length) return null;
-	const xs = points.map(([x]) => x);
-	const ys = points.map(([, y]) => y);
-	const minX = Math.min(...xs);
-	const maxX = Math.max(...xs);
-	const minY = Math.min(...ys);
-	const maxY = Math.max(...ys);
+function getPresetBounds(points: Point2D[]) {
+	let minX = Infinity;
+	let maxX = -Infinity;
+	let minY = Infinity;
+	let maxY = -Infinity;
+	for (const [x, y] of points) {
+		minX = Math.min(minX, x);
+		maxX = Math.max(maxX, x);
+		minY = Math.min(minY, y);
+		maxY = Math.max(maxY, y);
+	}
 	return {
 		minX,
 		maxX,
@@ -239,24 +225,11 @@ function getPresetBounds(points: Path2D = []) {
 	};
 }
 
-function cloneOutline(outline: OutlineRecord): OutlineRecord {
-	return JSON.parse(JSON.stringify(outline)) as OutlineRecord;
-}
-
-function getPresetNotchIndex(preset: string | undefined): number | null {
-	if (preset === 'roof') return 6;
-	return null;
-}
-
-function presetSupportsSemantic(
-	preset: string,
-	key: keyof Pick<OutlineSemantic, 'lean' | 'taper' | 'notchDepth'>
-) {
-	if (key === 'lean') return ['pillar', 'slab', 'wall', 'ramp', 'corner'].includes(preset);
-	if (key === 'taper') return ['pillar', 'wall'].includes(preset);
-	if (key === 'notchDepth') return preset === 'roof';
-	return true;
-}
+const PRESET_SEMANTICS = {
+	lean: ['pillar', 'slab', 'wall', 'ramp', 'corner'],
+	taper: ['pillar', 'wall'],
+	notchDepth: ['roof']
+};
 
 /**
  * Applies normalized semantic values to a preset without changing its storage
@@ -268,27 +241,25 @@ function presetSupportsSemantic(
  * parameters are left untouched.
  */
 export function updatePresetOutline(
-	outline: OutlineRecord,
+	outline: OutlineDraft,
 	patch: Partial<OutlineSemantic> = {},
 	canvasSize: OutlineCanvasSize = {}
-): OutlineRecord {
-	if (!outline.shape || !isPresetOutline(outline)) return outline;
-	const updated = cloneOutline(outline);
-	const updatedShape = updated.shape;
-	if (!updatedShape) return outline;
-	const points: Path2D = getOutlinePoints(updated, canvasSize).map((point) => [...point]);
+): OutlineDraft {
+	if (!isPresetOutline(outline)) return outline;
+	const shape = outline.shape;
+	const points = getOutlinePoints(outline, canvasSize).map((point): Point2D => [...point]);
+	if (!points.length) return outline;
 	const initialBounds = getPresetBounds(points);
-	if (!initialBounds) return outline;
-	const semantic = { version: PRESET_SEMANTIC_VERSION, ...(updatedShape.semantic || {}) };
+	const semantic: OutlineSemantic = { version: PRESET_SEMANTIC_VERSION, ...shape.semantic };
 
-	if (typeof patch.width === 'number' && Number.isFinite(patch.width) && patch.width > 0) {
+	if (patch.width !== undefined && Number.isFinite(patch.width) && patch.width > 0) {
 		const factor = patch.width / initialBounds.width;
 		for (const point of points)
 			point[0] = initialBounds.minX + (point[0] - initialBounds.minX) * factor;
 		semantic.width = patch.width;
 	}
 
-	if (typeof patch.height === 'number' && Number.isFinite(patch.height) && patch.height > 0) {
+	if (patch.height !== undefined && Number.isFinite(patch.height) && patch.height > 0) {
 		const factor = patch.height / initialBounds.height;
 		for (const point of points)
 			point[1] = initialBounds.maxY - (initialBounds.maxY - point[1]) * factor;
@@ -296,53 +267,30 @@ export function updatePresetOutline(
 	}
 
 	const bounds = getPresetBounds(points);
-	if (!bounds) return outline;
-	const applyRelative = (
-		key: 'lean' | 'taper' | 'notchDepth',
-		apply: (
-			difference: number,
-			currentBounds: NonNullable<ReturnType<typeof getPresetBounds>>
-		) => void
-	) => {
+	for (const key of ['lean', 'taper', 'notchDepth'] as const) {
 		const value = patch[key];
 		if (
-			typeof value !== 'number' ||
+			value === undefined ||
 			!Number.isFinite(value) ||
-			!presetSupportsSemantic(updatedShape.preset ?? '', key)
+			!PRESET_SEMANTICS[key].includes(shape.preset ?? '')
 		)
-			return;
-		const previous =
-			typeof semantic[key] === 'number' && Number.isFinite(semantic[key]) ? semantic[key] : 0;
-		apply(value - previous, bounds);
+			continue;
+		const difference = value - (semantic[key] ?? 0);
+		for (const [index, point] of points.entries()) {
+			const fromTop = (bounds.maxY - point[1]) / bounds.height;
+			if (key === 'lean') point[0] += difference * bounds.width * fromTop;
+			else if (key === 'taper')
+				point[0] = bounds.centerX + (point[0] - bounds.centerX) * (1 + difference * fromTop);
+			else if (index === 6) point[1] += difference * bounds.height;
+		}
 		semantic[key] = value;
+	}
+	return {
+		...outline,
+		shape: { ...shape, semantic },
+		points2D: points,
+		closed: isClosedPath(points)
 	};
-
-	applyRelative('lean', (difference, currentBounds) => {
-		for (const point of points) {
-			const fromTop = (currentBounds.maxY - point[1]) / currentBounds.height;
-			point[0] += difference * currentBounds.width * fromTop;
-		}
-	});
-
-	applyRelative('taper', (difference, currentBounds) => {
-		for (const point of points) {
-			const fromTop = (currentBounds.maxY - point[1]) / currentBounds.height;
-			point[0] =
-				currentBounds.centerX + (point[0] - currentBounds.centerX) * (1 + difference * fromTop);
-		}
-	});
-
-	applyRelative('notchDepth', (difference, currentBounds) => {
-		const notchIndex = getPresetNotchIndex(updatedShape.preset);
-		if (notchIndex !== null && points[notchIndex]) {
-			points[notchIndex][1] += difference * currentBounds.height;
-		}
-	});
-
-	updatedShape.semantic = semantic;
-	updated.points2D = points.map((point) => [...point]);
-	updated.closed = isClosedShape(points);
-	return updated;
 }
 
 /**
@@ -351,14 +299,15 @@ export function updatePresetOutline(
  * value before delegating to updatePresetOutline().
  */
 export function applyPresetSemanticHandle(
-	outline: OutlineRecord,
+	outline: OutlineDraft,
 	handleId: string,
 	point: Point2D,
 	canvasSize: OutlineCanvasSize = {}
-): OutlineRecord {
-	if (!outline.shape || !isPresetOutline(outline) || !Array.isArray(point)) return outline;
-	const bounds = getPresetBounds(getOutlinePoints(outline, canvasSize));
-	if (!bounds) return outline;
+): OutlineDraft {
+	if (!isPresetOutline(outline)) return outline;
+	const points = getOutlinePoints(outline, canvasSize);
+	if (!points.length) return outline;
+	const bounds = getPresetBounds(points);
 	let patch: Partial<OutlineSemantic>;
 	if (handleId === 'width') patch = { width: Math.max(point[0] - bounds.minX, Number.EPSILON) };
 	else if (handleId === 'height')
@@ -373,51 +322,45 @@ export function applyPresetSemanticHandle(
 }
 
 export function applyPresetSemanticHandleDrag(
-	outline: OutlineRecord,
+	outline: OutlineDraft,
 	handleId: string,
 	startPoint: Point2D,
 	point: Point2D,
 	canvasSize: OutlineCanvasSize = {}
-): OutlineRecord {
-	if (
-		!outline.shape ||
-		!isPresetOutline(outline) ||
-		!Array.isArray(startPoint) ||
-		!Array.isArray(point)
-	)
-		return outline;
-	const bounds = getPresetBounds(getOutlinePoints(outline, canvasSize));
-	if (!bounds) return outline;
-	const semantic = outline.shape.semantic || {};
+): OutlineDraft {
+	if (!isPresetOutline(outline)) return outline;
+	const points = getOutlinePoints(outline, canvasSize);
+	if (!points.length) return outline;
+	const bounds = getPresetBounds(points);
+	const semantic: OutlineSemantic = outline.shape.semantic || {};
 	const dx = point[0] - startPoint[0];
 	const dy = point[1] - startPoint[1];
 	let patch: Partial<OutlineSemantic>;
 	if (handleId === 'width') patch = { width: Math.max(bounds.width + dx, Number.EPSILON) };
 	else if (handleId === 'height') patch = { height: Math.max(bounds.height - dy, Number.EPSILON) };
-	else if (handleId === 'lean') patch = { lean: (Number(semantic.lean) || 0) + dx / bounds.width };
-	else if (handleId === 'taper')
-		patch = { taper: (Number(semantic.taper) || 0) + dx / (bounds.width / 2) };
+	else if (handleId === 'lean') patch = { lean: (semantic.lean ?? 0) + dx / bounds.width };
+	else if (handleId === 'taper') patch = { taper: (semantic.taper ?? 0) + dx / (bounds.width / 2) };
 	else if (handleId === 'notch')
-		patch = { notchDepth: (Number(semantic.notchDepth) || 0) + dy / bounds.height };
+		patch = { notchDepth: (semantic.notchDepth ?? 0) + dy / bounds.height };
 	else return outline;
 	return updatePresetOutline(outline, patch, canvasSize);
 }
 
 /** Drops editor-only preset information while retaining the exact visible path. */
 export function convertPresetToPolyline(
-	outline: OutlineRecord,
+	outline: OutlineDraft,
 	canvasSize: OutlineCanvasSize = {}
-): OutlineRecord {
-	if (!outline.shape || !isPresetOutline(outline)) return outline;
+): OutlineDraft {
+	if (!isPresetOutline(outline)) return outline;
 	const points2D = getOutlinePoints(outline, canvasSize);
 	outline.shape = { type: OUTLINE_SHAPE_TYPES.POLYLINE };
 	outline.points2D = points2D;
-	outline.closed = isClosedShape(points2D);
+	outline.closed = isClosedPath(points2D);
 	return outline;
 }
 
 export function normalizeCanvasSize(canvasSize: OutlineCanvasSize = {}) {
-	const { baseWidth = 1, baseHeight = 1 } = canvasSize || {};
+	const { baseWidth = 1, baseHeight = 1 } = canvasSize;
 	return {
 		baseWidth: Math.max(baseWidth, 1),
 		baseHeight: Math.max(baseHeight, 1)
@@ -439,7 +382,7 @@ export function createRectanglePoints(
 		square = false,
 		canvasSize
 	}: { center?: boolean; square?: boolean; canvasSize?: OutlineCanvasSize } = {}
-): Path2D {
+): Point2D[] {
 	const { baseWidth, baseHeight } = normalizeCanvasSize(canvasSize);
 	let minX;
 	let maxX;
@@ -489,10 +432,10 @@ export function createCirclePoints(
 	radius2D: number,
 	canvasSize: OutlineCanvasSize = {},
 	segments = CIRCLE_SEGMENTS
-): Path2D {
+): Point2D[] {
 	const { baseWidth, baseHeight } = normalizeCanvasSize(canvasSize);
 	const radiusY = radius2D * (baseWidth / baseHeight);
-	const points: Path2D = [];
+	const points: Point2D[] = [];
 
 	for (let i = 0; i < segments; i++) {
 		const angle = (i / segments) * Math.PI * 2;
@@ -525,11 +468,11 @@ function perpendicularDistancePx(
 }
 
 export function simplifyPoints(
-	points: Path2D,
+	points: Point2D[],
 	tolerancePx = DEFAULT_FREEHAND_SMOOTHING_PX,
 	canvasSize: OutlineCanvasSize = {}
-): Path2D {
-	if (!points || points.length <= 2 || tolerancePx <= 0) return points || [];
+): Point2D[] {
+	if (points.length <= 2 || tolerancePx <= 0) return points;
 
 	let maxDistance = 0;
 	let index = 0;
@@ -559,11 +502,11 @@ export function simplifyPoints(
  * closure and at least three vertices.
  */
 export function simplifyClosedPoints(
-	points: Path2D,
+	points: Point2D[],
 	tolerancePx = DEFAULT_FREEHAND_SMOOTHING_PX,
 	canvasSize: OutlineCanvasSize = {}
-): Path2D {
-	if (!isClosedPath(points) || points.length <= 4 || tolerancePx <= 0) return points || [];
+): Point2D[] {
+	if (!isClosedPath(points) || points.length <= 4 || tolerancePx <= 0) return points;
 
 	let simplified = points.slice(0, -1);
 	// A second pass catches runs of very short, nearly straight brush vertices
@@ -578,15 +521,11 @@ export function simplifyClosedPoints(
 		simplified = next;
 	}
 
-	return [...simplified, [...simplified[0]]];
-}
-
-export function isClosedShape(points: Path2D = []): boolean {
-	return isClosedPath(points);
+	return closePath(simplified);
 }
 
 export function translateOutline(
-	outline: OutlineRecord,
+	outline: OutlineDraft,
 	deltaX: number,
 	deltaY: number,
 	canvasSize: OutlineCanvasSize = {}
@@ -610,18 +549,25 @@ export function translateOutline(
 	outline.points2D = getOutlinePoints(outline, canvasSize);
 }
 
+export function editOutlinePath(
+	outline: OutlineDraft,
+	edit: (points: Point2D[]) => Point2D[],
+	canvasSize: OutlineCanvasSize = {}
+): void {
+	const points2D = edit(getOutlinePoints(outline, canvasSize));
+	outline.shape = { type: OUTLINE_SHAPE_TYPES.POLYLINE };
+	outline.points2D = points2D;
+	outline.closed = isClosedPath(points2D);
+}
+
 export function setOutlinePoint(
-	outline: OutlineRecord,
+	outline: OutlineDraft,
 	pointIndex: number,
 	point: Point2D,
 	canvasSize: OutlineCanvasSize = {}
 ): void {
-	const currentPoints = getOutlinePoints(outline, canvasSize);
-	const points = movePathVertex(currentPoints, pointIndex, point, {
-		closed: isClosedPath(currentPoints)
-	});
+	const points = getOutlinePoints(outline, canvasSize);
 	if (!points[pointIndex]) return;
-
 	if (outline.shape?.type === OUTLINE_SHAPE_TYPES.CIRCLE) {
 		const center = outline.shape.center2D;
 		if (!center) return;
@@ -629,46 +575,13 @@ export function setOutlinePoint(
 			distancePx(center, point, canvasSize) / normalizeCanvasSize(canvasSize).baseWidth;
 		outline.points2D = getOutlinePoints(outline, canvasSize);
 	} else {
-		// A direct vertex edit turns a preset or rectangle into a manual path.
-		if (isPresetOutline(outline) || outline.shape?.type === OUTLINE_SHAPE_TYPES.RECTANGLE)
-			outline.shape = { type: OUTLINE_SHAPE_TYPES.POLYLINE };
-		outline.points2D = points;
+		outline.shape = { type: OUTLINE_SHAPE_TYPES.POLYLINE };
+		outline.points2D = movePathVertex(points, pointIndex, point);
 	}
+	outline.closed = isClosedPath(outline.points2D);
 }
 
-export function insertOutlinePoint(
-	outline: OutlineRecord,
-	insertIndex: number,
-	point: Point2D,
-	canvasSize: OutlineCanvasSize = {}
-): void {
-	const currentPoints = getOutlinePoints(outline, canvasSize);
-	const points = insertPathVertex(currentPoints, insertIndex, point, {
-		closed: isClosedPath(currentPoints)
-	});
-	outline.shape = { type: OUTLINE_SHAPE_TYPES.POLYLINE };
-	outline.points2D = points;
-}
-
-export function removeOutlinePoint(
-	outline: OutlineRecord,
-	pointIndex: number,
-	canvasSize: OutlineCanvasSize = {}
-): void {
-	const currentPoints = getOutlinePoints(outline, canvasSize);
-	const points = removePathVertex(currentPoints, pointIndex, {
-		closed: isClosedPath(currentPoints)
-	});
-	outline.shape = { type: OUTLINE_SHAPE_TYPES.POLYLINE };
-	outline.points2D = points;
-}
-
-export function getOutlineMidpoints(outline: OutlineRecord, canvasSize: OutlineCanvasSize = {}) {
-	const points = getOutlinePoints(outline, canvasSize);
-	return getPathMidpoints(points, { closed: isClosedPath(points) });
-}
-
-export function createOutlineRecord({
+export function createOutline({
 	id,
 	lineStyle = 'rock',
 	type = OUTLINE_SHAPE_TYPES.POLYLINE,
@@ -678,17 +591,11 @@ export function createOutlineRecord({
 	fillOpacity = 0.3,
 	curve = { enabled: false, tension: DEFAULT_OUTLINE_CURVE_TENSION },
 	canvasSize = {}
-}: {
-	id: string;
-	lineStyle?: string;
-	type?: string;
-	points2D?: Path2D;
-	shape?: OutlineShape | null;
-	fillColor?: string | null;
-	fillOpacity?: number;
-	curve?: { enabled: boolean; tension: number };
-	canvasSize?: OutlineCanvasSize;
-}): OutlineRecord {
+}: Partial<OutlineDraft> &
+	Pick<Outline, 'id'> & {
+		type?: string;
+		canvasSize?: OutlineCanvasSize;
+	}): OutlineDraft {
 	const semanticShape =
 		(shape ? { ...shape } : null) ||
 		(type === OUTLINE_SHAPE_TYPES.CIRCLE || type === OUTLINE_SHAPE_TYPES.RECTANGLE
@@ -697,7 +604,7 @@ export function createOutlineRecord({
 	const initialPoints = points2D;
 	// Preview shapes carry vertices for the drawing UI; persisted shapes do not.
 	if (semanticShape && 'points2D' in semanticShape) delete semanticShape.points2D;
-	const outline = {
+	const outline: OutlineDraft = {
 		id,
 		lineStyle,
 		shape: semanticShape,
@@ -705,51 +612,34 @@ export function createOutlineRecord({
 		fillColor,
 		fillOpacity,
 		curve: {
-			enabled: Boolean(curve?.enabled),
-			tension: Number.isFinite(Number(curve?.tension))
-				? Math.min(1, Math.max(0, Number(curve.tension)))
+			enabled: curve.enabled ?? false,
+			tension: Number.isFinite(curve.tension ?? DEFAULT_OUTLINE_CURVE_TENSION)
+				? Math.min(1, Math.max(0, curve.tension ?? DEFAULT_OUTLINE_CURVE_TENSION))
 				: DEFAULT_OUTLINE_CURVE_TENSION
-		},
-		closed: isClosedShape(initialPoints)
+		}
 	};
 
 	outline.points2D = getOutlinePoints(outline, canvasSize);
-	outline.closed = isClosedShape(outline.points2D);
+	outline.closed = isClosedPath(outline.points2D);
 	return outline;
 }
 
-export function prepareOutlinesForExport(outlines = [], canvasSize = {}) {
+export function prepareOutlinesForExport(
+	outlines: OutlineDraft[] = [],
+	canvasSize: OutlineCanvasSize = {}
+): Outline[] {
 	return outlines.map((outline) => {
-		const exported = JSON.parse(JSON.stringify(outline));
-		exported.points2D = getOutlinePoints(exported, canvasSize);
-		exported.closed = isClosedShape(exported.points2D);
-		return exported;
+		const points2D = getOutlinePoints(outline, canvasSize);
+		return {
+			...outline,
+			points2D: isLinePath(points2D) ? points2D : undefined,
+			closed: isClosedPath(points2D)
+		};
 	});
 }
 
-import {
-	getPathMidpoints,
-	insertPathVertex,
-	isClosedPath,
-	movePathVertex,
-	removePathVertex,
-	translatePath
-} from './path-geometry.ts';
-import {
-	getOutlinePoints as getSharedOutlinePoints,
-	pointsToSmoothSvgPath as sharedPointsToSmoothSvgPath,
-	pointsToSvg as sharedPointsToSvg
-} from '@vorstieg/topo-renderer';
-
-export const pointsToSvg = sharedPointsToSvg;
-export const pointsToSmoothSvgPath = sharedPointsToSmoothSvgPath;
-export function getOutlinePoints(outline: OutlineRecord, canvasSize?: OutlineCanvasSize): Path2D {
-	// Polyline drafts may contain fewer than two points; shape geometry is handled by the renderer.
-	if (outline.shape?.type !== 'rectangle' && outline.shape?.type !== 'circle') {
-		return outline.points2D;
-	}
-	return getSharedOutlinePoints(
-		{ ...outline, points2D: isLinePath(outline.points2D) ? outline.points2D : undefined },
-		canvasSize
-	);
+export function getOutlinePoints(outline: OutlineDraft, canvasSize?: OutlineCanvasSize): Point2D[] {
+	if (outline.shape?.type !== 'rectangle' && outline.shape?.type !== 'circle')
+		return outline.points2D ?? [];
+	return getSharedOutlinePoints({ id: outline.id, shape: outline.shape }, canvasSize);
 }

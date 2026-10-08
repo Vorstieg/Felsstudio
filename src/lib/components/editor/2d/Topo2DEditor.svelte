@@ -21,7 +21,7 @@
 	import { syncTopoToolLifecycle } from './sync-topo-tool-lifecycle.ts';
 	import type { Route } from '@vorstieg/fels-types/types';
 	import type { InteractionId, InteractionPoint } from '$lib/state/topo-2d-editor-interactions.ts';
-	import type { Point2D } from '$lib/assets/js/path-geometry.ts';
+	import type { Point2D } from '@vorstieg/fels-types/types';
 	import type { createTopo2DEditorState as createEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
 
 	type Editor = ReturnType<typeof createEditorState>;

@@ -1,5 +1,5 @@
-import type { OutlineRecord } from '$lib/assets/js/outline-geometry.ts';
-import type { Path2D, Point2D } from '$lib/assets/js/path-geometry.ts';
+import type { OutlineDraft } from '$lib/assets/js/outline-geometry.ts';
+import type { Point2D } from '@vorstieg/fels-types/types';
 
 export type InteractionId = string | number;
 export type InteractionPoint = { x: number; y: number };
@@ -24,7 +24,7 @@ export type RoutePointTarget = {
 export type SelectionSnapshot = {
 	startMouse: InteractionPoint;
 	items: {
-		paths: Array<{ target: EditablePathTarget; snapshot: OutlineRecord | Path2D }>;
+		paths: Array<{ target: EditablePathTarget; snapshot: OutlineDraft | Point2D[] }>;
 		symbols: Array<{ symbolId: InteractionId; startPos: Point2D }>;
 		texts: Array<{ textId: InteractionId; startPos: Point2D }>;
 	};
@@ -49,7 +49,7 @@ export type Topo2DInteraction =
 			outlineId: InteractionId;
 			handleId: InteractionId;
 			startMouse: Point2D;
-			outlineSnapshot: OutlineRecord;
+			outlineSnapshot: OutlineDraft;
 	  }
 	| {
 			kind: 'move-symbol';

@@ -1,16 +1,16 @@
 import { generateOutlineId, generateSymbolId, generateTextId } from '$lib/assets/js/id-utils.ts';
 import { translateOutline } from '$lib/assets/js/outline-geometry.ts';
-import type { OutlineRecord } from '$lib/assets/js/outline-geometry.ts';
+import type { OutlineDraft } from '$lib/assets/js/outline-geometry.ts';
 import type { FixPoint, TextLabel } from '@vorstieg/fels-types/types';
 
 type ClipboardTopo = {
-	outlines: OutlineRecord[];
+	outlines: OutlineDraft[];
 	fixPoints: FixPoint[];
 	textLabels?: TextLabel[];
 };
 type CanvasSize = { baseWidth: number; baseHeight: number };
 type ClipboardItem =
-	| { type: 'outline'; item: OutlineRecord }
+	| { type: 'outline'; item: OutlineDraft }
 	| { type: 'symbol'; item: FixPoint }
 	| { type: 'text'; item: TextLabel };
 type PastedItem = { type: ClipboardItem['type']; id: string | number };

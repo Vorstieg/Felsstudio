@@ -5,12 +5,22 @@
 	import { OUTLINE_FILL_COLORS, OUTLINE_STYLES } from './OutlineTool.svelte.ts';
 	import { _ } from 'svelte-i18n';
 	import type { RouteEditTool } from './RouteEditTool.svelte.ts';
-	import type { OutlineRecord } from '$lib/assets/js/outline-geometry.ts';
+	import type { OutlineDraft } from '$lib/assets/js/outline-geometry.ts';
 	type Curve = { enabled?: boolean; tension?: number };
-	type Route = { routeEditTool?: RouteEditTool | null; curve?: Curve | null; onCurveChange?: (_changes: Curve) => void };
+	type Route = {
+		routeEditTool?: RouteEditTool | null;
+		curve?: Curve | null;
+		onCurveChange?: (_changes: Curve) => void;
+	};
 	type GridActions = { toggleSnapToGrid: () => void; setGridSize: (_value: unknown) => void };
-	type CurveActions = { setCurveEnabled: (_enabled: boolean) => void; setCurveTension: (_value: unknown) => void };
-	type StyleActions = { setLineStyle: (_lineStyle: string) => void; setFillColor: (_color: string | null, _opacity?: number) => void };
+	type CurveActions = {
+		setCurveEnabled: (_enabled: boolean) => void;
+		setCurveTension: (_value: unknown) => void;
+	};
+	type StyleActions = {
+		setLineStyle: (_lineStyle: string) => void;
+		setFillColor: (_color: string | null, _opacity?: number) => void;
+	};
 
 	let {
 		selectedOutlineId = null,
@@ -29,7 +39,7 @@
 		selectedRoute?: Route | false | null;
 		outlineEditTool?: { snapToGrid: boolean; gridSize: number } | null;
 		outlineGridActions?: GridActions | null;
-		selectedOutline?: OutlineRecord | null;
+		selectedOutline?: OutlineDraft | null;
 		outlineCurveActions?: CurveActions | null;
 		outlineStyleActions?: StyleActions | null;
 		simplifyTolerancePx?: number;
@@ -80,7 +90,8 @@
 							? 'shadow-[inset_0_0_0_2px_var(--color-creator-blue)]'
 							: ''}"
 						style={fillSwatchStyle(color)}
-							onclick={() => outlineStyleActions?.setFillColor(color.value, color.opacity ?? undefined)}
+						onclick={() =>
+							outlineStyleActions?.setFillColor(color.value, color.opacity ?? undefined)}
 						title={$_(color.labelKey)}
 						aria-label={$_(color.labelKey)}
 					>

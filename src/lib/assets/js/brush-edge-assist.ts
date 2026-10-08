@@ -7,7 +7,7 @@
  * brush gesture, not automatic rock segmentation.
  */
 
-import type { Path2D, Point2D } from './path-geometry.ts';
+import type { Point2D } from '@vorstieg/fels-types/types';
 import type { BrushCanvasSize } from './brush-outline-geometry.ts';
 
 type Metrics = { width: number; height: number };
@@ -51,12 +51,12 @@ function imagePlacementMetrics(canvas: Metrics, placement?: ImagePlacement): Ima
 }
 
 function cleanStroke(
-	strokePoints: Path2D,
+	strokePoints: Point2D[],
 	canvasSize: BrushCanvasSize,
 	minimumDistance = 0.5
-): Path2D {
+): Point2D[] {
 	const { width, height } = canvasMetrics(canvasSize);
-	const result: Path2D = [];
+	const result: Point2D[] = [];
 	for (const point of strokePoints ?? []) {
 		if (!Array.isArray(point) || !Number.isFinite(point[0]) || !Number.isFinite(point[1])) continue;
 		const pixel: Point2D = [point[0] * width, point[1] * height];
@@ -65,7 +65,7 @@ function cleanStroke(
 	return result;
 }
 
-function interpolateStroke(stroke: Path2D, spacing: number): Path2D {
+function interpolateStroke(stroke: Point2D[], spacing: number): Point2D[] {
 	if (stroke.length < 2) return stroke;
 	const result = [stroke[0]];
 	for (let index = 1; index < stroke.length; index++) {
@@ -82,7 +82,7 @@ function interpolateStroke(stroke: Path2D, spacing: number): Path2D {
 
 /** Creates a predicate for the union of the round dabs painted by a stroke. */
 export function createBrushMaskPredicate(
-	strokePoints: Path2D,
+	strokePoints: Point2D[],
 	{
 		brushRadiusPx = 18,
 		canvasSize = {}
@@ -180,7 +180,7 @@ function candidatesAt(
  */
 export function findBrushImageEdge(
 	imageData: PixelData,
-	strokePoints: Path2D,
+	strokePoints: Point2D[],
 	{
 		canvasSize = {},
 		brushRadiusPx = 18,
@@ -192,7 +192,7 @@ export function findBrushImageEdge(
 		candidateSpacingPx = 2,
 		minimumConfidence = 0.32
 	}: BrushEdgeOptions = {}
-): { points: Path2D; confidence: number } | null {
+): { points: Point2D[]; confidence: number } | null {
 	if (!imageData?.data || !Number.isFinite(imageData.width) || !Number.isFinite(imageData.height))
 		return null;
 	const canvas = canvasMetrics(canvasSize);
@@ -260,7 +260,7 @@ export function findBrushImageEdge(
 				candidate.total > layer[best].total ? candidateIndex : best,
 			0
 		);
-	const path: Path2D = [];
+	const path: Point2D[] = [];
 	const scores: number[] = [];
 	for (let layerIndex = layers.length - 1; layerIndex >= 0; layerIndex--) {
 		const candidate = layers[layerIndex][index];

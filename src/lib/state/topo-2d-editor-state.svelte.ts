@@ -1,6 +1,13 @@
+import type { OutlineDraft } from '$lib/assets/js/outline-geometry.ts';
 import { getContext, setContext } from 'svelte';
-import type { FixPoint, Pitch, Route, TextLabel, Variant } from '@vorstieg/fels-types/types';
-import type { OutlineRecord } from '$lib/assets/js/outline-geometry.ts';
+import type {
+	FelsTopoDocument,
+	FixPoint,
+	Pitch,
+	Route,
+	TextLabel,
+	Variant
+} from '@vorstieg/fels-types/types';
 import type { TopoDrawingTarget } from './topo-drawing-target.ts';
 import type { Topo2DInteraction } from './topo-2d-editor-interactions.ts';
 import {
@@ -40,13 +47,13 @@ type History = {
 	savedSnapshot: Topo2DEditorDocument | null;
 };
 type ClipboardItem =
-	| { type: 'outline'; item: OutlineRecord }
+	| { type: 'outline'; item: OutlineDraft }
 	| { type: 'symbol'; item: FixPoint }
 	| { type: 'text'; item: TextLabel };
 type HistoryOptions = { recordHistory?: boolean };
 type RouteTarget = { type: 'pitch'; pitchId: Id } | { type: 'variant'; variantId: Id } | null;
 type WrappedSessionInput = {
-	topo: Topo2DEditorDocument;
+	topo: FelsTopoDocument | Topo2DEditorDocument;
 	editorMode?: '2d' | '3d';
 	has3DTopoAvailable?: boolean;
 	entryPath?: string;
@@ -187,11 +194,11 @@ function drawingTargetExists(topo: Topo2DEditorDocument, drawingTarget: TopoDraw
 export function createTopo2DEditorState({
 	topo
 }: {
-	topo?: Topo2DEditorDocument;
+	topo?: Partial<Topo2DEditorDocument>;
 } = {}) {
 	const initialUi = createInitialTopo2DEditorUi();
 	const state = $state({
-		topo: topo ? clone(topo) : createInitialTopo(),
+		topo: createInitialTopo(topo ? clone(topo) : undefined),
 		ui: initialUi,
 		interaction: null,
 		drafts: createDrafts(),
@@ -235,7 +242,7 @@ export function createTopo2DEditorState({
 		state.ui.modelScale = session?.modelScale || [1, 1, 1];
 		state.ui.scale = session?.scale || 1;
 		state.ui.canvasAspectRatio = session?.canvasAspectRatio || document.imageAspectRatio || 1.5;
-		writeTopo(clone(document));
+		writeTopo(createInitialTopo(clone(document)));
 		state.clustering = session?.clustering ? clone(session.clustering) : createInitialClustering();
 		if (session?.glbBlob) setModelFile(session.glbBlob);
 		state.ui.activeDraftId = id;
@@ -586,8 +593,8 @@ export function createTopo2DEditorState({
 			return pasted;
 		});
 	}
-	function load(nextTopo: Topo2DEditorDocument | null) {
-		writeTopo(nextTopo ? clone(nextTopo) : createInitialTopo());
+	function load(nextTopo: Partial<Topo2DEditorDocument> | null) {
+		writeTopo(createInitialTopo(nextTopo ? clone(nextTopo) : undefined));
 		Object.assign(state.ui, createUi());
 		state.selection = new Set();
 		state.selectedItems = new Set();
@@ -850,8 +857,8 @@ export function createTopo2DEditorState({
 			updateFixpoint: (id: Id, changes: Partial<FixPoint>, options?: HistoryOptions) =>
 				updateItem('fixPoints', id, changes, 'Update fixpoint', options),
 			removeFixpoint: (id: Id) => removeItem('fixPoints', id, 'Remove fixpoint'),
-			addOutline: (item: OutlineRecord) => collectionMethod('outlines', item, 'Add outline'),
-			updateOutline: (id: Id, changes: Partial<OutlineRecord>, options?: HistoryOptions) =>
+			addOutline: (item: OutlineDraft) => collectionMethod('outlines', item, 'Add outline'),
+			updateOutline: (id: Id, changes: Partial<OutlineDraft>, options?: HistoryOptions) =>
 				updateItem('outlines', id, changes, 'Update outline', options),
 			removeOutline: (id: Id) => removeItem('outlines', id, 'Remove outline'),
 			addTextLabel: (item: TextLabel, options?: HistoryOptions) =>

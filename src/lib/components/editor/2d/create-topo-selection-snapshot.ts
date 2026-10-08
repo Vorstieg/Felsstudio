@@ -1,4 +1,4 @@
-import type { Point2D } from '$lib/assets/js/path-geometry.ts';
+import type { Point2D } from '@vorstieg/fels-types/types';
 import type {
 	EditablePathTarget,
 	InteractionPoint,
