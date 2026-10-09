@@ -11,6 +11,42 @@ const document = () => ({
 });
 
 describe('createTopo2DEditorState', () => {
+	it('keeps the crag save destination and draft when applying a JSON document', () => {
+		const editor = createTopo2DEditorState({ topo: document() });
+		editor.loadSession(
+			{
+				topo: document(),
+				editorMode: '2d',
+				entryPath: 'area/crag/crag',
+				topoFileName: 'area/crag/crag-topo.json',
+				has3DTopoAvailable: true
+			},
+			'existing-draft'
+		);
+		editor.ui.workspace = '/topos/2d/editor';
+		const ui = editor.ui;
+		const imported = { routes: [{ id: 'imported-route' }] };
+
+		editor.load(imported, { preserveSession: true });
+		editor.clearSelection();
+
+		expect(editor.ui).toBe(ui);
+		expect(editor.ui).toMatchObject({
+			editorMode: '2d',
+			workspace: '/topos/2d/editor',
+			activeDraftId: 'existing-draft',
+			has3DTopoAvailable: true
+		});
+		expect(editor.getSaveSession()).toMatchObject({
+			entryPath: 'area/crag/crag',
+			topoFileName: 'area/crag/crag-topo.json',
+			topo: { routes: imported.routes, fixPoints: [], outlines: [], textLabels: [] }
+		});
+		editor.reset();
+		expect(editor.ui.topoFileName).toBeNull();
+		expect(editor.ui.activeDraftId).toBeNull();
+	});
+
 	it.each(['constructor', 'load', 'loadSession'])(
 		'initializes absent collections through %s without changing the input',
 		(method) => {

@@ -1,5 +1,6 @@
 import { onMount } from 'svelte';
 import { draftsState, isBlankTopoSession } from '$lib/state/drafts.svelte.ts';
+import { resolveTopoSavePath } from '$lib/assets/js/topo-save-path.ts';
 import type {
 	DraftEditorExtras,
 	DraftSession,
@@ -122,6 +123,11 @@ export function useTopoDraftAutosave({
 				}
 			}
 			if (disposed || !initialized) return;
+			const topoFileName = resolveTopoSavePath(topoSession.ui, entryPath);
+			if (topoFileName) {
+				topoSession.ui.topoFileName = topoFileName;
+				topoSession.ui.entryPath ||= topoFileName.replace(/-topo\.json$/, '');
+			}
 			topoSession.ui.editorMode = editorMode;
 			topoSession.ui.workspace = getWorkspace();
 			onInitialized?.();

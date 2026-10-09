@@ -22,6 +22,7 @@
 	import TopoPropertiesPanel from '$lib/components/editor/TopoPropertiesPanel.svelte';
 	import { authState } from '$lib/api/auth.svelte.ts';
 	import { writeJson } from '$lib/api/felslager.ts';
+	import { resolveTopoSavePath } from '$lib/assets/js/topo-save-path.ts';
 	import { topoSymbols } from '@vorstieg/topo-renderer';
 	import { _ } from 'svelte-i18n';
 	import { browser } from '$app/environment';
@@ -179,9 +180,10 @@
 
 			let topoToSave = editorState.getSaveSnapshot();
 
-			const fileName = editorState.ui.topoFileName;
+			const fileName = resolveTopoSavePath(editorState.ui, initialEntryPath);
 			if (typeof fileName !== 'string' || !fileName)
 				throw new Error('Topo file path is unavailable');
+			editorState.ui.topoFileName = fileName;
 			await writeJson(fileName, topoToSave);
 			editorState.markSaved();
 

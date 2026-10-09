@@ -27,6 +27,7 @@
 
 	import { generateSymbolId, initializeIdCounters } from '$lib/assets/js/id-utils.ts';
 	import { writeFile, writeJson } from '$lib/api/felslager.ts';
+	import { resolveTopoSavePath } from '$lib/assets/js/topo-save-path.ts';
 	import { authState } from '$lib/api/auth.svelte.ts';
 	import ToolPalette3D from '$lib/components/editor/3d/ToolPalette3D.svelte';
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
@@ -419,10 +420,11 @@
 			}
 
 			// Save topo JSON to Felslager
-			const topoFileName = topoSession.ui.topoFileName;
+			const topoFileName = resolveTopoSavePath(topoSession.ui, initialEntryPath);
 			if (typeof topoFileName !== 'string' || !topoFileName) {
 				throw new Error('Topo file path is unavailable');
 			}
+			topoSession.ui.topoFileName = topoFileName;
 			await writeJson(topoFileName, topoToSave);
 
 			// Upload GLB model if available (3D mode)

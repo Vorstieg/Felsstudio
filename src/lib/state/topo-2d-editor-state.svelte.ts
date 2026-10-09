@@ -593,9 +593,12 @@ export function createTopo2DEditorState({
 			return pasted;
 		});
 	}
-	function load(nextTopo: Partial<Topo2DEditorDocument> | null) {
+	function load(
+		nextTopo: Partial<Topo2DEditorDocument> | null,
+		{ preserveSession = false }: { preserveSession?: boolean } = {}
+	) {
 		writeTopo(createInitialTopo(nextTopo ? clone(nextTopo) : undefined));
-		Object.assign(state.ui, createUi());
+		if (!preserveSession) Object.assign(state.ui, createUi());
 		state.selection = new Set();
 		state.selectedItems = new Set();
 		state.selectedSymbolInstance = null;

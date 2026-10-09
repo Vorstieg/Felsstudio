@@ -145,9 +145,7 @@
 			return;
 		}
 
-		const currentMode = editorState.ui.editorMode;
-		editorState.load(parsed as Topo2DEditorDocument);
-		editorState.ui.editorMode = currentMode;
+		editorState.load(parsed as Topo2DEditorDocument, { preserveSession: true });
 		editorState.clearSelection();
 		drawingTarget = null;
 		topoJsonError = '';
