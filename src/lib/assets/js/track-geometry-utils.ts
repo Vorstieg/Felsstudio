@@ -1,13 +1,13 @@
 import maplibregl from 'maplibre-gl';
 import * as turf from '@turf/turf';
+import type { Point2D } from '@vorstieg/fels-types/types';
 
 /** Longitude/latitude pair used by recorded tracks. */
-export type TrackCoordinate = [longitude: number, latitude: number];
 export type TrackCleanupOptions = { radiusMeters?: number; minimumPoints?: number };
 
 export function fitCoordinatesBounds(
 	map: maplibregl.Map | null | undefined,
-	coordinates: TrackCoordinate[] = [],
+	coordinates: Point2D[] = [],
 	options: maplibregl.FitBoundsOptions = {}
 ): void {
 	if (!map || coordinates.length === 0) return;
@@ -30,10 +30,7 @@ export function trimCoordinatesEnd<T>(coordinates: T[] = [], count = 0): T[] {
 	return coordinates.slice(0, Math.max(0, coordinates.length - count));
 }
 
-export function simplifyTrackCoordinates(
-	coordinates: TrackCoordinate[] = [],
-	toleranceMeters = 10
-): TrackCoordinate[] {
+export function simplifyTrackCoordinates(coordinates: Point2D[] = [], toleranceMeters = 10): Point2D[] {
 	if (!Array.isArray(coordinates) || coordinates.length <= 2) return [...coordinates];
 	if (!Number.isFinite(toleranceMeters) || toleranceMeters <= 0) return [...coordinates];
 
@@ -52,10 +49,8 @@ export function simplifyTrackCoordinates(
 		mutate: false
 	});
 	const simplified =
-		(
-			turf.toWgs84(simplifiedMercator) as
-				{ geometry?: { coordinates?: TrackCoordinate[] } } | undefined
-		)?.geometry?.coordinates || [];
+		(turf.toWgs84(simplifiedMercator) as { geometry?: { coordinates?: Point2D[] } } | undefined)
+			?.geometry?.coordinates || [];
 	return simplified.length >= 2 ? simplified : [...coordinates];
 }
 
@@ -68,7 +63,7 @@ export function simplifyTrackCoordinates(
  * minimum-point threshold avoids treating normal, slow walking as a pause.
  */
 export function cleanStationaryTrackCoordinates(
-	coordinates: TrackCoordinate[] = [],
+	coordinates: Point2D[] = [],
 	{ radiusMeters = 15, minimumPoints = 20 }: TrackCleanupOptions = {}
 ) {
 	if (!Array.isArray(coordinates) || coordinates.length <= 2) return [...coordinates];

@@ -3,14 +3,14 @@
 	import ToolBar from '$lib/components/editor/tools/ToolBar.svelte';
 	import MapSearch from '$lib/components/editor/MapSearch.svelte';
 	import type { Map as MapLibreMap } from 'maplibre-gl';
-	import type { TrackCoordinate } from './use-crag-track-editor.svelte.ts';
+	import type { Point2D } from '@vorstieg/fels-types/types';
 
 	type Action = () => void | Promise<void>;
 	type Props = {
 		map?: MapLibreMap | null;
 		activeTool?: string;
 		toolOptionsOpen?: boolean;
-		currentTrackPoints?: TrackCoordinate[];
+		currentTrackPoints?: Point2D[];
 		isRoutingTrack?: boolean;
 		hasPendingTrackCut?: boolean;
 		onStartRoutingDraft?: Action;

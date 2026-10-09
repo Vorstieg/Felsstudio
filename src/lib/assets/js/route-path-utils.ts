@@ -1,6 +1,6 @@
-import type { TrackCoordinate } from './track-geometry-utils.ts';
+import type { Point2D } from '@vorstieg/fels-types/types';
 
-export function parseGpx(text: string): TrackCoordinate[] {
+export function parseGpx(text: string): Point2D[] {
 	const parser = new DOMParser();
 	const xml = parser.parseFromString(text, 'text/xml');
 	if (xml.querySelector('parsererror')) throw new Error('Invalid GPX file.');
@@ -10,7 +10,7 @@ export function parseGpx(text: string): TrackCoordinate[] {
 	if (points.length === 0) points = Array.from(xml.querySelectorAll('wpt'));
 
 	return points
-		.map((point): TrackCoordinate => [
+		.map((point): Point2D => [
 			parseFloat(point.getAttribute('lon') ?? ''),
 			parseFloat(point.getAttribute('lat') ?? '')
 		])

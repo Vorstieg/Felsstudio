@@ -44,8 +44,7 @@
 	import type {
 		AccessTrackFeature,
 		ActiveTrackTarget,
-		RoutePathTarget,
-		TrackCoordinate
+		RoutePathTarget
 	} from '$lib/components/editor/crag/use-crag-track-editor.svelte.ts';
 	import { createCragRouteTool } from '$lib/components/editor/crag/CragRouteTool.svelte.ts';
 	import type { CragSelection } from '$lib/components/editor/crag/crag-route-types.ts';
@@ -65,6 +64,7 @@
 	import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.ts';
 	import { createRouteEditController } from './route-editing.ts';
 	import { getGeometryCenter } from '$lib/assets/js/sector-utils.ts';
+	import type { Point2D } from '@vorstieg/fels-types/types';
 
 	type Point2 = [number, number];
 	type Selection = CragSelection;
@@ -1060,7 +1060,7 @@
 
 	function saveCragTrackGeometry(
 		target: ActiveTrackTarget | null,
-		coordinates: TrackCoordinate[]
+		coordinates: Point2D[]
 	): boolean {
 		if (target?.kind === 'route-path')
 			return Boolean(routeTool.saveRoutePathCoordinates(target, coordinates));

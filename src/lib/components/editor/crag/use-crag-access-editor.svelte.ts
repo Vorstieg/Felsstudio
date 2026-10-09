@@ -4,7 +4,7 @@ import * as turf from '@turf/turf';
 import type { AccessCollection, CragEditorSession } from '$lib/types/crag';
 import { getGeometryCenter } from '$lib/assets/js/sector-utils.ts';
 import { base } from '$app/paths';
-import { createAccessFeature, createAccessId } from '$lib/assets/js/access-geojson.ts';
+import { createAccessId } from '$lib/assets/js/access-geojson.ts';
 import { createIconMarkerElement } from '$lib/components/editor/crag/crag-editor-map.ts';
 import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.ts';
 
@@ -223,12 +223,12 @@ export function useCragAccessEditor({
 		coordinates: Coordinates,
 		properties: { name?: string; mode?: TransitMode } = {}
 	) {
-		const feature = createAccessFeature({
+		const feature = {
+			type: 'Feature',
 			id: createAccessId(kind),
-			kind,
 			geometry: { type: 'Point', coordinates },
-			properties
-		});
+			properties: { ...properties, kind }
+		} as AccessFeature;
 		replaceFeatures([...accessFeatures(), feature]);
 		createPointMarker(feature);
 		return feature.id;

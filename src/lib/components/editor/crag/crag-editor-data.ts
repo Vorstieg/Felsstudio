@@ -1,11 +1,11 @@
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
-import type { PathFeature } from '@vorstieg/fels-types/types';
+import type { PathFeature, Point2D } from '@vorstieg/fels-types/types';
 import type {
 	AccessTrackFeature,
 	ActiveTrackTarget,
-	RoutePathTarget,
-	TrackCoordinate
+	RoutePathTarget
 } from './use-crag-track-editor.svelte.ts';
+import type { TrackCoordinate } from '$lib/components/editor/track/track-drawing.ts';
 
 type CragSelection = {
 	type?: string;
@@ -30,7 +30,7 @@ export type BuildEditorFeatureCollectionOptions = {
 	routePaths?: RoutePathItem[];
 	selectedObject?: CragSelection | null;
 	editingRoutePath?: RoutePathTarget | null;
-	drawingPoints?: TrackCoordinate[];
+	drawingPoints?: Point2D[];
 	visibleDrawingPointIndexes?: number[];
 	editingDrawingPath?: boolean;
 	selectedTrackPointIndex?: number | null;

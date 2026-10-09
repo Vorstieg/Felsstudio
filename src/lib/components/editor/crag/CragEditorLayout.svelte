@@ -9,9 +9,10 @@
 	import { _ } from 'svelte-i18n';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.ts';
-	import type { TrackCoordinate, ActiveTrackTarget } from './use-crag-track-editor.svelte.ts';
+	import type { ActiveTrackTarget } from './use-crag-track-editor.svelte.ts';
 	import type { useCragTrackEditor } from './use-crag-track-editor.svelte.ts';
 	import type { CragSelection } from './crag-route-types.ts';
+	import type { Point2D } from '@vorstieg/fels-types/types';
 
 	type TrackEditor = ReturnType<typeof useCragTrackEditor>;
 	type TrackDraftMode = Parameters<TrackEditor['setTrackDraftMode']>[0];
@@ -36,7 +37,7 @@
 		isDetectionLoading?: boolean;
 		isDetectionZoomLimited?: boolean;
 		selectedObject?: Selection | null;
-		currentTrackPoints?: TrackCoordinate[];
+		currentTrackPoints?: Point2D[];
 		activeTrackTarget?: ActiveTrackTarget | null;
 		trackDraftMode?: TrackDraftMode;
 		selectedTrackPointCount?: number;

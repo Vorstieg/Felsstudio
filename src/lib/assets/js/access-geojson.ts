@@ -32,21 +32,3 @@ export function createAccessId(kind: string): string {
 			: Math.random().toString(36).slice(2, 11);
 	return `${kind}-${suffix}`;
 }
-
-export function createAccessFeature<
-	const G extends AccessGeometry,
-	const K extends string,
-	P extends Record<string, unknown> = Record<string, never>
->({
-	id = createAccessId('access'),
-	kind,
-	geometry,
-	properties
-}: AccessFeatureInput<G, K, P>): AccessFeature<G, P & { kind: K }> {
-	return {
-		type: 'Feature',
-		id,
-		geometry,
-		properties: { ...properties, kind } as P & { kind: K }
-	};
-}

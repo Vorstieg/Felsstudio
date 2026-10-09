@@ -12,7 +12,7 @@ import {
 	appendTrackPointToDraft,
 	buildRoutedDraft
 } from '$lib/components/editor/track/track-drawing.ts';
-import { createAccessFeature, createAccessId } from '$lib/assets/js/access-geojson.ts';
+import { createAccessId } from '$lib/assets/js/access-geojson.ts';
 import type {
 	Map as MapLibreMap,
 	MapLayerMouseEvent,
@@ -20,8 +20,8 @@ import type {
 	Point
 } from 'maplibre-gl';
 import type { CragEditorSession } from '$lib/types/crag.ts';
+import type { Point2D } from '@vorstieg/fels-types/types';
 
-export type TrackCoordinate = [longitude: number, latitude: number];
 type TrackDraftMode = 'routing' | 'editing' | 'select' | 'delete';
 type TrackTarget = { kind: 'access'; featureId: string };
 export type RoutePathTarget = {
@@ -34,12 +34,12 @@ export type ActiveTrackTarget = TrackTarget | ({ kind: 'route-path' } & RoutePat
 export type AccessTrackFeature = {
 	type?: 'Feature';
 	id: string;
-	geometry: { type: string; coordinates: TrackCoordinate[] } | null;
+	geometry: { type: string; coordinates: Point2D[] } | null;
 	properties?: { kind?: string; name?: string; [key: string]: unknown } | null;
 };
 type DraftSnapshot = {
-	points: TrackCoordinate[];
-	waypoints: TrackCoordinate[];
+	points: Point2D[];
+	waypoints: Point2D[];
 	mode: TrackDraftMode;
 };
 type TrackHistoryEntry =
@@ -47,28 +47,28 @@ type TrackHistoryEntry =
 	| {
 			type: 'point-move';
 			pointIndex: number;
-			coordinate: TrackCoordinate;
+			coordinate: Point2D;
 	  };
 type TrackPointDragState = {
 	pointIndex: number;
 	isMidpoint: boolean;
 	selectedIndexes?: number[];
-	startCoordinate?: TrackCoordinate;
-	startPoints?: TrackCoordinate[];
+	startCoordinate?: Point2D;
+	startPoints?: Point2D[];
 };
 type DraggingTrackPoint = {
 	pointIndex: number;
-	coordinate: TrackCoordinate;
+	coordinate: Point2D;
 	selectedIndexes?: number[];
 };
-type RouteSaveCallback = (target: RoutePathTarget, coordinates: TrackCoordinate[]) => unknown;
+type RouteSaveCallback = (target: RoutePathTarget, coordinates: Point2D[]) => unknown;
 type TrackMapEvent = MapLayerMouseEvent | MapLayerTouchEvent;
 type DraftBuilder = (args: {
 	trackDraftMode: TrackDraftMode;
-	waypoints: TrackCoordinate[];
-	points: TrackCoordinate[];
-	lngLat: TrackCoordinate;
-}) => Promise<{ waypoints: TrackCoordinate[]; points: TrackCoordinate[] }>;
+	waypoints: Point2D[];
+	points: Point2D[];
+	lngLat: Point2D;
+}) => Promise<{ waypoints: Point2D[]; points: Point2D[] }>;
 const accessFeaturesFromState = (state: CragEditorSession): AccessTrackFeature[] =>
 	(state.getWorkspaceAccess()?.features || []) as AccessTrackFeature[];
 
@@ -87,7 +87,7 @@ export type CragTrackEditorOptions = {
 	onTrackPointDragStart?: () => void;
 	onTrackPointDragEnd?: () => void;
 	getTrackFeature?: (target: ActiveTrackTarget | null) => AccessTrackFeature | null;
-	saveTrackGeometry?: (target: ActiveTrackTarget | null, coordinates: TrackCoordinate[]) => boolean;
+	saveTrackGeometry?: (target: ActiveTrackTarget | null, coordinates: Point2D[]) => boolean;
 	removeTrackTarget?: (target: ActiveTrackTarget | null) => boolean;
 };
 
@@ -130,8 +130,8 @@ export function useCragTrackEditor({
 		return true;
 	}
 }: CragTrackEditorOptions) {
-	let currentTrackPoints = $state<TrackCoordinate[]>([]);
-	let routeDraftWaypoints = $state<TrackCoordinate[]>([]);
+	let currentTrackPoints = $state<Point2D[]>([]);
+	let routeDraftWaypoints = $state<Point2D[]>([]);
 	let activeTrackTarget = $state<ActiveTrackTarget | null>(null);
 	let trackDraftMode = $state<TrackDraftMode>('routing');
 	const isSnappingEnabled = $state(true);
@@ -162,8 +162,8 @@ export function useCragTrackEditor({
 
 	function createDraftSnapshot() {
 		return {
-			points: $state.snapshot(currentTrackPoints).map((point) => [...point] as TrackCoordinate),
-			waypoints: $state.snapshot(routeDraftWaypoints).map((point) => [...point] as TrackCoordinate),
+			points: $state.snapshot(currentTrackPoints).map((point) => [...point] as Point2D),
+			waypoints: $state.snapshot(routeDraftWaypoints).map((point) => [...point] as Point2D),
 			mode: trackDraftMode
 		};
 	}
@@ -176,11 +176,11 @@ export function useCragTrackEditor({
 		trackEditHistory.push(snapshot);
 	}
 
-	function saveTrackPointMoveHistory(pointIndex: number, coordinate: TrackCoordinate) {
+	function saveTrackPointMoveHistory(pointIndex: number, coordinate: Point2D) {
 		trackEditHistory.push({
 			type: 'point-move',
 			pointIndex,
-			coordinate: [...coordinate] as TrackCoordinate
+			coordinate: [...coordinate] as Point2D
 		});
 	}
 
@@ -238,11 +238,11 @@ export function useCragTrackEditor({
 	}
 
 	function simplifySelectedTrackCoordinates(
-		points: TrackCoordinate[],
+		points: Point2D[],
 		selectedIndexes: Set<number>,
 		tolerance: number
-	): TrackCoordinate[] {
-		const simplified: TrackCoordinate[] = [];
+	): Point2D[] {
+		const simplified: Point2D[] = [];
 		let index = 0;
 		while (index < points.length) {
 			if (!selectedIndexes.has(index)) {
@@ -286,7 +286,7 @@ export function useCragTrackEditor({
 		trackEditHistory = [];
 	}
 
-	async function addTrackPoint(lngLat: TrackCoordinate): Promise<void> {
+	async function addTrackPoint(lngLat: Point2D): Promise<void> {
 		const waypoints = $state.snapshot(routeDraftWaypoints);
 		const points = $state.snapshot(currentTrackPoints);
 		const snapshot = createDraftSnapshot();
@@ -354,12 +354,12 @@ export function useCragTrackEditor({
 		if (currentTrackPoints.length > 0) currentTrackPoints = currentTrackPoints.slice(0, -1);
 	}
 
-	function insertTrackPoint(index: number, coordinate: TrackCoordinate) {
+	function insertTrackPoint(index: number, coordinate: Point2D) {
 		if (!Array.isArray(coordinate) || coordinate.length < 2 || currentTrackPoints.length < 2)
 			return false;
 		saveDraftHistory();
 		const points = $state.snapshot(currentTrackPoints);
-		points.splice(index, 0, [...coordinate] as TrackCoordinate);
+		points.splice(index, 0, [...coordinate] as Point2D);
 		currentTrackPoints = points;
 		selectedTrackPointIndex = index;
 		clearTrackSelection();
@@ -400,7 +400,7 @@ export function useCragTrackEditor({
 		return true;
 	}
 
-	function useEditedTrackPoints(points: TrackCoordinate[]) {
+	function useEditedTrackPoints(points: Point2D[]) {
 		saveDraftHistory();
 		currentTrackPoints = points;
 		routeDraftWaypoints = [];
@@ -468,7 +468,7 @@ export function useCragTrackEditor({
 			return { changed: false, pointCount: points.length, radius, minimum };
 		}
 
-		useEditedTrackPoints(cleaned as TrackCoordinate[]);
+		useEditedTrackPoints(cleaned as Point2D[]);
 		return {
 			changed: true,
 			pointCount: cleaned.length,
@@ -478,11 +478,11 @@ export function useCragTrackEditor({
 		};
 	}
 
-	async function rebuildRoutedDraft(waypoints: TrackCoordinate[]): Promise<void> {
+	async function rebuildRoutedDraft(waypoints: Point2D[]): Promise<void> {
 		routeDraftWaypoints = waypoints;
 		isRoutingTrack = waypoints.length >= 2;
 		currentTrackPoints = await (
-			buildRoutedDraft as (points: TrackCoordinate[]) => Promise<TrackCoordinate[]>
+			buildRoutedDraft as (points: Point2D[]) => Promise<Point2D[]>
 		)(waypoints);
 		isRoutingTrack = false;
 	}
@@ -494,8 +494,8 @@ export function useCragTrackEditor({
 	}
 
 	function splitEditingTrack(
-		startCoordinates: TrackCoordinate[],
-		endCoordinates: TrackCoordinate[]
+		startCoordinates: Point2D[],
+		endCoordinates: Point2D[]
 	) {
 		if (
 			activeTrackTarget?.kind !== 'access' ||
@@ -560,12 +560,12 @@ export function useCragTrackEditor({
 
 		replaceApproaches([
 			...approachFeatures(),
-			createAccessFeature({
+			{
 				id: createAccessId('approach'),
-				kind: 'approach',
+				type: 'Feature',
 				geometry: { type: 'LineString', coordinates },
 				properties: { name: `Approach ${approachFeatures().length + 1}` }
-			})
+			}
 		]);
 		resetDraft();
 	}
@@ -575,7 +575,7 @@ export function useCragTrackEditor({
 		const track = getTrackFeature(target);
 		if (!track?.geometry?.coordinates?.length) return;
 		activeTrackTarget = target;
-		currentTrackPoints = track.geometry.coordinates.map((point) => [...point] as TrackCoordinate);
+		currentTrackPoints = track.geometry.coordinates.map((point) => [...point] as Point2D);
 		routeDraftWaypoints = [];
 		trackDraftMode = 'select';
 		clearDraftHistory();
@@ -585,11 +585,11 @@ export function useCragTrackEditor({
 		setActiveTab('registry');
 	}
 
-	function editRoutePath(coordinates: TrackCoordinate[]) {
+	function editRoutePath(coordinates: Point2D[]) {
 		if (!Array.isArray(coordinates)) return;
 		const routePathTarget = getRoutePathTarget();
 		activeTrackTarget = routePathTarget ? { kind: 'route-path', ...routePathTarget } : null;
-		currentTrackPoints = coordinates.map((point) => [...point] as TrackCoordinate);
+		currentTrackPoints = coordinates.map((point) => [...point] as Point2D);
 		routeDraftWaypoints = [];
 		trackDraftMode = 'select';
 		clearDraftHistory();
@@ -626,7 +626,7 @@ export function useCragTrackEditor({
 		clearTrackSelection();
 	}
 
-	function fitTrackBounds(points: TrackCoordinate[]) {
+	function fitTrackBounds(points: Point2D[]) {
 		fitCoordinatesBounds(getMap(), points);
 	}
 
@@ -644,12 +644,12 @@ export function useCragTrackEditor({
 				onPathFinished();
 				return;
 			}
-			const feature = createAccessFeature({
+			const feature = {
 				id: createAccessId('approach'),
 				kind: 'approach',
 				geometry: { type: 'LineString', coordinates: points },
 				properties: { name: file.name.replace(/\.gpx$/i, '') }
-			});
+			};
 			replaceApproaches([...approachFeatures(), feature]);
 			editTrack(feature.id);
 		}
@@ -680,7 +680,7 @@ export function useCragTrackEditor({
 			},
 			onDragStart: (drag, event) => {
 				if (trackDraftMode === 'select') {
-					const points: TrackCoordinate[] = $state.snapshot(currentTrackPoints);
+					const points: Point2D[] = $state.snapshot(currentTrackPoints);
 					drag.selectedIndexes = [...selectedTrackPointIndexes];
 					drag.startCoordinate = [...points[drag.pointIndex]];
 					drag.startPoints = points.map((point) => [...point]);
@@ -713,7 +713,7 @@ export function useCragTrackEditor({
 				const { pointIndex } = drag;
 				if (draggingTrackPoint?.pointIndex !== pointIndex) return;
 				if (trackDraftMode === 'select') {
-					const coordinate: TrackCoordinate = [event.lngLat.lng, event.lngLat.lat];
+					const coordinate: Point2D = [event.lngLat.lng, event.lngLat.lat];
 					const startCoordinate = drag.startCoordinate!;
 					const startPoints = drag.startPoints!;
 					const selectedIndexes = drag.selectedIndexes!;
