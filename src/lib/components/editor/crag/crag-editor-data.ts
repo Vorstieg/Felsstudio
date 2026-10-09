@@ -5,7 +5,6 @@ import type {
 	ActiveTrackTarget,
 	RoutePathTarget
 } from './use-crag-track-editor.svelte.ts';
-import type { TrackCoordinate } from '$lib/components/editor/track/track-drawing.ts';
 
 type CragSelection = {
 	type?: string;

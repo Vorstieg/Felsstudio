@@ -4,14 +4,14 @@
 	import type { Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import { loadMapStyle } from '$lib/map-style.ts';
+	import type { Point2D } from '@vorstieg/fels-types/types';
 
-	type Coordinates = [longitude: number, latitude: number];
 	type MapStyle = 'transport' | 'satellite' | 'terrain';
 	type Props = {
 		map?: MapLibreMap | null;
 		isMapLoaded?: boolean;
 		mapStyle?: MapStyle;
-		initialCoordinates?: Coordinates;
+		initialCoordinates?: Point2D;
 		onStyleLoad?: (_map: MapLibreMap) => void;
 		onMapClick?: (_event: MapMouseEvent) => void;
 	};
@@ -20,7 +20,7 @@
 		map = $bindable<MapLibreMap | null>(null),
 		isMapLoaded = $bindable(false),
 		mapStyle = 'terrain',
-		initialCoordinates = [0, 0] as Coordinates,
+		initialCoordinates = [0, 0] as Point2D,
 		onStyleLoad = () => {},
 		onMapClick = () => {}
 	}: Props = $props();
