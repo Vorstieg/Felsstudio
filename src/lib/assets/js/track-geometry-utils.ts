@@ -30,7 +30,10 @@ export function trimCoordinatesEnd<T>(coordinates: T[] = [], count = 0): T[] {
 	return coordinates.slice(0, Math.max(0, coordinates.length - count));
 }
 
-export function simplifyTrackCoordinates(coordinates: Point2D[] = [], toleranceMeters = 10): Point2D[] {
+export function simplifyTrackCoordinates(
+	coordinates: Point2D[] = [],
+	toleranceMeters = 10
+): Point2D[] {
 	if (!Array.isArray(coordinates) || coordinates.length <= 2) return [...coordinates];
 	if (!Number.isFinite(toleranceMeters) || toleranceMeters <= 0) return [...coordinates];
 

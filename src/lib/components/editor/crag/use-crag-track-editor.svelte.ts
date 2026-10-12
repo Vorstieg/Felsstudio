@@ -481,9 +481,9 @@ export function useCragTrackEditor({
 	async function rebuildRoutedDraft(waypoints: Point2D[]): Promise<void> {
 		routeDraftWaypoints = waypoints;
 		isRoutingTrack = waypoints.length >= 2;
-		currentTrackPoints = await (
-			buildRoutedDraft as (points: Point2D[]) => Promise<Point2D[]>
-		)(waypoints);
+		currentTrackPoints = await (buildRoutedDraft as (points: Point2D[]) => Promise<Point2D[]>)(
+			waypoints
+		);
 		isRoutingTrack = false;
 	}
 
@@ -493,10 +493,7 @@ export function useCragTrackEditor({
 			cancelTrackEdit();
 	}
 
-	function splitEditingTrack(
-		startCoordinates: Point2D[],
-		endCoordinates: Point2D[]
-	) {
+	function splitEditingTrack(startCoordinates: Point2D[], endCoordinates: Point2D[]) {
 		if (
 			activeTrackTarget?.kind !== 'access' ||
 			startCoordinates.length < 2 ||
