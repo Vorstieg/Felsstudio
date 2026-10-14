@@ -76,7 +76,7 @@ test('moving an approach track to topo paths is one undoable edit', () => {
 	expect(state.undo()).toBe(false);
 });
 
-test('adding a path and attaching it to a route is one undo step', () => {
+test('a new path stays outside the document until Finish, then creates one undo step', () => {
 	const state = createCragEditorSession();
 	state.workspace = {
 		entry: createFelsEntry('crag', { id: 'wall', name: 'Wall' }),
@@ -91,12 +91,26 @@ test('adding a path and attaching it to a route is one undo step', () => {
 		childEntries: []
 	};
 	state.activeWorkspaceEntryPath = 'crags/wall';
+	let target;
 	const tool = createCragRouteTool({
 		state,
-		startRouteDraft: () => {},
+		startRouteDraft: (value) => {
+			target = value;
+		},
 		startRoutingDraft: () => {}
 	});
 	tool.addRoutePath('crags/wall/wall-topo.json', 'route-1');
+	expect(state.history.entries).toHaveLength(0);
+	expect(state.workspace.topo.paths.features).toHaveLength(0);
+	expect(state.workspace.topo.routes[0].pathRefs).toHaveLength(0);
+	expect(
+		tool.saveRouteSegments(target, [
+			[
+				[16, 48],
+				[16.001, 48.001]
+			]
+		])
+	).toBe(true);
 	expect(state.history.entries).toHaveLength(1);
 	expect(state.workspace.topo.paths.features).toHaveLength(1);
 	expect(state.workspace.topo.routes[0].pathRefs).toHaveLength(1);

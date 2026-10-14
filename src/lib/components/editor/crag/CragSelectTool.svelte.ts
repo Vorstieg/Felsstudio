@@ -1,16 +1,12 @@
 import type { Map as MapLibreMap, MapMouseEvent, MapGeoJSONFeature } from 'maplibre-gl';
-import { getMapHitRadius } from '$lib/assets/js/mobile-utils.ts';
+import {
+	queryCragFeatures,
+	trackTargetFromProperties,
+	type CragMapProperties
+} from './crag-map-hit-testing.ts';
 import type { CragSelection, RouteDocument } from './crag-route-types.ts';
 
-type SelectableProperties = {
-	feature?: string;
-	kind?: string;
-	documentPath?: string;
-	pathId?: string | number;
-	pathIndex?: string | number;
-	accessFeatureId?: string;
-	path?: string;
-};
+type SelectableProperties = CragMapProperties;
 type SelectableFeature = Pick<MapGeoJSONFeature, 'properties'>;
 type CragSelectToolOptions = {
 	getMap: () => MapLibreMap | null | undefined;
@@ -21,7 +17,7 @@ type CragSelectToolOptions = {
 		documentPath: string,
 		routeId: string | number | undefined,
 		pathId: string | number,
-		pathIndex: number
+		pathIndex?: number
 	) => void;
 	onEditTrack?: (featureId: string) => void;
 };
@@ -36,23 +32,7 @@ export function createCragSelectTool({
 	onEditTrack
 }: CragSelectToolOptions) {
 	function querySelectableFeatures(event: MapMouseEvent, pathsOnly = false): SelectableFeature[] {
-		const map = getMap();
-		if (!map) return [];
-		const radius = getMapHitRadius(24) / 2;
-		const layers = [
-			'route-paths-line',
-			'tracks-line-saved',
-			...(pathsOnly ? [] : ['sector-polygons-fill', 'sector-polygons-outline'])
-		].filter((layer) => map.getLayer(layer));
-		return layers.length
-			? map.queryRenderedFeatures(
-					[
-						[event.point.x - radius, event.point.y - radius],
-						[event.point.x + radius, event.point.y + radius]
-					],
-					{ layers }
-				)
-			: [];
+		return queryCragFeatures(getMap(), event.point, pathsOnly);
 	}
 
 	function firstSelectableFeature(features: SelectableFeature[], pathsOnly = false) {
@@ -80,22 +60,28 @@ export function createCragSelectTool({
 		properties: SelectableProperties,
 		{ editPath = false }: { editPath?: boolean } = {}
 	) {
+		const target = trackTargetFromProperties(properties);
 		if (
 			properties.feature === 'route-path' &&
 			properties.documentPath &&
 			properties.pathId != null
 		) {
-			const pathIndex = Number(properties.pathIndex);
+			const pathIndex = target?.kind === 'route-path' ? target.pathIndex : undefined;
 			selectObject({
 				type: 'route-path',
 				documentPath: properties.documentPath,
 				pathId: String(properties.pathId),
-				...(Number.isInteger(pathIndex) ? { pathIndex } : {})
+				...(pathIndex != null ? { pathIndex } : {})
 			});
 			setActiveTab?.('registry');
 			if (editPath) {
 				const route = routeForPath(properties.documentPath, properties.pathId);
-				onEditRoutePath?.(properties.documentPath, route?.id, properties.pathId, pathIndex);
+				onEditRoutePath?.(
+					properties.documentPath,
+					route?.id,
+					properties.pathId,
+					pathIndex ?? undefined
+				);
 			}
 			return true;
 		}
@@ -123,7 +109,8 @@ export function createCragSelectTool({
 	function handleMapClick(event: MapMouseEvent) {
 		const features = querySelectableFeatures(event);
 		const feature = firstSelectableFeature(features);
-		if (feature) return selectFeature((feature.properties || {}) as SelectableProperties);
+		if (feature)
+			return selectFeature((feature.properties || {}) as SelectableProperties, { editPath: true });
 		selectObject(null);
 		return true;
 	}

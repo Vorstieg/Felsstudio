@@ -9,8 +9,9 @@ import {
 	findTopoPath,
 	splitTopoPath
 } from '$lib/assets/js/topo-document-paths.ts';
+import type { RoutePathTarget } from './crag-track-types.ts';
 import type { CragEditorSession } from '$lib/types/crag';
-import type { FelsTopoDocument, PathFeature, Route } from '@vorstieg/fels-types/types';
+import type { FelsTopoDocument, PathFeature, Point2D, Route } from '@vorstieg/fels-types/types';
 import type {
 	CragSelection,
 	RouteDocument,
@@ -36,10 +37,12 @@ type CragRouteToolOptions = {
 		routeId?: string | number;
 		pathId: string;
 		pathIndex?: number;
+		isNew?: boolean;
 	}) => void;
 	startRoutingDraft: () => void;
 	editRoutePathTrack: (coordinates: [number, number][]) => void;
 	setActiveTool: (tool: string) => void;
+	requestTrackTransition?: (action: () => void) => void;
 };
 
 /** Route-document and route-path workflows for the crag editor. */
@@ -52,7 +55,8 @@ export function createCragRouteTool({
 	startRouteDraft,
 	startRoutingDraft,
 	editRoutePathTrack,
-	setActiveTool
+	setActiveTool,
+	requestTrackTransition = (action) => action()
 }: CragRouteToolOptions) {
 	function documents(): RouteDocument[] {
 		const active = state.getActiveWorkspaceEntry();
@@ -189,22 +193,10 @@ export function createCragRouteTool({
 			pathId = generateId('path');
 		} while (document.data.paths?.features?.some((feature) => String(feature.id) === pathId));
 		const pathIndex = document.data.paths?.features.length || 0;
-		updateDocument(path, (data) => {
-			data.paths = data.paths || { type: 'FeatureCollection', features: [] };
-			data.paths.features = [
-				...data.paths.features,
-				{
-					type: 'Feature',
-					id: pathId,
-					properties: { name: 'Route path' },
-					geometry: { type: 'LineString', coordinates: [] }
-				}
-			] as NonNullable<FelsTopoDocument['paths']>['features'];
-			const route = data.routes.find((item) => String(item.id) === String(routeId));
-			if (route) route.pathRefs = [...(route.pathRefs || []), { pathId, role: 'main' }];
+		requestTrackTransition(() => {
+			startRouteDraft({ documentPath: path, routeId, pathId, pathIndex, isNew: true });
+			startRoutingDraft();
 		});
-		startRouteDraft({ documentPath: path, routeId, pathId, pathIndex });
-		startRoutingDraft();
 	}
 
 	function assignExistingRoutePath(
@@ -325,8 +317,61 @@ export function createCragRouteTool({
 			// Map editing uses longitude/latitude pairs; the shared schema also permits altitude.
 			feature.geometry = {
 				type: 'LineString',
-				coordinates: coordinates as PathFeature['geometry']['coordinates']
+				coordinates: coordinates as unknown as PathFeature['geometry']['coordinates']
 			};
+		});
+		return true;
+	}
+
+	function saveRouteSegments(
+		target: {
+			documentPath: string;
+			pathId: string;
+			pathIndex?: number | null;
+			routeId?: Id;
+			isNew?: boolean;
+		},
+		segments: [number, number][][]
+	): boolean {
+		const document = documentAt(target.documentPath);
+		if (!document || !segments.length || segments.some((points) => points.length < 2)) return false;
+		const existing = findPathFeature(document, target.pathId, target.pathIndex ?? null);
+		const route = document.data.routes.find((item) => String(item.id) === String(target.routeId));
+		if ((!target.isNew && !existing) || (target.isNew && (!route || existing))) return false;
+		updateDocument(target.documentPath, (data) => {
+			data.paths ||= { type: 'FeatureCollection', features: [] };
+			const feature =
+				existing || createPathFeature(segments[0], { name: 'Route path' }, target.pathId);
+			feature.geometry = {
+				type: 'LineString',
+				coordinates: segments[0] as unknown as PathFeature['geometry']['coordinates']
+			};
+			if (target.isNew) {
+				data.paths.features.push(feature);
+				route!.pathRefs = [...(route!.pathRefs || []), { pathId: target.pathId, role: 'main' }];
+			}
+			for (const [index, coordinates] of segments.slice(1).entries()) {
+				let id: string;
+				do {
+					id = generateId('path');
+				} while (data.paths.features.some((item) => String(item.id) === id));
+				data.paths.features.push({
+					...feature,
+					id,
+					properties: {
+						...feature.properties,
+						name: `${feature.properties?.name || 'Route path'} · ${index + 2}`
+					},
+					geometry: {
+						type: 'LineString',
+						coordinates: coordinates as unknown as PathFeature['geometry']['coordinates']
+					}
+				});
+				for (const current of data.routes)
+					current.pathRefs = (current.pathRefs || []).flatMap((ref) =>
+						String(ref.pathId) === target.pathId ? [ref, { ...ref, pathId: id }] : [ref]
+					);
+			}
 		});
 		return true;
 	}
@@ -347,13 +392,15 @@ export function createCragRouteTool({
 		if (!feature) return;
 		const coordinates = feature.geometry.coordinates;
 		const resolvedPathIndex = (document?.data.paths?.features || []).indexOf(feature);
-		startRouteDraft({
-			documentPath: path,
-			routeId,
-			pathId: String(pathId),
-			pathIndex: resolvedPathIndex
+		requestTrackTransition(() => {
+			startRouteDraft({
+				documentPath: path,
+				routeId,
+				pathId: String(pathId),
+				pathIndex: resolvedPathIndex
+			});
+			editRoutePathTrack(coordinates.map(([longitude, latitude]) => [longitude, latitude]));
 		});
-		editRoutePathTrack(coordinates.map(([longitude, latitude]) => [longitude, latitude]));
 	}
 
 	function duplicateRoutePath(path: string, pathId: Id | undefined) {
@@ -403,44 +450,25 @@ export function createCragRouteTool({
 		return true;
 	}
 
-	function pointDistance(a: number[] | undefined, b: number[] | undefined) {
-		if (!a || !b) return Infinity;
-		return Math.hypot(Number(a[0]) - Number(b[0]), Number(a[1]) - Number(b[1]));
-	}
-
-	function orientConcatCoordinates(firstCoordinates: number[][], secondCoordinates: number[][]) {
-		const first = firstCoordinates.map((point) => [...point]);
-		const second = secondCoordinates.map((point) => [...point]);
-		const reversedSecond = [...second].reverse();
-		const options = [
-			{
-				distance: pointDistance(first.at(-1), second[0]),
-				coordinates: [...first, ...second.slice(1)]
-			},
-			{
-				distance: pointDistance(first.at(-1), second.at(-1)),
-				coordinates: [...first, ...reversedSecond.slice(1)]
-			},
-			{
-				distance: pointDistance(first[0], second.at(-1)),
-				coordinates: [...second, ...first.slice(1)]
-			},
-			{
-				distance: pointDistance(first[0], second[0]),
-				coordinates: [...reversedSecond, ...first.slice(1)]
-			}
-		];
-		return options.sort((a, b) => a.distance - b.distance)[0].coordinates;
-	}
-
-	function concatRoutePaths(
-		path: string,
-		basePathId: Id | undefined,
-		appendPathId: Id | undefined,
-		basePathIndex: number | null = null,
-		appendPathIndex: number | null = null
-	) {
-		if (basePathId == null || appendPathId == null) return false;
+	function joinRoutePaths({
+		base: baseTarget,
+		candidate: appendTarget,
+		points: coordinates,
+		name
+	}: {
+		base: RoutePathTarget;
+		candidate: RoutePathTarget;
+		points: Point2D[];
+		name: string;
+	}) {
+		if (
+			baseTarget.documentPath !== appendTarget.documentPath ||
+			baseTarget.pathId === appendTarget.pathId ||
+			coordinates.length < 2
+		)
+			return false;
+		const { documentPath: path, pathId: basePathId, pathIndex: basePathIndex = null } = baseTarget;
+		const { pathId: appendPathId, pathIndex: appendPathIndex = null } = appendTarget;
 		const document = documentAt(path);
 		const features = document?.data.paths?.features || [];
 		const baseIndex =
@@ -459,6 +487,8 @@ export function createCragRouteTool({
 			!base ||
 			!append ||
 			baseIndex === appendIndex ||
+			String(base.id) !== String(basePathId) ||
+			String(append.id) !== String(appendPathId) ||
 			base.geometry?.type !== 'LineString' ||
 			append.geometry?.type !== 'LineString' ||
 			base.geometry.coordinates?.length < 2 ||
@@ -469,17 +499,14 @@ export function createCragRouteTool({
 		updateDocument(path, (data) => {
 			base.geometry = {
 				type: 'LineString',
-				coordinates: orientConcatCoordinates(
-					base.geometry.coordinates,
-					append.geometry.coordinates
-				) as unknown as PathFeature['geometry']['coordinates']
+				coordinates: coordinates as unknown as PathFeature['geometry']['coordinates']
 			};
 			const baseProperties = base.properties as { name?: string } | undefined;
 			const appendProperties = append.properties as { name?: string } | undefined;
 			base.properties = {
 				...(append.properties || {}),
 				...(base.properties || {}),
-				name: baseProperties?.name || appendProperties?.name || 'Route path'
+				name: name.trim() || baseProperties?.name || appendProperties?.name || 'Route path'
 			};
 			data.paths?.features.splice(appendIndex, 1);
 			for (const route of data.routes || []) {
@@ -490,12 +517,6 @@ export function createCragRouteTool({
 					return hasBaseRef ? [] : [{ ...ref, pathId: String(base.id) }];
 				});
 			}
-		});
-		selectObject({
-			type: 'route-path',
-			documentPath: path,
-			pathId: String(base.id),
-			pathIndex: baseIndex
 		});
 		return true;
 	}
@@ -575,9 +596,10 @@ export function createCragRouteTool({
 		createRoutePathFromAccess,
 		moveApproachTrackToTopoPaths,
 		saveRoutePathCoordinates,
+		saveRouteSegments,
 		editRoutePath,
 		duplicateRoutePath,
-		concatRoutePaths,
+		joinRoutePaths,
 		splitRoutePath,
 		updateRoutePath,
 		updateRoutePathFeature,

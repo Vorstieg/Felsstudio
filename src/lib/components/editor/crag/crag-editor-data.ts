@@ -4,7 +4,7 @@ import type {
 	AccessTrackFeature,
 	ActiveTrackTarget,
 	RoutePathTarget
-} from './use-crag-track-editor.svelte.ts';
+} from './crag-track-types.ts';
 
 type CragSelection = {
 	type?: string;
@@ -30,6 +30,10 @@ export type BuildEditorFeatureCollectionOptions = {
 	selectedObject?: CragSelection | null;
 	editingRoutePath?: RoutePathTarget | null;
 	drawingPoints?: Point2D[];
+	drawingTails?: Point2D[][];
+	joinPreview?: { candidatePoints: Point2D[]; connection: Point2D[] } | null;
+	removedDrawingPoints?: Point2D[];
+	midpointSelected?: number | null;
 	visibleDrawingPointIndexes?: number[];
 	editingDrawingPath?: boolean;
 	selectedTrackPointIndex?: number | null;
@@ -45,9 +49,12 @@ export function buildEditorFeatureCollection({
 	selectedObject = null,
 	editingRoutePath = null,
 	drawingPoints = [],
+	drawingTails = [],
+	joinPreview = null,
+	removedDrawingPoints = [],
+	midpointSelected = null,
 	visibleDrawingPointIndexes = [],
 	editingDrawingPath = false,
-	selectedTrackPointIndex = null,
 	selectedTrackPointIndexes = [],
 	draggingTrackPointIndex = null,
 	activeTrackTarget = null
@@ -102,6 +109,53 @@ export function buildEditorFeatureCollection({
 			}
 		});
 	});
+	if (joinPreview) {
+		features.push({
+			type: 'Feature',
+			geometry: { type: 'LineString', coordinates: joinPreview.candidatePoints },
+			properties: { feature: 'track-join-candidate' }
+		});
+		features.push({
+			type: 'Feature',
+			geometry: { type: 'LineString', coordinates: joinPreview.connection },
+			properties: { feature: 'track-join-connection' }
+		});
+		for (const coordinate of joinPreview.connection)
+			features.push({
+				type: 'Feature',
+				geometry: { type: 'Point', coordinates: coordinate },
+				properties: { feature: 'track-join-endpoint' }
+			});
+	}
+	for (const [index, coordinates] of drawingTails.entries()) {
+		features.push({
+			type: 'Feature',
+			geometry: { type: 'LineString', coordinates },
+			properties: { feature: 'track-tail', segment: index }
+		});
+	}
+	if (removedDrawingPoints.length > 1)
+		features.push({
+			type: 'Feature',
+			geometry: { type: 'LineString', coordinates: removedDrawingPoints },
+			properties: { feature: 'track-trim-preview' }
+		});
+	if (drawingPoints.length) {
+		features.push({
+			type: 'Feature',
+			geometry: { type: 'Point', coordinates: drawingPoints[0] },
+			properties: { feature: 'track-endpoint', label: 'A', end: false }
+		});
+		if (drawingPoints.length > 1)
+			features.push({
+				type: 'Feature',
+				geometry: {
+					type: 'Point',
+					coordinates: drawingTails.at(-1)?.at(-1) || drawingPoints[drawingPoints.length - 1]
+				},
+				properties: { feature: 'track-endpoint', label: 'B', end: true }
+			});
+	}
 	const drawingSegments =
 		draggingTrackPointIndex === null
 			? [drawingPoints]
@@ -146,24 +200,8 @@ export function buildEditorFeatureCollection({
 					feature: 'track-midpoint',
 					type: 'Point',
 					state: 'drawing',
-					pointIndex: index + 1
-				}
-			});
-		}
-		if (
-			selectedTrackPointIndex !== null &&
-			drawingPoints.length > 2 &&
-			drawingPoints[selectedTrackPointIndex] &&
-			draggingTrackPointIndex === null
-		) {
-			features.push({
-				type: 'Feature',
-				geometry: { type: 'Point', coordinates: drawingPoints[selectedTrackPointIndex] },
-				properties: {
-					feature: 'track-vertex-delete',
-					type: 'Point',
-					state: 'drawing',
-					pointIndex: selectedTrackPointIndex
+					pointIndex: index + 1,
+					selected: midpointSelected === index + 1
 				}
 			});
 		}

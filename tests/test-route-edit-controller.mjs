@@ -1,50 +1,31 @@
 // @vitest-environment node
-
-import assert from 'node:assert/strict';
-import { test } from 'vitest';
+import { expect, test } from 'vitest';
 import { createRouteEditController } from '../src/lib/components/editor/crag/route-editing.ts';
 
-function createController(initialSelection = null, initialDraft = null) {
-	let selection = initialSelection;
-	let draft = initialDraft;
-	let commitCount = 0;
+test('selection changes finish the current draft through the shared tool policy', () => {
+	let selection = { type: 'route', key: 'a' },
+		draft = { pathId: 'a' },
+		transitions = 0;
 	const controller = createRouteEditController({
 		getSelection: () => selection,
-		getDraft: () => draft,
-		commitDraft: () => {
-			commitCount += 1;
+		requestLeave: (next) => {
+			transitions++;
 			draft = null;
+			next();
 		},
-		setSelection: (value) => (selection = value),
-		setDraft: (value) => (draft = value)
+		setSelection: (next) => {
+			selection = next;
+		},
+		setDraft: (next) => {
+			draft = next;
+		}
 	});
-	return { controller, selection: () => selection, draft: () => draft, commits: () => commitCount };
-}
-
-test('commits the current route before selecting another route', () => {
-	const state = createController({ type: 'route', key: 'route-a' }, { pathId: 'path-a' });
-
-	state.controller.selectObject({ type: 'route', key: 'route-b' });
-
-	assert.equal(state.commits(), 1);
-	assert.deepEqual(state.selection(), { type: 'route', key: 'route-b' });
-	assert.equal(state.draft(), null);
-});
-
-test('commits the current draft before starting Draw path or Edit path', () => {
-	const state = createController({ type: 'route', key: 'route-a' }, { pathId: 'path-a' });
-
-	state.controller.startDraft({ pathId: 'path-b' });
-
-	assert.equal(state.commits(), 1);
-	assert.deepEqual(state.draft(), { pathId: 'path-b' });
-});
-
-test('does not commit when selecting the same object', () => {
-	const state = createController({ type: 'route', key: 'route-a' }, { pathId: 'path-a' });
-
-	state.controller.selectObject({ type: 'route', key: 'route-a' });
-
-	assert.equal(state.commits(), 0);
-	assert.deepEqual(state.draft(), { pathId: 'path-a' });
+	controller.selectObject({ type: 'route', key: 'a' });
+	expect(transitions).toBe(0);
+	controller.selectObject({ type: 'route', key: 'b' });
+	expect(transitions).toBe(1);
+	expect(draft).toBeNull();
+	controller.startDraft({ pathId: 'b' });
+	expect(transitions).toBe(2);
+	expect(draft).toEqual({ pathId: 'b' });
 });

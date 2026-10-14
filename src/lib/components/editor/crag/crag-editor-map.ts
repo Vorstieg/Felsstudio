@@ -1,3 +1,4 @@
+import { TRACK_SNAP_LAYER_ID } from '../track/track-snapping.ts';
 import { getMapHitRadius, getTouchTargetSize } from '$lib/assets/js/mobile-utils.ts';
 import { maptilerTilesUrl } from '$lib/map-style.ts';
 import { PathLayer, ScatterplotLayer } from '@deck.gl/layers';
@@ -490,7 +491,6 @@ export function syncFlightPlanPreview(
 export function ensureCragEditorLayers(map: MapLibreMap): void {
 	const detectionRadius = getMapHitRadius(12);
 	const drawingPointRadius = getTouchTargetSize(5);
-	const deleteTextSize = getTouchTargetSize(17);
 
 	const maptilerSourceUrl = maptilerTilesUrl();
 	if (maptilerSourceUrl && !map.getSource('maptiler_planet'))
@@ -498,9 +498,9 @@ export function ensureCragEditorLayers(map: MapLibreMap): void {
 			type: 'vector',
 			url: maptilerSourceUrl
 		});
-	if (map.getSource('maptiler_planet') && !map.getLayer('snap-helper'))
+	if (map.getSource('maptiler_planet') && !map.getLayer(TRACK_SNAP_LAYER_ID))
 		map.addLayer({
-			id: 'snap-helper',
+			id: TRACK_SNAP_LAYER_ID,
 			type: 'line',
 			source: 'maptiler_planet',
 			'source-layer': 'transportation',
@@ -604,108 +604,65 @@ export function ensureCragEditorLayers(map: MapLibreMap): void {
 			source: 'crag-editor-data',
 			filter: ['==', ['get', 'feature'], 'track-midpoint'],
 			paint: {
-				'circle-radius': 5,
+				'circle-radius': ['case', ['==', ['get', 'selected'], true], 8, 5],
 				'circle-color': '#f59e0b',
 				'circle-stroke-width': 2,
 				'circle-stroke-color': '#ffffff'
 			}
 		});
-	if (!map.getLayer('tracks-point-delete'))
+	for (const [id, feature, color, dashed] of [
+		['track-tail-line', 'track-tail', '#f59e0b', false],
+		['track-join-candidate-line', 'track-join-candidate', '#f59e0b', false],
+		['track-join-connection-line', 'track-join-connection', '#f59e0b', true],
+		['track-trim-preview-line', 'track-trim-preview', '#dc2626', true]
+	] as const) {
+		if (!map.getLayer(id))
+			map.addLayer({
+				id,
+				type: 'line',
+				source: 'crag-editor-data',
+				filter: ['==', ['get', 'feature'], feature],
+				paint: {
+					'line-color': color,
+					'line-width': 4,
+					...(dashed ? { 'line-dasharray': [2, 2] } : {})
+				}
+			});
+	}
+	if (!map.getLayer('track-join-endpoints'))
 		map.addLayer({
-			id: 'tracks-point-delete',
+			id: 'track-join-endpoints',
+			type: 'circle',
+			source: 'crag-editor-data',
+			filter: ['==', ['get', 'feature'], 'track-join-endpoint'],
+			paint: {
+				'circle-radius': 8,
+				'circle-color': '#f59e0b',
+				'circle-stroke-color': '#fff',
+				'circle-stroke-width': 3
+			}
+		});
+	if (!map.getLayer('track-endpoints'))
+		map.addLayer({
+			id: 'track-endpoints',
+			type: 'circle',
+			source: 'crag-editor-data',
+			filter: ['==', ['get', 'feature'], 'track-endpoint'],
+			paint: {
+				'circle-radius': 9,
+				'circle-color': ['case', ['get', 'end'], '#dc2626', '#16a34a'],
+				'circle-stroke-color': '#fff',
+				'circle-stroke-width': 2
+			}
+		});
+	if (!map.getLayer('track-endpoint-labels'))
+		map.addLayer({
+			id: 'track-endpoint-labels',
 			type: 'symbol',
 			source: 'crag-editor-data',
-			filter: ['==', ['get', 'feature'], 'track-vertex-delete'],
-			layout: {
-				'text-field': '×',
-				'text-font': ['Noto Sans Bold'],
-				'text-size': deleteTextSize,
-				'text-offset': [0.85, -0.85],
-				'text-allow-overlap': true,
-				'text-ignore-placement': true
-			},
-			paint: { 'text-color': '#ffffff', 'text-halo-color': '#dc2626', 'text-halo-width': 6 }
-		});
-	if (!map.getSource('tracks-drag-overlay'))
-		map.addSource('tracks-drag-overlay', {
-			type: 'geojson',
-			data: { type: 'FeatureCollection', features: [] }
-		});
-	if (!map.getLayer('tracks-drag-lines'))
-		map.addLayer({
-			id: 'tracks-drag-lines',
-			type: 'line',
-			source: 'tracks-drag-overlay',
-			filter: ['==', ['geometry-type'], 'LineString'],
-			paint: { 'line-color': '#0075de', 'line-width': 4, 'line-opacity': 1 }
-		});
-	if (!map.getLayer('tracks-drag-point'))
-		map.addLayer({
-			id: 'tracks-drag-point',
-			type: 'circle',
-			source: 'tracks-drag-overlay',
-			filter: ['==', ['get', 'feature'], 'track-drag-point'],
-			paint: {
-				'circle-radius': drawingPointRadius,
-				'circle-color': '#0075de',
-				'circle-stroke-width': 2,
-				'circle-stroke-color': '#ffffff'
-			}
-		});
-	if (!map.getLayer('tracks-drag-midpoint'))
-		map.addLayer({
-			id: 'tracks-drag-midpoint',
-			type: 'circle',
-			source: 'tracks-drag-overlay',
-			filter: ['==', ['get', 'feature'], 'track-midpoint'],
-			paint: {
-				'circle-radius': 5,
-				'circle-color': '#f59e0b',
-				'circle-stroke-width': 2,
-				'circle-stroke-color': '#ffffff'
-			}
-		});
-	if (!map.getLayer('tracks-drag-delete'))
-		map.addLayer({
-			id: 'tracks-drag-delete',
-			type: 'symbol',
-			source: 'tracks-drag-overlay',
-			filter: ['==', ['get', 'feature'], 'track-vertex-delete'],
-			layout: {
-				'text-field': '×',
-				'text-font': ['Noto Sans Bold'],
-				'text-size': deleteTextSize,
-				'text-offset': [0.85, -0.85],
-				'text-allow-overlap': true,
-				'text-ignore-placement': true
-			},
-			paint: { 'text-color': '#ffffff', 'text-halo-color': '#dc2626', 'text-halo-width': 6 }
-		});
-	if (!map.getSource('track-cut-overlay'))
-		map.addSource('track-cut-overlay', {
-			type: 'geojson',
-			data: { type: 'FeatureCollection', features: [] }
-		});
-	if (!map.getLayer('track-cut-line'))
-		map.addLayer({
-			id: 'track-cut-line',
-			type: 'line',
-			source: 'track-cut-overlay',
-			filter: ['==', ['geometry-type'], 'LineString'],
-			paint: { 'line-color': '#dc2626', 'line-width': 3, 'line-dasharray': [2, 1] }
-		});
-	if (!map.getLayer('track-cut-points'))
-		map.addLayer({
-			id: 'track-cut-points',
-			type: 'circle',
-			source: 'track-cut-overlay',
-			filter: ['==', ['geometry-type'], 'Point'],
-			paint: {
-				'circle-radius': ['case', ['==', ['get', 'intersection'], true], 7, 5],
-				'circle-color': ['case', ['==', ['get', 'intersection'], true], '#facc15', '#dc2626'],
-				'circle-stroke-width': 2,
-				'circle-stroke-color': '#ffffff'
-			}
+			filter: ['==', ['get', 'feature'], 'track-endpoint'],
+			layout: { 'text-field': ['get', 'label'], 'text-size': 12, 'text-allow-overlap': true },
+			paint: { 'text-color': '#fff' }
 		});
 	addFlightPathLayers(map);
 	ensureFlightPathDeckOverlay(map);

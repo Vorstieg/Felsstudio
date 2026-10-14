@@ -1,38 +1,23 @@
 type RouteEditSelection = Record<string, string | number>;
 
-type RouteEditControllerOptions<Selection extends RouteEditSelection, Draft> = {
-	getSelection: () => Selection | null;
-	getDraft: () => Draft | null;
-	commitDraft: () => void;
-	setSelection: (selection: Selection | null) => void;
-	setDraft: (draft: Draft | null) => void;
-};
-
-/** Coordinates route selection changes with the active route draft. */
+/** Selection and target changes apply valid edits through the shared tool policy. */
 export function createRouteEditController<Selection extends RouteEditSelection, Draft>({
 	getSelection,
-	getDraft,
-	commitDraft,
+	requestLeave,
 	setSelection,
 	setDraft
-}: RouteEditControllerOptions<Selection, Draft>) {
-	function selectionKey(value: Selection | null): string | null {
-		return value ? JSON.stringify(value) : null;
+}: {
+	getSelection: () => Selection | null;
+	requestLeave: (next: () => void) => void;
+	setSelection: (selection: Selection | null) => void;
+	setDraft: (draft: Draft | null) => void;
+}) {
+	function selectObject(next: Selection | null) {
+		if (JSON.stringify(getSelection()) === JSON.stringify(next)) return;
+		requestLeave(() => setSelection(next));
 	}
-
-	function commitActiveDraft(): void {
-		if (getDraft()) commitDraft();
+	function startDraft(next: Draft | null) {
+		requestLeave(() => setDraft(next));
 	}
-
-	function selectObject(nextObject: Selection | null): void {
-		if (selectionKey(getSelection()) !== selectionKey(nextObject)) commitActiveDraft();
-		setSelection(nextObject);
-	}
-
-	function startDraft(nextDraft: Draft | null): void {
-		commitActiveDraft();
-		setDraft(nextDraft);
-	}
-
-	return { commitActiveDraft, selectObject, startDraft };
+	return { selectObject, startDraft };
 }

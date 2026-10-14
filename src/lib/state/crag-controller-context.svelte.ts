@@ -17,9 +17,6 @@ export type CragEditorTools = {
 	accessEditor: ReturnType<typeof useCragAccessEditor>;
 	actions: {
 		back: () => void;
-		startTrackCut: () => void;
-		confirmTrackCut: () => void;
-		cancelTrackCut: () => void;
 		undo: () => boolean;
 		redo: () => boolean;
 		export: () => Promise<void>;

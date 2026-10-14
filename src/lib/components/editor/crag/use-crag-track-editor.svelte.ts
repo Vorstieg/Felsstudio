@@ -1,242 +1,328 @@
-import { parseGpx } from '$lib/assets/js/route-path-utils.ts';
-import { initMapPointDragHandlers } from '$lib/components/editor/map-point-drag-handlers.ts';
+import { createTrackGestureController } from '$lib/components/editor/track/track-gesture-controller.ts';
+import {
+	cloneTrackCoordinates as clone,
+	sameTrackCoordinates,
+	sameMapCoordinates
+} from '../track/track-coordinates.ts';
+import { previewTrackJoin } from '$lib/components/editor/track/track-join.ts';
+import { parseGpxSegments, type GpxSegment } from '$lib/assets/js/route-path-utils.ts';
 import {
 	cleanStationaryTrackCoordinates,
 	fitCoordinatesBounds,
 	reverseCoordinates,
-	simplifyTrackCoordinates,
-	trimCoordinatesEnd,
-	trimCoordinatesStart
+	simplifyTrackCoordinates
 } from '$lib/assets/js/track-geometry-utils.ts';
+import { getRoutedSegment } from '$lib/components/editor/track/track-drawing.ts';
 import {
-	appendTrackPointToDraft,
-	buildRoutedDraft
-} from '$lib/components/editor/track/track-drawing.ts';
-import { createAccessId } from '$lib/assets/js/access-geojson.ts';
-import type {
-	Map as MapLibreMap,
-	MapLayerMouseEvent,
-	MapLayerTouchEvent,
-	Point
-} from 'maplibre-gl';
-import type { CragEditorSession } from '$lib/types/crag.ts';
+	nearestTrackPoint,
+	nearestTrackSplit,
+	type ScreenPoint
+} from '$lib/components/editor/track/track-interactions.ts';
+import type { Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl';
 import type { Point2D } from '@vorstieg/fels-types/types';
 
-type TrackDraftMode = 'routing' | 'editing' | 'select' | 'delete';
-type TrackTarget = { kind: 'access'; featureId: string };
-export type RoutePathTarget = {
-	documentPath: string;
-	pathId: string;
-	pathIndex?: number | null;
-	routeId?: string | number;
-};
-export type ActiveTrackTarget = TrackTarget | ({ kind: 'route-path' } & RoutePathTarget);
-export type AccessTrackFeature = {
-	type?: 'Feature';
-	id: string;
-	geometry: { type: string; coordinates: Point2D[] } | null;
-	properties?: { kind?: string; name?: string; [key: string]: unknown } | null;
-};
-type DraftSnapshot = {
+import type {
+	TrackDraftMode,
+	RoutePathTarget,
+	ActiveTrackTarget,
+	TrackOperation
+} from './crag-track-types.ts';
+import type { CragTrackPersistence } from './create-crag-track-persistence.ts';
+import {
+	queryCragFeatures,
+	trackTargetFromProperties,
+	canJoinTrackTargets,
+	trackHitRadius
+} from './crag-map-hit-testing.ts';
+type Snapshot = {
 	points: Point2D[];
-	waypoints: Point2D[];
 	mode: TrackDraftMode;
+	tails: Point2D[][];
 };
-type TrackHistoryEntry =
-	| DraftSnapshot
-	| {
-			type: 'point-move';
-			pointIndex: number;
-			coordinate: Point2D;
-	  };
-type TrackPointDragState = {
-	pointIndex: number;
-	isMidpoint: boolean;
-	selectedIndexes?: number[];
-	startCoordinate?: Point2D;
-	startPoints?: Point2D[];
-};
-type DraggingTrackPoint = {
-	pointIndex: number;
-	coordinate: Point2D;
-	selectedIndexes?: number[];
-};
-type RouteSaveCallback = (target: RoutePathTarget, coordinates: Point2D[]) => unknown;
-type TrackMapEvent = MapLayerMouseEvent | MapLayerTouchEvent;
-type DraftBuilder = (args: {
-	trackDraftMode: TrackDraftMode;
-	waypoints: Point2D[];
-	points: Point2D[];
-	lngLat: Point2D;
-}) => Promise<{ waypoints: Point2D[]; points: Point2D[] }>;
-const accessFeaturesFromState = (state: CragEditorSession): AccessTrackFeature[] =>
-	(state.getWorkspaceAccess()?.features || []) as AccessTrackFeature[];
-
 export type CragTrackEditorOptions = {
-	state: CragEditorSession;
+	persistence: CragTrackPersistence;
 	getMap: () => MapLibreMap | null | undefined;
 	getActiveTool: () => string;
 	setActiveTool: (tool: string) => void;
-	setActiveTab: (tab: string) => void;
-	setSuppressNextMapClick: (suppress: boolean) => void;
+	setActiveTab?: (tab: string) => void;
 	getRoutePathTarget?: () => RoutePathTarget | null;
-	onSaveRoutePath?: RouteSaveCallback;
 	onRoutePathDrawingEnd?: () => void;
 	onPathFinished?: () => void;
 	onPathCancelled?: () => void;
 	onTrackPointDragStart?: () => void;
 	onTrackPointDragEnd?: () => void;
-	getTrackFeature?: (target: ActiveTrackTarget | null) => AccessTrackFeature | null;
-	saveTrackGeometry?: (target: ActiveTrackTarget | null, coordinates: Point2D[]) => boolean;
-	removeTrackTarget?: (target: ActiveTrackTarget | null) => boolean;
+	onShowOptions?: () => void;
+	onTransitionBlocked?: () => void;
 };
 
-export function useCragTrackEditor({
-	state,
-	getMap,
-	getActiveTool,
-	setActiveTool,
-	setActiveTab,
-	setSuppressNextMapClick,
-	getRoutePathTarget = () => null,
-	onSaveRoutePath = () => {},
-	onRoutePathDrawingEnd = () => {},
-	onPathFinished = () => {},
-	onPathCancelled = () => {},
-	onTrackPointDragStart = () => {},
-	onTrackPointDragEnd = () => {},
-	getTrackFeature = (target) => {
-		if (target?.kind !== 'access') return null;
-		return (
-			accessFeaturesFromState(state).find((feature) => feature.id === target.featureId) || null
-		);
-	},
-	saveTrackGeometry = (target, coordinates) => {
-		if (target?.kind !== 'access') return false;
-		state.replaceAccessFeatures(
-			accessFeaturesFromState(state).map((feature) =>
-				feature.id === target.featureId
-					? { ...feature, geometry: { type: 'LineString', coordinates } }
-					: feature
+/** One draft transaction, shared by approach and topo-path persistence adapters. */
+export function useCragTrackEditor(options: CragTrackEditorOptions) {
+	const {
+		persistence,
+		getMap,
+		getActiveTool,
+		setActiveTool,
+		getRoutePathTarget = () => null
+	} = options;
+	const getFeature = persistence.get;
+	let points = $state<Point2D[]>([]);
+	let tails = $state<Point2D[][]>([]);
+	let activeTrackTarget = $state<ActiveTrackTarget | null>(null);
+	let mode = $state<TrackDraftMode>('routing');
+	let sessionActive = $state(false);
+	let originalPoints = $state<Point2D[]>([]);
+	let name = $state('');
+	let history = $state<Snapshot[]>([]);
+	let redoHistory = $state<Snapshot[]>([]);
+	let selected = $state<number[]>([]);
+	let anchor = $state<number | null>(null);
+	let multiSelect = $state(false);
+	let rangePending = $state(false);
+	let midpointSelected = $state<number | null>(null);
+	let operation = $state<TrackOperation>({ kind: 'idle' });
+	const geometryPreview = $derived(
+		operation.kind === 'trim' ? operation : operation.kind === 'split' ? operation.preview : null
+	);
+	const joinPreview = $derived(operation.kind === 'join' ? operation.preview : null);
+	let message = $state('');
+	let isRoutingTrack = $state(false);
+	let importSegments = $state<GpxSegment[]>([]);
+	let importName = '';
+	let requestVersion = 0;
+	let routeAbort: AbortController | null = null;
+	let routeQueue: Promise<void> = Promise.resolve();
+	let queuedPoints = $state(0);
+	let failedPoint = $state<Point2D | null>(null);
+	let gestures: ReturnType<typeof createTrackGestureController<Snapshot>> | null = null;
+	let dragPreview = $state<Point2D[] | null>(null);
+
+	function snapshot(): Snapshot {
+		return { points: clone(points), mode, tails: tails.map(clone) };
+	}
+	function record() {
+		history = [...history, snapshot()];
+		redoHistory = [];
+	}
+	function restore(value: Snapshot) {
+		points = clone(value.points);
+
+		mode = value.mode;
+		tails = value.tails.map(clone);
+		clearTrackSelection();
+	}
+	function invalidateRouting() {
+		requestVersion++;
+		routeAbort?.abort();
+		routeAbort = null;
+		routeQueue = Promise.resolve();
+		queuedPoints = 0;
+		isRoutingTrack = false;
+		failedPoint = null;
+	}
+	function clearTrackSelection() {
+		selected = [];
+		anchor = null;
+		midpointSelected = null;
+		rangePending = false;
+	}
+	function cancelOperation() {
+		if (operation.kind === 'join') message = '';
+		operation = { kind: 'idle' };
+		gestures?.cancel();
+	}
+	function resetDraft() {
+		invalidateRouting();
+		cancelOperation();
+		sessionActive = false;
+		points = [];
+		originalPoints = [];
+
+		tails = [];
+		activeTrackTarget = null;
+		history = [];
+		redoHistory = [];
+		clearTrackSelection();
+		importSegments = [];
+		message = '';
+	}
+	function begin(
+		coordinates: Point2D[],
+		target: ActiveTrackTarget | null,
+		label: string,
+		nextMode: TrackDraftMode
+	) {
+		resetDraft();
+		sessionActive = true;
+		points = clone(coordinates);
+		originalPoints = clone(coordinates);
+		activeTrackTarget = target;
+		name = label;
+		mode = nextMode;
+		multiSelect = false;
+		setActiveTool('track');
+		options.onShowOptions?.();
+	}
+	const isDirty = () =>
+		sessionActive &&
+		(tails.length > 0 ||
+			!sameTrackCoordinates(points, originalPoints) ||
+			(!activeTrackTarget && points.length > 0) ||
+			Boolean(
+				activeTrackTarget?.kind === 'route-path' && activeTrackTarget.isNew && points.length
+			));
+	/** Apply valid edits before changing targets; incomplete work stays available. */
+	function requestLeave(action: () => void) {
+		if (sessionActive) {
+			if (operation.kind !== 'idle' || queuedPoints || importSegments.length || failedPoint) {
+				message = 'track.completeOperation';
+				options.onTransitionBlocked?.();
+				return false;
+			}
+			if (isDirty()) {
+				if (points.length < 2) {
+					message = 'track.incompleteTrack';
+					options.onTransitionBlocked?.();
+					return false;
+				}
+				if (!finalizeTrack()) return false;
+			} else cancelTrackEdit();
+		}
+		action();
+		return true;
+	}
+	function startRoutingDraft() {
+		const target = getRoutePathTarget();
+		begin([], target ? { kind: 'route-path', ...target } : null, 'track.new', 'routing');
+	}
+	function editTrack(id: string) {
+		const target: ActiveTrackTarget = { kind: 'access', featureId: id };
+		const feature = getFeature(target);
+		if (!feature?.geometry?.coordinates?.length) return;
+		requestLeave(() =>
+			begin(
+				feature.geometry!.coordinates,
+				target,
+				feature.properties?.name || 'track.approach',
+				'select'
 			)
 		);
-		return true;
-	},
-	removeTrackTarget = (target) => {
-		if (target?.kind !== 'access') return false;
-		state.replaceAccessFeatures(
-			accessFeaturesFromState(state).filter((feature) => feature.id !== target.featureId)
+	}
+	function editRoutePath(coordinates: Point2D[]) {
+		const target = getRoutePathTarget();
+		begin(
+			coordinates,
+			target ? { kind: 'route-path', ...target } : null,
+			(target ? getFeature({ kind: 'route-path', ...target })?.properties?.name : null) ||
+				'track.routePath',
+			coordinates.length ? 'select' : 'routing'
 		);
-		return true;
 	}
-}: CragTrackEditorOptions) {
-	let currentTrackPoints = $state<Point2D[]>([]);
-	let routeDraftWaypoints = $state<Point2D[]>([]);
-	let activeTrackTarget = $state<ActiveTrackTarget | null>(null);
-	let trackDraftMode = $state<TrackDraftMode>('routing');
-	const isSnappingEnabled = $state(true);
-	let isRoutingTrack = $state(false);
-	let draggingTrackPoint = $state<DraggingTrackPoint | null>(null);
-	let selectedTrackPointIndex = $state<number | null>(null);
-	let selectedTrackPointIndexes = $state(new Set<number>());
-	let trackSelectionAnchor = $state<number | null>(null);
-	let touchLongPress: {
-		pointIndex: number;
-		triggered: boolean;
-		timer: ReturnType<typeof setTimeout> | null;
-	} | null = null;
-	let isTouchRangePending = false;
-	let skipLongPressClick = false;
-	let lastTouchPointDeleteAt = 0;
-	let areTrackPointDragHandlersReady = false;
-	let trackEditHistory: TrackHistoryEntry[] = [];
-	const accessFeatures = () => accessFeaturesFromState(state);
-	const approachFeatures = () =>
-		accessFeatures().filter((feature) => feature.properties?.kind === 'approach');
-	const replaceApproaches = (features: AccessTrackFeature[]) => {
-		state.replaceAccessFeatures([
-			...accessFeatures().filter((feature) => feature.properties?.kind !== 'approach'),
-			...features
-		]);
-	};
+	function setTrackDraftMode(next: TrackDraftMode) {
+		if (next === mode) return;
+		invalidateRouting();
+		cancelOperation();
+		clearTrackSelection();
+		mode = next;
 
-	function createDraftSnapshot() {
-		return {
-			points: $state.snapshot(currentTrackPoints).map((point) => [...point] as Point2D),
-			waypoints: $state.snapshot(routeDraftWaypoints).map((point) => [...point] as Point2D),
-			mode: trackDraftMode
-		};
+		message = '';
 	}
-
-	function saveDraftHistory() {
-		trackEditHistory.push(createDraftSnapshot());
-	}
-
-	function saveDraftSnapshot(snapshot: DraftSnapshot) {
-		trackEditHistory.push(snapshot);
-	}
-
-	function saveTrackPointMoveHistory(pointIndex: number, coordinate: Point2D) {
-		trackEditHistory.push({
-			type: 'point-move',
-			pointIndex,
-			coordinate: [...coordinate] as Point2D
-		});
-	}
-
-	function clearTrackSelection() {
-		selectedTrackPointIndexes = new Set();
-		trackSelectionAnchor = null;
-		isTouchRangePending = false;
-		skipLongPressClick = false;
-		if (touchLongPress?.timer) clearTimeout(touchLongPress.timer);
-		touchLongPress = null;
-	}
-
-	function toggleTrackPointSelection(index: number, { range = false }: { range?: boolean } = {}) {
-		if (!Number.isInteger(index) || !currentTrackPoints[index]) return false;
-		const selected = new Set(selectedTrackPointIndexes);
-		if (
-			range &&
-			trackSelectionAnchor !== null &&
-			Number.isInteger(trackSelectionAnchor) &&
-			currentTrackPoints[trackSelectionAnchor]
-		) {
-			const [start, end] = [trackSelectionAnchor, index].sort((a, b) => a - b);
-			for (let pointIndex = start; pointIndex <= end; pointIndex += 1) selected.add(pointIndex);
-		} else if (selected.has(index)) {
-			selected.delete(index);
-		} else {
-			selected.add(index);
-		}
-		selectedTrackPointIndexes = selected;
-		trackSelectionAnchor = index;
-		return true;
-	}
-
-	function selectTrackPointScreenRegion(
-		start: Point | null,
-		end: Point | null,
-		map: MapLibreMap | null | undefined
+	function toggleTrackPointSelection(
+		index: number,
+		{ range = false, toggle = true }: { range?: boolean; toggle?: boolean } = {}
 	) {
-		if (!start || !end || !map?.project) return false;
-		const left = Math.min(start.x, end.x);
-		const right = Math.max(start.x, end.x);
-		const top = Math.min(start.y, end.y);
-		const bottom = Math.max(start.y, end.y);
-		const selected = new Set(selectedTrackPointIndexes);
-		let changed = false;
-		for (const [index, coordinate] of currentTrackPoints.entries()) {
-			const point = map.project(coordinate);
-			if (point.x < left || point.x > right || point.y < top || point.y > bottom) continue;
-			selected.add(index);
-			changed = true;
-		}
-		if (!changed) return false;
-		selectedTrackPointIndexes = selected;
+		if (!Number.isInteger(index) || !points[index]) return false;
+		if (range && anchor !== null) {
+			const [first, last] = [anchor, index].sort((a, b) => a - b);
+			selected = Array.from(
+				new Set([
+					...selected,
+					...Array.from({ length: last - first + 1 }, (_, offset) => first + offset)
+				])
+			);
+		} else if (toggle)
+			selected = selected.includes(index)
+				? selected.filter((item) => item !== index)
+				: [...selected, index];
+		else selected = [index];
+		anchor = index;
+		midpointSelected = null;
 		return true;
 	}
+	function deleteSelectedTrackPoints() {
+		if (
+			!selected.length ||
+			points.length - selected.length < 2 ||
+			operation.kind !== 'idle' ||
+			queuedPoints
+		)
+			return false;
+		record();
+		points = points.filter((_, index) => !selected.includes(index));
 
+		clearTrackSelection();
+		return true;
+	}
+	function removeTrackPoint(index: number) {
+		if (points.length <= 2 || !points[index]) return false;
+		record();
+		points = points.filter((_, at) => at !== index);
+		clearTrackSelection();
+		return true;
+	}
+	function insertTrackPoint(index: number, coordinate: Point2D) {
+		if (index < 1 || index >= points.length || !coordinate.every(Number.isFinite)) return false;
+		record();
+		points = [...points.slice(0, index), coordinate, ...points.slice(index)];
+		selected = [index];
+		return true;
+	}
+	function undoTrackPoint() {
+		if (queuedPoints) return false;
+		cancelOperation();
+		const previous = history.at(-1);
+		if (!previous) return false;
+		redoHistory = [...redoHistory, snapshot()];
+		history = history.slice(0, -1);
+		restore(previous);
+		return true;
+	}
+	function redoTrackPoint() {
+		if (queuedPoints) return false;
+		cancelOperation();
+		const next = redoHistory.at(-1);
+		if (!next) return false;
+		history = [...history, snapshot()];
+		redoHistory = redoHistory.slice(0, -1);
+		restore(next);
+		return true;
+	}
+	function useEditedTrackPoints(next: Point2D[]) {
+		record();
+		points = clone(next);
+
+		mode = 'select';
+		clearTrackSelection();
+	}
+	function reverseTrack() {
+		if (points.length < 2 || tails.length || operation.kind !== 'idle' || queuedPoints)
+			return false;
+		useEditedTrackPoints(reverseCoordinates(points));
+		return true;
+	}
+	function trimTrackStart(index: number) {
+		if (!Number.isInteger(index) || index <= 0 || points.length - index < 2) return false;
+		operation = { kind: 'trim', points: clone(points.slice(index)), tails: tails.map(clone) };
+		return true;
+	}
+	function trimTrackEnd(index: number) {
+		if (!Number.isInteger(index) || index < 1 || index >= points.length - 1) return false;
+		operation = {
+			kind: 'trim',
+			points: clone(points.slice(0, index + 1)),
+			tails: tails.map(clone)
+		};
+		return true;
+	}
 	function simplifySelectedTrackCoordinates(
 		points: Point2D[],
 		selectedIndexes: Set<number>,
@@ -263,617 +349,648 @@ export function useCragTrackEditor({
 		}
 		return simplified;
 	}
-
-	function deleteSelectedTrackPoints() {
-		const selected = selectedTrackPointIndexes;
-		if (selected.size === 0 || currentTrackPoints.length - selected.size < 2) return false;
-		saveDraftHistory();
-		currentTrackPoints = $state
-			.snapshot(currentTrackPoints)
-			.filter((_, index) => !selected.has(index));
-		clearTrackSelection();
-		return true;
-	}
-
-	function restoreDraftSnapshot(snapshot: DraftSnapshot) {
-		currentTrackPoints = snapshot.points;
-		routeDraftWaypoints = snapshot.waypoints;
-		trackDraftMode = snapshot.mode;
-		clearTrackSelection();
-	}
-
-	function clearDraftHistory() {
-		trackEditHistory = [];
-	}
-
-	async function addTrackPoint(lngLat: Point2D): Promise<void> {
-		const waypoints = $state.snapshot(routeDraftWaypoints);
-		const points = $state.snapshot(currentTrackPoints);
-		const snapshot = createDraftSnapshot();
-		isRoutingTrack = trackDraftMode === 'routing' && waypoints.length > 0;
-		const draft = await (appendTrackPointToDraft as DraftBuilder)({
-			trackDraftMode,
-			waypoints,
-			points,
-			lngLat
-		});
-		isRoutingTrack = false;
-		saveDraftSnapshot(snapshot);
-		routeDraftWaypoints = draft.waypoints;
-		currentTrackPoints = draft.points;
-	}
-
-	function handleTrackConfirm() {
-		finalizeTrack();
-	}
-
-	function startRoutingDraft() {
-		currentTrackPoints = [];
-		routeDraftWaypoints = [];
-		const routePathTarget = getRoutePathTarget();
-		activeTrackTarget = routePathTarget ? { kind: 'route-path', ...routePathTarget } : null;
-		clearDraftHistory();
-		selectedTrackPointIndex = null;
-		clearTrackSelection();
-		setActiveTool('track');
-	}
-
-	function setTrackDraftMode(mode: TrackDraftMode) {
-		if (!['routing', 'editing', 'select', 'delete'].includes(mode)) return;
-		if (trackDraftMode === mode) return;
-
-		trackDraftMode = mode;
-		routeDraftWaypoints =
-			mode === 'routing' && currentTrackPoints.length > 0
-				? [currentTrackPoints[currentTrackPoints.length - 1]]
-				: [];
-		clearTrackSelection();
-	}
-
-	function undoTrackPoint() {
-		const snapshot = trackEditHistory.pop();
-		if (snapshot) {
-			if ('type' in snapshot && snapshot.type === 'point-move') {
-				const points = $state.snapshot(currentTrackPoints);
-				if (points[snapshot.pointIndex]) {
-					points[snapshot.pointIndex] = snapshot.coordinate;
-					currentTrackPoints = points;
-				}
-				return;
-			}
-			restoreDraftSnapshot(snapshot as DraftSnapshot);
-			return;
-		}
-
-		if (trackDraftMode === 'routing') {
-			const waypoints = $state.snapshot(routeDraftWaypoints);
-			if (waypoints.length === 0) return;
-			rebuildRoutedDraft(waypoints.slice(0, -1));
-			return;
-		}
-		if (currentTrackPoints.length > 0) currentTrackPoints = currentTrackPoints.slice(0, -1);
-	}
-
-	function insertTrackPoint(index: number, coordinate: Point2D) {
-		if (!Array.isArray(coordinate) || coordinate.length < 2 || currentTrackPoints.length < 2)
-			return false;
-		saveDraftHistory();
-		const points = $state.snapshot(currentTrackPoints);
-		points.splice(index, 0, [...coordinate] as Point2D);
-		currentTrackPoints = points;
-		selectedTrackPointIndex = index;
-		clearTrackSelection();
-		return true;
-	}
-
-	function removeTrackPoint(index: number) {
-		if (currentTrackPoints.length <= 2 || !currentTrackPoints[index]) return false;
-		saveDraftHistory();
-		currentTrackPoints = $state
-			.snapshot(currentTrackPoints)
-			.filter((_, pointIndex) => pointIndex !== index);
-		selectedTrackPointIndex = null;
-		clearTrackSelection();
-		return true;
-	}
-
-	function removeTrackPointFromMapEvent(event: TrackMapEvent) {
-		// Touch browsers commonly emit a synthetic click after touchstart. Because
-		// points are addressed by array index, handling both events would delete the
-		// touched point and then the next point after indexes shift.
-		const originalEvent = event.originalEvent;
-		if (originalEvent?.type === 'click' && Date.now() - lastTouchPointDeleteAt < 700) {
-			originalEvent?.stopPropagation?.();
-			setSuppressNextMapClick(true);
-			return false;
-		}
-
-		const pointIndex = Number(event.features?.[0]?.properties?.pointIndex);
-		if (!Number.isInteger(pointIndex) || !removeTrackPoint(pointIndex)) return false;
-		if (originalEvent?.type === 'touchstart') {
-			lastTouchPointDeleteAt = Date.now();
-			originalEvent?.preventDefault?.();
-		}
-		originalEvent?.stopPropagation?.();
-		setSuppressNextMapClick(true);
-		onTrackPointDragEnd();
-		return true;
-	}
-
-	function useEditedTrackPoints(points: Point2D[]) {
-		saveDraftHistory();
-		currentTrackPoints = points;
-		routeDraftWaypoints = [];
-		trackDraftMode = 'editing';
-		clearTrackSelection();
-	}
-
-	function reverseTrack() {
-		if (currentTrackPoints.length <= 1) return false;
-		useEditedTrackPoints(reverseCoordinates($state.snapshot(currentTrackPoints)));
-		return true;
-	}
-
-	function trimTrackStart(index: number) {
-		const points = $state.snapshot(currentTrackPoints);
-		const trimIndex = Math.max(0, Math.min(points.length - 1, Number(index)));
-		if (!Number.isInteger(trimIndex) || trimIndex <= 0 || points.length - trimIndex < 2)
-			return false;
-		useEditedTrackPoints(trimCoordinatesStart(points, trimIndex));
-		return true;
-	}
-
-	function trimTrackEnd(index: number) {
-		const points = $state.snapshot(currentTrackPoints);
-		const trimIndex = Math.max(0, Math.min(points.length - 1, Number(index)));
-		if (!Number.isInteger(trimIndex) || trimIndex < 1 || trimIndex >= points.length - 1)
-			return false;
-		useEditedTrackPoints(trimCoordinatesEnd(points, trimIndex));
-		return true;
-	}
-
 	function simplifyTrack(toleranceMeters: number) {
-		const points = $state.snapshot(currentTrackPoints);
-		if (points.length <= 1) return { changed: false, pointCount: points.length };
-
-		const tolerance = Math.max(1, Number(toleranceMeters) || 0);
-		const selected = selectedTrackPointIndexes;
-		const simplified = selected.size
-			? simplifySelectedTrackCoordinates(points, selected, tolerance)
-			: simplifyTrackCoordinates(points, tolerance);
-		if (simplified.length >= points.length || simplified.length < 2) {
+		const tolerance = Math.max(1, Number(toleranceMeters) || 1);
+		if (operation.kind !== 'idle' || queuedPoints || tails.length)
 			return { changed: false, pointCount: points.length, tolerance };
-		}
-
-		useEditedTrackPoints(simplified);
-		return {
-			changed: true,
-			pointCount: simplified.length,
-			previousPointCount: points.length,
-			tolerance
-		};
+		const next = selected.length
+			? simplifySelectedTrackCoordinates(points, new Set(selected), tolerance)
+			: simplifyTrackCoordinates(points, tolerance);
+		const previousPointCount = points.length;
+		if (next.length >= points.length || next.length < 2)
+			return { changed: false, pointCount: points.length, tolerance };
+		useEditedTrackPoints(next);
+		return { changed: true, pointCount: next.length, previousPointCount, tolerance };
 	}
-
 	function cleanTrackPauses(radiusMeters: number, minimumPoints: number) {
-		const points = $state.snapshot(currentTrackPoints);
-		if (points.length <= 2) return { changed: false, pointCount: points.length };
-
-		const radius = Math.max(1, Number(radiusMeters) || 0);
-		const minimum = Math.max(3, Math.round(Number(minimumPoints) || 0));
-		const cleaned = cleanStationaryTrackCoordinates(points, {
+		const radius = Math.max(1, Number(radiusMeters) || 1),
+			minimum = Math.max(3, Math.round(Number(minimumPoints) || 3));
+		const previousPointCount = points.length;
+		if (operation.kind !== 'idle' || queuedPoints || tails.length)
+			return { changed: false, pointCount: points.length, radius, minimum };
+		const next = cleanStationaryTrackCoordinates(points, {
 			radiusMeters: radius,
 			minimumPoints: minimum
-		});
-		if (cleaned.length >= points.length || cleaned.length < 2) {
+		}) as Point2D[];
+		if (next.length >= points.length || next.length < 2)
 			return { changed: false, pointCount: points.length, radius, minimum };
-		}
-
-		useEditedTrackPoints(cleaned as Point2D[]);
-		return {
-			changed: true,
-			pointCount: cleaned.length,
-			previousPointCount: points.length,
-			radius,
-			minimum
-		};
+		useEditedTrackPoints(next);
+		return { changed: true, pointCount: next.length, previousPointCount, radius, minimum };
 	}
-
-	async function rebuildRoutedDraft(waypoints: Point2D[]): Promise<void> {
-		routeDraftWaypoints = waypoints;
-		isRoutingTrack = waypoints.length >= 2;
-		currentTrackPoints = await (buildRoutedDraft as (points: Point2D[]) => Promise<Point2D[]>)(
-			waypoints
-		);
-		isRoutingTrack = false;
-	}
-
-	function removeTrack(id: string) {
-		removeTrackTarget({ kind: 'access', featureId: id });
-		if (activeTrackTarget?.kind === 'access' && activeTrackTarget.featureId === id)
-			cancelTrackEdit();
-	}
-
-	function splitEditingTrack(startCoordinates: Point2D[], endCoordinates: Point2D[]) {
+	function addTrackPoint(coordinate: Point2D): Promise<void> {
 		if (
-			activeTrackTarget?.kind !== 'access' ||
-			startCoordinates.length < 2 ||
-			endCoordinates.length < 2
+			!sessionActive ||
+			!['routing', 'editing'].includes(mode) ||
+			operation.kind !== 'idle' ||
+			tails.length ||
+			failedPoint
 		)
-			return false;
+			return Promise.resolve();
+		const version = requestVersion,
+			requestedMode = mode;
+		queuedPoints++;
+		routeQueue = routeQueue
+			.then(async () => {
+				if (version !== requestVersion || failedPoint) return;
+				const before = snapshot();
+				try {
+					let next = [...points, coordinate];
+					if (requestedMode === 'routing' && points.length) {
+						isRoutingTrack = true;
+						routeAbort = new AbortController();
+						const route = await getRoutedSegment(
+							points[points.length - 1],
+							coordinate,
+							routeAbort.signal
+						);
+						if (version !== requestVersion) return;
+						next = [...points, ...route.slice(1)];
+					}
+					if (version !== requestVersion) return;
+					history = [...history, before];
+					redoHistory = [];
+					points = next;
 
-		const track = getTrackFeature(activeTrackTarget);
-		if (!track) return false;
-
-		const segmentName = `${track.properties?.name || 'Approach Track'} segment 2`;
-		const featureId = activeTrackTarget.featureId;
-		replaceApproaches([
-			...approachFeatures().flatMap((feature) =>
-				feature.id === featureId
-					? [
-							{ ...feature, geometry: { type: 'LineString', coordinates: startCoordinates } },
-							{
-								...feature,
-								id: createAccessId('approach'),
-								properties: { ...feature.properties, name: segmentName },
-								geometry: { type: 'LineString', coordinates: endCoordinates }
-							}
-						]
-					: [feature]
-			)
-		]);
-		resetDraft();
-		setActiveTab('registry');
-		setActiveTool('geometry');
-		return true;
-	}
-
-	function finalizeTrack() {
-		if (currentTrackPoints.length <= 1) return;
-
-		const coordinates = $state.snapshot(currentTrackPoints);
-		const routePathTarget = getRoutePathTarget();
-		if (routePathTarget) {
-			onSaveRoutePath(routePathTarget, coordinates);
-			setActiveTool('geometry');
-			resetDraft();
-			onRoutePathDrawingEnd();
-			onPathFinished();
-			return;
-		}
-
-		if (activeTrackTarget?.kind === 'access') {
-			saveTrackGeometry(activeTrackTarget, coordinates);
-			setActiveTab('registry');
-			setActiveTool('track');
-			fitTrackBounds(coordinates);
-			activeTrackTarget = null;
-			currentTrackPoints = [];
-			routeDraftWaypoints = [];
-			clearDraftHistory();
-			clearTrackSelection();
-			onPathFinished();
-			return;
-		}
-
-		replaceApproaches([
-			...approachFeatures(),
-			{
-				id: createAccessId('approach'),
-				type: 'Feature',
-				geometry: { type: 'LineString', coordinates },
-				properties: { name: `Approach ${approachFeatures().length + 1}` }
-			}
-		]);
-		resetDraft();
-	}
-
-	function editTrack(id: string) {
-		const target: TrackTarget = { kind: 'access', featureId: id };
-		const track = getTrackFeature(target);
-		if (!track?.geometry?.coordinates?.length) return;
-		activeTrackTarget = target;
-		currentTrackPoints = track.geometry.coordinates.map((point) => [...point] as Point2D);
-		routeDraftWaypoints = [];
-		trackDraftMode = 'select';
-		clearDraftHistory();
-		selectedTrackPointIndex = null;
-		clearTrackSelection();
-		setActiveTool('track');
-		setActiveTab('registry');
-	}
-
-	function editRoutePath(coordinates: Point2D[]) {
-		if (!Array.isArray(coordinates)) return;
-		const routePathTarget = getRoutePathTarget();
-		activeTrackTarget = routePathTarget ? { kind: 'route-path', ...routePathTarget } : null;
-		currentTrackPoints = coordinates.map((point) => [...point] as Point2D);
-		routeDraftWaypoints = [];
-		trackDraftMode = 'select';
-		clearDraftHistory();
-		selectedTrackPointIndex = null;
-		clearTrackSelection();
-		setActiveTool('track');
-	}
-
-	function cancelTrackEdit() {
-		const routePathTarget = getRoutePathTarget();
-		resetDraft();
-		if (routePathTarget) onRoutePathDrawingEnd();
-		onPathCancelled();
-	}
-
-	function commitRoutePathEdit() {
-		const routePathTarget = getRoutePathTarget();
-		if (!routePathTarget) return false;
-		if (currentTrackPoints.length > 1) {
-			onSaveRoutePath(routePathTarget, $state.snapshot(currentTrackPoints));
-		}
-		setActiveTool('geometry');
-		resetDraft();
-		onRoutePathDrawingEnd();
-		return true;
-	}
-
-	function resetDraft() {
-		currentTrackPoints = [];
-		routeDraftWaypoints = [];
-		activeTrackTarget = null;
-		clearDraftHistory();
-		selectedTrackPointIndex = null;
-		clearTrackSelection();
-	}
-
-	function fitTrackBounds(points: Point2D[]) {
-		fitCoordinatesBounds(getMap(), points);
-	}
-
-	async function handleGpxUpload(event: Event): Promise<void> {
-		const file = (event.currentTarget as HTMLInputElement).files?.[0];
-		if (!file) return;
-		const points = parseGpx(await file.text());
-		if (points.length > 1) {
-			const routePathTarget = getRoutePathTarget();
-			if (routePathTarget) {
-				onSaveRoutePath(routePathTarget, points);
-				setActiveTool('geometry');
-				resetDraft();
-				onRoutePathDrawingEnd();
-				onPathFinished();
-				return;
-			}
-			const feature = {
-				id: createAccessId('approach'),
-				kind: 'approach',
-				geometry: { type: 'LineString', coordinates: points },
-				properties: { name: file.name.replace(/\.gpx$/i, '') }
-			};
-			replaceApproaches([...approachFeatures(), feature]);
-			editTrack(feature.id);
-		}
-	}
-
-	function initTrackPointDragHandlers() {
-		const map = getMap();
-		if (!map || areTrackPointDragHandlersReady) return;
-		areTrackPointDragHandlersReady = true;
-		let selectionBoxStart: Point | null = null;
-		let selectionBox: HTMLDivElement | null = null;
-
-		initMapPointDragHandlers<TrackPointDragState>({
-			map,
-			layers: ['tracks-points-drawing', 'tracks-point-midpoints'],
-			canDrag: (event, layerId) => {
-				if (getActiveTool() !== 'track') return false;
-				if (trackDraftMode === 'editing') return true;
-				if (trackDraftMode !== 'select' || layerId !== 'tracks-points-drawing') return false;
-				const pointIndex = Number(event?.features?.[0]?.properties?.pointIndex);
-				return selectedTrackPointIndexes.has(pointIndex);
-			},
-			getDragState: (event, layerId) => {
-				const pointIndex = Number(event.features?.[0]?.properties?.pointIndex);
-				return Number.isInteger(pointIndex)
-					? { pointIndex, isMidpoint: layerId === 'tracks-point-midpoints' }
-					: null;
-			},
-			onDragStart: (drag, event) => {
-				if (trackDraftMode === 'select') {
-					const points: Point2D[] = $state.snapshot(currentTrackPoints);
-					drag.selectedIndexes = [...selectedTrackPointIndexes];
-					drag.startCoordinate = [...points[drag.pointIndex]];
-					drag.startPoints = points.map((point) => [...point]);
-					draggingTrackPoint = {
-						pointIndex: drag.pointIndex,
-						coordinate: [...drag.startCoordinate],
-						selectedIndexes: drag.selectedIndexes
-					};
-					saveDraftHistory();
-					onTrackPointDragStart();
-					return;
-				}
-				if (drag.isMidpoint) {
-					if (
-						!event.lngLat ||
-						!insertTrackPoint(drag.pointIndex, [event.lngLat.lng, event.lngLat.lat])
-					)
-						return false;
-				} else {
-					saveTrackPointMoveHistory(drag.pointIndex, currentTrackPoints[drag.pointIndex]);
-				}
-				const pointIndex = drag.pointIndex;
-				const coordinate = $state.snapshot(currentTrackPoints)[pointIndex];
-				if (!coordinate) return;
-				draggingTrackPoint = { pointIndex, coordinate: [...coordinate] };
-				selectedTrackPointIndex = pointIndex;
-				onTrackPointDragStart();
-			},
-			onDragMove: (drag, event) => {
-				const { pointIndex } = drag;
-				if (draggingTrackPoint?.pointIndex !== pointIndex) return;
-				if (trackDraftMode === 'select') {
-					const coordinate: Point2D = [event.lngLat.lng, event.lngLat.lat];
-					const startCoordinate = drag.startCoordinate!;
-					const startPoints = drag.startPoints!;
-					const selectedIndexes = drag.selectedIndexes!;
-					const offset = [coordinate[0] - startCoordinate[0], coordinate[1] - startCoordinate[1]];
-					currentTrackPoints = startPoints.map((point, index) =>
-						selectedIndexes.includes(index) ? [point[0] + offset[0], point[1] + offset[1]] : point
-					);
-					draggingTrackPoint = { ...draggingTrackPoint, coordinate };
-					return;
-				}
-				draggingTrackPoint.coordinate = [event.lngLat.lng, event.lngLat.lat];
-			},
-			onDragEnd: (drag) => {
-				const { pointIndex } = drag;
-				if (draggingTrackPoint?.pointIndex === pointIndex) {
-					if (trackDraftMode === 'editing') {
-						const points = $state.snapshot(currentTrackPoints);
-						points[pointIndex] = draggingTrackPoint.coordinate;
-						currentTrackPoints = points;
+					message = '';
+				} catch {
+					if (version === requestVersion) {
+						failedPoint = coordinate;
+						message = 'track.routingFailed';
+					}
+				} finally {
+					if (version === requestVersion) {
+						isRoutingTrack = false;
+						routeAbort = null;
 					}
 				}
-				draggingTrackPoint = null;
-				onTrackPointDragEnd();
-				setSuppressNextMapClick(true);
-			}
-		});
+			})
+			.finally(() => {
+				if (version === requestVersion) queuedPoints--;
+			});
+		return routeQueue;
+	}
+	function retryRouting() {
+		const next = failedPoint;
+		failedPoint = null;
+		if (next) void addTrackPoint(next);
+	}
+	function useStraightSegment() {
+		if (!failedPoint || queuedPoints) return;
+		record();
+		points = [...points, failedPoint];
 
-		const deleteTrackPoint = (event: TrackMapEvent) => {
-			if (getActiveTool() !== 'track' || trackDraftMode !== 'editing') return;
-			removeTrackPointFromMapEvent(event);
-		};
-		map.on('click', 'tracks-point-delete', deleteTrackPoint);
-		map.on('touchstart', 'tracks-point-delete', deleteTrackPoint);
-
-		const selectTrackPoint = (event: TrackMapEvent) => {
-			if (getActiveTool() !== 'track' || trackDraftMode !== 'select') return;
-			if (skipLongPressClick) {
-				skipLongPressClick = false;
-				event.originalEvent?.stopPropagation?.();
-				setSuppressNextMapClick(true);
-				return;
-			}
-			const pointIndex = Number(event.features?.[0]?.properties?.pointIndex);
-			const range = Boolean(event.originalEvent?.shiftKey) || isTouchRangePending;
-			if (!toggleTrackPointSelection(pointIndex, { range })) return;
-			isTouchRangePending = false;
-			event.originalEvent?.stopPropagation?.();
-			setSuppressNextMapClick(true);
-		};
-		const beginTouchRange = (event: TrackMapEvent) => {
-			if (getActiveTool() !== 'track' || trackDraftMode !== 'select') return;
-			const pointIndex = Number(event.features?.[0]?.properties?.pointIndex);
-			if (!Number.isInteger(pointIndex)) return;
-			if (touchLongPress?.timer) clearTimeout(touchLongPress.timer);
-			touchLongPress = {
-				pointIndex,
-				triggered: false,
-				timer: setTimeout(() => {
-					trackSelectionAnchor = pointIndex;
-					isTouchRangePending = true;
-					touchLongPress = { pointIndex, triggered: true, timer: null };
-				}, 500)
+		failedPoint = null;
+		message = '';
+	}
+	function startBoxSelection() {
+		cancelOperation();
+		operation = { kind: 'box', start: null, end: null, preview: null };
+	}
+	function startTrackJoin() {
+		if (
+			!sessionActive ||
+			!activeTrackTarget ||
+			points.length < 2 ||
+			tails.length ||
+			queuedPoints ||
+			failedPoint ||
+			importSegments.length ||
+			operation.kind !== 'idle' ||
+			(activeTrackTarget.kind === 'route-path' && activeTrackTarget.isNew)
+		)
+			return;
+		cancelOperation();
+		clearTrackSelection();
+		mode = 'select';
+		operation = { kind: 'join', preview: null };
+		message = '';
+	}
+	function previewJoinTrack(event: MapMouseEvent) {
+		const map = getMap(),
+			base = activeTrackTarget;
+		if (!map || !base) return;
+		const resultName = joinPreview?.name;
+		operation = { kind: 'join', preview: null };
+		const hits = queryCragFeatures(map, event.point, true);
+		for (const hit of hits) {
+			const target = trackTargetFromProperties(hit.properties || {});
+			if (!target || !canJoinTrackTargets(base, target)) continue;
+			const feature = getFeature(target);
+			if (feature?.geometry?.type !== 'LineString') continue;
+			const candidatePoints = clone(feature.geometry.coordinates);
+			const preview = previewTrackJoin(points, candidatePoints);
+			if (!preview) continue;
+			operation = {
+				kind: 'join',
+				preview: {
+					...preview,
+					target,
+					candidatePoints,
+					targetName: feature.properties?.name || '',
+					name: resultName ?? (name.startsWith('track.') ? '' : name)
+				}
 			};
-		};
-		const endTouchRange = () => {
-			if (touchLongPress?.triggered) skipLongPressClick = true;
-			if (touchLongPress?.timer) clearTimeout(touchLongPress.timer);
-			touchLongPress = null;
-		};
-		map.on('click', 'tracks-points-drawing', selectTrackPoint);
-		map.on('touchstart', 'tracks-points-drawing', beginTouchRange);
-		map.on('touchend', 'tracks-points-drawing', endTouchRange);
-
-		const deleteTrackPointInDeleteMode = (event: TrackMapEvent) => {
-			if (getActiveTool() !== 'track' || trackDraftMode !== 'delete') return;
-			removeTrackPointFromMapEvent(event);
-		};
-		map.on('click', 'tracks-points-drawing', deleteTrackPointInDeleteMode);
-		map.on('touchstart', 'tracks-points-drawing', deleteTrackPointInDeleteMode);
-
-		const removeSelectionBox = () => {
-			selectionBox?.remove();
-			selectionBox = null;
-		};
-		const updateSelectionBox = (end: Point) => {
-			if (!selectionBoxStart || !selectionBox) return;
-			const left = Math.min(selectionBoxStart.x, end.x);
-			const top = Math.min(selectionBoxStart.y, end.y);
-			selectionBox.style.left = `${left}px`;
-			selectionBox.style.top = `${top}px`;
-			selectionBox.style.width = `${Math.abs(end.x - selectionBoxStart.x)}px`;
-			selectionBox.style.height = `${Math.abs(end.y - selectionBoxStart.y)}px`;
-		};
-		map.on('mousedown', (event) => {
-			if (
-				getActiveTool() !== 'track' ||
-				trackDraftMode !== 'select' ||
-				event.originalEvent?.button !== 0 ||
-				event.originalEvent?.shiftKey ||
-				event.originalEvent?.altKey ||
-				event.originalEvent?.ctrlKey ||
-				event.originalEvent?.metaKey ||
-				map.queryRenderedFeatures(event.point, { layers: ['tracks-points-drawing'] }).length
-			)
-				return;
-			selectionBoxStart = event.point;
-			selectionBox = document.createElement('div');
-			selectionBox.style.cssText =
-				'position:absolute;pointer-events:none;border:1px dashed #2563eb;background:rgba(59,130,246,.14);z-index:2;';
-			map.getContainer().append(selectionBox);
-			map.dragPan.disable();
+			message = '';
+			options.onShowOptions?.();
+			return;
+		}
+		message = base.kind === 'access' ? 'track.joinChooseApproach' : 'track.joinChoosePath';
+		options.onTransitionBlocked?.();
+	}
+	function confirmJoinTrack() {
+		const preview = joinPreview,
+			base = activeTrackTarget;
+		if (!preview || !base || operation.kind !== 'join') return false;
+		const original = getFeature(base),
+			candidate = getFeature(preview.target);
+		if (
+			original?.geometry?.type !== 'LineString' ||
+			candidate?.geometry?.type !== 'LineString' ||
+			!sameMapCoordinates(original.geometry.coordinates, originalPoints) ||
+			!sameMapCoordinates(candidate.geometry.coordinates, preview.candidatePoints)
+		) {
+			message = 'track.joinChanged';
+			options.onTransitionBlocked?.();
+			return false;
+		}
+		const resultName =
+			preview.name.trim() || original.properties?.name || candidate.properties?.name || 'Track';
+		const saved = persistence.join({
+			base,
+			candidate: preview.target,
+			points: clone(preview.points),
+			name: resultName
 		});
-		map.on('mousemove', (event) => updateSelectionBox(event.point));
-		map.on('mouseup', (event) => {
-			if (!selectionBoxStart) return;
-			const start = selectionBoxStart;
-			selectionBoxStart = null;
-			removeSelectionBox();
-			map.dragPan.enable();
-			if (Math.hypot(event.point.x - start.x, event.point.y - start.y) < 4) return;
-			selectTrackPointScreenRegion(start, event.point, map);
-			setSuppressNextMapClick(true);
+		if (!saved) {
+			message = 'track.saveFailed';
+			options.onTransitionBlocked?.();
+			return false;
+		}
+		finishSession();
+		return true;
+	}
+	function startTrackSplit() {
+		if (points.length < 2 || tails.length || queuedPoints) return;
+		cancelOperation();
+		operation = { kind: 'split', preview: null };
+	}
+	function previewSplit(at: ScreenPoint) {
+		const map = getMap();
+		if (!map) return;
+		const split = nearestTrackSplit(points, at, map);
+		if (split) {
+			operation = {
+				kind: 'split',
+				preview: {
+					points: clone(split.first),
+					tails: [clone(split.second)],
+					coordinate: split.coordinate
+				}
+			};
+			message = '';
+		} else message = 'track.splitMiss';
+	}
+	function confirmOperation(): boolean {
+		if (operation.kind === 'join') return confirmJoinTrack();
+		if (operation.kind === 'box' && operation.preview !== null) {
+			selected = operation.preview;
+			cancelOperation();
+			return true;
+		}
+		if (!geometryPreview) return false;
+		record();
+		points = clone(geometryPreview.points);
+		tails = geometryPreview.tails.map(clone);
+		mode = 'select';
+		clearTrackSelection();
+		cancelOperation();
+		return true;
+	}
+	function finalizeTrack(): boolean {
+		if (
+			points.length < 2 ||
+			queuedPoints ||
+			operation.kind !== 'idle' ||
+			importSegments.length ||
+			failedPoint
+		)
+			return false;
+		const saved = persistence.save({
+			target: activeTrackTarget,
+			segments: [clone(points), ...tails.map(clone)],
+			name: name.startsWith('track.') ? '' : name
+		});
+		if (!saved) {
+			message = 'track.saveFailed';
+			options.onTransitionBlocked?.();
+			return false;
+		}
+		finishSession();
+		return true;
+	}
+	function finishSession() {
+		resetDraft();
+		options.onRoutePathDrawingEnd?.();
+		setActiveTool('select');
+		options.setActiveTab?.('registry');
+		options.onPathFinished?.();
+	}
+	function cancelTrackEdit() {
+		resetDraft();
+		options.onRoutePathDrawingEnd?.();
+		setActiveTool('select');
+		options.onPathCancelled?.();
+	}
+	function removeTrack(id: string) {
+		requestLeave(() => {
+			persistence.remove({ kind: 'access', featureId: id });
 		});
 	}
-
+	function fitTrackBounds(coordinates = points) {
+		const mobile = typeof window !== 'undefined' && window.innerWidth <= 1024;
+		fitCoordinatesBounds(getMap(), coordinates, {
+			padding: mobile
+				? { top: 90, left: 35, right: 35, bottom: Math.min(window.innerHeight * 0.6, 440) }
+				: { top: 100, left: 350, right: 350, bottom: 60 }
+		});
+	}
+	async function handleGpxUpload(event: Event) {
+		const input = event.currentTarget as HTMLInputElement,
+			file = input.files?.[0];
+		if (!file) return;
+		const version = requestVersion,
+			importTarget = getRoutePathTarget();
+		try {
+			const segments = parseGpxSegments(await file.text());
+			if (version !== requestVersion || !requestLeave(() => {})) return;
+			{
+				const target = importTarget;
+				begin(
+					[],
+					target ? { kind: 'route-path', ...target } : null,
+					file.name.replace(/\.gpx$/i, ''),
+					'select'
+				);
+				importName = file.name.replace(/\.gpx$/i, '');
+				if (segments.length === 1) importSegment(segments[0]);
+				else importSegments = segments;
+			}
+		} catch {
+			message = 'track.invalidGpx';
+		} finally {
+			input.value = '';
+		}
+	}
+	function importSegment(segment: GpxSegment) {
+		points = clone(segment.points);
+		originalPoints = [];
+		name = importName;
+		importSegments = [];
+		mode = 'select';
+		fitTrackBounds();
+	}
+	function cancelImport() {
+		importSegments = [];
+		cancelTrackEdit();
+	}
+	function handleMapClick(event: MapMouseEvent): boolean {
+		if (!sessionActive || getActiveTool() !== 'track') return false;
+		if (gestures?.consumeClick(event.point)) return true;
+		if (importSegments.length) return true;
+		if (operation.kind === 'join') {
+			previewJoinTrack(event);
+			return true;
+		}
+		if (operation.kind === 'split') {
+			previewSplit(event.point);
+			return true;
+		}
+		if (operation.kind === 'box') {
+			if (!operation.start || operation.preview !== null)
+				startBoxAt([event.lngLat.lng, event.lngLat.lat]);
+			else {
+				operation.end = [event.lngLat.lng, event.lngLat.lat];
+				updateBoxPreview();
+				confirmOperation();
+			}
+			return true;
+		}
+		if (operation.kind !== 'idle') return true;
+		const map = getMap();
+		if (!map) return true;
+		if (mode === 'select') {
+			const touch =
+				'pointerType' in event.originalEvent && event.originalEvent.pointerType === 'touch';
+			const radius = trackHitRadius(touch ? 'touch' : undefined);
+			const index = nearestTrackPoint(points, event.point, map, radius);
+			if (index !== null) {
+				const awaitingFirst = rangePending && anchor === null;
+				toggleTrackPointSelection(index, {
+					range: event.originalEvent.shiftKey || rangePending,
+					toggle: event.originalEvent.ctrlKey || event.originalEvent.metaKey || multiSelect
+				});
+				rangePending = awaitingFirst;
+			} else {
+				const midpoints = points
+					.slice(1)
+					.map((point, index): Point2D => [
+						(point[0] + points[index][0]) / 2,
+						(point[1] + points[index][1]) / 2
+					]);
+				const midpoint = nearestTrackPoint(midpoints, event.point, map, radius);
+				clearTrackSelection();
+				midpointSelected = midpoint === null ? null : midpoint + 1;
+			}
+			return true;
+		}
+		return false;
+	}
+	function startBoxAt(coordinate: Point2D) {
+		operation = { kind: 'box', start: coordinate, end: null, preview: null };
+	}
+	function updateBoxPreview() {
+		const map = getMap();
+		if (!map || operation.kind !== 'box' || !operation.start || !operation.end) return;
+		const a = map.project(operation.start),
+			b = map.project(operation.end);
+		operation.preview = points.flatMap((point, index) => {
+			const at = map.project(point);
+			return at.x >= Math.min(a.x, b.x) &&
+				at.x <= Math.max(a.x, b.x) &&
+				at.y >= Math.min(a.y, b.y) &&
+				at.y <= Math.max(a.y, b.y)
+				? [index]
+				: [];
+		});
+	}
+	function initTrackPointDragHandlers() {
+		const map = getMap();
+		if (!map || gestures?.map === map) return;
+		cleanup();
+		gestures = createTrackGestureController({
+			map,
+			getState: () => ({
+				enabled:
+					sessionActive && getActiveTool() === 'track' && !queuedPoints && !importSegments.length,
+				canEditPoints: mode === 'select' && operation.kind === 'idle' && !rangePending,
+				points,
+				selectedIndexes: selected,
+				boxSelecting: operation.kind === 'box',
+				splitCoordinate: operation.kind === 'split' ? (geometryPreview?.coordinate ?? null) : null
+			}),
+			snapshot,
+			onTapPoint: (index) => {
+				toggleTrackPointSelection(index, { toggle: multiSelect });
+			},
+			onTapMidpoint: (index) => {
+				clearTrackSelection();
+				midpointSelected = index;
+			},
+			onPreviewPoints: (preview, indexes) => {
+				dragPreview = preview;
+				if (indexes) selected = indexes;
+			},
+			onCommitPoints: (before, preview, insertedIndex) => {
+				history = [...history, before];
+				redoHistory = [];
+				points = clone(preview);
+				if (insertedIndex !== null) selected = [insertedIndex];
+			},
+			onBoxStart: startBoxAt,
+			onBoxEnd: (coordinate) => {
+				if (operation.kind === 'box') operation.end = coordinate;
+			},
+			onBoxConfirm: () => {
+				updateBoxPreview();
+				confirmOperation();
+			},
+			onBoxCancel: () => {
+				if (operation.kind === 'box')
+					operation = { kind: 'box', start: null, end: null, preview: null };
+			},
+			onSplitPreview: previewSplit,
+			onDragStart: () => options.onTrackPointDragStart?.(),
+			onDragEnd: () => options.onTrackPointDragEnd?.()
+		});
+	}
+	function cleanup() {
+		invalidateRouting();
+		gestures?.destroy();
+		gestures = null;
+	}
+	function canApply() {
+		return (
+			sessionActive &&
+			points.length >= 2 &&
+			!queuedPoints &&
+			operation.kind === 'idle' &&
+			!importSegments.length &&
+			!failedPoint
+		);
+	}
+	function primaryAction() {
+		if (!sessionActive) return null;
+		let label: string, disabled: boolean;
+		switch (operation.kind) {
+			case 'join':
+				label = 'track.join';
+				disabled = !operation.preview;
+				break;
+			case 'split':
+				label = 'track.applySplit';
+				disabled = !operation.preview;
+				break;
+			case 'trim':
+				label = 'track.applyTrim';
+				disabled = false;
+				break;
+			case 'box':
+				label = 'track.useSelection';
+				disabled = operation.preview === null;
+				break;
+			default:
+				label = 'track.done';
+				disabled = !canApply();
+		}
+		return {
+			label,
+			disabled,
+			placement: operation.kind === 'join' ? 'panel' : 'toolbar',
+			run: operation.kind === 'idle' ? finalizeTrack : confirmOperation
+		};
+	}
+	function handleKeyDown(event: KeyboardEvent) {
+		if (
+			!sessionActive ||
+			(event.target instanceof Element &&
+				event.target.closest('input, textarea, select, [contenteditable="true"]'))
+		)
+			return false;
+		if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+			event.preventDefault();
+			if (event.shiftKey) redoTrackPoint();
+			else undoTrackPoint();
+			return true;
+		}
+		if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') {
+			event.preventDefault();
+			redoTrackPoint();
+			return true;
+		}
+		if (event.key === 'Delete' || event.key === 'Backspace') {
+			event.preventDefault();
+			if (event.key === 'Backspace' && mode !== 'select') undoTrackPoint();
+			else deleteSelectedTrackPoints();
+			return true;
+		}
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			if (operation.kind !== 'idle') cancelOperation();
+			else if (selected.length || midpointSelected !== null || rangePending) clearTrackSelection();
+			else requestLeave(() => {});
+			return true;
+		}
+		if (event.key === 'Enter' || event.key.toLowerCase() === 'n') {
+			event.preventDefault();
+			const action = primaryAction();
+			if (action && !action.disabled) action.run();
+			return true;
+		}
+		return false;
+	}
 	return {
 		get currentTrackPoints() {
-			return currentTrackPoints;
+			return dragPreview || geometryPreview?.points || points;
+		},
+		get draftPoints() {
+			return points;
+		},
+		get draftTails() {
+			return geometryPreview?.tails || tails;
 		},
 		get activeTrackTarget() {
 			return activeTrackTarget;
 		},
 		get trackDraftMode() {
-			return trackDraftMode;
-		},
-		get isSnappingEnabled() {
-			return isSnappingEnabled;
+			return mode;
 		},
 		get isRoutingTrack() {
-			return isRoutingTrack;
+			return isRoutingTrack || queuedPoints > 0;
 		},
-		get draggingTrackPoint() {
-			return draggingTrackPoint;
+		get hasRoutingFailure() {
+			return failedPoint !== null;
+		},
+		get sessionActive() {
+			return sessionActive;
+		},
+		get isDirty() {
+			return isDirty();
+		},
+		get trackName() {
+			return name;
+		},
+		get canUndo() {
+			return history.length > 0 && queuedPoints === 0;
+		},
+		get canRedo() {
+			return redoHistory.length > 0 && queuedPoints === 0;
+		},
+		get canApply() {
+			return canApply();
 		},
 		get selectedTrackPointIndex() {
-			return selectedTrackPointIndex;
+			return selected.length === 1 ? selected[0] : null;
 		},
 		get selectedTrackPointIndexes() {
-			return [...selectedTrackPointIndexes];
+			return selected;
 		},
 		get selectedTrackPointCount() {
-			return selectedTrackPointIndexes.size;
+			return selected.length;
 		},
+		get multiSelect() {
+			return multiSelect;
+		},
+		setMultiSelect(value: boolean) {
+			multiSelect = value;
+		},
+		get rangePending() {
+			return rangePending;
+		},
+		startRangeSelection() {
+			rangePending = true;
+			anchor = selected.length === 1 ? selected[0] : null;
+		},
+		get midpointSelected() {
+			return midpointSelected;
+		},
+		get operation() {
+			return operation;
+		},
+		get geometryPreview() {
+			return geometryPreview;
+		},
+		get primaryAction() {
+			return primaryAction();
+		},
+		get cancelAction() {
+			return sessionActive
+				? {
+						label: operation.kind === 'idle' ? 'track.discard' : 'ui.cancel',
+						run: operation.kind === 'idle' ? cancelTrackEdit : cancelOperation
+					}
+				: null;
+		},
+		instructionKey(isExpanded: boolean) {
+			switch (operation.kind) {
+				case 'join':
+					return 'track.joinHelp';
+				case 'box':
+					return 'track.boxHelp';
+				case 'split':
+					return 'track.splitHelp';
+				case 'trim':
+					return 'track.trimHelp';
+			}
+			return rangePending
+				? 'track.rangeHelp'
+				: mode === 'select'
+					? isExpanded
+						? 'track.editHelp'
+						: 'track.touchEditHelp'
+					: mode === 'editing'
+						? 'track.manualHelp'
+						: 'track.followHelp';
+		},
+		get message() {
+			return message;
+		},
+		get importSegments() {
+			return importSegments;
+		},
+		requestLeave,
+		handleMapClick,
+		handleKeyDown,
+		startBoxSelection,
+		startTrackSplit,
+		startTrackJoin,
+		confirmJoinTrack,
+		get joinPreview() {
+			return joinPreview;
+		},
+		setJoinName(value: string) {
+			if (joinPreview) joinPreview.name = value;
+		},
+		confirmOperation,
+		cancelOperation,
 		addTrackPoint,
-		handleTrackConfirm,
 		startRoutingDraft,
 		setTrackDraftMode,
 		undoTrackPoint,
+		redoTrackPoint,
 		insertTrackPoint,
 		removeTrackPoint,
 		clearTrackSelection,
 		toggleTrackPointSelection,
-		selectTrackPointScreenRegion,
 		deleteSelectedTrackPoints,
 		reverseTrack,
 		trimTrackStart,
@@ -881,13 +998,17 @@ export function useCragTrackEditor({
 		simplifyTrack,
 		cleanTrackPauses,
 		removeTrack,
-		splitEditingTrack,
 		finalizeTrack,
 		editTrack,
 		editRoutePath,
 		cancelTrackEdit,
-		commitRoutePathEdit,
 		handleGpxUpload,
-		initTrackPointDragHandlers
+		importSegment,
+		cancelImport,
+		retryRouting,
+		useStraightSegment,
+		fitTrackBounds,
+		initTrackPointDragHandlers,
+		cleanup
 	};
 }

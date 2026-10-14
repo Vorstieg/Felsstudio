@@ -36,12 +36,11 @@
 	};
 
 	const cragEditorState = getCragEditorSession();
-	const { accessEditor, trackEditor, routeTool } = getCragEditorTools();
+	const { accessEditor, trackEditor, routeTool, actions } = getCragEditorTools();
 	const {
 		addRoutePath: onAddRoutePath,
 		editRoutePath: onEditRoutePath,
 		duplicateRoutePath: onDuplicateRoutePath,
-		concatRoutePaths: onConcatRoutePaths,
 		deleteRoutePath: onDeleteRoutePath,
 		moveApproachTrackToTopoPaths: onMoveApproachTrackToTopoPaths,
 		updateRoutePathFeature: onUpdateRoutePathFeature
@@ -126,16 +125,16 @@
 	}
 
 	function selectApproach(track: AccessFeature): void {
-		selectedObject = { type: 'approach', id: track.id };
+		void actions.selectObject({ type: 'approach', id: track.id });
 	}
 
 	function selectPath(document: TopoEntry, feature: RegistryPathFeature, pathIndex: number): void {
-		selectedObject = {
+		void actions.selectObject({
 			type: 'route-path',
 			documentPath: document.path,
 			pathId: String(feature.id),
 			pathIndex
-		};
+		});
 	}
 
 	function editPath(document: TopoEntry, feature: RegistryPathFeature, pathIndex: number): void {
@@ -146,24 +145,6 @@
 
 	function duplicatePath(document: TopoEntry, feature: RegistryPathFeature): void {
 		onDuplicateRoutePath(document.path, feature.id);
-	}
-
-	function concatPath(
-		event: Event & { currentTarget: HTMLSelectElement },
-		document: TopoEntry,
-		feature: RegistryPathFeature,
-		pathIndex: number
-	): void {
-		const appendPathIndex = Number(event.currentTarget.value);
-		if (!Number.isInteger(appendPathIndex)) return;
-		const append = topoPaths(document)[appendPathIndex];
-		if (append)
-			onConcatRoutePaths(document.path, feature.id, append.id, pathIndex, appendPathIndex);
-		event.currentTarget.value = '';
-	}
-
-	function pathLabel(feature: RegistryPathFeature, index: number): string {
-		return feature.properties?.name || `Path ${index + 1}`;
 	}
 
 	function accessFeatureLabel(feature: AccessFeature): string {
@@ -542,21 +523,6 @@
 								<option value="">No access feature</option>
 								{#each assignableAccessFeatures as accessFeature}
 									<option value={accessFeature.id}>{accessFeatureLabel(accessFeature)}</option>
-								{/each}
-							</select>
-						{/if}
-						{#if topoPaths(document).length > 1}
-							<select
-								class="input-studio w-full"
-								aria-label="Concatenate with another path"
-								onclick={(event) => event.stopPropagation()}
-								onchange={(event) => concatPath(event, document, feature, pathIndex)}
-							>
-								<option value="" selected>Concat with…</option>
-								{#each topoPaths(document) as otherFeature, otherIndex}
-									{#if otherIndex !== pathIndex}
-										<option value={otherIndex}>{pathLabel(otherFeature, otherIndex)}</option>
-									{/if}
 								{/each}
 							</select>
 						{/if}

@@ -4,18 +4,25 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 import { useCragTrackEditor } from '../src/lib/components/editor/crag/use-crag-track-editor.svelte.ts';
 
-function createEditor(initialCoordinates) {
+function createEditor(initialCoordinates, map = null) {
 	let target = { documentPath: 'crag-topo.json', routeId: 'route-1', pathId: 'path-1' };
 	const savedCoordinates = [];
 	const activeTools = [];
 
 	const editor = useCragTrackEditor({
-		getMap: () => null,
+		getMap: () => map,
 		getActiveTool: () => activeTools.at(-1) || 'select',
 		setActiveTool: (tool) => activeTools.push(tool),
-		setSuppressNextMapClick: () => {},
 		getRoutePathTarget: () => target,
-		onSaveRoutePath: (_, coordinates) => savedCoordinates.push(coordinates),
+		persistence: {
+			get: () => null,
+			save: ({ segments }) => {
+				savedCoordinates.push(segments[0]);
+				return true;
+			},
+			join: () => false,
+			remove: () => false
+		},
 		onRoutePathDrawingEnd: () => {
 			target = null;
 		},
@@ -35,7 +42,7 @@ test('commits an edited route path and closes the edit context', () => {
 	]);
 	assert.equal(activeTools.at(-1), 'track');
 
-	assert.equal(editor.commitRoutePathEdit(), true);
+	assert.equal(editor.finalizeTrack(), true);
 	assert.deepEqual(savedCoordinates, [
 		[
 			[16, 48],
@@ -52,7 +59,9 @@ test('allows an empty route path to enter edit mode', () => {
 	assert.equal(activeTools.at(-1), 'track');
 	assert.equal(editor.currentTrackPoints.length, 0);
 
-	assert.equal(editor.commitRoutePathEdit(), true);
+	assert.equal(editor.finalizeTrack(), false);
+	assert.notEqual(target(), null);
+	editor.cancelTrackEdit();
 	assert.deepEqual(savedCoordinates, []);
 	assert.equal(target(), null);
 });
@@ -83,21 +92,21 @@ test('opens an existing path in select mode and supports range selection and bul
 	assert.equal(editor.currentTrackPoints.length, 4);
 });
 
-test('selects vertices inside an empty-map marquee rectangle', () => {
-	const { editor } = createEditor();
+test('selects vertices by picking the corners of a map rectangle', () => {
+	const { editor } = createEditor(undefined, {
+		project: ([lng]) => ({ x: (lng - 16) * 10000, y: (lng - 16) * 10000 })
+	});
 	editor.editRoutePath([
 		[16, 48],
 		[16.001, 48.001],
 		[16.002, 48.002],
 		[16.003, 48.003]
 	]);
-
-	editor.selectTrackPointScreenRegion(
-		{ x: 10, y: 10 },
-		{ x: 31, y: 31 },
-		{ project: ([lng]) => ({ x: (lng - 16) * 10000, y: (lng - 16) * 10000 }) }
-	);
+	editor.startBoxSelection();
+	editor.handleMapClick({ point: { x: 10, y: 10 }, lngLat: { lng: 16.001, lat: 48.001 } });
+	editor.handleMapClick({ point: { x: 31, y: 31 }, lngLat: { lng: 16.0031, lat: 48.0031 } });
 	assert.deepEqual(editor.selectedTrackPointIndexes, [1, 2, 3]);
+	assert.equal(editor.operation.kind, 'idle');
 });
 
 test('simplifies only selected vertex runs', () => {
@@ -126,16 +135,15 @@ test('simplifies only selected vertex runs', () => {
 	assert.equal(editor.selectedTrackPointCount, 0);
 });
 
-test('supports delete mode with undoable single-point removal', () => {
+test('supports undoable deletion through point selection', () => {
 	const { editor } = createEditor();
 	editor.editRoutePath([
 		[16, 48],
 		[16.001, 48.001],
 		[16.002, 48.002]
 	]);
-	editor.setTrackDraftMode('delete');
-	assert.equal(editor.trackDraftMode, 'delete');
-	assert.equal(editor.removeTrackPoint(1), true);
+	editor.toggleTrackPointSelection(1);
+	assert.equal(editor.deleteSelectedTrackPoints(), true);
 	assert.equal(editor.currentTrackPoints.length, 2);
 	editor.undoTrackPoint();
 	assert.equal(editor.currentTrackPoints.length, 3);

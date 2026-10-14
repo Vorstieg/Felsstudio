@@ -1,28 +1,21 @@
 <script lang="ts">
 	import { _ } from 'svelte-i18n';
+	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.ts';
 	import ToolBar from '$lib/components/editor/tools/ToolBar.svelte';
 	import MapSearch from '$lib/components/editor/MapSearch.svelte';
 	import type { Map as MapLibreMap } from 'maplibre-gl';
-	import type { Point2D } from '@vorstieg/fels-types/types';
 
+	const { trackEditor } = getCragEditorTools();
 	type Action = () => void | Promise<void>;
 	type Props = {
 		map?: MapLibreMap | null;
 		activeTool?: string;
 		toolOptionsOpen?: boolean;
-		currentTrackPoints?: Point2D[];
-		isRoutingTrack?: boolean;
-		hasPendingTrackCut?: boolean;
 		onStartRoutingDraft?: Action;
-		onHandleTrackConfirm?: Action;
-		onCancelTrackEdit?: Action;
-		onUndoTrackPoint?: Action;
 		onUndo?: Action;
 		onRedo?: Action;
 		canUndo?: boolean;
 		canRedo?: boolean;
-		onConfirmTrackCut?: Action;
-		onCancelTrackCut?: Action;
 		onExport?: Action;
 		status?: 'idle' | 'saving' | 'success' | 'error';
 		errorMessage?: string;
@@ -32,19 +25,11 @@
 		map = null,
 		activeTool = $bindable('select'),
 		toolOptionsOpen = $bindable(false),
-		currentTrackPoints = [],
-		isRoutingTrack = false,
-		hasPendingTrackCut = false,
 		onStartRoutingDraft = () => {},
-		onHandleTrackConfirm = () => {},
-		onCancelTrackEdit = () => {},
-		onUndoTrackPoint = () => {},
 		onUndo = () => {},
 		onRedo = () => {},
 		canUndo = false,
 		canRedo = false,
-		onConfirmTrackCut = () => {},
-		onCancelTrackCut = () => {},
 		onExport = () => {},
 		status = 'idle',
 		errorMessage = ''
@@ -65,14 +50,16 @@
 		{
 			id: 'track',
 			icon: 'fa-route',
-			label: 'Approach Track',
+			label: $_('track.title'),
+			openOptionsOnSelect: true,
 			hasOptions: true,
 			onSelect: ({ isActive }: { isActive: boolean }) => {
 				if (!isActive) onStartRoutingDraft();
 			}
-		},
+		}
 	]);
-	let canFinishTrack = $derived(activeTool === 'track' && currentTrackPoints.length > 1);
+	let primaryAction = $derived(trackEditor.primaryAction);
+	let cancelAction = $derived(trackEditor.cancelAction);
 </script>
 
 <ToolBar
@@ -80,20 +67,41 @@
 	bind:toolOptionsOpen
 	neutralTool="select"
 	{tools}
-	undo={activeTool === 'track'
-		? { label: 'Undo', run: onUndoTrackPoint, disabled: currentTrackPoints.length === 0 }
-		: canUndo ? { label: 'Undo', run: onUndo } : null}
-	redo={activeTool === 'track' ? null : canRedo ? { label: 'Redo', run: onRedo } : null}
-	finish={canFinishTrack
-		? { label: $_('ui.finish'), run: onHandleTrackConfirm, disabled: isRoutingTrack }
-		: activeTool === 'cut' && hasPendingTrackCut
-			? { label: $_('ui.finish'), run: onConfirmTrackCut }
-		: null}
-	cancel={activeTool === 'track'
-		? { label: $_('ui.cancel'), run: onCancelTrackEdit }
-		: activeTool === 'cut'
-			? { label: $_('ui.cancel'), run: onCancelTrackCut }
+	requestToolChange={(tool, select) => {
+		if (tool.id === 'track' && trackEditor.sessionActive) {
+			toolOptionsOpen = true;
+			return;
+		}
+		trackEditor.requestLeave(select);
+	}}
+	undo={trackEditor.sessionActive
+		? {
+				label: $_('track.undo'),
+				run: () => {
+					trackEditor.undoTrackPoint();
+				},
+				disabled: !trackEditor.canUndo
+			}
+		: canUndo
+			? { label: 'Undo', run: onUndo }
 			: null}
+	redo={trackEditor.sessionActive
+		? {
+				label: $_('track.redo'),
+				run: () => {
+					trackEditor.redoTrackPoint();
+				},
+				disabled: !trackEditor.canRedo
+			}
+		: canRedo
+			? { label: 'Redo', run: onRedo }
+			: null}
+	finish={primaryAction?.placement === 'toolbar'
+		? { ...primaryAction, label: $_(primaryAction.label), keepActive: true }
+		: null}
+	cancel={cancelAction
+		? { ...cancelAction, label: $_(cancelAction.label), keepActive: true }
+		: null}
 	save={{ status, errorMessage, run: onExport }}
 >
 	{#snippet mobileSearch()}

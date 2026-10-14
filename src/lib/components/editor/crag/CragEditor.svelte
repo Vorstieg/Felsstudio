@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import { onMount, untrack } from 'svelte';
 	import maplibregl from 'maplibre-gl';
 	import type {
@@ -8,10 +9,10 @@
 		Marker,
 		PointLike
 	} from 'maplibre-gl';
-	import type { Feature, FeatureCollection } from 'geojson';
 	import type { FelsEntryWorkspace } from '$lib/types/crag';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import * as turf from '@turf/turf';
+	import { snapToNearestWay } from '../track/track-snapping.ts';
 	import {
 		createCragEditorSession,
 		createFelsEntry,
@@ -40,12 +41,9 @@
 		addEquipment,
 		removeEquipment
 	} from '$lib/components/editor/crag/crag-editor-equipment.ts';
+	import { createCragTrackPersistence } from './create-crag-track-persistence.ts';
 	import { useCragTrackEditor } from '$lib/components/editor/crag/use-crag-track-editor.svelte.ts';
-	import type {
-		AccessTrackFeature,
-		ActiveTrackTarget,
-		RoutePathTarget
-	} from '$lib/components/editor/crag/use-crag-track-editor.svelte.ts';
+	import type { RoutePathTarget } from './crag-track-types.ts';
 	import { createCragRouteTool } from '$lib/components/editor/crag/CragRouteTool.svelte.ts';
 	import type { CragSelection } from '$lib/components/editor/crag/crag-route-types.ts';
 	import { createCragSelectTool } from '$lib/components/editor/crag/CragSelectTool.svelte.ts';
@@ -53,7 +51,6 @@
 	import { useCragGeometryEditor } from '$lib/components/editor/crag/use-crag-geometry-editor.svelte.ts';
 	import { useCragSectorMarkers } from '$lib/components/editor/crag/use-crag-sector-markers.svelte.ts';
 	import { useCragAccessEditor } from '$lib/components/editor/crag/use-crag-access-editor.svelte.ts';
-	import { initMapPointDragHandlers } from '$lib/components/editor/map-point-drag-handlers.ts';
 	import {
 		createIconMarkerElement,
 		ensureCragEditorLayers,
@@ -69,7 +66,6 @@
 	type Point2 = [number, number];
 	type Selection = CragSelection;
 	type RoutePathDraft = RoutePathTarget;
-	type TrackCut = { startCoordinates: Point2[]; endCoordinates: Point2[]; intersection: Point2 };
 	type DraftSession = {
 		workspace: FelsEntryWorkspace;
 		activeWorkspaceEntryPath: string | null;
@@ -129,12 +125,6 @@
 		);
 	});
 	let routeEditDraft = $state<RoutePathDraft | null>(null);
-	let isRoutePathDrawing = $derived(routeEditDraft !== null);
-	let cutLineStart = $state<Point2 | null>(null);
-	let cutLineEnd = $state<Point2 | null>(null);
-	let pendingTrackCut = $state<TrackCut | null>(null);
-	let hasPendingTrackCut = $derived(pendingTrackCut !== null);
-	let areTrackCutDragHandlersReady = false;
 	let areTrackViewportSyncHandlersReady = false;
 	let suppressNextMapClick = false;
 	let canAutosaveSession = $state(false);
@@ -144,28 +134,42 @@
 	const cragDraftSessionKey = (id: string) => `crag_editor_draft_session_${id}`;
 
 	const trackEditor = useCragTrackEditor({
-		state: cragEditorState,
+		persistence: createCragTrackPersistence(cragEditorState, {
+			save: (target, segments) => routeTool.saveRouteSegments(target, segments),
+			join: (base, append, coordinates, name) =>
+				routeTool.joinRoutePaths({ base, candidate: append, points: coordinates, name }),
+			remove: (target) =>
+				routeTool.deleteRoutePath(target.documentPath, target.pathId, target.pathIndex ?? null)
+		}),
 		getMap: () => map,
 		getActiveTool: () => activeTool,
 		setActiveTool: (value) => (activeTool = value),
 		setActiveTab: (value) => (activeTab = value),
-		setSuppressNextMapClick: (value) => (suppressNextMapClick = value),
 		getRoutePathTarget: () => routeEditDraft,
-		onSaveRoutePath: (...args) => routeTool?.saveRoutePathCoordinates(...args),
+		onShowOptions: () => {
+			toolOptionsOpen = true;
+		},
+		onTransitionBlocked: () => {
+			toolOptionsOpen = true;
+		},
 		onRoutePathDrawingEnd: () => (routeEditDraft = null),
 		onPathFinished: () => selectObject(null),
 		onPathCancelled: () => selectObject(null),
 		onTrackPointDragStart: () => syncEditorData(),
-		onTrackPointDragEnd: () => syncEditorData(),
-		getTrackFeature: getCragTrackFeature,
-		saveTrackGeometry: saveCragTrackGeometry
+		onTrackPointDragEnd: () => syncEditorData()
 	});
-	const routeEditController = createRouteEditController({
+
+	const routeEditController = createRouteEditController<Selection, RoutePathTarget>({
 		getSelection: () => selectedObject,
-		getDraft: () => routeEditDraft,
-		commitDraft: () => trackEditor.commitRoutePathEdit(),
-		setSelection: (value) => (selectedObject = value),
-		setDraft: (value) => (routeEditDraft = value)
+		requestLeave: (next) => {
+			trackEditor.requestLeave(next);
+		},
+		setSelection: (value) => {
+			selectedObject = value;
+		},
+		setDraft: (value) => {
+			routeEditDraft = value;
+		}
 	});
 
 	async function activateWorkspaceEntry(target: string) {
@@ -186,6 +190,12 @@
 	}
 
 	async function selectObject(value: Selection | null) {
+		if (trackEditor.sessionActive && JSON.stringify(value) !== JSON.stringify(selectedObject)) {
+			trackEditor.requestLeave(() => {
+				void selectObject(value);
+			});
+			return;
+		}
 		if (value?.type === 'entry') {
 			if (typeof value.key !== 'string' || !(await activateWorkspaceEntry(value.key))) return;
 			activeTab = 'info';
@@ -204,27 +214,22 @@
 		if (focus) geometryEditor?.focusTarget(target);
 	}
 
-	const startRoutePathDraft = routeEditController.startDraft;
+	const startRoutePathDraft = (value: RoutePathTarget | null) => {
+		routeEditDraft = value;
+	};
 	let currentTrackPoints = $derived(trackEditor.currentTrackPoints);
 	let trackDraftMode = $derived(trackEditor.trackDraftMode);
-	let isSnappingEnabled = $derived(trackEditor.isSnappingEnabled);
-	let isRoutingTrack = $derived(trackEditor.isRoutingTrack);
-	let activeTrackDragState = $derived(trackEditor.draggingTrackPoint);
 	let activeTrackTarget = $derived(trackEditor.activeTrackTarget);
 	let selectedTrackPointIndexes = $derived(trackEditor.selectedTrackPointIndexes);
-	let selectedTrackPointCount = $derived(trackEditor.selectedTrackPointCount);
 
 	const addTrackPoint = trackEditor.addTrackPoint;
-	const handleTrackConfirm = trackEditor.handleTrackConfirm;
 	const startRoutingDraft = trackEditor.startRoutingDraft;
-	const undoTrackPoint = trackEditor.undoTrackPoint;
-	const splitEditingTrack = trackEditor.splitEditingTrack;
 	const editTrack = (...args: Parameters<typeof trackEditor.editTrack>) => {
-		toolOptionsOpen = false;
+		toolOptionsOpen = true;
 		return trackEditor.editTrack(...args);
 	};
 	const editRoutePathTrack = (...args: Parameters<typeof trackEditor.editRoutePath>) => {
-		toolOptionsOpen = false;
+		toolOptionsOpen = true;
 		return trackEditor.editRoutePath(...args);
 	};
 	const cancelTrackEdit = trackEditor.cancelTrackEdit;
@@ -276,7 +281,10 @@
 		startRouteDraft: startRoutePathDraft,
 		startRoutingDraft,
 		editRoutePathTrack,
-		setActiveTool: (value) => (activeTool = value)
+		setActiveTool: (value) => (activeTool = value),
+		requestTrackTransition: (action) => {
+			trackEditor.requestLeave(action);
+		}
 	});
 
 	const selectTool = createCragSelectTool({
@@ -382,144 +390,6 @@
 		selectedObject = { type: 'entry', key: entry.properties.id };
 	}
 
-	function coordinatesEqual(a: Point2 | undefined, b: Point2): boolean {
-		if (!a) return false;
-		return Math.abs(a[0] - b[0]) < 1e-10 && Math.abs(a[1] - b[1]) < 1e-10;
-	}
-
-	function segmentLineIntersection(
-		a: Point2,
-		b: Point2,
-		c: Point2,
-		d: Point2
-	): { coordinate: Point2; t: number } | null {
-		const [x1, y1] = a;
-		const [x2, y2] = b;
-		const [x3, y3] = c;
-		const [x4, y4] = d;
-		const denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-		if (Math.abs(denominator) < 1e-12) return null;
-
-		const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denominator;
-		const u = -((x1 - x2) * (y1 - y2) - (y1 - y2) * (x1 - x3)) / denominator;
-		if (t < 0 || t > 1 || u < 0 || u > 1) return null;
-		return { coordinate: [x1 + t * (x2 - x1), y1 + t * (y2 - y1)], t };
-	}
-
-	function findTrackCutIntersection(coordinates: Point2[], lineStart: Point2, lineEnd: Point2) {
-		for (let index = 0; index < coordinates.length - 1; index += 1) {
-			const intersection = segmentLineIntersection(
-				coordinates[index],
-				coordinates[index + 1],
-				lineStart,
-				lineEnd
-			);
-			if (intersection) return { ...intersection, segmentIndex: index };
-		}
-		return null;
-	}
-
-	function splitTrackAtIntersection(
-		coordinates: Point2[],
-		intersection: { coordinate: Point2; segmentIndex: number }
-	): [Point2[], Point2[]] {
-		const { coordinate, segmentIndex } = intersection;
-		const startCoordinates = coordinates.slice(0, segmentIndex + 1);
-		const endCoordinates = coordinates.slice(segmentIndex + 1);
-		if (!coordinatesEqual(startCoordinates.at(-1), coordinate)) startCoordinates.push(coordinate);
-		if (!coordinatesEqual(endCoordinates[0], coordinate)) endCoordinates.unshift(coordinate);
-		return [startCoordinates, endCoordinates];
-	}
-
-	function cutOverlayFeatures(): FeatureCollection {
-		const features: Feature[] = [];
-		if (cutLineStart && cutLineEnd) {
-			features.push({
-				type: 'Feature',
-				properties: { feature: 'track-cut-line' },
-				geometry: { type: 'LineString', coordinates: [cutLineStart, cutLineEnd] }
-			});
-		}
-		for (const [cutPointIndex, coordinate] of [cutLineStart, cutLineEnd].entries()) {
-			if (!coordinate) continue;
-			features.push({
-				type: 'Feature',
-				properties: { feature: 'track-cut-point', cutPointIndex },
-				geometry: { type: 'Point', coordinates: coordinate }
-			});
-		}
-		if (pendingTrackCut?.intersection) {
-			features.push({
-				type: 'Feature',
-				properties: { feature: 'track-cut-intersection', intersection: true },
-				geometry: { type: 'Point', coordinates: pendingTrackCut.intersection }
-			});
-		}
-		return { type: 'FeatureCollection', features };
-	}
-
-	function syncTrackCutOverlay() {
-		const source = map?.getSource('track-cut-overlay') as GeoJSONSource | undefined;
-		if (source) source.setData(cutOverlayFeatures());
-	}
-
-	function trackDragOverlayFeatures(): FeatureCollection {
-		if (!activeTrackDragState) return { type: 'FeatureCollection', features: [] };
-		const { pointIndex, coordinate } = activeTrackDragState;
-		const features: Feature[] = [];
-		const dragPoints = [...currentTrackPoints];
-		dragPoints[pointIndex] = coordinate;
-		if (currentTrackPoints[pointIndex - 1]) {
-			features.push({
-				type: 'Feature',
-				properties: { feature: 'track-drag-edge' },
-				geometry: {
-					type: 'LineString',
-					coordinates: [currentTrackPoints[pointIndex - 1], coordinate]
-				}
-			});
-		}
-		if (currentTrackPoints[pointIndex + 1]) {
-			features.push({
-				type: 'Feature',
-				properties: { feature: 'track-drag-edge' },
-				geometry: {
-					type: 'LineString',
-					coordinates: [coordinate, currentTrackPoints[pointIndex + 1]]
-				}
-			});
-		}
-		features.push({
-			type: 'Feature',
-			properties: { feature: 'track-drag-point' },
-			geometry: { type: 'Point', coordinates: coordinate }
-		});
-		for (let index = 0; index < dragPoints.length - 1; index += 1) {
-			const first = dragPoints[index];
-			const second = dragPoints[index + 1];
-			if (!first || !second) continue;
-			features.push({
-				type: 'Feature',
-				properties: { feature: 'track-midpoint', pointIndex: index + 1 },
-				geometry: {
-					type: 'Point',
-					coordinates: [(first[0] + second[0]) / 2, (first[1] + second[1]) / 2]
-				}
-			});
-		}
-		features.push({
-			type: 'Feature',
-			properties: { feature: 'track-vertex-delete', pointIndex },
-			geometry: { type: 'Point', coordinates: coordinate }
-		});
-		return { type: 'FeatureCollection', features };
-	}
-
-	function syncTrackDragOverlay() {
-		const source = map?.getSource('tracks-drag-overlay') as GeoJSONSource | undefined;
-		if (source) source.setData(trackDragOverlayFeatures());
-	}
-
 	function visibleDrawingPointIndexes(points: Point2[]): number[] {
 		const bounds = map?.getBounds?.();
 		if (!bounds) return [];
@@ -536,107 +406,17 @@
 		for (const event of ['moveend', 'zoomend', 'resize']) map.on(event, syncEditorData);
 	}
 
-	function resetTrackCut() {
-		cutLineStart = null;
-		cutLineEnd = null;
-		pendingTrackCut = null;
-		syncTrackCutOverlay();
-	}
-
-	function rebuildPendingTrackCut() {
-		if (!cutLineStart || !cutLineEnd || currentTrackPoints.length < 2) {
-			pendingTrackCut = null;
-			return;
-		}
-		const intersection = findTrackCutIntersection(currentTrackPoints, cutLineStart, cutLineEnd);
-		if (!intersection) {
-			pendingTrackCut = null;
-			return;
-		}
-		const [startCoordinates, endCoordinates] = splitTrackAtIntersection(
-			currentTrackPoints,
-			intersection
-		);
-		pendingTrackCut =
-			startCoordinates.length > 1 && endCoordinates.length > 1
-				? { startCoordinates, endCoordinates, intersection: intersection.coordinate }
-				: null;
-	}
-
-	function startTrackCut() {
-		const isEditingRoutePath = routeEditDraft && trackDraftMode === 'editing';
-		if ((activeTrackTarget === null && !isEditingRoutePath) || currentTrackPoints.length < 2)
-			return;
-		activeTool = 'cut';
-		resetTrackCut();
-	}
-
-	function handleTrackCutClick(coordinate: Point2) {
-		if (!cutLineStart || pendingTrackCut) {
-			cutLineStart = coordinate;
-			cutLineEnd = null;
-			pendingTrackCut = null;
-		} else {
-			cutLineEnd = coordinate;
-			rebuildPendingTrackCut();
-		}
-		syncTrackCutOverlay();
-	}
-
-	function confirmTrackCut() {
-		if (!pendingTrackCut) return;
-		const wasSplit = routeEditDraft
-			? routeTool.splitRoutePath(
-					routeEditDraft,
-					pendingTrackCut.startCoordinates,
-					pendingTrackCut.endCoordinates
-				)
-			: splitEditingTrack(pendingTrackCut.startCoordinates, pendingTrackCut.endCoordinates);
-		if (wasSplit) resetTrackCut();
-	}
-
-	function initTrackCutDragHandlers() {
-		if (!map || areTrackCutDragHandlersReady) return;
-		areTrackCutDragHandlersReady = true;
-		initMapPointDragHandlers({
-			map,
-			layers: ['track-cut-points'],
-			canDrag: () => activeTool === 'cut',
-			getDragState: (event) => {
-				const cutPointIndex = Number(event.features?.[0]?.properties?.cutPointIndex);
-				return cutPointIndex === 0 || cutPointIndex === 1 ? { cutPointIndex } : null;
-			},
-			onDragMove: ({ cutPointIndex }, event) => {
-				const coordinate: Point2 = [event.lngLat.lng, event.lngLat.lat];
-				if (cutPointIndex === 0) cutLineStart = coordinate;
-				else cutLineEnd = coordinate;
-				rebuildPendingTrackCut();
-				syncTrackCutOverlay();
-			},
-			onDragEnd: () => {
-				suppressNextMapClick = true;
-			}
-		});
-	}
-
 	onMount(() => {
 		canAutosaveSession = true;
 
-		const handleKeyDown = (e: KeyboardEvent) => {
-			if (activeTool === 'track') {
-				if (e.key === 'Enter' || e.key === 'n' || e.key === 'N') handleTrackConfirm();
-				else if (e.key === 'Escape') cancelTrackEdit();
-				else if (e.key === 'Backspace' || e.key === 'Delete') {
-					undoTrackPoint();
-				}
-			} else if (activeTool === 'cut' && e.key === 'Escape') {
-				resetTrackCut();
-			}
+		const handleKeyDown = (event: KeyboardEvent) => {
+			trackEditor.handleKeyDown(event);
 		};
 
 		window.addEventListener('keydown', handleKeyDown);
 		return () => {
 			window.removeEventListener('keydown', handleKeyDown);
+			trackEditor.cleanup();
 			geometryEditor.cleanup();
 			sectorMarkers.cleanup();
 			accessEditor.cleanup();
@@ -650,35 +430,15 @@
 
 	async function handleMapClick(e: MapMouseEvent) {
 		if (!map) return;
+		if (trackEditor.handleMapClick(e)) return;
 		if (suppressNextMapClick) {
 			suppressNextMapClick = false;
-			return;
-		}
-
-		if (activeTool === 'cut') {
-			handleTrackCutClick([e.lngLat.lng, e.lngLat.lat]);
 			return;
 		}
 
 		if (activeTool === 'select') {
 			selectTool.handleMapClick(e);
 			return;
-		}
-
-		if (
-			activeTool === 'track' &&
-			['select', 'delete'].includes(trackDraftMode) &&
-			currentTrackPoints.length > 0
-		) {
-			if (trackDraftMode === 'select') trackEditor.clearTrackSelection();
-			return;
-		}
-
-		const canSelectPathFromTool =
-			activeTool !== 'track' || (!routeEditDraft && currentTrackPoints.length === 0);
-		if (canSelectPathFromTool) {
-			const selectedPath = selectTool.handlePathMapClick(e, { editPath: activeTool === 'track' });
-			if (selectedPath) return;
 		}
 
 		if (map.getLayer('detection-points')) {
@@ -713,8 +473,8 @@
 		}
 
 		let lngLat: Point2 = [e.lngLat.lng, e.lngLat.lat];
-		if (activeTool === 'track' && isSnappingEnabled) {
-			lngLat = snapToNearestWay(e.point, lngLat);
+		if (activeTool === 'track' && trackDraftMode === 'routing') {
+			lngLat = snapToNearestWay(map, e.point, lngLat);
 		}
 
 		if (activeTool === 'transit') {
@@ -763,15 +523,6 @@
 	});
 
 	$effect(() => {
-		activeTrackDragState;
-		syncTrackDragOverlay();
-	});
-
-	$effect(() => {
-		if (activeTool !== 'cut' && (cutLineStart || cutLineEnd || pendingTrackCut)) resetTrackCut();
-	});
-
-	$effect(() => {
 		if (!isMapLoaded || !map) return;
 		JSON.stringify(activeSectors);
 		JSON.stringify(workspaceTopos);
@@ -796,52 +547,6 @@
 		if (!isMapLoaded || !map) return;
 		accessEditor.syncDetectionHighlights();
 	});
-
-	function snapToNearestWay(point: { x: number; y: number }, originalLngLat: Point2): Point2 {
-		if (!map) return originalLngLat;
-		const activeMap = map;
-		const layers = [
-			'Path',
-			'Track',
-			'Minor road',
-			'Minor road outline',
-			'Main road',
-			'Highway',
-			'Road construction',
-			'snap-helper'
-		].filter((id) => activeMap.getLayer(id));
-		const features = activeMap.queryRenderedFeatures(
-			[
-				[point.x - 20, point.y - 20],
-				[point.x + 20, point.y + 20]
-			],
-			{ layers }
-		);
-		if (features.length === 0) return originalLngLat;
-		let closestPoint: Point2 | null = null;
-		let minDistance = Infinity;
-		features.forEach((feature) => {
-			if (feature.geometry.type === 'LineString' || feature.geometry.type === 'MultiLineString') {
-				const lines =
-					feature.geometry.type === 'LineString'
-						? [feature.geometry.coordinates]
-						: feature.geometry.coordinates;
-				for (const coordinates of lines) {
-					if (coordinates.length < 2) continue;
-					const snapped = turf.nearestPointOnLine(
-						turf.lineString(coordinates),
-						turf.point(originalLngLat)
-					);
-					const dist = turf.distance(turf.point(originalLngLat), snapped);
-					if (dist < minDistance) {
-						minDistance = dist;
-						closestPoint = [snapped.geometry.coordinates[0], snapped.geometry.coordinates[1]];
-					}
-				}
-			}
-		});
-		return closestPoint || originalLngLat;
-	}
 
 	function centerMapOnUser() {
 		if (!navigator.geolocation || !map) return;
@@ -891,13 +596,10 @@
 		accessEditor.syncAccessMarkers();
 
 		trackEditor.initTrackPointDragHandlers();
-		initTrackCutDragHandlers();
 		initTrackViewportSyncHandlers();
 		geometryEditor.initHandlers(loadedMap);
 		accessEditor.initDetectionPointHandlers();
 		syncEditorData();
-		syncTrackCutOverlay();
-		syncTrackDragOverlay();
 	}
 
 	function syncEditorData() {
@@ -927,12 +629,16 @@
 				selectedObject,
 				editingRoutePath,
 				drawingPoints,
-				visibleDrawingPointIndexes: visibleDrawingPointIndexes(drawingPoints),
-				editingDrawingPath: trackDraftMode === 'editing',
+				visibleDrawingPointIndexes:
+					trackEditor.operation.kind === 'join' ? [] : visibleDrawingPointIndexes(drawingPoints),
+				editingDrawingPath: trackDraftMode === 'select' && trackEditor.operation.kind === 'idle',
+				joinPreview: trackEditor.joinPreview,
+				drawingTails: trackEditor.draftTails,
+				removedDrawingPoints: trackEditor.operation.kind === 'trim' ? trackEditor.draftPoints : [],
+				midpointSelected: trackEditor.midpointSelected,
 				selectedTrackPointIndex: trackEditor.selectedTrackPointIndex,
 				selectedTrackPointIndexes,
-				activeTrackTarget,
-				draggingTrackPointIndex: untrack(() => activeTrackDragState?.pointIndex ?? null)
+				activeTrackTarget
 			})
 		);
 		syncFlightPlanPreview(map, $state.snapshot(flightPlan));
@@ -944,6 +650,12 @@
 	}
 
 	async function saveToServer() {
+		if (!trackEditor.requestLeave(() => {})) {
+			toolOptionsOpen = true;
+			saveStatus = 'error';
+			saveError = $_(trackEditor.message);
+			return;
+		}
 		if (!authState.requireAuth(() => saveToServer())) return;
 		if (cragEditorState.hierarchyErrors.length) {
 			saveStatus = 'error';
@@ -1049,32 +761,6 @@
 			selectedObject = { type: 'entry', key: cragEditorState.getWorkspaceEntryPath(node) };
 	}
 
-	function getCragTrackFeature(target: ActiveTrackTarget | null): AccessTrackFeature | null {
-		if (target?.kind !== 'access') return null;
-		return (
-			(activeAccess.features as AccessTrackFeature[]).find(
-				(feature) => feature.id === target.featureId
-			) ?? null
-		);
-	}
-
-	function saveCragTrackGeometry(
-		target: ActiveTrackTarget | null,
-		coordinates: Point2D[]
-	): boolean {
-		if (target?.kind === 'route-path')
-			return Boolean(routeTool.saveRoutePathCoordinates(target, coordinates));
-		if (target?.kind !== 'access') return false;
-		cragEditorState.replaceAccessFeatures(
-			(activeAccess.features as AccessTrackFeature[]).map((feature) =>
-				feature.id === target.featureId
-					? { ...feature, geometry: { type: 'LineString', coordinates } }
-					: feature
-			)
-		);
-		return true;
-	}
-
 	function undoCragEdit() {
 		return cragEditorState.undo();
 	}
@@ -1087,9 +773,6 @@
 		accessEditor,
 		actions: {
 			back: () => goto(base + '/'),
-			startTrackCut,
-			confirmTrackCut,
-			cancelTrackCut: resetTrackCut,
 			undo: undoCragEdit,
 			redo: () => cragEditorState.redo(),
 			export: saveToServer,
@@ -1127,23 +810,11 @@
 	{isDetectionLoading}
 	{isDetectionZoomLimited}
 	bind:selectedObject
-	{currentTrackPoints}
-	{activeTrackTarget}
-	{trackDraftMode}
-	{selectedTrackPointCount}
-	{isRoutingTrack}
-	{hasPendingTrackCut}
-	{isRoutePathDrawing}
 	{saveStatus}
 	{saveError}
 />
 
-<RouteDetailModal routeEntry={selectedRouteEntry} onClose={() => selectObject(null)} />
-
-{#if activeTool === 'cut' && cutLineEnd && !pendingTrackCut}
-	<div
-		class="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-sm border border-black/10 bg-near-black px-3 py-2 text-sm text-white shadow-lg"
-	>
-		No intersection found. Click again to start a new cut line.
-	</div>
-{/if}
+<RouteDetailModal
+	routeEntry={trackEditor.sessionActive ? null : selectedRouteEntry}
+	onClose={() => selectObject(null)}
+/>

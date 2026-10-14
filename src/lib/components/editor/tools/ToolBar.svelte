@@ -33,7 +33,8 @@
 		mobileSearch,
 		dense = false,
 		controls,
-		children
+		children,
+		requestToolChange
 	}: {
 		activeTool?: string | null;
 		toolOptionsOpen?: boolean;
@@ -48,6 +49,7 @@
 		dense?: boolean;
 		controls?: Snippet;
 		children?: Snippet;
+		requestToolChange?: (_tool: ToolbarTool, _select: () => void) => void;
 	} = $props();
 
 	let isCompact = $derived(!viewport.isExpanded);
@@ -73,6 +75,10 @@
 		shouldOpenOptionsOnSelect: (tool) => !isCompact || Boolean(tool.openOptionsOnSelect),
 		getNeutralTool: () => neutralTool
 	});
+	function requestSelect(tool: ToolbarTool) {
+		if (requestToolChange) requestToolChange(tool, () => selectTool(tool));
+		else selectTool(tool);
+	}
 </script>
 
 <div class="fixed top-2 left-2 right-2 z-50">
@@ -81,7 +87,7 @@
 			{#if !isCompact}
 				<div class="flex items-center gap-1">
 					{#each tools.filter((tool) => !tool.hidden) as tool}
-						<ToolButton {tool} {dense} active={activeTool === tool.id} onclick={() => selectTool(tool)} />
+						<ToolButton {tool} {dense} active={activeTool === tool.id} onclick={() => requestSelect(tool)} />
 					{/each}
 				</div>
 				{@render controls?.()}
@@ -129,7 +135,7 @@
 		<div use:observeMobileDock class="mobile-tool-dock flex w-full flex-col gap-0 pointer-events-auto">
 			<div class={`panel flex w-full items-center justify-center overflow-x-auto rounded-none border-x-0 shadow-panel ${dense ? 'gap-0.5 p-1' : 'gap-1 p-1.5'}`}>
 				{#each tools.filter((tool) => !tool.hidden) as tool}
-					<ToolButton {tool} {dense} active={activeTool === tool.id} compact onclick={() => selectTool(tool)} />
+					<ToolButton {tool} {dense} active={activeTool === tool.id} compact onclick={() => requestSelect(tool)} />
 				{/each}
 				{#if undo || redo}<div class="mx-0.5 h-7 w-px shrink-0 bg-black/15"></div>{/if}
 				{#if undo}<ToolActionButton action={undo} icon="fa-rotate-left" compact onclick={() => runAction(undo, { finish, cancel })} />{/if}
