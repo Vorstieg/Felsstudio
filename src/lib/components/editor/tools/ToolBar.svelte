@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { _ } from 'svelte-i18n';
 	import type { Snippet } from 'svelte';
+	import ReviewActions from '../ReviewActions.svelte';
+	import { getDraftEditor } from '../use-draft-editor.svelte';
 	import SaveStatus from '$lib/components/ui/SaveStatus.svelte';
+	import SessionInfo from '$lib/components/ui/SessionInfo.svelte';
 	import { viewport } from '$lib/state/viewport.svelte.ts';
 	import ToolButton from './ToolButton.svelte';
 	import ToolActionButton from './ToolActionButton.svelte';
@@ -53,9 +56,13 @@
 	} = $props();
 
 	let isCompact = $derived(!viewport.isExpanded);
+	const draft = getDraftEditor();
 	function observeMobileDock(node: HTMLDivElement) {
 		const updateDockHeight = () => {
-			document.documentElement.style.setProperty('--mobile-tool-dock-height', `${node.offsetHeight}px`);
+			document.documentElement.style.setProperty(
+				'--mobile-tool-dock-height',
+				`${node.offsetHeight}px`
+			);
 		};
 		const observer = new ResizeObserver(updateDockHeight);
 		observer.observe(node);
@@ -81,13 +88,18 @@
 	}
 </script>
 
-<div class="fixed top-2 left-2 right-2 z-50">
+<div class="fixed top-2 left-2 right-2 z-50" role="group" aria-label="Editor toolbar">
 	<div class="panel flex items-center justify-between gap-2 bg-white p-1.5 shadow-panel">
 		<div class="flex min-w-0 items-center gap-2.5">
 			{#if !isCompact}
 				<div class="flex items-center gap-1">
 					{#each tools.filter((tool) => !tool.hidden) as tool}
-						<ToolButton {tool} {dense} active={activeTool === tool.id} onclick={() => requestSelect(tool)} />
+						<ToolButton
+							{tool}
+							{dense}
+							active={activeTool === tool.id}
+							onclick={() => requestSelect(tool)}
+						/>
 					{/each}
 				</div>
 				{@render controls?.()}
@@ -104,45 +116,106 @@
 					<div class="flex items-center gap-1">
 						{#each [undo, redo] as action, index}
 							{#if action}
-								<ToolActionButton action={action} icon={index === 0 ? 'fa-rotate-left' : 'fa-rotate-right'} onclick={() => runAction(action, { finish, cancel })} />
+								<ToolActionButton
+									{action}
+									icon={index === 0 ? 'fa-rotate-left' : 'fa-rotate-right'}
+									onclick={() => runAction(action, { finish, cancel })}
+								/>
 							{/if}
 						{/each}
 					</div>
 				{/if}
 				{#if finish || cancel}
 					<div class="flex items-center gap-1">
-						{#if finish}<ToolActionButton action={finish} icon="fa-check" variant="finish" onclick={() => runAction(finish, { finish, cancel, vibration: 'success' })} />{/if}
-						{#if cancel}<ToolActionButton action={cancel} icon="fa-xmark" variant="cancel" onclick={() => runAction(cancel, { finish, cancel })} />{/if}
+						{#if finish}<ToolActionButton
+								action={finish}
+								icon="fa-check"
+								variant="finish"
+								onclick={() => runAction(finish, { finish, cancel, vibration: 'success' })}
+							/>{/if}
+						{#if cancel}<ToolActionButton
+								action={cancel}
+								icon="fa-xmark"
+								variant="cancel"
+								onclick={() => runAction(cancel, { finish, cancel })}
+							/>{/if}
 					</div>
 				{/if}
 			{/if}
 			{#if save}
-				<SaveStatus status={save.status} errorMessage={save.errorMessage} />
-				<button
-					type="button"
-					class="bg-creator-blue rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white shadow-sm transition-none hover:bg-creator-blue-active disabled:opacity-40 md:px-4"
-					onclick={() => runAction(save, { finish, cancel })}
-					disabled={save.disabled || save.status === 'saving'}
-					>{save.label || $_('save.save_to_server')}</button
-				>
+				{#if draft}
+					<ReviewActions
+						disabled={Boolean(finish && !finish.disabled) || save.status === 'saving'}
+						onSave={() => runAction(save, { finish, cancel })}
+						saveDisabled={save.disabled || save.status === 'saving'}
+						saveStatus={save.status}
+						saveError={save.errorMessage}
+					/>
+				{:else}
+					<SessionInfo />
+					<SaveStatus status={save.status} errorMessage={save.errorMessage} />
+					<button
+						type="button"
+						class="btn-pill gap-2 whitespace-nowrap disabled:cursor-default disabled:opacity-40 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue!"
+						onclick={() => runAction(save, { finish, cancel })}
+						disabled={save.disabled || save.status === 'saving'}
+						>{save.label || $_('save.save_to_server')}</button
+					>
+				{/if}
 			{/if}
 		</div>
 	</div>
 </div>
 
 {#if isCompact}
-	<div class="mobile-toolbar fixed inset-x-0 z-50 flex justify-center pointer-events-none" style="bottom: calc(var(--info-panel-height, 0px) + var(--mobile-toolbar-gap, max(0.75rem, env(safe-area-inset-bottom)))); transition: var(--info-panel-transition, none); visibility: var(--mobile-toolbar-visibility, visible);">
-		<div use:observeMobileDock class="mobile-tool-dock flex w-full flex-col gap-0 pointer-events-auto">
-			<div class={`panel flex w-full items-center justify-center overflow-x-auto rounded-none border-x-0 shadow-panel ${dense ? 'gap-0.5 p-1' : 'gap-1 p-1.5'}`}>
+	<div
+		class="mobile-toolbar fixed inset-x-0 z-50 flex justify-center pointer-events-none"
+		style="bottom: calc(var(--info-panel-height, 0px) + var(--mobile-toolbar-gap, max(0.75rem, env(safe-area-inset-bottom)))); transition: var(--info-panel-transition, none); visibility: var(--mobile-toolbar-visibility, visible);"
+	>
+		<div
+			use:observeMobileDock
+			class="mobile-tool-dock flex w-full flex-col gap-0 pointer-events-auto"
+		>
+			<div
+				class={`panel flex w-full items-center justify-center overflow-x-auto rounded-none border-x-0 shadow-panel ${dense ? 'gap-0.5 p-1' : 'gap-1 p-1.5'}`}
+			>
 				{#each tools.filter((tool) => !tool.hidden) as tool}
-					<ToolButton {tool} {dense} active={activeTool === tool.id} compact onclick={() => requestSelect(tool)} />
+					<ToolButton
+						{tool}
+						{dense}
+						active={activeTool === tool.id}
+						compact
+						onclick={() => requestSelect(tool)}
+					/>
 				{/each}
 				{#if undo || redo}<div class="mx-0.5 h-7 w-px shrink-0 bg-black/15"></div>{/if}
-				{#if undo}<ToolActionButton action={undo} icon="fa-rotate-left" compact onclick={() => runAction(undo, { finish, cancel })} />{/if}
-				{#if redo}<ToolActionButton action={redo} icon="fa-rotate-right" compact onclick={() => runAction(redo, { finish, cancel })} />{/if}
+				{#if undo}<ToolActionButton
+						action={undo}
+						icon="fa-rotate-left"
+						compact
+						onclick={() => runAction(undo, { finish, cancel })}
+					/>{/if}
+				{#if redo}<ToolActionButton
+						action={redo}
+						icon="fa-rotate-right"
+						compact
+						onclick={() => runAction(redo, { finish, cancel })}
+					/>{/if}
 				{#if finish || cancel}<div class="mx-0.5 h-7 w-px shrink-0 bg-black/15"></div>{/if}
-				{#if finish}<ToolActionButton action={finish} icon="fa-check" variant="finish" compact onclick={() => runAction(finish, { finish, cancel, vibration: 'success' })} />{/if}
-				{#if cancel}<ToolActionButton action={cancel} icon="fa-xmark" variant="cancel" compact onclick={() => runAction(cancel, { finish, cancel })} />{/if}
+				{#if finish}<ToolActionButton
+						action={finish}
+						icon="fa-check"
+						variant="finish"
+						compact
+						onclick={() => runAction(finish, { finish, cancel, vibration: 'success' })}
+					/>{/if}
+				{#if cancel}<ToolActionButton
+						action={cancel}
+						icon="fa-xmark"
+						variant="cancel"
+						compact
+						onclick={() => runAction(cancel, { finish, cancel })}
+					/>{/if}
 			</div>
 		</div>
 	</div>
@@ -154,7 +227,7 @@
 	@media (max-width: 1024px) and (orientation: landscape) {
 		.mobile-toolbar {
 			--mobile-toolbar-gap: max(0.1rem, env(safe-area-inset-bottom));
-				width: fit-content;
+			width: fit-content;
 		}
 
 		.mobile-tool-dock :global(button) {

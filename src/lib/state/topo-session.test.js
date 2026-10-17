@@ -39,13 +39,10 @@ describe('createTopo2DEditorState', () => {
 		const session = createTopo2DEditorState();
 		session.ui.selectedRouteId = 'stale';
 
-		session.loadSession(
-			{
-				topo: { name: 'Loaded', routes: [{ id: 'route-2' }] },
-				clustering: { rawHits: [{ id: 1 }] }
-			},
-			'draft-1'
-		);
+		session.loadSession({
+			topo: { name: 'Loaded', routes: [{ id: 'route-2' }] },
+			clustering: { rawHits: [{ id: 1 }] }
+		});
 
 		expect(session.topo).toEqual({
 			name: 'Loaded',
@@ -58,7 +55,7 @@ describe('createTopo2DEditorState', () => {
 		expect(session.ui.name).toBe('');
 		expect(session.topo.routes).toEqual([{ id: 'route-2' }]);
 		expect(session.ui.selectedRouteId).toBeNull();
-		expect(session.ui.activeDraftId).toBe('draft-1');
+		expect(session.ui).not.toHaveProperty('activeDraftId');
 		expect(session.clustering.rawHits).toEqual([{ id: 1 }]);
 	});
 });

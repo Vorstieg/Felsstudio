@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
 	createCragEditorSession,
 	createFelsEntry,
-	snapshotDraftWorkspace,
 	snapshotFelsEntryWorkspace
 } from './crag-session.svelte.ts';
 import { Topo } from '$lib/assets/js/topo-paths.ts';
@@ -143,28 +142,6 @@ describe('createCragEditorSession workspace state', () => {
 		expect(session.redo()).toBe(true);
 		expect(session.getActiveWorkspaceEntry().images).toEqual([image]);
 		expect(session.getPendingImages(session.getActiveWorkspaceEntry())).toEqual([upload]);
-	});
-	it('omits unsaved image descriptors from persisted drafts at every level', () => {
-		const tree = workspace();
-		tree.images = [{ name: 'root.jpg', path: 'country/root.jpg', clientId: 'pending-root' }];
-		tree.childEntries[0].images = [
-			{ name: 'pending.jpg', path: 'country/wall/pending.jpg', clientId: 'pending-child' },
-			{
-				name: 'saved.jpg',
-				path: 'country/wall/saved.jpg',
-				clientId: 'saved',
-				sourcePath: 'country/wall/saved.jpg'
-			},
-			{ name: 'loaded.jpg', path: 'country/wall/loaded.jpg' }
-		];
-		const draft = snapshotDraftWorkspace(tree);
-		expect(draft.images).toEqual([]);
-		expect(draft.childEntries[0].images.map((image) => image.name)).toEqual([
-			'saved.jpg',
-			'loaded.jpg'
-		]);
-		expect(tree.images).toHaveLength(1);
-		expect(tree.childEntries[0].images).toHaveLength(3);
 	});
 	it('marks canonical topo and access files on their owner node', () => {
 		const session = createCragEditorSession();

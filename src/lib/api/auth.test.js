@@ -1,63 +1,93 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-const credentials = vi.hoisted(() => ({
-	has: vi.fn(),
-	set: vi.fn(),
-	clear: vi.fn()
-}));
-
-vi.mock('$lib/api/felslager.ts', () => ({
-	hasCredentials: credentials.has,
-	setCredentials: credentials.set,
-	clearCredentials: credentials.clear
-}));
-
+import { init } from 'svelte-i18n';
 import { authState } from './auth.svelte.ts';
+
+init({ initialLocale: 'en', fallbackLocale: 'en' });
+const authUrl = (
+	import.meta.env.VITE_FELSLAGER_URL || 'https://lager.felsverzeichnis.at/api/fs'
+).replace(/\/fs\/?$/, '/auth');
+const user = { id: '1', name: 'Editor', email: 'editor@example.test' };
+const response = (data, ok = true) => ({ ok, json: async () => data });
+const session = () => response({ user, session: { id: 'session' } });
 
 describe('authState', () => {
 	beforeEach(() => {
-		credentials.has.mockReset().mockReturnValue(false);
-		credentials.set.mockReset();
-		credentials.clear.mockReset();
-		authState.showPrompt = false;
-		authState.error = null;
-		authState._pendingCallback = null;
+		authState.dismiss();
+		authState.user = null;
+		authState.busy = false;
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(session()));
 	});
 
-	it('allows authenticated actions without showing the prompt', () => {
-		credentials.has.mockReturnValue(true);
-		expect(authState.requireAuth()).toBe(true);
-		expect(authState.showPrompt).toBe(false);
-	});
-
-	it('queues unauthenticated actions and retries them after login', () => {
+	it('validates the server session before resuming a queued save', async () => {
 		const callback = vi.fn();
 		expect(authState.requireAuth(callback)).toBe(false);
-		expect(authState.showPrompt).toBe(true);
-
-		authState.login('alice', 'secret');
-		expect(credentials.set).toHaveBeenCalledWith('alice', 'secret');
+		await authState.login(user.email, 'long-password');
+		expect(fetch).toHaveBeenNthCalledWith(1, `${authUrl}/sign-in/email`, {
+			credentials: 'include',
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ email: user.email, password: 'long-password' })
+		});
+		expect(fetch).toHaveBeenNthCalledWith(2, `${authUrl}/get-session`, { credentials: 'include' });
 		expect(callback).toHaveBeenCalledOnce();
-		expect(authState.showPrompt).toBe(false);
+		expect(authState.requireAuth()).toBe(true);
 	});
 
-	it('rejects incomplete credentials and clears a pending callback', () => {
-		authState.requireAuth(vi.fn());
-		authState.login('', 'secret');
-		expect(credentials.clear).toHaveBeenCalledOnce();
-		expect(authState.error).toBe('Username and password are required.');
+	it('does not resume saves after invalid login or a missing session', async () => {
+		const callback = vi.fn();
+		authState.requireAuth(callback);
+		fetch.mockResolvedValueOnce(response({ message: 'Invalid password' }, false));
+		await authState.login(user.email, 'wrong');
+		expect(callback).not.toHaveBeenCalled();
+		expect(authState.error).toBe('Invalid password');
+		fetch.mockResolvedValueOnce(response({ user })).mockResolvedValueOnce(response(null));
+		await authState.login(user.email, 'long-password');
+		expect(callback).not.toHaveBeenCalled();
 		expect(authState.showPrompt).toBe(true);
 	});
 
-	it('dismisses and logs out by clearing all transient auth state', () => {
-		authState.requireAuth(vi.fn());
-		authState.dismiss();
-		expect(authState.showPrompt).toBe(false);
-		expect(authState.error).toBeNull();
+	it.each([401, 403])('never replays a partial save after a %s rejection', async (status) => {
+		const callback = vi.fn();
+		authState.requireAuth(callback);
+		authState.handleRejection(status);
+		await authState.login(user.email, 'long-password');
+		expect(callback).not.toHaveBeenCalled();
+	});
 
-		authState.login('alice', 'secret');
-		authState.logout();
-		expect(credentials.clear).toHaveBeenCalled();
-		expect(authState._pendingCallback).toBeNull();
+	it('preserves a forbidden session without prompting for another login', async () => {
+		await authState.refresh();
+		authState.handleRejection(403);
+		expect(authState.user.id).toBe('1');
+		expect(authState.showPrompt).toBe(false);
+		expect(authState.error).toBeTruthy();
+	});
+
+	it('preserves identity if logout fails and clears it after successful logout', async () => {
+		await authState.refresh();
+		fetch.mockRejectedValueOnce(new Error('Offline'));
+		await authState.logout();
+		expect(authState.user.id).toBe('1');
+		await authState.logout();
+		expect(fetch).toHaveBeenLastCalledWith(`${authUrl}/sign-out`, {
+			credentials: 'include',
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: '{}'
+		});
+		expect(authState.user).toBeNull();
+	});
+
+	it('ignores a stale refresh after a server session rejection', async () => {
+		let resolve;
+		fetch.mockReturnValue(
+			new Promise((done) => {
+				resolve = done;
+			})
+		);
+		const refreshing = authState.refresh();
+		authState.handleRejection(401);
+		resolve(session());
+		await refreshing;
+		expect(authState.user).toBeNull();
 	});
 });

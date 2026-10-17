@@ -3,10 +3,8 @@
 	import { resolve } from '$app/paths';
 	import { _ } from 'svelte-i18n';
 	import JSZip from 'jszip';
-	import { onMount } from 'svelte';
-	import { page } from '$app/state';
 	import { loadGlbIntoEditorState } from '$lib/assets/js/gltf-loader.ts';
-	import { draftsState } from '$lib/state/drafts.svelte.ts';
+	import { useDraftEditor, topoDraftAdapter } from '$lib/components/editor/use-draft-editor.svelte';
 	import {
 		createTopo2DEditorState,
 		provideTopo2DEditorState
@@ -21,19 +19,16 @@
 	let projectFile = $state<File | null>(null);
 	let cropFolderFiles = $state<File[]>([]);
 
-	onMount(async () => {
-		const draftId = page.url.searchParams.get('draft');
-		if (!draftId) return;
-		draftsState.load();
-		const session = await draftsState.getById(draftId);
-		if (session) topoSession.loadSession(session, draftId);
+	const draft = useDraftEditor({
+		mode: '3d',
+		adapter: topoDraftAdapter(topoSession, '3d'),
+		resume: false
 	});
 
 	async function processFiles() {
+		if (!draft.ready) return;
 		isLoading = true;
-		const seededTopo = { ...topoSession.topo };
-		topoSession.reset();
-		topoSession.topo = { ...topoSession.topo, ...seededTopo };
+		// Keep the draft ID, document selection, paths, and edits while adding a model.
 		topoSession.ui.editorMode = '3d';
 
 		try {
@@ -127,20 +122,7 @@
 				}
 			}
 
-			draftsState.load();
-			const { topo, ...extras } = topoSession.getSaveSession();
-			topoSession.ui.activeDraftId = await draftsState.save(
-				topo,
-				topoSession.ui.activeDraftId,
-				{
-					...extras,
-					clustering: $state.snapshot(topoSession.clustering)
-				}
-			);
-			topoSession.ui.lastSaved = new Date().toISOString();
-			goto(
-				`${resolve('/topos/3d/editor', {})}?draft=${encodeURIComponent(topoSession.ui.activeDraftId)}`
-			);
+			await goto(draft.href('topos/3d/editor'));
 		} catch (error) {
 			console.error(error);
 			alert(error instanceof Error ? error.message : String(error));
@@ -157,12 +139,13 @@
 				<h2 class="text-section-title leading-none">{$_('ui.3d_studio')}</h2>
 			</div>
 			<div class="p-5 bg-white">
+				{#if draft.error}<p role="alert" class="text-rose-600">{draft.error}</p>{/if}
 				<Topo3DUploadForm
 					bind:zipFile
 					bind:glbFile
 					bind:projectFile
 					bind:cropFolderFiles
-					{isLoading}
+					isLoading={isLoading || !draft.ready}
 					onBack={() => goto(resolve('/topos/3d/select', {}))}
 					onSubmit={processFiles}
 				/>
