@@ -69,6 +69,7 @@ async function loadWorkspaceNode(
 		}
 	const { type: _type, properties: _properties, geometry: _geometry, ...entryExtras } = raw || {};
 	return {
+		clientId: crypto.randomUUID(),
 		entry: raw,
 		id,
 		path,

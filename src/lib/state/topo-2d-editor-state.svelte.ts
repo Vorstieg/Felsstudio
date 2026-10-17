@@ -52,7 +52,7 @@ type ClipboardItem =
 	| { type: 'text'; item: TextLabel };
 type HistoryOptions = { recordHistory?: boolean };
 type RouteTarget = { type: 'pitch'; pitchId: Id } | { type: 'variant'; variantId: Id } | null;
-type WrappedSessionInput = {
+export type TopoSessionInput = {
 	topo: FelsTopoDocument | Topo2DEditorDocument;
 	editorMode?: '2d' | '3d';
 	has3DTopoAvailable?: boolean;
@@ -227,7 +227,7 @@ export function createTopo2DEditorState({
 		state.transient.modelUrl = file ? URL.createObjectURL(file) : null;
 		state.transient.modelRevision++;
 	}
-	function loadSession(session: WrappedSessionInput | null, id: string | null = null) {
+	function loadSession(session: TopoSessionInput | null) {
 		const document = session?.topo || createInitialTopo();
 		if (state.transient.modelUrl) URL.revokeObjectURL(state.transient.modelUrl);
 		state.transient = createTransientState();
@@ -245,7 +245,6 @@ export function createTopo2DEditorState({
 		writeTopo(createInitialTopo(clone(document)));
 		state.clustering = session?.clustering ? clone(session.clustering) : createInitialClustering();
 		if (session?.glbBlob) setModelFile(session.glbBlob);
-		state.ui.activeDraftId = id;
 		state.selection = new Set();
 		state.selectedItems = new Set<string>();
 		projectSelection();

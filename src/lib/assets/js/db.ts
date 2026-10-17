@@ -1,72 +1,56 @@
-/** Simple IndexedDB wrapper for storing topo drafts. */
-import type { StoredTopoDraft } from '$lib/state/draft-serialization.ts';
-export type { StoredTopoDraft } from '$lib/state/draft-serialization.ts';
+import type { SharedDraft } from '$lib/state/shared-draft';
 
-const DB_NAME = 'TopoCreatorDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'topos';
+// A fresh database intentionally ignores all previous draft formats.
+const DB_NAME = 'FelsstudioDraftSessions';
+const STORE_NAME = 'drafts';
 
-function openDB(): Promise<IDBDatabase> {
+async function transact<T>(
+	mode: IDBTransactionMode,
+	action: (store: IDBObjectStore) => IDBRequest<T>
+): Promise<T> {
+	const db = await new Promise<IDBDatabase>((resolve, reject) => {
+		if (typeof indexedDB === 'undefined') return reject(new Error('IndexedDB is not supported'));
+		const request = indexedDB.open(DB_NAME, 1);
+		request.onupgradeneeded = () => request.result.createObjectStore(STORE_NAME, { keyPath: 'id' });
+		request.onsuccess = () => resolve(request.result);
+		request.onerror = () => reject(request.error);
+	});
 	return new Promise((resolve, reject) => {
-		if (typeof indexedDB === 'undefined') {
-			reject(new Error('IndexedDB is not supported'));
+		const transaction = db.transaction(STORE_NAME, mode);
+		let request: IDBRequest<T>;
+		try {
+			request = action(transaction.objectStore(STORE_NAME));
+		} catch (error) {
+			transaction.abort();
+			db.close();
+			reject(error);
 			return;
 		}
-
-		const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-		request.onupgradeneeded = () => {
-			const db = request.result;
-			if (!db.objectStoreNames.contains(STORE_NAME)) {
-				db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-			}
+		transaction.oncomplete = () => {
+			db.close();
+			resolve(request.result);
 		};
-
-		request.onsuccess = () => resolve(request.result);
-		request.onerror = () => reject(request.error);
+		transaction.onabort = () => {
+			db.close();
+			reject(transaction.error || request.error || new Error('Draft transaction aborted'));
+		};
+		transaction.onerror = () => {
+			/* onabort reports the failed transaction */
+		};
 	});
 }
 
-function wrap<T>(request: IDBRequest<T>): Promise<T> {
-	return new Promise((resolve, reject) => {
-		request.onsuccess = () => resolve(request.result);
-		request.onerror = () => reject(request.error);
-	});
-}
-
-export const topoStore = {
-	async get(id: string): Promise<StoredTopoDraft | null> {
-		try {
-			const db = await openDB();
-			const tx = db.transaction(STORE_NAME, 'readonly');
-			const store = tx.objectStore(STORE_NAME);
-			return ((await wrap(store.get(id))) as StoredTopoDraft | undefined) ?? null;
-		} catch (e) {
-			console.error('IndexedDB Error (get):', e);
-			return null;
-		}
+export const draftStore = {
+	async get(id: string): Promise<SharedDraft | null> {
+		return (await transact('readonly', (store) => store.get(id))) ?? null;
 	},
-
-	async set(topo: StoredTopoDraft): Promise<void> {
-		try {
-			const db = await openDB();
-			const tx = db.transaction(STORE_NAME, 'readwrite');
-			const store = tx.objectStore(STORE_NAME);
-			await wrap(store.put(topo));
-		} catch (e) {
-			console.error('IndexedDB Error (set):', e);
-			throw e;
-		}
+	async list(): Promise<SharedDraft[]> {
+		return transact('readonly', (store) => store.getAll());
 	},
-
+	async set(draft: SharedDraft): Promise<void> {
+		await transact('readwrite', (store) => store.put(draft));
+	},
 	async delete(id: string): Promise<void> {
-		try {
-			const db = await openDB();
-			const tx = db.transaction(STORE_NAME, 'readwrite');
-			const store = tx.objectStore(STORE_NAME);
-			await wrap(store.delete(id));
-		} catch (e) {
-			console.error('IndexedDB Error (delete):', e);
-		}
+		await transact('readwrite', (store) => store.delete(id));
 	}
 };

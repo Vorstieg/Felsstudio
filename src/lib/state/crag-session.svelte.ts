@@ -73,19 +73,7 @@ export const snapshotFelsEntryWorkspace = (
 		childEntries: childEntries.map(snapshotFelsEntryWorkspace) as FelsEntryWorkspace[]
 	};
 };
-/** Draft storage cannot retain File objects, so omit descriptors for uploads not on the server. */
-export const snapshotDraftWorkspace = (
-	node: FelsEntryWorkspace | null
-): FelsEntryWorkspace | null => {
-	const snapshot = snapshotFelsEntryWorkspace(node);
-	if (!snapshot) return null;
-	const discardUnsavedImages = (entry: FelsEntryWorkspace) => {
-		entry.images = (entry.images || []).filter((image) => !image.clientId || image.sourcePath);
-		entry.childEntries.forEach(discardUnsavedImages);
-	};
-	discardUnsavedImages(snapshot);
-	return snapshot;
-};
+
 function find(node: FelsEntryWorkspace | null, path?: string | null): FelsEntryWorkspace | null {
 	if (!node || !path) return null;
 	if (workspaceEntryPath(node) === path.replace(/^\/+|\/+$/g, '')) return node;
@@ -376,6 +364,7 @@ export function createCragEditorSession(): CragEditorSession {
 				return null;
 			}
 			const node: FelsEntryWorkspace = {
+				clientId: createImageToken(),
 				entry,
 				id: entry.properties.id,
 				path: workspaceEntryPath(parent),

@@ -61,7 +61,6 @@
 
 	let canUndo = $derived(cragEditorState.canUndo);
 	let canRedo = $derived(cragEditorState.canRedo);
-
 </script>
 
 <CragEditorToolbar

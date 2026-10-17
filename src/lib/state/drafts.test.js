@@ -1,185 +1,168 @@
+// @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-const mocks = vi.hoisted(() => ({
-	topoStore: {
-		set: vi.fn(),
-		get: vi.fn(),
-		delete: vi.fn()
+vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
+vi.mock('$app/paths', () => ({ base: '' }));
+const database = vi.hoisted(() => ({ records: new Map(), fail: false }));
+vi.mock('$lib/assets/js/db', () => ({
+	draftStore: {
+		get: vi.fn(async (id) => database.records.get(id) || null),
+		list: vi.fn(async () => [...database.records.values()]),
+		set: vi.fn(async (draft) => {
+			if (database.fail) throw new Error('Storage full');
+			database.records.set(draft.id, draft);
+		}),
+		delete: vi.fn(async (id) => database.records.delete(id))
 	}
 }));
+import { draftsState } from './drafts.svelte';
+import { createDraft, draftNode, createDraftResources, workspaceNodes } from './shared-draft';
+import { createCragEditorSession } from './crag-session.svelte';
+import { createTopo2DEditorState } from './topo-2d-editor-state.svelte';
+import { cragDraftAdapter, topoDraftAdapter } from '$lib/components/editor/use-draft-editor.svelte';
 
-vi.mock('$lib/assets/js/db.ts', () => ({ topoStore: mocks.topoStore }));
-
-import { draftsState, isBlankTopoSession } from './drafts.svelte.ts';
-
-if (!globalThis.localStorage) {
-	let values = new Map();
-	globalThis.localStorage = {
-		clear: () => values.clear(),
-		getItem: (key) => values.get(key) ?? null,
-		setItem: (key, value) => values.set(key, String(value)),
-		removeItem: (key) => values.delete(key),
-		key: (index) => [...values.keys()][index] ?? null,
-		get length() {
-			return values.size;
-		}
-	};
-}
-
-describe('draft persistence', () => {
-	beforeEach(() => {
-		localStorage.clear();
-		draftsState.drafts = [];
-		mocks.topoStore.set.mockReset().mockResolvedValue(undefined);
-		mocks.topoStore.get.mockReset().mockResolvedValue(null);
-		mocks.topoStore.delete.mockReset().mockResolvedValue(undefined);
-	});
-
-	it('saves the full session and lightweight metadata separately', async () => {
-		const topo = {
-			id: 'topo-1',
-			routes: [{ id: 'route-1', name: 'Direkter Einstieg' }]
-		};
-
-		const draftId = await draftsState.save(topo, null, {
-			editorMode: '2d',
-			entryPath: '/lower-austria/rote-wand/rote-wand/',
-			topoFileName: 'lower-austria/rote-wand/rote-wand-topo.json',
-			selectedRouteId: 'route-1',
-			name: 'Rote Wand'
-		});
-
-		expect(draftId).toBe('2d-topo-1');
-		expect(mocks.topoStore.set).toHaveBeenCalledOnce();
-		expect(mocks.topoStore.set).toHaveBeenCalledWith(
-			expect.objectContaining({
-				id: '2d-topo-1',
-				topo,
-				selectedRouteId: 'route-1'
-			})
-		);
-		expect(JSON.parse(localStorage.getItem('topo_drafts_v1'))).toEqual([
-			expect.objectContaining({
-				id: '2d-topo-1',
-				name: 'Rote Wand',
-				editorMode: '2d',
-				sourceEntryPath: '/lower-austria/rote-wand/rote-wand/',
-				sourceTopoFileName: 'lower-austria/rote-wand/rote-wand-topo.json'
-			})
-		]);
-		expect(
-			Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
-		).toEqual(['topo_drafts_v1']);
-
-		topo.routes[0].name = 'Changed after save';
-		expect(mocks.topoStore.set.mock.calls[0][0].topo.routes[0].name).toBe('Direkter Einstieg');
-	});
-
-	it('converts GLB blobs to restorable array buffers', async () => {
-		const blob = Object.assign(new Blob(['glb-data'], { type: 'model/gltf-binary' }), {
-			arrayBuffer: async () => new TextEncoder().encode('glb-data').buffer
-		});
-		await draftsState.save({}, 'draft-3d', { editorMode: '3d', name: 'Model', glbBlob: blob });
-
-		const saved = mocks.topoStore.set.mock.calls[0][0];
-		expect(saved.glbBlob).toBeUndefined();
-		expect(saved.glbArrayBuffer.byteLength).toBeGreaterThan(0);
-		expect(new TextDecoder().decode(new Uint8Array(saved.glbArrayBuffer))).toBe('glb-data');
-	});
-
-	it('finds the latest non-blank draft for the requested editor mode', async () => {
-		draftsState.drafts = [
-			{ id: 'blank', editorMode: '2d', updated: '2026-01-03T00:00:00.000Z' },
-			{ id: 'three-d', editorMode: '3d', updated: '2026-01-02T00:00:00.000Z' },
-			{ id: 'two-d', editorMode: '2d', updated: '2026-01-01T00:00:00.000Z' }
-		];
-		const sessions = {
-			blank: { editorMode: '2d', topo: { routes: [] } },
-			'three-d': { editorMode: '3d', name: '3D wall', topo: {} },
-			'two-d': { editorMode: '2d', name: '2D wall', topo: {} }
-		};
-		vi.spyOn(draftsState, 'getById').mockImplementation(async (id) => sessions[id] || null);
-
-		const result = await draftsState.getLatest('2d');
-
-		expect(result).toEqual({
-			id: 'two-d',
-			session: sessions['two-d'],
-			metadata: draftsState.drafts[2]
-		});
-		draftsState.getById.mockRestore();
-	});
-
-	it('finds the latest matching non-blank draft for a source entry path', async () => {
-		draftsState.drafts = [
-			{
-				id: 'matching-newer',
-				editorMode: '2d',
-				updated: '2026-01-03T00:00:00.000Z',
-				sourceEntryPath: 'lower-austria/rote-wand/rote-wand'
-			},
-			{
-				id: 'other-source',
-				editorMode: '2d',
-				updated: '2026-01-04T00:00:00.000Z',
-				sourceEntryPath: 'lower-austria/other/other'
-			},
-			{
-				id: 'matching-blank',
-				editorMode: '2d',
-				updated: '2026-01-05T00:00:00.000Z',
-				sourceEntryPath: 'lower-austria/rote-wand/rote-wand'
-			}
-		];
-		const sessions = {
-			'matching-newer': {
-				editorMode: '2d',
-				entryPath: 'lower-austria/rote-wand/rote-wand',
-				name: 'Rote Wand draft',
-				topo: {}
-			},
-			'other-source': {
-				editorMode: '2d',
-				entryPath: 'lower-austria/other/other',
-				name: 'Other',
-				topo: {}
-			},
-			'matching-blank': {
-				editorMode: '2d',
-				entryPath: 'lower-austria/rote-wand/rote-wand',
-				topo: { routes: [] }
-			}
-		};
-		vi.spyOn(draftsState, 'getById').mockImplementation(async (id) => sessions[id] || null);
-
-		expect(
-			await draftsState.getLatestForSource('2d', '/lower-austria/rote-wand/rote-wand/')
-		).toBeNull();
-		const result = await draftsState.getLatestForSource('2d', 'lower-austria/rote-wand/rote-wand');
-
-		expect(result).toEqual({
-			id: 'matching-newer',
-			session: sessions['matching-newer'],
-			metadata: draftsState.drafts[0]
-		});
-		draftsState.getById.mockRestore();
-	});
-
-	it('removes draft metadata and the stored session when deleting a draft', async () => {
-		draftsState.drafts = [{ id: '2d-topo-1', name: 'Rote Wand', editorMode: '2d' }];
-		localStorage.setItem('topo_drafts_v1', JSON.stringify(draftsState.drafts));
-		await draftsState.delete('2d-topo-1');
-
-		expect(draftsState.drafts).toEqual([]);
-		expect(mocks.topoStore.delete).toHaveBeenCalledWith('2d-topo-1');
-		expect(mocks.topoStore.get).not.toHaveBeenCalled();
-	});
+const restore = async (id) => createDraftResources().restore(await draftsState.get(id));
+beforeEach(() => {
+	database.records.clear();
+	database.fail = false;
+	draftsState.drafts = [];
 });
 
-describe('isBlankTopoSession', () => {
-	it('recognizes empty sessions and meaningful content', () => {
-		expect(isBlankTopoSession({ topo: { routes: [], fixPoints: [] } })).toBe(true);
-		expect(isBlankTopoSession({ topo: { routes: [{ id: 'route-1' }] } })).toBe(false);
-		expect(isBlankTopoSession({ topo: {}, glbArrayBuffer: new ArrayBuffer(0) })).toBe(false);
+describe('whole-draft persistence and editor adapters', () => {
+	it('retains crag metadata, access, unknown fields, and 3D geometry through a 2D edit', async () => {
+		const draft = createDraft('crag');
+		const node = draftNode(draft);
+		node.topo = { routes: [{ id: 'r1', points3D: [[1, 2, 3]] }], custom: { retained: true } };
+		node.access = { type: 'FeatureCollection', features: [{ id: 'parking' }] };
+		const editor = createTopo2DEditorState();
+		const adapter = topoDraftAdapter(editor, '2d');
+		await adapter.load(draft);
+		editor.topo.routes[0].name = 'Edited in 2D';
+		adapter.capture(draft);
+		await draftsState.save(draft);
+		const loaded = await restore(draft.id);
+		expect(loaded.workspace.entry.properties.name).toBe('New Crag');
+		expect(loaded.workspace.access.features).toEqual([{ id: 'parking' }]);
+		expect(loaded.workspace.topo).toMatchObject({
+			custom: { retained: true },
+			routes: [{ id: 'r1', name: 'Edited in 2D', points3D: [[1, 2, 3]] }]
+		});
+		expect(loaded).not.toHaveProperty('documents');
+	});
+	it('keeps models and clustering outside crag history, preserving them through undo and save', async () => {
+		const draft = createDraft('3d');
+		draft.contexts[draft.activeNodeId] = {
+			glbBlob: new Blob(['model']),
+			modelScale: [2, 2, 2],
+			clustering: { rawHits: [{ id: 'hit' }], cropsMap: {} }
+		};
+		const crag = createCragEditorSession();
+		const adapter = cragDraftAdapter(crag);
+		adapter.load(draft);
+		crag.setCragField('name', 'Changed');
+		crag.undo();
+		adapter.capture(draft);
+		await draftsState.save(draft);
+		const loaded = await restore(draft.id);
+		expect(await loaded.contexts[draft.activeNodeId].glbBlob.text()).toBe('model');
+		expect(loaded.contexts[draft.activeNodeId].modelScale).toEqual([2, 2, 2]);
+		expect(loaded.contexts[draft.activeNodeId].clustering.rawHits).toEqual([{ id: 'hit' }]);
+		expect(loaded.workspace.entry.properties.name).toBe('New Crag');
+	});
+	it('retains pending image data across restoration, crag undo, and another save', async () => {
+		const draft = createDraft('crag');
+		const node = draftNode(draft);
+		node.images = [{ name: 'image.png', path: 'new-crag/image.png', clientId: 'image' }];
+		node.pendingImages = [
+			{
+				file: new File(['image'], 'image.png', { type: 'image/png' }),
+				previewUrl: 'blob:transient',
+				path: 'new-crag/image.png',
+				clientId: 'image'
+			}
+		];
+		await draftsState.save(draft);
+		const loaded = await restore(draft.id);
+		const crag = createCragEditorSession();
+		const adapter = cragDraftAdapter(crag);
+		adapter.load(loaded);
+		crag.setCragField('name', 'Edit');
+		crag.undo();
+		adapter.capture(loaded);
+		await draftsState.save(loaded);
+		expect(await (await restore(draft.id)).workspace.pendingImages[0].file.text()).toBe('image');
+		expect(node.pendingImages[0].previewUrl).toBe('blob:transient');
+	});
+	it('preserves node identity and pending operations through renaming', async () => {
+		const draft = createDraft('crag');
+		const crag = createCragEditorSession();
+		const adapter = cragDraftAdapter(crag);
+		adapter.load(draft);
+		const original = draft.activeNodeId;
+		crag.setMetadataField('id', 'renamed');
+		crag.workspace.removedPaths = ['old.json'];
+		crag.workspace.removedDirectories = ['old-directory'];
+		adapter.capture(draft);
+		await draftsState.save(draft);
+		const loaded = await restore(draft.id);
+		expect(loaded.activeNodeId).toBe(original);
+		expect(loaded.workspace.entry.properties.id).toBe('renamed');
+		expect(loaded.workspace.removedPaths).toEqual(['old.json']);
+		expect(loaded.workspace.removedDirectories).toEqual(['old-directory']);
+	});
+	it('keeps sibling topos independent and prunes removed nodes only from persisted snapshots', async () => {
+		const draft = createDraft('crag');
+		const crag = createCragEditorSession();
+		const adapter = cragDraftAdapter(crag);
+		adapter.load(draft);
+		const child = crag.createWorkspaceEntry({
+			type: 'Feature',
+			properties: { id: 'sector', name: 'Sector', kind: 'sector' },
+			geometry: null
+		});
+		const id = child.clientId;
+		expect(id).toBeTruthy();
+		child.topo = { routes: [{ id: 'child' }] };
+		draft.workspace.topo = { routes: [{ id: 'root' }] };
+		draft.contexts[id] = { glbBlob: new Blob(['child-model']) };
+		adapter.capture(draft);
+		await draftsState.save(draft);
+		expect(
+			workspaceNodes((await restore(draft.id)).workspace).map((node) => node.topo.routes[0].id)
+		).toEqual(['root', 'child']);
+		crag.removeWorkspaceEntry('new-crag/sector');
+		adapter.capture(draft);
+		await draftsState.save(draft);
+		expect((await draftsState.get(draft.id)).contexts[id]).toBeUndefined();
+		expect(draft.contexts[id]).toBeDefined();
+		crag.undo();
+		adapter.capture(draft);
+		await draftsState.save(draft);
+		expect(await (await restore(draft.id)).contexts[id].glbBlob.text()).toBe('child-model');
+	});
+	it('orders saves and snapshots data before later edits', async () => {
+		const draft = createDraft('2d');
+		draft.workspace.topo = { routes: [{ id: 'first' }] };
+		const first = draftsState.save(draft);
+		draft.workspace.topo.routes[0].id = 'second';
+		const second = draftsState.save(draft);
+		draft.workspace.topo.routes[0].id = 'not-saved';
+		await Promise.all([first, second]);
+		expect((await restore(draft.id)).workspace.topo.routes[0].id).toBe('second');
+	});
+	it('does not publish metadata or damage another draft after a failed commit', async () => {
+		const first = createDraft('2d');
+		const second = createDraft('crag');
+		await draftsState.save(first);
+		await draftsState.save(second);
+		const metadata = [...draftsState.drafts];
+		database.fail = true;
+		first.name = 'Not committed';
+		await expect(draftsState.save(first)).rejects.toThrow('Storage full');
+		expect(draftsState.drafts).toEqual(metadata);
+		expect((await draftsState.get(first.id)).name).not.toBe('Not committed');
+		database.fail = false;
+		await draftsState.delete(first.id);
+		expect(await draftsState.get(first.id)).toBeNull();
+		expect(await draftsState.get(second.id)).toBeTruthy();
 	});
 });

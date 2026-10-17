@@ -8,7 +8,7 @@
 	let brokenDraftId = $state<string | null>(null);
 
 	onMount(() => {
-		draftsState.load();
+		void draftsState.load();
 	});
 
 	function handleSelect(wizardRoute: string) {
@@ -103,12 +103,14 @@
 							tabindex="0"
 							onclick={async () => {
 								brokenDraftId = null;
-								const session = await draftsState.getById(draft.id);
+								const session = await draftsState.get(draft.id);
 								if (session) {
 									const workspace =
-										(session.editorMode || draft.editorMode) === '2d'
-											? 'topos/2d/editor'
-											: 'topos/3d/editor';
+										session.lastEditor === 'crag'
+											? 'crags/editor'
+											: session.lastEditor === '2d'
+												? 'topos/2d/editor'
+												: 'topos/3d/editor';
 									goto(`${base}/${workspace}?draft=${encodeURIComponent(draft.id)}`);
 								} else {
 									brokenDraftId = draft.id;
