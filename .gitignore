@@ -8,3 +8,5 @@ vite.config.js.timestamp-*.mjs
 .env.*
 !.env.example
 .DS_Store
+test-results/
+playwright-report/

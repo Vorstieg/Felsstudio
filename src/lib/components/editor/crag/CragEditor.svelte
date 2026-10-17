@@ -61,7 +61,6 @@
 	import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.ts';
 	import { createRouteEditController } from './route-editing.ts';
 	import { getGeometryCenter } from '$lib/assets/js/sector-utils.ts';
-	import type { Point2D } from '@vorstieg/fels-types/types';
 
 	type Point2 = [number, number];
 	type Selection = CragSelection;

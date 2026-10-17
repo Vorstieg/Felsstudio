@@ -1,10 +1,6 @@
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
 import type { PathFeature, Point2D } from '@vorstieg/fels-types/types';
-import type {
-	AccessTrackFeature,
-	ActiveTrackTarget,
-	RoutePathTarget
-} from './crag-track-types.ts';
+import type { AccessTrackFeature, ActiveTrackTarget, RoutePathTarget } from './crag-track-types.ts';
 
 type CragSelection = {
 	type?: string;

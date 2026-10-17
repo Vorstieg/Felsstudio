@@ -475,13 +475,21 @@
 		"path_desc": "Hochtouren und Klettersteige mit eingebetteten Routenpfaden verwalten."
 	},
 	"auth": {
-		"title": "Authentifizierung erforderlich",
-		"description": "Gib deine Felslager-Zugangsdaten ein, um Änderungen zu speichern.",
-		"username": "Benutzername",
+		"title": "Anmelden",
+		"description": "Melde dich mit deinem persönlichen Konto an, um gemeinsame Inhalte zu speichern.",
+		"email": "E-Mail",
 		"password": "Passwort",
-		"username_placeholder": "admin",
 		"login": "Anmelden",
-		"cancel": "Abbrechen"
+		"logout": "Abmelden",
+		"cancel": "Abbrechen",
+		"account": "Konto",
+		"loading": "Wird geladen…",
+		"working": "Bitte warten…",
+		"local_notice": "Lokale Entwürfe bleiben auf diesem Gerät und werden nicht mit deinem Konto synchronisiert.",
+		"network_error": "Der Server ist nicht erreichbar. Prüfe deine Verbindung und versuche es erneut.",
+		"login_failed": "Anmeldung fehlgeschlagen. Prüfe deine E-Mail-Adresse und dein Passwort.",
+		"session_expired": "Deine Sitzung ist abgelaufen. Melde dich erneut an. Deine lokale Arbeit bleibt erhalten.",
+		"save_forbidden": "Der Server hat diese Änderung abgelehnt. Deine lokale Arbeit bleibt erhalten."
 	},
 	"save": {
 		"saving": "Speichert...",

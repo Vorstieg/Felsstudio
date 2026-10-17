@@ -12,6 +12,7 @@
 		renameFile
 	} from '$lib/api/felslager.ts';
 	import { authState } from '$lib/api/auth.svelte.ts';
+	import SessionInfo from '$lib/components/ui/SessionInfo.svelte';
 	import type { ApiListEntry } from '$lib/types/api.ts';
 
 	const errorMessage = (value: unknown) => (value instanceof Error ? value.message : String(value));
@@ -287,6 +288,7 @@
 				{uploading ? 'Uploading…' : 'Add file'}
 			</button>
 			{#if selectedFile && selectedFileType !== 'image'}
+				<SessionInfo />
 				<button class="btn-primary px-4" onclick={saveFile} disabled={saving}>
 					{saving ? $_('save.saving') : $_('save.save_to_server')}
 				</button>

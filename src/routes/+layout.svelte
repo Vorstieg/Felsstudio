@@ -13,6 +13,7 @@
 	import { onMount } from 'svelte';
 	import { navigating } from '$app/state';
 	import { browser } from '$app/environment';
+	import { authState } from '$lib/api/auth.svelte.ts';
 	addMessages('en', en);
 	addMessages('de', de);
 
@@ -23,6 +24,9 @@
 
 	onMount(() => {
 		const cleanupViewport = initViewport();
+		const refreshAuth = () => void authState.refresh();
+		refreshAuth();
+		window.addEventListener('focus', refreshAuth);
 
 		const erudaWindow = window as Window & { __FELSSTUDIO_ERUDA_INITIALIZED__?: boolean };
 		if (browser && import.meta.env.DEV && !erudaWindow.__FELSSTUDIO_ERUDA_INITIALIZED__) {
@@ -35,7 +39,10 @@
 				});
 		}
 
-		return cleanupViewport;
+		return () => {
+			cleanupViewport();
+			window.removeEventListener('focus', refreshAuth);
+		};
 	});
 
 	let { children }: { children?: Snippet } = $props();
