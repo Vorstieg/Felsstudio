@@ -28,6 +28,30 @@ beforeEach(() => {
 });
 
 describe('whole-draft persistence and editor adapters', () => {
+	it('replaces crag history and upload caches when reloading a published reviewer snapshot', () => {
+		const editor = createCragEditorSession();
+		const adapter = cragDraftAdapter(editor);
+		const draft = createDraft('crag');
+		const node = draftNode(draft);
+		node.pendingImages = [
+			{
+				clientId: 'photo',
+				path: 'new-crag/photo.jpg',
+				file: new File(['photo'], 'photo.jpg'),
+				previewUrl: 'blob:old-preview'
+			}
+		];
+		node.images = [{ clientId: 'photo', name: 'photo.jpg', path: 'new-crag/photo.jpg' }];
+		adapter.load(draft);
+		editor.setCragField('name', 'Correction');
+		expect(editor.canUndo).toBe(true);
+		expect(editor.getPendingImages(node)).toHaveLength(1);
+		const published = structuredClone(draft);
+		published.workspace.pendingImages = [];
+		adapter.load(published);
+		expect(editor.canUndo).toBe(false);
+		expect(editor.getPendingImages(published.workspace)).toEqual([]);
+	});
 	it('retains crag metadata, access, unknown fields, and 3D geometry through a 2D edit', async () => {
 		const draft = createDraft('crag');
 		const node = draftNode(draft);

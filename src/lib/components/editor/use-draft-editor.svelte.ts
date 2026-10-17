@@ -90,6 +90,7 @@ export function topoDraftAdapter(
 export function cragDraftAdapter(editor: CragEditorSession): DraftAdapter {
 	return {
 		load(draft) {
+			editor.reset();
 			editor.workspace = draft.workspace;
 			const path = workspaceNodePath(draftNode(draft));
 			editor.activeWorkspaceEntryPath = path;
@@ -126,18 +127,21 @@ export function useDraftEditor({
 	adapter,
 	entryPath,
 	resume = mode !== 'crag',
-	onReady
+	onReady,
+	beforeReview
 }: {
 	mode: EditorMode;
 	adapter: DraftAdapter;
 	entryPath?: string | null;
 	resume?: boolean;
 	onReady?: () => void | Promise<void>;
+	beforeReview?: () => void;
 }) {
 	let draft = $state<SharedDraft | null>(null);
 	let ready = $state(false);
 	let error = $state('');
 	let navigating = $state(false);
+	let reviewing = $state(false);
 	let bypass = false;
 	let timeout: ReturnType<typeof setTimeout> | undefined;
 	const resources = createDraftResources();
@@ -167,7 +171,48 @@ export function useDraftEditor({
 			return error;
 		},
 		get busy() {
-			return navigating;
+			return navigating || reviewing;
+		},
+		get reviewId() {
+			return draft?.reviewId;
+		},
+		get reviewProductionSaved() {
+			return draft?.reviewProductionSaved || false;
+		},
+		async submitReview() {
+			if (reviewing) return;
+			reviewing = true;
+			try {
+				beforeReview?.();
+				await flush();
+				const { createReviewPackage } = await import('$lib/assets/js/review-package');
+				const { submitReview } = await import('$lib/api/reviews');
+				return await submitReview(await createReviewPackage((await draftsState.get(draft!.id))!));
+			} finally {
+				reviewing = false;
+			}
+		},
+		async publishReview() {
+			if (reviewing) return false;
+			reviewing = true;
+			try {
+				// A cleanup retry must not recapture or republish subsequent editor changes.
+				if (!draft?.reviewProductionSaved) {
+					beforeReview?.();
+					await flush();
+				}
+				const { publishReview } = await import('$lib/assets/js/publish-review');
+				const saved = resources.restore((await draftsState.get(draft!.id))!);
+				try {
+					return await publishReview(saved, () => draftsState.save(saved));
+				} finally {
+					draft = saved;
+					await adapter.load(draft);
+					await draftsState.save(draft);
+				}
+			} finally {
+				reviewing = false;
+			}
 		},
 		flush,
 		href(route: string) {
@@ -202,7 +247,7 @@ export function useDraftEditor({
 			await onReady?.();
 		})().catch(fail);
 		const onHide = () => {
-			if (ready && document.visibilityState === 'hidden') void flush().catch(fail);
+			if (ready && !reviewing && document.visibilityState === 'hidden') void flush().catch(fail);
 		};
 		document.addEventListener('visibilitychange', onHide);
 		window.addEventListener('pagehide', onHide);
@@ -215,7 +260,10 @@ export function useDraftEditor({
 		};
 	});
 	$effect(() => {
-		if (!ready) return;
+		if (!ready || reviewing) {
+			clearTimeout(timeout);
+			return;
+		}
 		adapter.signature();
 		clearTimeout(timeout);
 		timeout = setTimeout(() => void flush().catch(fail), 2000);
@@ -227,6 +275,7 @@ export function useDraftEditor({
 		}
 		if (!ready || navigation.willUnload || !navigation.to) return;
 		navigation.cancel();
+		if (reviewing) return;
 		if (navigating) return;
 		navigating = true;
 		error = '';

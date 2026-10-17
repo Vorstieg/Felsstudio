@@ -283,6 +283,11 @@
 			</div>
 		</div>
 		<div class="flex gap-2">
+			<a
+				class="flex items-center gap-2 rounded-sm px-3 py-1.5 text-ui-label hover:bg-black/5 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue!"
+				href={`${base}/felslager/reviews`}
+				><i class="fa-solid fa-inbox" aria-hidden="true"></i>Review inbox</a
+			>
 			<input bind:this={uploadInput} type="file" class="hidden" onchange={handleUploadSelection} />
 			<button class="btn-secondary px-4" onclick={selectFileForUpload} disabled={uploading}>
 				{uploading ? 'Uploading…' : 'Add file'}
