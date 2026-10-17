@@ -2,6 +2,7 @@
 	import { _ } from 'svelte-i18n';
 	import type { Snippet } from 'svelte';
 	import SaveStatus from '$lib/components/ui/SaveStatus.svelte';
+	import SessionInfo from '$lib/components/ui/SessionInfo.svelte';
 	import { viewport } from '$lib/state/viewport.svelte.ts';
 	import ToolButton from './ToolButton.svelte';
 	import ToolActionButton from './ToolActionButton.svelte';
@@ -117,6 +118,7 @@
 				{/if}
 			{/if}
 			{#if save}
+				<SessionInfo />
 				<SaveStatus status={save.status} errorMessage={save.errorMessage} />
 				<button
 					type="button"

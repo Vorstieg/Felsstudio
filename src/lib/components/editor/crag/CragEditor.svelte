@@ -61,6 +61,7 @@
 	import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.ts';
 	import { createRouteEditController } from './route-editing.ts';
 	import { getGeometryCenter } from '$lib/assets/js/sector-utils.ts';
+
 	type Point2 = [number, number];
 	type Selection = CragSelection;
 	type RoutePathDraft = RoutePathTarget;
@@ -103,12 +104,12 @@
 		[activeWorkspace, ...activeSectors].flatMap((node) =>
 			node?.entry?.properties.id && node.topo
 				? [
-						{
-							node,
-							path: workspaceNodeDocumentPaths(node).topo,
-							data: node.topo
-						}
-					]
+					{
+						node,
+						path: workspaceNodeDocumentPaths(node).topo,
+						data: node.topo
+					}
+				]
 				: []
 		)
 	);
@@ -306,9 +307,9 @@
 			session.activeMetadataTarget || session.activeWorkspaceEntryPath;
 		selectedObject = cragEditorState.activeWorkspaceEntryPath
 			? {
-					type: 'entry',
-					key: cragEditorState.activeWorkspaceEntryPath
-				}
+				type: 'entry',
+				key: cragEditorState.activeWorkspaceEntryPath
+			}
 			: null;
 		activeCragDraftId = id;
 		return true;
@@ -452,9 +453,9 @@
 				const distanceTo = (feature: (typeof features)[number]) =>
 					feature.geometry.type === 'Point'
 						? turf.distance(
-								turf.point(e.lngLat.toArray()),
-								turf.point(feature.geometry.coordinates)
-							)
+							turf.point(e.lngLat.toArray()),
+							turf.point(feature.geometry.coordinates)
+						)
 						: Infinity;
 				const closest = features.reduce((prev, curr) => {
 					const prevDist = distanceTo(prev);
@@ -558,7 +559,8 @@
 					duration: 500
 				});
 			},
-			() => {},
+			() => {
+			},
 			{ enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
 		);
 	}
@@ -648,7 +650,8 @@
 	}
 
 	async function saveToServer() {
-		if (!trackEditor.requestLeave(() => {})) {
+		if (!trackEditor.requestLeave(() => {
+		})) {
 			toolOptionsOpen = true;
 			saveStatus = 'error';
 			saveError = $_(trackEditor.message);
