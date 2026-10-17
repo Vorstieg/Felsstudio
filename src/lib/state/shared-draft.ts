@@ -15,6 +15,9 @@ export type SharedDraft = {
 	workspace: FelsEntryWorkspace;
 	contexts: Record<string, Omit<TopoSessionInput, 'topo'>>;
 	media: Record<string, { background?: Blob; crops: Record<string, Blob> }>;
+	reviewId?: string;
+	/** Production has been saved; only deletion of the review archive remains. */
+	reviewProductionSaved?: boolean;
 };
 export function workspaceNodes<T extends { childEntries: T[] }>(root: T): T[] {
 	return [root, ...root.childEntries.flatMap(workspaceNodes<T>)];

@@ -287,6 +287,10 @@
 		mode: 'crag',
 		entryPath: untrack(() => entryPath),
 		adapter: cragDraftAdapter(cragEditorState),
+		beforeReview: () => {
+			if (!trackEditor.requestLeave(() => {})) throw new Error($_(trackEditor.message));
+			if (cragEditorState.hierarchyErrors.length) throw new Error(cragEditorState.hierarchyErrors[0].message);
+		},
 		onReady: () => {
 			selectedObject = { type: 'entry', key: cragEditorState.activeWorkspaceEntryPath! };
 		}

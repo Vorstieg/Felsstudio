@@ -33,7 +33,7 @@
 		{#if draft.error}
 			<p
 				role="alert"
-				class="absolute right-0 top-full z-50 mt-2 w-64 max-w-[calc(100vw-1rem)] rounded-sm border border-rose-200 bg-white p-2 text-micro-data text-rose-600 shadow-panel"
+				class="mt-2 rounded-sm border border-rose-200 bg-white p-2 text-micro-data text-rose-600 shadow-panel"
 			>
 				{$_('draft.save_failed')}: {draft.error}
 			</p>

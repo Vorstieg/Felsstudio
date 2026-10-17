@@ -57,18 +57,19 @@ test('one anonymous draft survives crag, 2D, and 3D switches and reload', async 
 	const id = await seedDraft(page);
 	await page.goto(`/topos/2d/editor?draft=${id}`);
 	const navigation = page.getByRole('navigation', { name: 'Draft editors' });
-	await expect(navigation.getByRole('combobox')).toBeEnabled();
-	await expectBesideSave(page);
+	await expectCompactActions(page);
 	await page.getByLabel('Description', { exact: true }).fill('Edited in 2D');
+	await page.getByRole('button', { name: 'More editor actions', exact: true }).click();
 	await navigation.getByRole('combobox').selectOption('crag');
 	await expect(page).toHaveURL(/\/crags\/editor\?draft=/);
 	await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Original crag');
-	await expectBesideSave(page);
+	await expectCompactActions(page);
 	await page.getByLabel('Name', { exact: true }).fill('Edited crag');
+	await page.getByRole('button', { name: 'More editor actions', exact: true }).click();
 	await navigation.getByRole('combobox').selectOption('3d');
 	await expect(page).toHaveURL(/\/topos\/3d\/editor\?draft=/);
-	await expect(navigation.getByRole('combobox')).toBeEnabled();
-	await expectBesideSave(page);
+	await expectCompactActions(page);
+	await page.getByRole('button', { name: 'More editor actions', exact: true }).click();
 	await navigation.getByRole('combobox').selectOption('2d');
 	await expect(page).toHaveURL(/\/topos\/2d\/editor\?draft=/);
 	await expect(page.getByLabel('Description', { exact: true })).toHaveValue('Edited in 2D');
@@ -87,13 +88,13 @@ test('a failed IndexedDB transaction prevents switching editors and keeps unsave
 	const id = await seedDraft(page);
 	await page.goto(`/topos/2d/editor?draft=${id}`);
 	const navigation = page.getByRole('navigation', { name: 'Draft editors' });
-	await expect(navigation.getByRole('combobox')).toBeEnabled();
 	await page.getByLabel('Description', { exact: true }).fill('Keep this unsaved edit');
 	await page.evaluate(() => {
 		IDBObjectStore.prototype.put = function () {
 			throw new DOMException('Storage full', 'QuotaExceededError');
 		};
 	});
+	await page.getByRole('button', { name: 'More editor actions', exact: true }).click();
 	await navigation.getByRole('combobox').selectOption('crag');
 	await expect(navigation.getByRole('alert')).toContainText('Storage full');
 	await expect(page).toHaveURL(/\/topos\/2d\/editor\?draft=/);
@@ -150,18 +151,17 @@ test('a fresh topo has its draft and node IDs before the first editor switch', a
 	);
 	await page.goto('/topos/2d/editor');
 	const navigation = page.getByRole('navigation', { name: 'Draft editors' });
-	await expect(navigation.getByRole('combobox')).toBeEnabled({
-		timeout: 20000
-	});
-	await expectBesideSave(page);
+	await expectCompactActions(page);
 	const id = new URL(page.url()).searchParams.get('draft');
 	expect(id).toBeTruthy();
+	await page.getByRole('button', { name: 'More editor actions', exact: true }).click();
 	await navigation.getByRole('combobox').selectOption('crag');
 	await expect(page).toHaveURL(/\/crags\/editor\?draft=/);
 	await expect(page.getByLabel('Name', { exact: true })).toHaveValue('New Crag');
-	await expectBesideSave(page);
+	await expectCompactActions(page);
 	expect(new URL(page.url()).searchParams.get('draft')).toBe(id);
 	expect(new URL(page.url()).searchParams.get('node')).toBeTruthy();
+	await expect(page.getByRole('searchbox')).toBeVisible();
 });
 
 test('adding a model keeps the draft and its existing topo edits', async ({ page }) => {
@@ -180,7 +180,8 @@ test('adding a model keeps the draft and its existing topo edits', async ({ page
 	await expect(page).toHaveURL(/\/topos\/3d\/editor\?draft=/);
 	expect(new URL(page.url()).searchParams.get('draft')).toBe(id);
 	const navigation = page.getByRole('navigation', { name: 'Draft editors' });
-	await expectBesideSave(page);
+	await expectCompactActions(page);
+	await page.getByRole('button', { name: 'More editor actions', exact: true }).click();
 	await navigation.getByRole('combobox').selectOption('2d');
 	await expect(page.getByLabel('Description', { exact: true })).toHaveValue('Original topo');
 	await page.reload();
@@ -193,15 +194,24 @@ test('adding a model keeps the draft and its existing topo edits', async ({ page
 	).toBe(true);
 });
 
-async function expectBesideSave(page) {
-	const select = await page.getByRole('combobox', { name: 'Draft editors' }).boundingBox();
-	const save = await page.getByRole('button', { name: 'Save', exact: true }).boundingBox();
-	expect(select).not.toBeNull();
+async function expectCompactActions(page) {
+	await expect(
+		page.getByRole('group', { name: 'Publishing actions', exact: true }).getByRole('button')
+	).toHaveCount(2);
+	await expect(page.getByRole('combobox', { name: 'Draft editors' })).not.toBeVisible();
+	const primary = page.getByRole('button', { name: 'Submit for review', exact: true });
+	await expect(primary).toBeEnabled();
+	const save = await primary.boundingBox();
 	expect(save).not.toBeNull();
-	expect(select.y).toBeLessThan(60);
-	expect(Math.abs(select.y - save.y)).toBeLessThan(10);
-	expect(save.x + save.width).toBeLessThanOrEqual(select.x);
+	const toolbar = await page
+		.getByRole('group', { name: 'Editor toolbar', exact: true })
+		.boundingBox();
+	expect(toolbar).not.toBeNull();
+	expect(toolbar.y).toBeLessThan(16);
+	expect(toolbar.height).toBeLessThanOrEqual(60);
+	const more = await page.getByRole('button', { name: 'More editor actions' }).boundingBox();
+	expect(more.x).toBeGreaterThanOrEqual(save.x + save.width);
+	expect(more.x + more.width).toBeLessThanOrEqual(page.viewportSize().width);
 	expect(save.x).toBeGreaterThanOrEqual(0);
-	expect(select.x + select.width).toBeLessThanOrEqual(page.viewportSize().width);
 	await page.screenshot({ path: test.info().outputPath('toolbar.png') });
 }

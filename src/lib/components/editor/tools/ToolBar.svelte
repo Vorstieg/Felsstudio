@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { _ } from 'svelte-i18n';
 	import type { Snippet } from 'svelte';
-	import SharedDraftNavigation from '../SharedDraftNavigation.svelte';
+	import ReviewActions from '../ReviewActions.svelte';
+	import { getDraftEditor } from '../use-draft-editor.svelte';
 	import SaveStatus from '$lib/components/ui/SaveStatus.svelte';
 	import SessionInfo from '$lib/components/ui/SessionInfo.svelte';
 	import { viewport } from '$lib/state/viewport.svelte.ts';
@@ -55,6 +56,7 @@
 	} = $props();
 
 	let isCompact = $derived(!viewport.isExpanded);
+	const draft = getDraftEditor();
 	function observeMobileDock(node: HTMLDivElement) {
 		const updateDockHeight = () => {
 			document.documentElement.style.setProperty(
@@ -86,7 +88,7 @@
 	}
 </script>
 
-<div class="fixed top-2 left-2 right-2 z-50">
+<div class="fixed top-2 left-2 right-2 z-50" role="group" aria-label="Editor toolbar">
 	<div class="panel flex items-center justify-between gap-2 bg-white p-1.5 shadow-panel">
 		<div class="flex min-w-0 items-center gap-2.5">
 			{#if !isCompact}
@@ -141,16 +143,25 @@
 				{/if}
 			{/if}
 			{#if save}
-				<SessionInfo />
-				<SaveStatus status={save.status} errorMessage={save.errorMessage} />
-				<button
-					type="button"
-					class="bg-creator-blue rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white shadow-sm transition-none hover:bg-creator-blue-active disabled:opacity-40 md:px-4"
-					onclick={() => runAction(save, { finish, cancel })}
-					disabled={save.disabled || save.status === 'saving'}
-					>{save.label || $_('save.save_to_server')}</button
-				>
-				<SharedDraftNavigation />
+				{#if draft}
+					<ReviewActions
+						disabled={Boolean(finish && !finish.disabled) || save.status === 'saving'}
+						onSave={() => runAction(save, { finish, cancel })}
+						saveDisabled={save.disabled || save.status === 'saving'}
+						saveStatus={save.status}
+						saveError={save.errorMessage}
+					/>
+				{:else}
+					<SessionInfo />
+					<SaveStatus status={save.status} errorMessage={save.errorMessage} />
+					<button
+						type="button"
+						class="btn-pill gap-2 whitespace-nowrap disabled:cursor-default disabled:opacity-40 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue!"
+						onclick={() => runAction(save, { finish, cancel })}
+						disabled={save.disabled || save.status === 'saving'}
+						>{save.label || $_('save.save_to_server')}</button
+					>
+				{/if}
 			{/if}
 		</div>
 	</div>
