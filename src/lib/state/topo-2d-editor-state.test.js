@@ -13,16 +13,13 @@ const document = () => ({
 describe('createTopo2DEditorState', () => {
 	it('keeps the crag save destination and draft when applying a JSON document', () => {
 		const editor = createTopo2DEditorState({ topo: document() });
-		editor.loadSession(
-			{
-				topo: document(),
-				editorMode: '2d',
-				entryPath: 'area/crag/crag',
-				topoFileName: 'area/crag/crag-topo.json',
-				has3DTopoAvailable: true
-			},
-			'existing-draft'
-		);
+		editor.loadSession({
+			topo: document(),
+			editorMode: '2d',
+			entryPath: 'area/crag/crag',
+			topoFileName: 'area/crag/crag-topo.json',
+			has3DTopoAvailable: true
+		});
 		editor.ui.workspace = '/topos/2d/editor';
 		const ui = editor.ui;
 		const imported = { routes: [{ id: 'imported-route' }] };
@@ -34,7 +31,6 @@ describe('createTopo2DEditorState', () => {
 		expect(editor.ui).toMatchObject({
 			editorMode: '2d',
 			workspace: '/topos/2d/editor',
-			activeDraftId: 'existing-draft',
 			has3DTopoAvailable: true
 		});
 		expect(editor.getSaveSession()).toMatchObject({
@@ -44,7 +40,7 @@ describe('createTopo2DEditorState', () => {
 		});
 		editor.reset();
 		expect(editor.ui.topoFileName).toBeNull();
-		expect(editor.ui.activeDraftId).toBeNull();
+		expect(editor.ui).not.toHaveProperty('activeDraftId');
 	});
 
 	it.each(['constructor', 'load', 'loadSession'])(

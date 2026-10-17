@@ -1,4 +1,9 @@
 {
+	"draft": {
+		"add_model": "3D-Modell hinzufügen",
+		"editors": "Entwurfseditoren",
+		"save_failed": "Entwurf konnte nicht gespeichert werden"
+	},
 	"menu": {
 		"map": "Karte",
 		"list": "Liste",

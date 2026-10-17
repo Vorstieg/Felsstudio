@@ -20,25 +20,20 @@
 		createTopo2DEditorState,
 		provideTopo2DEditorState
 	} from '$lib/state/topo-2d-editor-state.svelte.ts';
-	import { isBlankTopoSession } from '$lib/state/drafts.svelte.ts';
-	import { useTopoDraftAutosave } from '$lib/components/editor/use-topo-draft-autosave.svelte.ts';
+	import { useDraftEditor, topoDraftAdapter } from '$lib/components/editor/use-draft-editor.svelte';
 
 	// 2D Editor imports
 
-	import { generateSymbolId, initializeIdCounters } from '$lib/assets/js/id-utils.ts';
-	import { writeFile, writeJson } from '$lib/api/felslager.ts';
+	import { generateSymbolId } from '$lib/assets/js/id-utils.ts';
+	import { writeFile } from '$lib/api/felslager.ts';
+	import { publishTopoDocument } from '$lib/assets/js/publish-draft-assets';
 	import { resolveTopoSavePath } from '$lib/assets/js/topo-save-path.ts';
 	import { authState } from '$lib/api/auth.svelte.ts';
 	import ToolPalette3D from '$lib/components/editor/3d/ToolPalette3D.svelte';
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
 	import { fixpointSymbols } from '@vorstieg/topo-renderer';
-	import {
-		loadTopoEditorEntry,
-		persistTopoSessionImmediately
-	} from '$lib/assets/js/open-topo-editor-entry.ts';
+
 	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
-	import type { DraftSession } from '$lib/state/draft-serialization.ts';
 	import type { Topo2DEditorDocument } from '$lib/state/topo-2d-editor-initial-state.ts';
 	import type { TopoDrawingTarget } from '$lib/state/topo-drawing-target.ts';
 
@@ -205,68 +200,15 @@
 		};
 	});
 
-	function restoreSession(session: DraftSession, id: string) {
-		topoSession.loadSession(session, id);
-		topoSession.ui.editorMode = session.editorMode === '2d' ? '2d' : '3d';
-		topoSession.ui.workspace =
-			topoSession.ui.editorMode === '2d' ? 'topos/2d/editor' : 'topos/3d/editor';
-	}
-
-	useTopoDraftAutosave({
-		session: topoSession,
-		draftId: browser ? new URL(window.location.href).searchParams.get('draft') : null,
+	const draft = useDraftEditor({
+		mode: '3d',
 		entryPath: initialEntryPath,
-		loadEntrySession: async (entryPath) => {
-			const { loadedTopo } = await loadTopoEditorEntry({
-				entryPath,
-				workspace: '/topos/3d/editor',
-				topoSession: topoSession
-			});
-			if (!loadedTopo) {
-				const draftId = await persistTopoSessionImmediately(topoSession, $state.snapshot);
-				goto(`${resolve('/topos/3d/upload', {})}?draft=${encodeURIComponent(draftId)}`);
-				return false;
-			}
-		},
-		editorMode: '3d',
-		getWorkspace: () => workspace,
-		shouldRestore: () =>
-			!initialEntryPath &&
-			(workspace.endsWith('edit') ||
-				isBlankTopoSession({
-					topo: topoSession.topo,
-					clustering: topoSession.clustering,
-					glbBlob: topoSession.transient.glbBlob
-				})),
-		restoreSession: (session, id) => {
-			restoreSession(session, id);
+		adapter: topoDraftAdapter(topoSession, '3d'),
+		onReady: () => {
 			activeTool = getInitialActiveTool();
-			initializeIdCounters(topoSession.topo);
-		},
-		onInitialized: () => {
-			initializeIdCounters(topoSession.topo);
-			activeTool = getInitialActiveTool();
-			if (topoSession.transient.modelUrl) loadGlbFromUrl(topoSession.transient.modelUrl);
-		},
-		getSaveSignature: () =>
-			JSON.stringify({
-				routes: topoSession.topo.routes,
-				fixPoints: topoSession.topo.fixPoints,
-				outlines: topoSession.topo.outlines,
-				textLabels: topoSession.topo.textLabels,
-				image2D: topoSession.topo.image2D,
-				imageAspectRatio: topoSession.topo.imageAspectRatio,
-				canvasAspectRatio: topoSession.ui.canvasAspectRatio,
-				backgroundFit: topoSession.topo.backgroundFit,
-				name: topoSession.ui.name,
-				modelOffset: topoSession.ui.modelOffset,
-				modelRotation: topoSession.ui.modelRotation,
-				modelScale: topoSession.ui.modelScale,
-				scale: topoSession.ui.scale,
-				clustering: topoSession.clustering,
-				glbBlob: topoSession.transient.glbBlob,
-				modelRevision: topoSession.transient.modelRevision
-			})
+			if (topoSession.transient.modelUrl) void loadGlbFromUrl(topoSession.transient.modelUrl);
+			else if (initialEntryPath) void goto(draft.href('topos/3d/upload'));
+		}
 	});
 
 	async function loadGlbFromUrl(url: string) {
@@ -425,7 +367,7 @@
 				throw new Error('Topo file path is unavailable');
 			}
 			topoSession.ui.topoFileName = topoFileName;
-			await writeJson(topoFileName, topoToSave);
+			await publishTopoDocument(topoFileName, topoToSave);
 
 			// Upload GLB model if available (3D mode)
 			if (topoSession.transient.glbBlob) {
@@ -670,4 +612,12 @@
 		bind:modelScale={topoSession.ui.modelScale}
 		onClose={closeMapModal}
 	/>
+{/if}
+
+{#if draft.ready && !topoSession.transient.glbBlob}
+	<button
+		type="button"
+		class="fixed bottom-14 left-2 z-[60] panel bg-white px-3 py-2 text-ui-label"
+		onclick={() => goto(draft.href('topos/3d/upload'))}>{$_('draft.add_model')}</button
+	>
 {/if}

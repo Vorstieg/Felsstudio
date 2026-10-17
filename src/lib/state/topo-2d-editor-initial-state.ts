@@ -11,7 +11,6 @@ export type Topo2DEditorDocument = Pick<
 	| 'tags'
 	| 'image2D'
 	| 'backgroundFit'
-	| 'wallAzimuth'
 	| 'imageAspectRatio'
 	| 'date'
 	| 'updated'
@@ -20,6 +19,7 @@ export type Topo2DEditorDocument = Pick<
 	| 'paths'
 > & {
 	backgroundFit?: 'contain' | 'cover';
+	wallAzimuth?: number;
 	routes: Route[];
 	fixPoints: FixPoint[];
 	outlines: OutlineDraft[];
@@ -75,8 +75,6 @@ export interface Topo2DEditorUi {
 	selectedOutlineId: string | number | null;
 	selectedFixpointId: string | number | null;
 	selectedTextLabelId: string | number | null;
-	activeDraftId: string | null;
-	lastSaved: string | null;
 }
 
 export interface Topo2DEditorClustering {
@@ -228,9 +226,7 @@ export function createInitialTopo2DEditorUi(): Topo2DEditorUi {
 		selectedVariantId: null,
 		selectedOutlineId: null,
 		selectedFixpointId: null,
-		selectedTextLabelId: null,
-		activeDraftId: null,
-		lastSaved: null
+		selectedTextLabelId: null
 	};
 }
 

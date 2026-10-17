@@ -9,16 +9,13 @@
 		Marker,
 		PointLike
 	} from 'maplibre-gl';
-	import type { FelsEntryWorkspace } from '$lib/types/crag';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import * as turf from '@turf/turf';
 	import { snapToNearestWay } from '../track/track-snapping.ts';
 	import {
 		createCragEditorSession,
-		createFelsEntry,
 		createImageToken,
-		provideCragEditorSession,
-		snapshotDraftWorkspace
+		provideCragEditorSession
 	} from '$lib/state/crag-session.svelte.ts';
 	import { provideCragEditorTools } from '$lib/state/crag-controller-context.svelte.ts';
 	import { viewport } from '$lib/state/viewport.svelte.ts';
@@ -28,13 +25,13 @@
 	import CragEditorMap from '$lib/components/editor/crag/CragEditorMap.svelte';
 	import CragEditorLayout from '$lib/components/editor/crag/CragEditorLayout.svelte';
 	import RouteDetailModal from '$lib/components/editor/crag/RouteDetailModal.svelte';
+	import { publishDraftModels, publishTopoDocument } from '$lib/assets/js/publish-draft-assets';
+	import { writeJson } from '$lib/api/felslager';
+	import type { FelsTopoDocument } from '@vorstieg/fels-types/types';
 	import { authState } from '$lib/api/auth.svelte.ts';
-	import { storage } from '$lib/assets/js/storage-utils.ts';
+	import { useDraftEditor, cragDraftAdapter } from '../use-draft-editor.svelte';
 	import { Topo } from '$lib/assets/js/topo-paths.ts';
-	import {
-		workspaceDocumentPaths,
-		workspaceNodeDocumentPaths
-	} from '$lib/assets/js/workspace-paths.ts';
+	import { workspaceNodeDocumentPaths } from '$lib/assets/js/workspace-paths.ts';
 	import { loadFelsEntryWorkspaceDetails } from '$lib/assets/js/load-crag-editor-entry.ts';
 	import { saveCragWorkspace } from '$lib/assets/js/save-crag-workspace.ts';
 	import {
@@ -65,15 +62,11 @@
 	type Point2 = [number, number];
 	type Selection = CragSelection;
 	type RoutePathDraft = RoutePathTarget;
-	type DraftSession = {
-		workspace: FelsEntryWorkspace;
-		activeWorkspaceEntryPath: string | null;
-		activeMetadataTarget?: string | null;
-	};
 	let {
 		inspectorShadow = true,
-		initialSession = null
-	}: { inspectorShadow?: boolean; initialSession?: DraftSession | null } = $props();
+		entryPath = null
+	}: { inspectorShadow?: boolean; entryPath?: string | null } = $props();
+
 	const cragEditorState = provideCragEditorSession(createCragEditorSession());
 
 	// Layout flags
@@ -126,11 +119,6 @@
 	let routeEditDraft = $state<RoutePathDraft | null>(null);
 	let areTrackViewportSyncHandlersReady = false;
 	let suppressNextMapClick = false;
-	let canAutosaveSession = $state(false);
-	let autosaveSessionTimeout: ReturnType<typeof setTimeout> | undefined;
-	let activeCragDraftId = $state<string | null>(null);
-	const CRAG_DRAFTS_KEY = 'crag_editor_drafts_v1';
-	const cragDraftSessionKey = (id: string) => `crag_editor_draft_session_${id}`;
 
 	const trackEditor = useCragTrackEditor({
 		persistence: createCragTrackPersistence(cragEditorState, {
@@ -295,99 +283,14 @@
 		onEditTrack: editTrack
 	});
 
-	function isBlankCragSession() {
-		return !cragEditorState.workspace;
-	}
-
-	function restoreCragSession(session: DraftSession | null, id: string | null = null) {
-		if (!session?.workspace) return false;
-		cragEditorState.workspace = snapshotDraftWorkspace(session.workspace);
-		cragEditorState.activeWorkspaceEntryPath = session.activeWorkspaceEntryPath;
-		cragEditorState.activeMetadataTarget =
-			session.activeMetadataTarget || session.activeWorkspaceEntryPath;
-		selectedObject = cragEditorState.activeWorkspaceEntryPath
-			? {
-					type: 'entry',
-					key: cragEditorState.activeWorkspaceEntryPath
-				}
-			: null;
-		activeCragDraftId = id;
-		return true;
-	}
-
-	function getCragDraftIdFromUrl() {
-		if (typeof window === 'undefined') return null;
-		return new URL(window.location.href).searchParams.get('draft');
-	}
-
-	function setCragDraftParamInUrl(id: string | null) {
-		if (!id || typeof window === 'undefined') return;
-		const url = new URL(window.location.href);
-		if (url.searchParams.get('draft') === id) return;
-		url.searchParams.set('draft', id);
-		window.history.replaceState(window.history.state, '', url);
-	}
-
-	function createCragDraftId() {
-		return activeEntry?.properties.id
-			? `crag-${activeEntry.properties.id}`
-			: `draft-crag-${Date.now()}`;
-	}
-
-	function getCragDraftSession(id: string) {
-		return storage.get<DraftSession>(cragDraftSessionKey(id), null);
-	}
-
-	function saveLatestCragSession() {
-		const workspace = cragEditorState.workspace;
-		if (!workspace) return;
-		const timestamp = new Date().toISOString();
-		const id = activeCragDraftId || createCragDraftId();
-		const session = {
-			workspace: snapshotDraftWorkspace(workspace),
-			activeWorkspaceEntryPath: cragEditorState.activeWorkspaceEntryPath,
-			activeMetadataTarget: cragEditorState.activeMetadataTarget,
-			updated: timestamp
-		};
-		const metadata = {
-			id,
-			name: activeEntry?.properties.name || 'Unnamed Crag',
-			path: cragEditorState.activeWorkspaceEntryPath || '',
-			cragId: activeEntry?.properties.id || '',
-			updated: timestamp
-		};
-		const drafts = (storage.get<Array<{ id: string }>>(CRAG_DRAFTS_KEY, []) ?? []).filter(
-			(draft) => draft.id !== id
-		);
-		storage.set(CRAG_DRAFTS_KEY, [metadata, ...drafts]);
-		storage.set(cragDraftSessionKey(id), session);
-		activeCragDraftId = id;
-		setCragDraftParamInUrl(id);
-	}
-
-	function initializeCragSession(sourceSession: DraftSession | null) {
-		const draftId = getCragDraftIdFromUrl();
-		if (draftId && restoreCragSession(getCragDraftSession(draftId), draftId)) return;
-		if (sourceSession && restoreCragSession(sourceSession)) return;
-		const entry = createFelsEntry('crag', { id: 'new-crag', name: 'New Crag' });
-		cragEditorState.workspace = {
-			entry,
-			id: entry.properties.id,
-			path: '',
-			childEntries: [],
-			topo: null,
-			access: null,
-			dirtyPaths: [workspaceDocumentPaths('', entry.properties.id).entry],
-			removedPaths: [],
-			images: [],
-			pendingImages: [],
-			documentsLoaded: true,
-			detailsLoaded: true
-		};
-		cragEditorState.activeWorkspaceEntryPath = entry.properties.id;
-		cragEditorState.setActiveMetadataTarget(entry.properties.id);
-		selectedObject = { type: 'entry', key: entry.properties.id };
-	}
+	const draft = useDraftEditor({
+		mode: 'crag',
+		entryPath: untrack(() => entryPath),
+		adapter: cragDraftAdapter(cragEditorState),
+		onReady: () => {
+			selectedObject = { type: 'entry', key: cragEditorState.activeWorkspaceEntryPath! };
+		}
+	});
 
 	function visibleDrawingPointIndexes(points: Point2[]): number[] {
 		const bounds = map?.getBounds?.();
@@ -406,8 +309,6 @@
 	}
 
 	onMount(() => {
-		canAutosaveSession = true;
-
 		const handleKeyDown = (event: KeyboardEvent) => {
 			trackEditor.handleKeyDown(event);
 		};
@@ -419,13 +320,8 @@
 			geometryEditor.cleanup();
 			sectorMarkers.cleanup();
 			accessEditor.cleanup();
-			clearTimeout(autosaveSessionTimeout);
 		};
 	});
-
-	// Restore before child components initialize. Hierarchy placement reads the
-	// crag path during initialization and must not start with a blank path.
-	if (isBlankCragSession()) initializeCragSession(untrack(() => initialSession));
 
 	async function handleMapClick(e: MapMouseEvent) {
 		if (!map) return;
@@ -486,21 +382,6 @@
 			await addTrackPoint(lngLat);
 		}
 	}
-
-	$effect(() => {
-		if (!canAutosaveSession) return;
-
-		const sessionString = JSON.stringify({
-			workspace: cragEditorState.workspace,
-			activeWorkspaceEntryPath: cragEditorState.activeWorkspaceEntryPath,
-			activeMetadataTarget: cragEditorState.activeMetadataTarget
-		});
-
-		if (sessionString) {
-			clearTimeout(autosaveSessionTimeout);
-			autosaveSessionTimeout = setTimeout(saveLatestCragSession, 1000);
-		}
-	});
 
 	$effect(() => {
 		const target = cragEditorState.activeMetadataTarget;
@@ -669,6 +550,10 @@
 			if (!cragEditorState.workspace) throw new Error('No entry workspace is open.');
 			try {
 				await saveCragWorkspace(cragEditorState.workspace, {
+					write: (path, data) =>
+						path.endsWith('-topo.json')
+							? publishTopoDocument(path, data as FelsTopoDocument)
+							: writeJson(path, data),
 					getPendingImages: (node) => cragEditorState.getPendingImages(node),
 					finishUpload: (node, image) => cragEditorState.removePendingImage(node, image.clientId)
 				});
@@ -676,7 +561,8 @@
 				// A failed save may have completed earlier operations on the server.
 				cragEditorState.clearHistory();
 			}
-			saveLatestCragSession();
+			await draft.flush();
+			if (draft.id) await publishDraftModels(draft.id);
 			saveStatus = 'success';
 			setTimeout(() => {
 				if (saveStatus === 'success') saveStatus = 'idle';
@@ -788,32 +674,40 @@
 	});
 </script>
 
-<CragEditorMap
-	bind:map
-	bind:isMapLoaded
-	{mapStyle}
-	initialCoordinates={$state.snapshot(getGeometryCenter(activeEntry?.geometry) || [0, 0])}
-	onStyleLoad={initMarkersAndLayers}
-	onMapClick={handleMapClick}
-/>
+{#if draft.ready}
+	<CragEditorMap
+		bind:map
+		bind:isMapLoaded
+		{mapStyle}
+		initialCoordinates={$state.snapshot(getGeometryCenter(activeEntry?.geometry) || [0, 0])}
+		onStyleLoad={initMarkersAndLayers}
+		onMapClick={handleMapClick}
+	/>
 
-<CragEditorLayout
-	{inspectorShadow}
-	{map}
-	{isExpanded}
-	bind:activeTool
-	bind:toolOptionsOpen
-	bind:mapStyle
-	bind:activeTab
-	{detectedAssets}
-	{isDetectionLoading}
-	{isDetectionZoomLimited}
-	bind:selectedObject
-	{saveStatus}
-	{saveError}
-/>
+	<CragEditorLayout
+		{inspectorShadow}
+		{map}
+		{isExpanded}
+		bind:activeTool
+		bind:toolOptionsOpen
+		bind:mapStyle
+		bind:activeTab
+		{detectedAssets}
+		{isDetectionLoading}
+		{isDetectionZoomLimited}
+		bind:selectedObject
+		{saveStatus}
+		{saveError}
+	/>
 
-<RouteDetailModal
-	routeEntry={trackEditor.sessionActive ? null : selectedRouteEntry}
-	onClose={() => selectObject(null)}
-/>
+	<RouteDetailModal
+		routeEntry={trackEditor.sessionActive ? null : selectedRouteEntry}
+		onClose={() => selectObject(null)}
+	/>
+{/if}
+
+{#if !draft.ready && draft.error}
+	<p role="alert" class="fixed top-2 left-2 right-2 z-50 panel bg-white p-2 text-rose-600">
+		{draft.error}
+	</p>
+{/if}

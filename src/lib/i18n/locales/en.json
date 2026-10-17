@@ -1,4 +1,9 @@
 {
+	"draft": {
+		"add_model": "Add 3D model",
+		"editors": "Draft editors",
+		"save_failed": "Could not save draft"
+	},
 	"menu": {
 		"map": "Map",
 		"list": "List",
