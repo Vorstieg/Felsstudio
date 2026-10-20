@@ -4,8 +4,7 @@
 		createTopo2DEditorState,
 		provideTopo2DEditorState
 	} from '$lib/state/topo-2d-editor-state.svelte.ts';
-	import { useTopoDraftAutosave } from '$lib/components/editor/use-topo-draft-autosave.svelte.ts';
-	import { initializeIdCounters } from '$lib/assets/js/id-utils.ts';
+	import { useDraftEditor, topoDraftAdapter } from '$lib/components/editor/use-draft-editor.svelte';
 	import Topo2DEditor from '$lib/components/editor/2d/Topo2DEditor.svelte';
 	import OutlineToolOptions from '$lib/components/editor/tools/OutlineToolOptions.svelte';
 	import SelectToolOptions from '$lib/components/editor/tools/SelectToolOptions.svelte';
@@ -21,13 +20,12 @@
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
 	import TopoPropertiesPanel from '$lib/components/editor/TopoPropertiesPanel.svelte';
 	import { authState } from '$lib/api/auth.svelte.ts';
-	import { writeJson } from '$lib/api/felslager.ts';
+	import { publishTopoDocument } from '$lib/assets/js/publish-draft-assets';
 	import { resolveTopoSavePath } from '$lib/assets/js/topo-save-path.ts';
 	import { topoSymbols } from '@vorstieg/topo-renderer';
 	import { _ } from 'svelte-i18n';
 	import { browser } from '$app/environment';
 	import { untrack } from 'svelte';
-	import { loadTopoEditorEntry } from '$lib/assets/js/open-topo-editor-entry.ts';
 	import { isMobileViewport } from '$lib/assets/js/mobile-utils.ts';
 	import { RouteTool } from '$lib/components/editor/tools/RouteTool.svelte.ts';
 	import { OutlineTool } from '$lib/components/editor/tools/OutlineTool.svelte.ts';
@@ -129,43 +127,10 @@
 		)
 	);
 
-	useTopoDraftAutosave({
-		session: editorState,
-		draftId: browser ? new URL(window.location.href).searchParams.get('draft') : null,
+	useDraftEditor({
+		mode: '2d',
 		entryPath: initialEntryPath,
-		loadEntrySession: async (entryPath) => {
-			await loadTopoEditorEntry({
-				entryPath,
-				workspace: '/topos/2d/editor',
-				topoSession: editorState
-			});
-			initializeIdCounters(editorState.topo);
-		},
-		editorMode: '2d',
-		getWorkspace: () => '/topos/2d/editor',
-		getSaveSession: () => ({
-			...editorState.getSaveSession(),
-			topo: editorState.getSaveSnapshot()
-		}),
-		onPersisted: () => editorState.markSaved(),
-		restoreSession: (session, id) => {
-			editorState.loadSession(session, id);
-			initializeIdCounters(editorState.topo);
-		},
-		getSaveSignature: () =>
-			JSON.stringify({
-				document: editorState.getSaveSnapshot(),
-				name: editorState.ui.name,
-				modelOffset: editorState.ui.modelOffset,
-				modelRotation: editorState.ui.modelRotation,
-				modelScale: editorState.ui.modelScale,
-				scale: editorState.ui.scale,
-				canvasAspectRatio: editorState.ui.canvasAspectRatio,
-				historyIndex: editorState.history.index,
-				historyLength: editorState.history.entries.length
-			}),
-		onInitialized: () => initializeIdCounters(editorState.topo),
-		shouldRestore: () => !initialEntryPath
+		adapter: topoDraftAdapter(editorState, '2d')
 	});
 
 	async function saveTopo() {
@@ -184,7 +149,7 @@
 			if (typeof fileName !== 'string' || !fileName)
 				throw new Error('Topo file path is unavailable');
 			editorState.ui.topoFileName = fileName;
-			await writeJson(fileName, topoToSave);
+			await publishTopoDocument(fileName, topoToSave);
 			editorState.markSaved();
 
 			saveStatus = 'success';

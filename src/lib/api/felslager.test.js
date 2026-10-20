@@ -1,114 +1,65 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-	clearCredentials,
-	deleteFile,
-	fileUrl,
-	getCredentials,
-	listDir,
-	renameFile,
-	setCredentials,
-	writeFile,
-	writeJson
-} from './felslager.ts';
-
+const auth = vi.hoisted(() => ({ handleRejection: vi.fn() }));
+vi.mock('./auth.svelte.ts', () => ({ authState: auth }));
+import { deleteFile, fileUrl, listDir, renameFile, writeFile, writeJson } from './felslager.ts';
+const baseUrl = import.meta.env.VITE_FELSLAGER_URL || 'https://lager.felsverzeichnis.at/api/fs';
 describe('Felslager API client', () => {
 	beforeEach(() => {
-		clearCredentials();
 		vi.restoreAllMocks();
+		auth.handleRejection.mockReset();
 	});
-
-	it('stores and clears session credentials', () => {
-		setCredentials('alice', 'secret');
-		expect(getCredentials()).toBe(btoa('alice:secret'));
-		clearCredentials();
-		expect(getCredentials()).toBeNull();
+	it('keeps public reads anonymous', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [] }));
+		await listDir('///entries//', { recursive: true });
+		expect(fetch).toHaveBeenCalledWith(`${baseUrl}/entries/?recursive=true`);
 	});
-
-	it('normalizes paths and adds recursive listing query parameters', async () => {
-		const response = { ok: true, json: vi.fn().mockResolvedValue([{ name: 'a.json' }]) };
-		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
-
-		await expect(listDir('///entries//', { recursive: true })).resolves.toEqual([
-			{ name: 'a.json' }
-		]);
-		expect(fetch).toHaveBeenCalledWith(
-			'https://lager.felsverzeichnis.at/api/fs/entries/?recursive=true'
-		);
-	});
-
-	it('writes JSON with credentials and a content type', async () => {
-		setCredentials('alice', 'secret');
-		const response = { ok: true };
-		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
-		const data = { name: 'Test', routes: [] };
-
-		await expect(writeJson('/entries/test.json', data)).resolves.toBe(response);
-		expect(fetch).toHaveBeenCalledWith(
-			'https://lager.felsverzeichnis.at/api/fs/entries/test.json',
-			expect.objectContaining({
-				method: 'PUT',
-				headers: {
-					Authorization: `Basic ${btoa('alice:secret')}`,
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(data, undefined, 4)
-			})
-		);
-	});
-
-	it('clears credentials when a write is rejected by authentication', async () => {
-		setCredentials('alice', 'secret');
-		const logError = vi.spyOn(console, 'error').mockImplementation(() => {});
-		vi.stubGlobal(
-			'fetch',
-			vi.fn().mockResolvedValue({
-				ok: false,
-				status: 401,
-				statusText: 'Unauthorized',
-				text: vi.fn().mockResolvedValue('expired')
-			})
-		);
-
-		await expect(writeFile('entries/test.json', '{}')).rejects.toThrow(
-			'Failed to write entries/test.json: 401 Unauthorized - expired'
-		);
-		expect(logError).toHaveBeenCalledWith(
-			'Failed to write entries/test.json: 401 Unauthorized - expired'
-		);
-		expect(getCredentials()).toBeNull();
-	});
-
-	it('sends authenticated delete and encoded move destinations', async () => {
-		setCredentials('alice', 'secret');
+	it('uses cookies and no authorization header on JSON writes', async () => {
 		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
-
+		await writeJson('/entries/test.json', { name: 'Test' });
+		expect(fetch).toHaveBeenCalledWith(`${baseUrl}/entries/test.json`, {
+			method: 'PUT',
+			credentials: 'include',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ name: 'Test' }, undefined, 4)
+		});
+	});
+	it.each([401, 403])(
+		'preserves structured %s errors without retrying the mutation',
+		async (status) => {
+			vi.stubGlobal(
+				'fetch',
+				vi.fn().mockResolvedValue({
+					ok: false,
+					status,
+					json: async () => ({ code: 'DENIED', message: 'Access denied' })
+				})
+			);
+			await expect(writeFile('entries/test.json', '{}')).rejects.toMatchObject({
+				status,
+				code: 'DENIED',
+				message: 'Access denied'
+			});
+			expect(auth.handleRejection).toHaveBeenCalledWith(status);
+			expect(fetch).toHaveBeenCalledOnce();
+		}
+	);
+	it('sends cookies with delete and encoded move destinations', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
 		await deleteFile('/entries/test.json');
 		await renameFile('/entries/test.json', '/archive/my file.json');
-
-		expect(fetch).toHaveBeenNthCalledWith(
-			1,
-			'https://lager.felsverzeichnis.at/api/fs/entries/test.json',
-			expect.objectContaining({ method: 'DELETE' })
-		);
-		expect(fetch).toHaveBeenNthCalledWith(
-			2,
-			'https://lager.felsverzeichnis.at/api/fs/entries/test.json',
-			expect.objectContaining({
-				method: 'MOVE',
-				headers: expect.objectContaining({ Destination: 'archive%2Fmy%20file.json' })
-			})
-		);
+		expect(fetch).toHaveBeenNthCalledWith(1, `${baseUrl}/entries/test.json`, {
+			method: 'DELETE',
+			credentials: 'include'
+		});
+		expect(fetch).toHaveBeenNthCalledWith(2, `${baseUrl}/entries/test.json`, {
+			method: 'MOVE',
+			credentials: 'include',
+			headers: { Destination: 'archive%2Fmy%20file.json' }
+		});
 	});
-
-	it('builds public file URLs using the same path normalization', () => {
-		expect(fileUrl('//images//wall.png')).toBe(
-			'https://lager.felsverzeichnis.at/api/fs/images/wall.png'
-		);
-	});
-
-	it('encodes individual public file path segments', () => {
-		expect(fileUrl('europe/austria/tyrol/ötztaler-alpen/wildspitze/my photo #1.jpg')).toBe(
-			'https://lager.felsverzeichnis.at/api/fs/europe/austria/tyrol/%C3%B6tztaler-alpen/wildspitze/my%20photo%20%231.jpg'
+	it('encodes public file path segments', () => {
+		expect(fileUrl('europe/ötztal/my photo #1.jpg')).toBe(
+			`${baseUrl}/europe/%C3%B6tztal/my%20photo%20%231.jpg`
 		);
 	});
 });

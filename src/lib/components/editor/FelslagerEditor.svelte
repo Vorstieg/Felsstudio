@@ -12,6 +12,7 @@
 		renameFile
 	} from '$lib/api/felslager.ts';
 	import { authState } from '$lib/api/auth.svelte.ts';
+	import SessionInfo from '$lib/components/ui/SessionInfo.svelte';
 	import type { ApiListEntry } from '$lib/types/api.ts';
 
 	const errorMessage = (value: unknown) => (value instanceof Error ? value.message : String(value));
@@ -282,11 +283,17 @@
 			</div>
 		</div>
 		<div class="flex gap-2">
+			<a
+				class="flex items-center gap-2 rounded-sm px-3 py-1.5 text-ui-label hover:bg-black/5 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue!"
+				href={`${base}/felslager/reviews`}
+				><i class="fa-solid fa-inbox" aria-hidden="true"></i>Review inbox</a
+			>
 			<input bind:this={uploadInput} type="file" class="hidden" onchange={handleUploadSelection} />
 			<button class="btn-secondary px-4" onclick={selectFileForUpload} disabled={uploading}>
 				{uploading ? 'Uploading…' : 'Add file'}
 			</button>
 			{#if selectedFile && selectedFileType !== 'image'}
+				<SessionInfo />
 				<button class="btn-primary px-4" onclick={saveFile} disabled={saving}>
 					{saving ? $_('save.saving') : $_('save.save_to_server')}
 				</button>

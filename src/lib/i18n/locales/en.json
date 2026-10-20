@@ -1,4 +1,9 @@
 {
+	"draft": {
+		"add_model": "Add 3D model",
+		"editors": "Draft editors",
+		"save_failed": "Could not save draft"
+	},
 	"menu": {
 		"map": "Map",
 		"list": "List",
@@ -474,13 +479,21 @@
 		"path_desc": "Manage alpine tours and via ferratas using embedded route paths."
 	},
 	"auth": {
-		"title": "Authentication Required",
-		"description": "Enter your Felslager credentials to save changes.",
-		"username": "Username",
+		"title": "Sign in",
+		"description": "Sign in with your personal account to save shared content.",
+		"email": "Email",
 		"password": "Password",
-		"username_placeholder": "admin",
-		"login": "Login",
-		"cancel": "Cancel"
+		"login": "Sign in",
+		"logout": "Sign out",
+		"cancel": "Cancel",
+		"account": "Account",
+		"loading": "Loading…",
+		"working": "Please wait…",
+		"local_notice": "Local drafts remain on this device and are not synced with your account.",
+		"network_error": "Unable to reach the server. Check your connection and try again.",
+		"login_failed": "Sign in failed. Check your email and password.",
+		"session_expired": "Your session has expired. Sign in again. Your local work is preserved.",
+		"save_forbidden": "The server refused this change. Your local work is preserved."
 	},
 	"save": {
 		"saving": "Saving...",
