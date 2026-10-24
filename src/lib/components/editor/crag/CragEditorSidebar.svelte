@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Map as MapLibreMap } from 'maplibre-gl';
+	import type { FlightPlan } from '$lib/assets/js/flight-plan-types.ts';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 	const cragEditorState = getCragEditorSession();
 	import DetailsComponent from '../DetailsComponent.svelte';
@@ -16,6 +17,7 @@
 	type SelectedObject = import('./crag-route-types.ts').CragSelection;
 	type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 	type Props = {
+		flightPlan?: FlightPlan | null;
 		inspectorShadow?: boolean;
 		map?: MapLibreMap | null;
 		activeTab?: string;
@@ -29,6 +31,7 @@
 	let {
 		inspectorShadow = true,
 		map = null,
+		flightPlan = $bindable(null),
 		activeTab = $bindable('info'),
 		detectedAssets = [],
 		isDetectionLoading = false,
@@ -50,13 +53,15 @@
 			label: 'Children',
 			icon: 'fa-table-cells-large',
 			count: cragEditorState.getActiveSectors().length
-		}
+		},
+		...(cragEditorState.getActiveWorkspaceEntry()?.entry?.geometry?.type === 'Polygon'
+			? [{ id: 'capture', label: 'Capture plan', icon: 'fa-helicopter' }]
+			: [])
 	]);
 </script>
 
 <DetailsComponent
 	title="Properties"
-	subtitle="Crag Inspector"
 	{tabs}
 	bind:activeTab
 	shadow={inspectorShadow}
@@ -64,6 +69,7 @@
 >
 	{#snippet children()}
 		<CragEditorPanelContent
+			bind:flightPlan
 			bind:activeTab
 			bind:selectedObject
 			showTabs={false}

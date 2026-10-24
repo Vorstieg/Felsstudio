@@ -7,19 +7,21 @@
 
 	type Detail = 'standard' | 'high' | 'topo';
 	type FlightPattern = 'facade-grid' | 'constant-distance-grid' | 'half-helix' | 'curved-sweep';
-	type Sector = {
+	type PolygonEntry = {
 		id?: string;
 		name?: string;
 		geometry?: PointOrAreaGeometry | null;
 	};
 	let {
-		sector,
-		cragName = '',
+		entry,
+		plan = $bindable(null),
+		entryName = '',
 		map = null,
 		onPlanGenerated = () => {}
 	}: {
-		sector?: Sector | null;
-		cragName?: string;
+		entry?: PolygonEntry | null;
+		plan?: FlightPlan | null;
+		entryName?: string;
 		map?: MapLibreMap | null;
 		onPlanGenerated?: (_plan: FlightPlan | null) => void;
 	} = $props();
@@ -27,9 +29,8 @@
 	let detail = $state<Detail>('topo');
 	let pattern = $state<FlightPattern>('facade-grid');
 	let minimumWallDistanceMeters = $state(2);
-	let plan = $state<FlightPlan | null>(null);
 	let error = $state('');
-	let cameraPreviewWaypointIndex = $state<number | null>(null);
+	let cameraPreviewWaypointIndex = $derived(plan?.previewWaypointIndex ?? null);
 	let rowStarts = $derived(
 		plan?.waypoints?.filter((waypoint) => waypoint.action === 'startInterval') || []
 	);
@@ -59,7 +60,7 @@
 				}
 				return elevation;
 			};
-			const geometry = sector?.geometry?.type === 'Polygon' ? sector.geometry : null;
+			const geometry = entry?.geometry?.type === 'Polygon' ? entry.geometry : null;
 			const polygon: import('geojson').Polygon | null = geometry
 				? {
 						type: 'Polygon',
@@ -68,7 +69,7 @@
 								const longitude = position[0];
 								const latitude = position[1];
 								if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
-									throw new Error('Sector geometry contains an invalid coordinate.');
+									throw new Error('Entry geometry contains an invalid coordinate.');
 								}
 								return [longitude, latitude];
 							})
@@ -80,48 +81,75 @@
 				pattern,
 				standOffMeters: wallDistance,
 				minimumFaceDistanceMeters: wallDistance,
-				cragName,
-				name: `${cragName || 'Crag'} ${sector?.name || sector?.id || 'sector'} capture plan`,
+				cragName: entryName,
+				startElevation: plan?.metadata.startElevation,
+				name: `${entry?.name || entry?.id || entryName || 'Entry'} capture plan`,
 				terrainElevationAt
 			});
-			generatedPlan.filename = `${(cragName || 'crag').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${(sector?.name || sector?.id || 'sector').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}-capture-plan`;
+			generatedPlan.filename = `${(entryName || 'entry')
+				.trim()
+				.toLowerCase()
+				.replace(/[^a-z0-9]+/g, '-')}-capture-plan`;
 			generatedPlan.metadata.camera = 'tele-6x';
 			generatedPlan.metadata.photoCount = generatedPlan.waypoints.filter(
 				(waypoint) => waypoint.phase === 'capture'
 			).length;
-			cameraPreviewWaypointIndex = generatedPlan.waypoints.find(
-				(waypoint) => waypoint.action === 'startInterval'
-			)?.index ?? null;
-			generatedPlan.previewWaypointIndex = cameraPreviewWaypointIndex;
+			const previewWaypointIndex =
+				generatedPlan.waypoints.find((waypoint) => waypoint.action === 'startInterval')?.index ??
+				null;
+			generatedPlan.previewWaypointIndex = previewWaypointIndex;
 			plan = generatedPlan;
 			onPlanGenerated(generatedPlan);
 		} catch (generationError) {
 			plan = null;
-			error = generationError instanceof Error ? generationError.message : 'Unable to generate a flight plan.';
+			onPlanGenerated(null);
+			error =
+				generationError instanceof Error
+					? generationError.message
+					: 'Unable to generate a flight plan.';
 		}
 	}
 
 	async function download() {
 		if (!plan) return;
-		await downloadFlightPlanKmz(plan);
+		error = '';
+		try {
+			const launchElevation = plan.metadata.startElevation;
+			if (typeof launchElevation !== 'number' || !Number.isFinite(launchElevation)) {
+				throw new Error('Enter the launch elevation in metres AMSL before exporting the capture plan.');
+			}
+			await downloadFlightPlanKmz(plan);
+		} catch (downloadError) {
+			error = downloadError instanceof Error ? downloadError.message : 'Unable to download the capture plan.';
+		}
+	}
+
+	function setLaunchElevation(event: Event & { currentTarget: HTMLInputElement }) {
+		if (!plan) return;
+		const elevation = event.currentTarget.valueAsNumber;
+		plan = {
+			...plan,
+			metadata: { ...plan.metadata, startElevation: Number.isFinite(elevation) ? elevation : undefined }
+		};
+		error = '';
+		onPlanGenerated(plan);
 	}
 
 	function deleteFlightPath() {
 		plan = null;
 		error = '';
-		cameraPreviewWaypointIndex = null;
 		onPlanGenerated(null);
 	}
 
 	function selectCameraPreview(event: Event & { currentTarget: HTMLSelectElement }) {
 		if (!plan) return;
 		const value = event.currentTarget.value;
-		cameraPreviewWaypointIndex = value === '' ? null : Number(value);
-		plan = { ...plan, previewWaypointIndex: cameraPreviewWaypointIndex };
+		const previewWaypointIndex = value === '' ? null : Number(value);
+		plan = { ...plan, previewWaypointIndex };
 		onPlanGenerated(plan);
 	}
 
-	let isPolygon = $derived(sector?.geometry?.type === 'Polygon');
+	let isPolygon = $derived(entry?.geometry?.type === 'Polygon');
 </script>
 
 <section class="space-y-2 border-t border-black/15 pt-3">
@@ -137,7 +165,7 @@
 
 	{#if !isPolygon}
 		<p class="rounded-sm border border-amber-200 bg-amber-50 p-2 text-[10px] text-amber-800">
-			Set this sector to a polygon before generating a capture plan.
+			Select an entry with polygon geometry before generating a capture plan.
 		</p>
 	{:else}
 		<label class="block text-ui-label text-warm-gray-500">
@@ -240,6 +268,14 @@
 					{/each}
 				</select>
 			</label>
+			<label class="mt-2 block text-ui-label text-warm-gray-500">
+				Launch elevation (m AMSL)
+				<input type="number" step="0.1" value={plan.metadata.startElevation ?? ''} oninput={setLaunchElevation} class="input-studio mt-0.5 w-full" />
+			</label>
+			<p class="mt-1 text-[9px] leading-snug text-warm-gray-500">
+				Enter the actual takeoff elevation using the same elevation reference as the terrain.
+				Clearance checks cover the capture path; approach and return flights require separate planning.
+			</p>
 			<button
 				type="button"
 				class="mt-2 flex h-9 w-full items-center justify-center gap-1.5 rounded-sm border border-creator-blue/30 bg-white px-3 text-[10px] font-bold uppercase tracking-widest text-creator-blue hover:bg-creator-blue/5"

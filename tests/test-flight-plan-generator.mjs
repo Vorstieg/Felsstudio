@@ -99,17 +99,14 @@ test('generates valid deterministic flight plans', () => {
 		'no capture waypoint may exceed the lowest capture altitude plus face height and tolerance'
 	);
 
-	const fragmentedTerrainPlan = generateFlightPlan(sector, {
-		...options,
-		terrainElevationAt: (longitude) => (longitude > 11.0008 && longitude < 11.0012 ? 720 : 700)
-	});
-	assert.ok(
-		fragmentedTerrainPlan.metadata.fragmentedRowCount > 0,
-		'a capped row split by high terrain should be replanned as separate fragments'
-	);
-	assert.ok(
-		fragmentedTerrainPlan.metadata.discardedFragmentWaypointCount > 0,
-		'the shorter disconnected fragment should not be bridged by the capture path'
+	assert.throws(
+		() =>
+			generateFlightPlan(sector, {
+				...options,
+				terrainElevationAt: (longitude) => (longitude > 11.0008 && longitude < 11.0012 ? 720 : 700)
+			}),
+		/Unsafe flight path between waypoints/,
+		'clipping rows must not leave an unchecked transition through high terrain'
 	);
 	assert.throws(
 		() => generateFlightPlan(sector, { ...options, standOffMeters: 0.5 }),
@@ -148,3 +145,141 @@ test('generates valid deterministic flight plans', () => {
 		'the detected centreline should follow the terrain break'
 	);
 });
+
+const sector = {
+	type: 'Polygon',
+	coordinates: [
+		[
+			[11, 47],
+			[11.002, 47],
+			[11.002, 47.0003],
+			[11, 47.0003],
+			[11, 47]
+		]
+	]
+};
+
+test('rejects terrain between individually clear capture waypoints', () => {
+	// This narrow ridge sits between 10 m capture samples, outside their local
+	// clearance meshes. Vertex elevations are level and no wall is detected.
+	assert.throws(
+		() =>
+			generateFlightPlan(sector, {
+				pointSpacingMeters: 10,
+				convergentPasses: 1,
+				terrainElevationAt: (longitude) => (Math.abs(longitude - 11.00006) < 0.00001 ? 705 : 700)
+			}),
+		/Unsafe flight path between waypoints/
+	);
+});
+
+test('preserves clearance-rejection gaps when selecting continuous row fragments', () => {
+	const plan = generateFlightPlan(sector, {
+		pointSpacingMeters: 5,
+		convergentPasses: 1,
+		terrainElevationAt: (longitude, latitude) =>
+			latitude >= 47.00015 ? 720 : longitude > 11.00085 && longitude < 11.00115 ? 703 : 700
+	});
+	assert.ok(plan.metadata.droppedWaypointCount > 0);
+	assert.ok(
+		plan.metadata.fragmentedRowCount > 0,
+		'clearance rejection must split the original sample order'
+	);
+	assert.ok(plan.metadata.discardedFragmentWaypointCount > 0);
+	const firstRow = plan.waypoints.slice(
+		0,
+		plan.waypoints.findIndex((waypoint) => waypoint.action === 'stopInterval') + 1
+	);
+	assert.ok(firstRow.length > 1);
+	assert.ok(
+		firstRow.every((waypoint) => waypoint.longitude > 11.00115),
+		'the fragmented base row must retain only its continuous right-hand section'
+	);
+	assert.deepEqual(
+		plan.waypoints.map((waypoint) => waypoint.index),
+		plan.waypoints.map((_, index) => index)
+	);
+});
+
+test('retains an explicit launch reference without requiring it for preview generation', () => {
+	const options = { terrainElevationAt: () => 700 };
+	assert.equal(generateFlightPlan(sector, options).metadata.startElevation, undefined);
+	assert.equal(
+		generateFlightPlan(sector, { ...options, startElevation: 680 }).metadata.startElevation,
+		680
+	);
+	assert.equal(
+		generateFlightPlan(sector, { ...options, startElevation: 0 }).metadata.startElevation,
+		0
+	);
+	assert.throws(
+		() => generateFlightPlan(sector, { ...options, startElevation: NaN }),
+		/Launch elevation/
+	);
+});
+
+test('rejects a cliff-face intrusion between points even when ground clearance stays sufficient', () => {
+	assert.throws(
+		() =>
+			generateFlightPlan(sector, {
+				pointSpacingMeters: 10,
+				convergentPasses: 1,
+				// The path itself is over level ground. The elevated patch lies beside
+				// it, within the face clearance, between the capture samples.
+				terrainElevationAt: (longitude, latitude) =>
+					Math.abs(longitude - 11.00006) < 0.00001 && Math.abs(latitude - 47.000182) < 0.000006
+						? 705
+						: 700
+			}),
+		/Unsafe flight path between waypoints/
+	);
+});
+
+for (const pattern of ['facade-grid', 'constant-distance-grid']) {
+	test(`${pattern} convergent passes aim at the original wall samples`, () => {
+		const standOffMeters = 10;
+		const plan = generateFlightPlan(sector, {
+			pattern,
+			standOffMeters,
+			pointSpacingMeters: 10,
+			convergentPasses: 2,
+			convergentOffsetMeters: 2,
+			terrainElevationAt: (_longitude, latitude) =>
+				700 + Math.max(0, Math.min(1, (latitude - 47.00012) / 0.00006)) * 20
+		});
+		assert.ok(plan.wallDetection.confidence > 0.9);
+		assert.equal(plan.metadata.droppedWaypointCount, 0);
+		const rows = [];
+		for (const waypoint of plan.waypoints) {
+			if (waypoint.action === 'startInterval') rows.push([]);
+			rows.at(-1).push(waypoint);
+		}
+		const rowsPerPass = rows.length / 2;
+		assert.ok(Number.isInteger(rowsPerPass) && rowsPerPass > 1);
+		const latitudeScale = (Math.PI / 180) * 6378137;
+		const longitudeScale = latitudeScale * Math.cos((47.00015 * Math.PI) / 180);
+		for (let row = 0; row < rowsPerPass; row += 1) {
+			const direct = [...rows[row]].sort((a, b) => a.longitude - b.longitude);
+			const convergent = [...rows[row + rowsPerPass]].sort((a, b) => a.longitude - b.longitude);
+			assert.equal(convergent.length, direct.length);
+			// Endpoints may be clamped to the detected wall extent. Interior
+			// samples must move 2 m and look back at the same surface location.
+			for (let index = 1; index < direct.length - 1; index += 1) {
+				const first = direct[index];
+				const second = convergent[index];
+				const shift = (second.longitude - first.longitude) * longitudeScale;
+				assert.ok(Math.abs(shift - 2) < 1e-5);
+				assert.ok(
+					Math.abs(second.latitude - first.latitude) * latitudeScale < 1e-5,
+					'convergence must preserve stand-off on a straight wall'
+				);
+				const expectedHeading = ((Math.atan2(-shift, standOffMeters) * 180) / Math.PI + 360) % 360;
+				assert.ok(
+					Math.abs(second.heading - expectedHeading) < 1e-5,
+					'the camera must aim back at the direct pass target'
+				);
+				assert.ok(Math.abs(second.heading - first.heading) > 1);
+			}
+		}
+	});
+}

@@ -39,6 +39,7 @@ export type FlightPlanMetadata = {
 	convergentPasses: number;
 	convergentOffsetMeters: number;
 	droppedWaypointCount: number;
+	/** Actual launch elevation in metres AMSL, in the terrain elevation datum. */
 	startElevation?: number;
 	speed?: number;
 	transitSpeed?: number;

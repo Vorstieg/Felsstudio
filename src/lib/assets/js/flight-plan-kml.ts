@@ -65,20 +65,19 @@ function missionWaypoints(plan: FlightPlan): NormalizedWaypoint[] {
 	return plan.waypoints.map(normaliseWaypoint);
 }
 
-function relativeStartElevation(plan: FlightPlan, waypoints: NormalizedWaypoint[]): number {
-	const explicit = Number(plan.metadata?.startElevation);
-	if (Number.isFinite(explicit)) return explicit;
-
-	// The current generator produces AMSL altitudes and its first waypoint is
-	// its terrain elevation plus stand-off.  This retains the intended stand-off
-	// when a dedicated mission-start elevation has not yet been recorded.
-	const standOff = Number(plan.metadata?.standOffMeters);
-	return waypoints[0].altitude - (Number.isFinite(standOff) ? standOff : 0);
+function relativeStartElevation(plan: FlightPlan): number {
+	const elevation = plan.metadata?.startElevation;
+	if (typeof elevation !== 'number' || !Number.isFinite(elevation)) {
+		throw new TypeError(
+			'Enter the launch elevation in metres AMSL before exporting the capture plan.'
+		);
+	}
+	return elevation;
 }
 
 function waypointHeight(waypoint: NormalizedWaypoint, startElevation: number): number {
-	const explicit = Number(waypoint.relativeAltitude ?? waypoint.executeHeight);
-	return Number.isFinite(explicit) ? explicit : waypoint.altitude - startElevation;
+	// AMSL is authoritative: overrides could invalidate the checked terrain clearance.
+	return waypoint.altitude - startElevation;
 }
 
 function cameraFocalLength(camera: unknown): number {
@@ -173,6 +172,7 @@ function missionConfigXml(speed: number): string {
 /** Build Mavic 4 Pro's template.kml from a validated plan. */
 export function exportFlightPlanTemplateKml(plan: FlightPlan): string {
 	const waypoints = missionWaypoints(plan);
+	relativeStartElevation(plan);
 	const now = Date.now();
 	const speed = Number(plan.metadata?.transitSpeed) || Number(waypoints[0].speed) || 5;
 	return `<?xml version="1.0" encoding="UTF-8"?>
@@ -189,7 +189,7 @@ export function exportFlightPlanTemplateKml(plan: FlightPlan): string {
 /** Build Mavic 4 Pro's executable waylines.wpml from a validated plan. */
 export function exportFlightPlanWaylinesWpml(plan: FlightPlan): string {
 	const waypoints = missionWaypoints(plan);
-	const startElevation = relativeStartElevation(plan, waypoints);
+	const startElevation = relativeStartElevation(plan);
 	let actionId = 1;
 	let actionGroupId = 1;
 	const placemarks = waypoints
@@ -203,10 +203,7 @@ export function exportFlightPlanWaylinesWpml(plan: FlightPlan): string {
 			const pitch = Number.isFinite(Number(waypoint.gimbalPitch))
 				? Number(waypoint.gimbalPitch)
 				: -8;
-			const turnMode =
-				index === 0 || index === waypoints.length - 1
-					? 'toPointAndStopWithContinuityCurvature'
-					: 'toPointAndPassWithContinuityCurvature';
+			const turnMode = 'toPointAndStopWithDiscontinuityCurvature';
 			return `
       <Placemark>
         <Point><coordinates>${formattedNumber(waypoint.longitude)},${formattedNumber(waypoint.latitude)}</coordinates></Point>
@@ -223,7 +220,7 @@ export function exportFlightPlanWaylinesWpml(plan: FlightPlan): string {
           <wpml:waypointTurnMode>${turnMode}</wpml:waypointTurnMode>
           <wpml:waypointTurnDampingDist>0</wpml:waypointTurnDampingDist>
         </wpml:waypointTurnParam>
-        <wpml:useStraightLine>0</wpml:useStraightLine>
+        <wpml:useStraightLine>1</wpml:useStraightLine>
         <wpml:actionGroup>
           <wpml:actionGroupId>${actionGroupId++}</wpml:actionGroupId>
           <wpml:actionGroupStartIndex>${index}</wpml:actionGroupStartIndex>

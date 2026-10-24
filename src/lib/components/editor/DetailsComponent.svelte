@@ -49,7 +49,11 @@
 
 {#snippet tabBar(mobile = false)}
 	{#if tabs.length}
-		<div class="bg-black/5 rounded-sm p-0.5 border border-black/10 flex gap-0.5 mx-3 mb-2 shrink-0">
+		<div
+			class="bg-black/5 rounded-sm p-0.5 border border-black/10 {!mobile && tabs.length > 3
+				? 'grid grid-cols-2'
+				: 'flex'} gap-0.5 mx-3 mb-2 shrink-0"
+		>
 			{#each tabs as tab}
 				<button
 					type="button"
@@ -68,11 +72,7 @@
 
 {#if isDesktop}
 	<div class="fixed top-14 right-2 z-50 flex flex-col max-h-[calc(100vh-4rem)]" style:width>
-		<div class="panel flex flex-1 flex-col overflow-hidden {shadow ? 'shadow-panel' : ''}">
-			<div class="flex justify-between items-center border-b border-black/15 p-3 pb-2 mb-2 shrink-0">
-				<div><h1 class="text-section-title">{title}</h1>{#if subtitle}<p class="text-ui-label m-0!">{subtitle}</p>{/if}</div>
-				{@render headerActions?.()}
-			</div>
+		<div class="panel flex flex-1 flex-col overflow-hidden pt-3 {shadow ? 'shadow-panel' : ''}">
 			{@render tabBar()}
 			<div class="overflow-y-auto flex-1 p-2.5 pt-0 custom-scrollbar bg-transparent">{@render children?.({ mobile: false })}</div>
 		</div>

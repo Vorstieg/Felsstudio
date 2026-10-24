@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { Map as MapLibreMap } from 'maplibre-gl';
 	import type { FelsEntryWorkspace } from '$lib/types/crag';
 	import type { CragSelection, RouteDocument } from './crag-route-types.ts';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
@@ -16,7 +15,6 @@
 	const onAddSectorRoute = routeTool.addRoute;
 	const { selectRoute: onSelectRoute, deleteRoute: onDeleteRoute } = routeTool;
 	const onAddParentRoute = () => routeTool.addRoute();
-	const onPlanGenerated = actions.handleFlightPlanGenerated;
 	let activeWorkspace = $derived(cragEditorState.getActiveWorkspaceEntry());
 	let sectors = $derived(activeWorkspace?.childEntries || []);
 	let topoEntries: RouteDocument[] = $derived.by(() =>
@@ -26,12 +24,11 @@
 				: []
 		)
 	);
-	import CragFlightPlanPanel from './CragFlightPlanPanel.svelte';
 	import CragEditorRouteTable from './CragEditorRouteTable.svelte';
 	type Selection = CragSelection | null;
-	type Props = { map?: MapLibreMap | null; selectedObject?: Selection };
+	type Props = { selectedObject?: Selection };
 
-	let { map = null, selectedObject = $bindable(null) }: Props = $props();
+	let { selectedObject = $bindable(null) }: Props = $props();
 	let parentRoutes = $derived(
 		topoEntries.flatMap((document) =>
 			document.node !== activeWorkspace
@@ -103,9 +100,9 @@
 	<div class="space-y-1">
 		{#each sectors as sectorNode}{@const sector =
 				sectorNode.entry?.properties}{#if sector}{@const isSelected =
-					selectedObject?.type === 'entry' &&
-					selectedObject.key === cragEditorState.getWorkspaceEntryPath(sectorNode)}{@const routes =
-					sectorRoutes(sector.id)}
+				selectedObject?.type === 'entry' &&
+				selectedObject.key === cragEditorState.getWorkspaceEntryPath(sectorNode)}{@const routes =
+				sectorRoutes(sector.id)}
 				<div
 					class="w-full panel-inner p-2 text-left border-black/10 hover:border-creator-blue cursor-pointer {isSelected
 						? 'border-creator-blue bg-creator-blue/5'
@@ -160,20 +157,6 @@
 					{#if routes.length > 0}
 						<div class="mt-2 border-t border-black/10">
 							<CragEditorRouteTable {routes} {selectedObject} {onSelectRoute} {onDeleteRoute} />
-						</div>
-					{/if}
-					{#if isSelected}
-						<div
-							onclick={(e) => e.stopPropagation()}
-							onkeydown={(e) => e.stopPropagation()}
-							role="presentation"
-						>
-							<CragFlightPlanPanel
-								{sector}
-								cragName={activeWorkspace?.entry?.properties.name}
-								{map}
-								{onPlanGenerated}
-							/>
 						</div>
 					{/if}
 				</div>

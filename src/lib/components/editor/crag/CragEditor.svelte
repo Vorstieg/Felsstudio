@@ -529,6 +529,13 @@
 		syncFlightPlanPreview(map, $state.snapshot(flightPlan));
 	}
 
+	// Entry navigation and geometry edits invalidate the current mission.
+	$effect(() => {
+		cragEditorState.activeWorkspaceEntryPath;
+		JSON.stringify(activeEntry?.geometry);
+		untrack(() => handleFlightPlanGenerated(null));
+	});
+
 	function handleFlightPlanGenerated(plan: FlightPlan | null) {
 		flightPlan = plan;
 		syncEditorData();
@@ -697,6 +704,7 @@
 		bind:activeTool
 		bind:toolOptionsOpen
 		bind:mapStyle
+		bind:flightPlan
 		bind:activeTab
 		{detectedAssets}
 		{isDetectionLoading}

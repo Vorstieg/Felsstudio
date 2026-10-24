@@ -77,6 +77,7 @@ test('exports valid KML and KMZ flight plans', async () => {
 	);
 	assert.match(
 		exportFlightPlanKml({
+			metadata: { startElevation: 700 },
 			waypoints: [
 				{ longitude: 15, latitude: 47, altitude: 800, heading: -270 },
 				{ longitude: 15.001, latitude: 47.001, altitude: 800, heading: 540 }
@@ -99,4 +100,27 @@ test('exports valid KML and KMZ flight plans', async () => {
 	assert.match(archivedTemplate, /<wpml:createTime>\d+<\/wpml:createTime>/);
 	assert.match(archivedTemplate, /<wpml:droneEnumValue>68<\/wpml:droneEnumValue>/);
 	assert.equal(await extracted.file('waylines.wpml').async('string'), waylinesWpml);
+});
+
+test('requires an explicit finite launch elevation and exports straight stopped segments', () => {
+	const plan = {
+		metadata: { standOffMeters: 2 },
+		waypoints: [
+			{ longitude: 15, latitude: 47, altitude: 703, relativeAltitude: 99 },
+			{ longitude: 15.001, latitude: 47, altitude: 713, executeHeight: 99 }
+		]
+	};
+	for (const startElevation of [undefined, null, '', NaN, Infinity]) {
+		plan.metadata.startElevation = startElevation;
+		assert.throws(() => exportFlightPlanWaylinesWpml(plan), /launch elevation/);
+		assert.throws(() => exportFlightPlanTemplateKml(plan), /launch elevation/);
+	}
+	plan.metadata.startElevation = 680;
+	const xml = exportFlightPlanWaylinesWpml(plan);
+	assert.match(xml, /<wpml:executeHeight>23<\/wpml:executeHeight>/);
+	assert.match(xml, /<wpml:executeHeight>33<\/wpml:executeHeight>/);
+	assert.equal((xml.match(/toPointAndStopWithDiscontinuityCurvature/g) || []).length, 2);
+	assert.equal((xml.match(/<wpml:useStraightLine>1/g) || []).length, 2);
+	plan.metadata.startElevation = 0;
+	assert.match(exportFlightPlanWaylinesWpml(plan), /<wpml:executeHeight>703<\/wpml:executeHeight>/);
 });

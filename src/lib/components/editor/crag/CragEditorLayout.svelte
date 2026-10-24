@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Map as MapLibreMap } from 'maplibre-gl';
+	import type { FlightPlan } from '$lib/assets/js/flight-plan-types.ts';
 	import MapSearch from '$lib/components/editor/MapSearch.svelte';
 	import MapStyleControl from '$lib/components/editor/MapStyleControl.svelte';
 	import CragEditorToolbar from '$lib/components/editor/crag/CragEditorToolbar.svelte';
@@ -20,6 +21,7 @@
 		distance: number;
 	};
 	type Props = {
+		flightPlan?: FlightPlan | null;
 		inspectorShadow?: boolean;
 		map?: MapLibreMap | null;
 		isExpanded?: boolean;
@@ -46,6 +48,7 @@
 	let {
 		inspectorShadow = true,
 		map,
+		flightPlan = $bindable(null),
 		isExpanded = false,
 		activeTool = $bindable('select'),
 		toolOptionsOpen = $bindable(false),
@@ -113,6 +116,7 @@
 	{inspectorShadow}
 	{map}
 	bind:activeTab
+	bind:flightPlan
 	{detectedAssets}
 	{isDetectionLoading}
 	{isDetectionZoomLimited}

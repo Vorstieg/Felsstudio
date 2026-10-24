@@ -25,8 +25,13 @@
 	onMount(() => {
 		const cleanupViewport = initViewport();
 		const refreshAuth = () => void authState.refresh();
-		refreshAuth();
-		window.addEventListener('focus', refreshAuth);
+		const isLocalDevelopment =
+			import.meta.env.DEV &&
+			['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+		if (!isLocalDevelopment) {
+			refreshAuth();
+			window.addEventListener('focus', refreshAuth);
+		}
 
 		const erudaWindow = window as Window & { __FELSSTUDIO_ERUDA_INITIALIZED__?: boolean };
 		if (browser && import.meta.env.DEV && !erudaWindow.__FELSSTUDIO_ERUDA_INITIALIZED__) {
@@ -41,7 +46,7 @@
 
 		return () => {
 			cleanupViewport();
-			window.removeEventListener('focus', refreshAuth);
+			if (!isLocalDevelopment) window.removeEventListener('focus', refreshAuth);
 		};
 	});
 

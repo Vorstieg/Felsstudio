@@ -42,6 +42,8 @@ const DEFAULTS = {
 type FlightPlanOptions = Partial<Omit<typeof DEFAULTS, 'terrainElevationAt'>> & {
 	name?: string;
 	cragName?: string;
+	/** Launch elevation in metres AMSL, using the same datum as the terrain. */
+	startElevation?: number;
 	terrainElevationAt?: (longitude: number, latitude: number) => number;
 };
 
@@ -627,6 +629,12 @@ export function generateFlightPlan(
 	if (!Number.isFinite(options.convergentOffsetMeters) || options.convergentOffsetMeters < 0) {
 		throw new TypeError('convergentOffsetMeters must be zero or greater.');
 	}
+	if (
+		suppliedOptions.startElevation !== undefined &&
+		!Number.isFinite(suppliedOptions.startElevation)
+	) {
+		throw new TypeError('Launch elevation must be a finite number in metres AMSL.');
+	}
 	const ring = openRing(geometry);
 	const projection = createProjection(ring);
 	const localRing = ring.map(projection.toLocal);
@@ -706,6 +714,24 @@ export function generateFlightPlan(
 					continue;
 				}
 				const target = surfacePoint?.local || wallFrame.target;
+				let cameraTarget = target;
+				if (options.pattern === 'constant-distance-grid' && lateralOffset !== 0) {
+					// Placement follows the shifted wall frame to retain stand-off.
+					// Aim back at the original coverage sample for a convergent view.
+					const captureFrame = wallFrameAt(along, axis, normal, detectedWall);
+					const captureSurface = wallSurfacePointAtHeight(
+						captureFrame.target,
+						captureFrame.topTarget,
+						height,
+						terrainAt,
+						options
+					);
+					if (!captureSurface) {
+						unresolvedWallSurfaceCount += 1;
+						continue;
+					}
+					cameraTarget = captureSurface.local;
+				}
 				const local = [
 					target[0] +
 						(options.pattern === 'constant-distance-grid' ? 0 : wallFrame.axis[0] * lateralOffset) +
@@ -734,23 +760,23 @@ export function generateFlightPlan(
 					droppedWaypointCount += 1;
 					continue;
 				}
-				rowWaypoints.push(
-					createWaypoint(
+				rowWaypoints.push({
+					...createWaypoint(
 						local,
 						altitude,
 						'capture',
 						options,
-						target,
+						cameraTarget,
 						'photo',
 						waypoints.length,
 						projection
-					)
-				);
+					),
+					captureOrder: point
+				});
 			}
 			rowWaypoints.forEach((waypoint, index) => {
 				waypoint.index = waypoints.length;
 				waypoint.captureRow = `${pass}:${row}`;
-				waypoint.captureOrder = index;
 				waypoint.action =
 					rowWaypoints.length === 1
 						? 'photo'
@@ -839,10 +865,48 @@ export function generateFlightPlan(
 			`No usable flight path remains after enforcing the ${options.minimumFaceDistanceMeters} m cliff-face clearance.`
 		);
 	}
+	// Validate every final connection, including row/pass transitions, after clipping
+	// and reversal. Never export a direct connection that fails the sampled DEM.
+	// Export uses straight segments with a full stop at each waypoint.
+	for (let index = 1; index < waypoints.length; index += 1) {
+		const first = waypoints[index - 1];
+		const second = waypoints[index];
+		const from = projection.toLocal([first.longitude, first.latitude]);
+		const to = projection.toLocal([second.longitude, second.latitude]);
+		const distance = Math.hypot(to[0] - from[0], to[1] - from[1], second.altitude - first.altitude);
+		const samples = Math.max(1, Math.ceil(distance / (options.terrainMeshSpacingMeters / 2)));
+		for (let sample = 0; sample <= samples; sample += 1) {
+			const fraction = sample / samples;
+			const local = [
+				from[0] + (to[0] - from[0]) * fraction,
+				from[1] + (to[1] - from[1]) * fraction
+			];
+			const altitude = first.altitude + (second.altitude - first.altitude) * fraction;
+			const groundClearance = altitude - terrainAt(local);
+			const faceClearance = terrainSurfaceClearance(
+				local,
+				altitude,
+				terrainAt,
+				options.minimumFaceDistanceMeters,
+				options.terrainMeshSpacingMeters
+			);
+			if (
+				groundClearance + 1e-6 < options.minimumGroundClearanceMeters ||
+				faceClearance + 1e-6 < options.minimumFaceDistanceMeters
+			) {
+				throw new RangeError(
+					`Unsafe flight path between waypoints ${index} and ${index + 1}: terrain clearance is insufficient. Increase stand-off or change the capture area.`
+				);
+			}
+		}
+	}
 	return {
 		name: suppliedOptions.name || 'Crag capture plan',
 		cragName: suppliedOptions.cragName || '',
 		metadata: {
+			...(suppliedOptions.startElevation !== undefined
+				? { startElevation: suppliedOptions.startElevation }
+				: {}),
 			pattern: options.pattern,
 			strategy: 'terrain-following-facade-with-convergent-pass',
 			targetGsdCm: options.targetGsdCm,
