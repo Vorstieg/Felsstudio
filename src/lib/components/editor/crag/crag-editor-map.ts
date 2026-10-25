@@ -5,6 +5,7 @@ import { PathLayer, ScatterplotLayer } from '@deck.gl/layers';
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import type { Feature, FeatureCollection } from 'geojson';
 import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
+import { cameraFootprint } from '$lib/assets/js/flight-plan-camera.ts';
 import type { FlightPlan, FlightWaypoint } from '$lib/assets/js/flight-plan-types.ts';
 
 type Coordinate2D = [longitude: number, latitude: number];
@@ -207,14 +208,37 @@ export function buildFlightPathFeatureCollections(
 	let camera = EMPTY_FEATURE_COLLECTION;
 	if (selectedCameraWaypoint?.phase === 'capture') {
 		const heading = (selectedCameraWaypoint.heading * Math.PI) / 180;
-		const target = offsetLngLat(
-			selectedCameraWaypoint.longitude,
-			selectedCameraWaypoint.latitude,
-			Math.sin(heading) * 12,
-			Math.cos(heading) * 12
+		const captureTarget = selectedCameraWaypoint.captureTarget;
+		const distance =
+			Math.hypot(
+				(captureTarget ? captureTarget.longitude - selectedCameraWaypoint.longitude : 0) *
+					111320 *
+					Math.cos((selectedCameraWaypoint.latitude * Math.PI) / 180),
+				(captureTarget ? captureTarget.latitude - selectedCameraWaypoint.latitude : 0) * 111320,
+				(captureTarget?.altitude ?? selectedCameraWaypoint.altitude) -
+					selectedCameraWaypoint.altitude
+			) || 12;
+		const target = captureTarget
+			? [captureTarget.longitude, captureTarget.latitude]
+			: offsetLngLat(
+					selectedCameraWaypoint.longitude,
+					selectedCameraWaypoint.latitude,
+					Math.sin(heading) * distance,
+					Math.cos(heading) * distance
+				);
+		const halfWidth = cameraFootprint(selectedCameraWaypoint.camera || 'wide', distance).width / 2;
+		const left = offsetLngLat(
+			target[0],
+			target[1],
+			Math.cos(heading) * -halfWidth,
+			Math.sin(heading) * halfWidth
 		);
-		const left = offsetLngLat(target[0], target[1], Math.cos(heading) * -7, Math.sin(heading) * 7);
-		const right = offsetLngLat(target[0], target[1], Math.cos(heading) * 7, Math.sin(heading) * -7);
+		const right = offsetLngLat(
+			target[0],
+			target[1],
+			Math.cos(heading) * halfWidth,
+			Math.sin(heading) * -halfWidth
+		);
 		camera = {
 			type: 'FeatureCollection',
 			features: [

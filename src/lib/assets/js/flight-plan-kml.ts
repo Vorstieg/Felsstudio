@@ -8,6 +8,7 @@
  */
 
 import JSZip from 'jszip';
+import { flightCamera } from './flight-plan-camera.ts';
 import type { FlightPlan, FlightWaypoint } from './flight-plan-types';
 
 type WaypointInput = Record<string, unknown>;
@@ -17,6 +18,7 @@ type NormalizedWaypoint = Pick<
 > & {
 	speed: number;
 	focalLength: number;
+	detailFocalLength?: number;
 };
 type NormalizedMission = {
 	waypoints: NormalizedWaypoint[];
@@ -65,7 +67,8 @@ function normaliseWaypoint(waypoint: unknown, index: number) {
 		gimbalPitch: optionalNumber(input.gimbalPitch) ?? -8,
 		speed: optionalNumber(input.speed),
 		phase: input.phase === 'capture' ? ('capture' as const) : ('transit' as const),
-		focalLength: cameraFocalLength(input.camera)
+		focalLength: cameraFocalLength(input.camera),
+		detailFocalLength: input.detailCamera ? cameraFocalLength(input.detailCamera) : undefined
 	};
 }
 
@@ -82,6 +85,10 @@ function normaliseHeading(value: number): number {
 
 function normaliseMission(plan: FlightPlan): NormalizedMission {
 	if (!plan || typeof plan !== 'object') throw new TypeError('A flight plan is required.');
+	if (plan.metadata?.coverageStatus === 'partial' || plan.metadata?.coverageStatus === 'unresolved')
+		throw new Error(
+			'The wall has uncovered or unresolved capture targets. Increase wall distance or adjust the capture area before exporting.'
+		);
 	if (!Array.isArray(plan.waypoints) || plan.waypoints.length < 2) {
 		throw new TypeError('A flight plan requires at least two waypoints.');
 	}
@@ -113,18 +120,7 @@ function waypointHeight(waypoint: NormalizedWaypoint, startElevation: number): n
 }
 
 function cameraFocalLength(camera: unknown): number {
-	switch (camera) {
-		case 'tele-6x':
-		case '6x':
-			return 168;
-		case 'tele-3x':
-		case 'medium-tele':
-			return 70;
-		case 'wide':
-		case 'main':
-		default:
-			return 24;
-	}
+	return flightCamera(typeof camera === 'string' ? camera : 'wide').focalLength;
 }
 
 function actionXml(actionId: number, type: string, parameters: string): string {
@@ -180,6 +176,25 @@ function waypointActions(
 			)
 		);
 	}
+	if (waypoint.phase === 'capture' && waypoint.detailFocalLength) {
+		actions.push(
+			actionXml(
+				actionId++,
+				'zoom',
+				`
+              <wpml:focalLength>${waypoint.detailFocalLength}</wpml:focalLength>
+              <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>`
+			),
+			actionXml(
+				actionId++,
+				'takePhoto',
+				`
+              <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>
+              <wpml:fileSuffix>crag-detail</wpml:fileSuffix>`
+			)
+		);
+	}
+
 	return { xml: actions.join(''), nextActionId: actionId };
 }
 

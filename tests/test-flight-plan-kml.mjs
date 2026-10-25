@@ -124,7 +124,7 @@ test('requires an explicit finite launch elevation and exports straight stopped 
 	assert.match(exportFlightPlanWaylinesWpml(plan), /<wpml:executeHeight>703<\/wpml:executeHeight>/);
 });
 
-test('exports every generated capture point once and uses generator metadata', () => {
+test('exports overview and detail photos with the generated camera pitches', () => {
 	const plan = generateFlightPlan(
 		{
 			type: 'Polygon',
@@ -138,18 +138,28 @@ test('exports every generated capture point once and uses generator metadata', (
 				]
 			]
 		},
-		{ camera: 'wide', startElevation: 680, terrainElevationAt: () => 700 }
+		{
+			startElevation: 680,
+			terrainElevationAt: (_longitude, latitude) =>
+				700 + Math.max(0, Math.min(1, (latitude - 47.00002) / 0.00006)) * 20
+		}
 	);
 	assert.equal(plan.metadata.camera, 'wide');
-	assert.equal(plan.metadata.photoCount, plan.waypoints.length);
+	assert.equal(
+		plan.metadata.photoCount,
+		plan.waypoints.filter((waypoint) => waypoint.phase === 'capture').length +
+			plan.metadata.detailPhotoCount
+	);
+	assert.ok(plan.metadata.detailPhotoCount > 0);
 	assert.equal(plan.previewWaypointIndex, plan.waypoints[0].index);
 	const xml = exportFlightPlanWaylinesWpml(plan);
 	assert.equal(
 		(xml.match(/<wpml:actionActuatorFunc>takePhoto</g) || []).length,
 		plan.metadata.photoCount
 	);
-	assert.equal((xml.match(/<wpml:focalLength>24</g) || []).length, plan.waypoints.length);
-	assert.match(xml, /<wpml:executeHeight>23<\/wpml:executeHeight>/);
+	assert.equal((xml.match(/<wpml:focalLength>28</g) || []).length, plan.waypoints.length);
+	assert.equal((xml.match(/<wpml:focalLength>168</g) || []).length, plan.metadata.detailPhotoCount);
+	assert.ok(plan.waypoints.some((waypoint) => waypoint.gimbalPitch !== -8));
 });
 
 test('normalizes export numbers and defaults consistently across waypoint actions and mission files', async () => {
@@ -186,7 +196,7 @@ test('normalizes export numbers and defaults consistently across waypoint action
 	assert.match(placemarks[0], /<wpml:focalLength>168</);
 	assert.match(placemarks[1], /<wpml:waypointHeadingAngle>0</);
 	assert.match(placemarks[1], /<wpml:waypointSpeed>2.5</);
-	assert.match(placemarks[1], /<wpml:focalLength>24</);
+	assert.match(placemarks[1], /<wpml:focalLength>28</);
 	for (const [index, pitch] of [
 		[0, -12],
 		[1, -8]

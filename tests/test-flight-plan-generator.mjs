@@ -1,290 +1,288 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { generateFlightPlan } from '../src/lib/assets/js/flight-plan-generator.ts';
+import {
+	generateFlightPlan,
+	validateFlightPlanOptions
+} from '../src/lib/assets/js/flight-plan-generator.ts';
+import {
+	cameraFootprint,
+	cameraContainsTarget,
+	flightCamera,
+	selectCoverageCamera
+} from '../src/lib/assets/js/flight-plan-camera.ts';
+import { terrainSurfaceClearance } from '../src/lib/assets/js/flight-plan-terrain.ts';
+import { exportFlightPlanWaylinesWpml } from '../src/lib/assets/js/flight-plan-kml.ts';
 
-test('generates valid deterministic flight plans', () => {
-	const sector = {
-		type: 'Polygon',
-		coordinates: [
-			[
-				[11.0, 47.0],
-				[11.002, 47.0],
-				[11.002, 47.0003],
-				[11.0, 47.0003],
-				[11.0, 47.0]
-			]
-		]
-	};
-	const options = {
-		cragName: 'Test wall',
-		stripSpacingMeters: 10,
-		pointSpacingMeters: 10,
-		terrainElevationAt: () => 700
-	};
-	const plan = generateFlightPlan(sector, options);
-
-	assert.equal(plan.cragName, 'Test wall');
-	assert.equal(plan.metadata.pattern, 'facade-grid');
-	assert.equal(plan.metadata.strategy, 'terrain-following-facade-with-convergent-pass');
-	assert.equal(plan.metadata.convergentPasses, 2);
-	assert.equal(plan.metadata.terrainSource, 'https://tiles.mapterhorn.com/tilejson.json');
-	assert.equal(plan.metadata.captureHeightMeters, 0);
-	assert.ok(
-		plan.waypoints.every(
-			(waypoint) => waypoint.phase === 'capture' && waypoint.camera === 'tele-6x'
-		)
-	);
-	assert.equal(plan.waypoints[0].rowBoundary, 'start');
-	assert.ok(plan.waypoints.every((waypoint) => waypoint.altitude >= 703));
-	assert.ok(plan.waypoints.some((waypoint) => waypoint.rowBoundary === 'start'));
-	assert.ok(plan.waypoints.some((waypoint) => waypoint.rowBoundary === 'end'));
-	const directOnlyPlan = generateFlightPlan(sector, { ...options, convergentPasses: 1 });
-	assert.equal(
-		plan.waypoints.length,
-		directOnlyPlan.waypoints.length * 2,
-		'a second convergent pass should provide a second view of every coverage row'
-	);
-	assert.notEqual(
-		plan.waypoints[0].heading,
-		plan.waypoints[directOnlyPlan.waypoints.length].heading,
-		'the convergent pass should look back to the face from a different viewpoint'
-	);
-	const constantDistancePlan = generateFlightPlan(sector, {
-		...options,
-		pattern: 'constant-distance-grid'
-	});
-	assert.equal(constantDistancePlan.metadata.pattern, 'constant-distance-grid');
-	assert.ok(
-		constantDistancePlan.waypoints.every((waypoint) => waypoint.altitude >= 703),
-		'the constant-distance grid must retain vertical clearance above the wall base'
-	);
-	const surfaceFollowingPlan = generateFlightPlan(sector, {
-		...options,
-		pattern: 'constant-distance-grid',
-		standOffMeters: 100,
-		terrainElevationAt: (_longitude, latitude) => 700 + ((latitude - 47) * 20) / 0.0003
-	});
-	assert.equal(surfaceFollowingPlan.metadata.pattern, 'constant-distance-grid');
-	const surfaceFollowingLatitudes = surfaceFollowingPlan.waypoints.map(
-		(waypoint) => waypoint.latitude
-	);
-	assert.ok(
-		Math.max(...surfaceFollowingLatitudes) - Math.min(...surfaceFollowingLatitudes) > 0.0001,
-		'every capture layer should move horizontally as it follows the DEM wall surface'
-	);
-	assert.deepEqual(plan, generateFlightPlan(sector, options), 'generation must be deterministic');
-	assert.throws(() => generateFlightPlan({ type: 'Point', coordinates: [11, 47] }));
-
-	const tallSectorPlan = generateFlightPlan(sector, {
-		...options,
-		terrainElevationAt: (longitude) => 700 + ((longitude - 11) * 100) / 0.002
-	});
-	assert.ok(Math.abs(tallSectorPlan.metadata.captureHeightMeters - 100) < 0.0001);
-	assert.ok(Math.abs(tallSectorPlan.metadata.sectorMinimumElevation - 700) < 0.0001);
-	assert.ok(Math.abs(tallSectorPlan.metadata.sectorMaximumElevation - 800) < 0.0001);
-	assert.ok(
-		tallSectorPlan.waypoints.every(
-			(waypoint) => waypoint.altitude - (700 + ((waypoint.longitude - 11) * 100) / 0.002) >= 3
-		),
-		'every waypoint must remain at least 3 m above the sampled ground'
-	);
-	assert.ok(
-		tallSectorPlan.metadata.altitudeCappedWaypointCount > 0,
-		'waypoints above the capture-altitude ceiling should be removed'
-	);
-	assert.ok(
-		tallSectorPlan.waypoints.every(
-			(waypoint) => waypoint.altitude <= tallSectorPlan.metadata.captureAltitudeCeiling
-		),
-		'no capture waypoint may exceed the lowest capture altitude plus face height and tolerance'
-	);
-
-	assert.throws(
-		() =>
-			generateFlightPlan(sector, {
-				...options,
-				terrainElevationAt: (longitude) => (longitude > 11.0008 && longitude < 11.0012 ? 720 : 700)
-			}),
-		/Unsafe flight path between waypoints/,
-		'clipping rows must not leave an unchecked transition through high terrain'
-	);
-	assert.throws(
-		() => generateFlightPlan(sector, { ...options, standOffMeters: 0.5 }),
-		/standOffMeters must be at least 1 metre/
-	);
-	assert.throws(
-		() => generateFlightPlan(sector, { ...options, minimumFaceDistanceMeters: 0.5 }),
-		/at least 1 metre/
-	);
-
-	const uphillFacingPlan = generateFlightPlan(sector, {
-		...options,
-		// The sector centre and north side are high ground; the south side is the
-		// air-facing side of the cliff.  The capture path must stay south and look
-		// back north towards the sector centre.
-		terrainElevationAt: (_longitude, latitude) => (latitude < 47.00015 ? 700 : 720)
-	});
-	const uphillCaptureWaypoints = uphillFacingPlan.waypoints.filter(
-		(waypoint) => waypoint.phase === 'capture'
-	);
-	assert.ok(uphillCaptureWaypoints.every((waypoint) => waypoint.latitude < 47.00015));
-	assert.ok(
-		uphillCaptureWaypoints.every((waypoint) => Math.cos((waypoint.heading * Math.PI) / 180) > 0),
-		'capture headings should have a northward component towards the sector centre'
-	);
-	assert.ok(
-		uphillFacingPlan.wallDetection.coordinates.length > 2,
-		'a continuous steep band should be detected as the wall'
-	);
-	assert.ok(uphillFacingPlan.wallDetection.confidence > 0.9);
-	assert.equal(uphillFacingPlan.wallDetection.shape, 'flat');
-	assert.ok(
-		uphillFacingPlan.wallDetection.coordinates.every(
-			([_longitude, latitude]) => Math.abs(latitude - 47.00015) < 0.00002
-		),
-		'the detected centreline should follow the terrain break'
-	);
-});
-
-const sector = {
-	type: 'Polygon',
-	coordinates: [
-		[
-			[11, 47],
-			[11.002, 47],
-			[11.002, 47.0003],
-			[11, 47.0003],
-			[11, 47]
-		]
-	]
+const latitudeScale = (Math.PI / 180) * 6378137;
+const longitudeScale = latitudeScale * Math.cos((47 * Math.PI) / 180);
+const coordinate = (x, y) => [11 + x / longitudeScale, 47 + y / latitudeScale];
+const local = (longitude, latitude) => [
+	(longitude - 11) * longitudeScale,
+	(latitude - 47) * latitudeScale
+];
+const ring = [
+	[-30, -8],
+	[30, -8],
+	[30, 8],
+	[-30, 8],
+	[-30, -8]
+].map(([x, y]) => coordinate(x, y));
+const sector = { type: 'Polygon', coordinates: [ring] };
+const ramp = (value, low, high) => Math.max(0, Math.min(1, (value - low) / (high - low)));
+const heightAt = (x) => 22 + 4 * Math.sin(x / 20);
+const terrain = (longitude, latitude) => {
+	const [x, y] = local(longitude, latitude);
+	return 700 + 8 * ramp(y, -6, -4) + (heightAt(x) - 8) * ramp(y, 0, 4);
 };
+const captures = (plan) => plan.waypoints.filter((waypoint) => waypoint.phase === 'capture');
+const photosOfKind = (plan, kind) =>
+	captures(plan).filter((waypoint) => waypoint.captureKind === kind);
 
-test('rejects terrain between individually clear capture waypoints', () => {
-	// This narrow ridge sits between 10 m capture samples, outside their local
-	// clearance meshes. Vertex elevations are level and no wall is detected.
-	assert.throws(
-		() =>
-			generateFlightPlan(sector, {
-				pointSpacingMeters: 10,
-				convergentPasses: 1,
-				terrainElevationAt: (longitude) => (Math.abs(longitude - 11.00006) < 0.00001 ? 705 : 700)
-			}),
-		/Unsafe flight path between waypoints/
-	);
-});
-
-test('preserves clearance-rejection gaps when selecting continuous row fragments', () => {
-	const plan = generateFlightPlan(sector, {
-		pointSpacingMeters: 5,
-		convergentPasses: 1,
-		terrainElevationAt: (longitude, latitude) =>
-			latitude >= 47.00015 ? 720 : longitude > 11.00085 && longitude < 11.00115 ? 703 : 700
-	});
-	assert.ok(plan.metadata.droppedWaypointCount > 0);
-	assert.ok(
-		plan.metadata.fragmentedRowCount > 0,
-		'clearance rejection must split the original sample order'
-	);
-	assert.ok(plan.metadata.discardedFragmentWaypointCount > 0);
-	const firstRow = plan.waypoints.slice(
-		0,
-		plan.waypoints.findIndex((waypoint) => waypoint.rowBoundary === 'end') + 1
-	);
-	assert.ok(firstRow.length > 1);
-	assert.ok(
-		firstRow.every((waypoint) => waypoint.longitude > 11.00115),
-		'the fragmented base row must retain only its continuous right-hand section'
-	);
-	assert.deepEqual(
-		plan.waypoints.map((waypoint) => waypoint.index),
-		plan.waypoints.map((_, index) => index)
-	);
-});
-
-test('retains an explicit launch reference without requiring it for preview generation', () => {
-	const options = { terrainElevationAt: () => 700 };
-	assert.equal(generateFlightPlan(sector, options).metadata.startElevation, undefined);
-	assert.equal(
-		generateFlightPlan(sector, { ...options, startElevation: 680 }).metadata.startElevation,
-		680
-	);
-	assert.equal(
-		generateFlightPlan(sector, { ...options, startElevation: 0 }).metadata.startElevation,
-		0
-	);
-	assert.throws(
-		() => generateFlightPlan(sector, { ...options, startElevation: NaN }),
-		/Launch elevation/
-	);
-});
-
-test('rejects a cliff-face intrusion between points even when ground clearance stays sufficient', () => {
-	assert.throws(
-		() =>
-			generateFlightPlan(sector, {
-				pointSpacingMeters: 10,
-				convergentPasses: 1,
-				// The path itself is over level ground. The elevated patch lies beside
-				// it, within the face clearance, between the capture samples.
-				terrainElevationAt: (longitude, latitude) =>
-					Math.abs(longitude - 11.00006) < 0.00001 && Math.abs(latitude - 47.000182) < 0.000006
-						? 705
-						: 700
-			}),
-		/Unsafe flight path between waypoints/
-	);
-});
-
-for (const pattern of ['facade-grid', 'constant-distance-grid']) {
-	test(`${pattern} convergent passes aim at the original wall samples`, () => {
-		const standOffMeters = 10;
-		const plan = generateFlightPlan(sector, {
-			pattern,
-			standOffMeters,
-			pointSpacingMeters: 10,
-			convergentPasses: 2,
-			convergentOffsetMeters: 2,
-			terrainElevationAt: (_longitude, latitude) =>
-				700 + Math.max(0, Math.min(1, (latitude - 47.00012) / 0.00006)) * 20
-		});
-		assert.ok(plan.wallDetection.confidence > 0.9);
-		assert.equal(plan.metadata.droppedWaypointCount, 0);
-		const rows = [];
-		for (const waypoint of plan.waypoints) {
-			if (waypoint.rowBoundary === 'start') rows.push([]);
-			rows.at(-1).push(waypoint);
+function assertSafePath(plan, terrainAt) {
+	const minimumGround =
+		plan.metadata.minimumGroundClearanceMeters + plan.metadata.clearanceMarginMeters;
+	const minimumFace = plan.metadata.minimumFaceDistanceMeters + plan.metadata.clearanceMarginMeters;
+	for (let index = 1; index < plan.waypoints.length; index++) {
+		const first = plan.waypoints[index - 1],
+			second = plan.waypoints[index];
+		const from = local(first.longitude, first.latitude),
+			to = local(second.longitude, second.latitude);
+		const count = Math.max(
+			1,
+			Math.ceil(
+				Math.hypot(to[0] - from[0], to[1] - from[1], second.altitude - first.altitude) / 0.25
+			)
+		);
+		for (let sample = 0; sample <= count; sample++) {
+			const fraction = sample / count;
+			const point = [
+				from[0] + (to[0] - from[0]) * fraction,
+				from[1] + (to[1] - from[1]) * fraction
+			];
+			const altitude = first.altitude + (second.altitude - first.altitude) * fraction;
+			const [longitude, latitude] = coordinate(...point);
+			assert.ok(altitude - terrainAt(longitude, latitude) >= minimumGround - 1e-5);
+			assert.ok(
+				terrainSurfaceClearance(
+					point,
+					altitude,
+					(p) => terrainAt(...coordinate(...p)),
+					minimumFace,
+					1
+				) >=
+					minimumFace - 1e-5
+			);
 		}
-		const rowsPerPass = rows.length / 2;
-		assert.ok(Number.isInteger(rowsPerPass) && rowsPerPass > 1);
-		const latitudeScale = (Math.PI / 180) * 6378137;
-		const longitudeScale = latitudeScale * Math.cos((47.00015 * Math.PI) / 180);
-		for (let row = 0; row < rowsPerPass; row += 1) {
-			const direct = [...rows[row]].sort((a, b) => a.longitude - b.longitude);
-			const convergent = [...rows[row + rowsPerPass]].sort((a, b) => a.longitude - b.longitude);
-			assert.equal(convergent.length, direct.length);
-			// Endpoints may be clamped to the detected wall extent. Interior
-			// samples must move 2 m and look back at the same surface location.
-			for (let index = 1; index < direct.length - 1; index += 1) {
-				const first = direct[index];
-				const second = convergent[index];
-				const shift = (second.longitude - first.longitude) * longitudeScale;
-				assert.ok(Math.abs(shift - 2) < 1e-5);
-				assert.ok(
-					Math.abs(second.latitude - first.latitude) * latitudeScale < 1e-5,
-					'convergence must preserve stand-off on a straight wall'
-				);
-				const expectedHeading = ((Math.atan2(-shift, standOffMeters) * 180) / Math.PI + 360) % 360;
-				assert.ok(
-					Math.abs(second.heading - expectedHeading) < 1e-5,
-					'the camera must aim back at the direct pass target'
-				);
-				assert.ok(Math.abs(second.heading - first.heading) > 1);
+	}
+}
+
+for (const pattern of ['facade-grid', 'constant-distance-grid', 'half-helix', 'curved-sweep']) {
+	test(`${pattern} aims each photo at its real 3D surface target, including the crest`, () => {
+		const options = { pattern, terrainElevationAt: terrain };
+		const plan = generateFlightPlan(sector, options);
+		assert.equal(plan.metadata.coverageStatus, 'modeled');
+		assert.equal(plan.metadata.uncoveredTargetCount, 0);
+		assert.equal(plan.metadata.coveredCrestTargetCount, plan.metadata.crestTargetCount);
+		assert.ok(plan.metadata.crestTargetCount > 2);
+		assert.equal(plan.metadata.discardedFragmentWaypointCount, 0);
+		assert.equal(plan.metadata.coveragePasses, 1);
+		assert.equal(photosOfKind(plan, 'grid').length, plan.metadata.gridWaypointCount);
+		assert.ok(photosOfKind(plan, 'grid').every((waypoint) => waypoint.captureView === 'face'));
+		assert.ok(plan.metadata.standOffMeters > plan.metadata.minimumFaceDistanceMeters);
+		const photos = captures(plan);
+		assert.equal(
+			plan.metadata.photoCount,
+			photos.length + photos.filter((waypoint) => waypoint.detailCamera).length
+		);
+		const pitches = new Set();
+		for (const waypoint of photos) {
+			const target = waypoint.captureTarget;
+			const from = local(waypoint.longitude, waypoint.latitude),
+				to = local(target.longitude, target.latitude);
+			const horizontal = Math.hypot(to[0] - from[0], to[1] - from[1]);
+			const expectedPitch =
+				(Math.atan2(target.altitude - waypoint.altitude, horizontal) * 180) / Math.PI;
+			assert.ok(Math.abs(waypoint.gimbalPitch - expectedPitch) < 1e-5);
+			const expectedHeading =
+				((Math.atan2(to[0] - from[0], to[1] - from[1]) * 180) / Math.PI + 360) % 360;
+			assert.ok(Math.abs(((waypoint.heading - expectedHeading + 540) % 360) - 180) < 1e-5);
+			assert.ok(Math.abs(target.altitude - terrain(target.longitude, target.latitude)) < 0.1);
+			assert.ok(waypoint.gimbalPitch >= -90 && waypoint.gimbalPitch <= 70);
+			pitches.add(Math.round(waypoint.gimbalPitch));
+			// A clear aircraft position alone does not prove that its target is visible.
+			const count = Math.max(1, Math.ceil(horizontal / 0.1));
+			for (let sample = 1; sample < count; sample++) {
+				const fraction = sample / count;
+				const point = [
+					from[0] + (to[0] - from[0]) * fraction,
+					from[1] + (to[1] - from[1]) * fraction
+				];
+				const altitude = waypoint.altitude + (target.altitude - waypoint.altitude) * fraction;
+				assert.ok(altitude + 0.1 >= terrain(...coordinate(...point)));
 			}
+			if (waypoint.captureView === 'crest') {
+				assert.ok(waypoint.altitude > target.altitude + 2);
+				assert.ok(target.altitude >= 700 + heightAt(to[0]) - 0.1);
+			}
+		}
+		assert.ok(pitches.size > 3, 'clearance lifts and oblique views must change pitch');
+		assert.ok(
+			photos.some(
+				(waypoint) => waypoint.captureView === 'face' && waypoint.captureTarget.altitude < 701
+			)
+		);
+		assert.ok(photos.some((waypoint) => waypoint.captureTarget.altitude > 724));
+		const grid = photosOfKind(plan, 'grid');
+		assert.equal(
+			new Set(grid.map((waypoint) => JSON.stringify(waypoint.captureTarget))).size,
+			grid.length,
+			'the main grid must visit each target only once'
+		);
+		assert.deepEqual(
+			plan.waypoints.map((waypoint) => waypoint.index),
+			plan.waypoints.map((_, index) => index)
+		);
+		assert.equal(
+			plan.waypoints.some((waypoint) => 'local' in waypoint || 'coverageKey' in waypoint),
+			false
+		);
+		if (pattern === 'constant-distance-grid') {
+			assertSafePath(plan, terrain);
+			assert.deepEqual(plan, generateFlightPlan(sector, options));
 		}
 	});
 }
 
-test('orders row transitions by distance in metres at high latitudes', () => {
+test('camera choice and photo spacing depend on optics and distance', () => {
+	assert.equal(selectCoverageCamera(8, 0.5), 'wide');
+	assert.equal(selectCoverageCamera(35, 0.5), 'tele-3x');
+	assert.equal(selectCoverageCamera(100, 0.5), 'tele-6x');
+	const plan = generateFlightPlan(sector, { terrainElevationAt: terrain });
+	const footprint = cameraFootprint(plan.metadata.camera, plan.metadata.standOffMeters);
+	assert.ok(
+		plan.metadata.pointSpacingMeters <= footprint.width * (1 - plan.metadata.captureOverlap)
+	);
+	assert.ok(
+		plan.metadata.stripSpacingMeters <= footprint.height * (1 - plan.metadata.captureOverlap)
+	);
+	for (const waypoint of captures(plan).filter((waypoint) => waypoint.detailCamera)) {
+		const from = local(waypoint.longitude, waypoint.latitude);
+		const target = waypoint.captureTarget,
+			to = local(target.longitude, target.latitude);
+		assert.ok(
+			Math.hypot(to[0] - from[0], to[1] - from[1], target.altitude - waypoint.altitude) >=
+				flightCamera(waypoint.detailCamera).minimumFocus
+		);
+	}
+});
+
+test('a blocked connection gets transits and a blocked mission never exports', () => {
+	const options = {
+		pattern: 'constant-distance-grid',
+		camera: 'wide',
+		standOffMeters: 20,
+		clearanceMarginMeters: 0,
+		terrainElevationAt: () => 700
+	};
+	const baseline = generateFlightPlan(sector, options);
+	const [a, b] = captures(baseline);
+	const ridgeLongitude = (a.longitude + b.longitude) / 2;
+	const ridge = (longitude) =>
+		Math.abs(longitude - ridgeLongitude) * longitudeScale < 0.4 ? 708 : 700;
+	const plan = generateFlightPlan(sector, { ...options, terrainElevationAt: ridge });
+	assert.ok(plan.waypoints.some((waypoint) => waypoint.phase === 'transit'));
+	assertSafePath(plan, ridge);
+	for (const waypoint of plan.waypoints.filter((waypoint) => waypoint.phase === 'transit')) {
+		assert.equal(waypoint.detailCamera, undefined);
+		assert.equal(waypoint.captureTarget, undefined);
+	}
+	assert.throws(
+		() => generateFlightPlan(sector, { ...options, terrainClearanceAt: () => 0 }),
+		/No usable flight path/
+	);
+	assert.throws(
+		() =>
+			exportFlightPlanWaylinesWpml({
+				...plan,
+				metadata: { ...plan.metadata, coverageStatus: 'partial', startElevation: 680 }
+			}),
+		/uncovered or unresolved/
+	);
+	assert.throws(
+		() => generateFlightPlan(sector, { ...options, terrainClearanceAt: () => NaN }),
+		/No usable flight path/
+	);
+	assert.equal(baseline.metadata.coverageStatus, 'unresolved');
+	assert.throws(
+		() =>
+			exportFlightPlanWaylinesWpml({
+				...baseline,
+				metadata: { ...baseline.metadata, startElevation: 680 }
+			}),
+		/uncovered or unresolved/
+	);
+});
+
+test('clearance margin is enforced and invalid requests fail before work grows', () => {
+	for (const key of [
+		'pointSpacingMeters',
+		'stripSpacingMeters',
+		'terrainMeshSpacingMeters',
+		'targetGsdCm'
+	])
+		for (const value of [0, -1, NaN, Infinity])
+			assert.throws(() => generateFlightPlan(sector, { [key]: value }), /greater than zero/);
+	for (const options of [
+		{ camera: 'unknown' },
+		{ captureOverlap: 0.1 },
+		{ clearanceMarginMeters: -1 },
+		{ standOffMeters: 0.5 },
+		{ minimumFaceDistanceMeters: 0.5 },
+		{ startElevation: NaN }
+	])
+		assert.throws(() => validateFlightPlanOptions(options));
+	assert.throws(
+		() => generateFlightPlan(sector, { pointSpacingMeters: 1e-9 }),
+		/Capture waypoints exceed/
+	);
+	assert.throws(
+		() => generateFlightPlan(sector, { wallDetectionSpacingMeters: 1e-9 }),
+		/Wall sections exceed/
+	);
+	const plan = generateFlightPlan(sector, {
+		terrainElevationAt: terrain,
+		startElevation: 680,
+		clearanceMarginMeters: 2
+	});
+	assert.equal(plan.metadata.startElevation, 680);
+	assert.equal(plan.metadata.clearanceMarginMeters, 2);
+	assert.ok(
+		captures(plan).every(
+			(waypoint) => waypoint.altitude - terrain(waypoint.longitude, waypoint.latitude) >= 5 - 1e-5
+		)
+	);
+});
+
+test('terrain caches belong to one generation', () => {
+	let offset = 0;
+	const options = {
+		terrainElevationAt: (longitude, latitude) => terrain(longitude, latitude) + offset
+	};
+	const first = generateFlightPlan(sector, options);
+	offset = 100;
+	const second = generateFlightPlan(sector, options);
+	assert.equal(second.waypoints.length, first.waypoints.length);
+	for (let index = 0; index < first.waypoints.length; index++) {
+		assert.ok(
+			Math.abs(second.waypoints[index].altitude - first.waypoints[index].altitude - 100) < 1e-5
+		);
+		assert.ok(
+			Math.abs(second.waypoints[index].gimbalPitch - first.waypoints[index].gimbalPitch) < 1e-5
+		);
+	}
+});
+
+test('orders single-grid row transitions by physical endpoint distance at high latitudes', () => {
 	const latitude = 80;
 	const latitudeScale = (Math.PI / 180) * 6378137;
 	const longitudeScale = latitudeScale * Math.cos((latitude * Math.PI) / 180);
@@ -299,6 +297,8 @@ test('orders row transitions by distance in metres at high latitudes', () => {
 		{ type: 'Polygon', coordinates: [[...ring, ring[0]]] },
 		{
 			pattern: 'constant-distance-grid',
+			camera: 'wide',
+			captureOverlap: 0.76,
 			standOffMeters: 10,
 			stripSpacingMeters: 8,
 			pointSpacingMeters: 10,
@@ -311,50 +311,143 @@ test('orders row transitions by distance in metres at high latitudes', () => {
 		}
 	);
 	const rows = [];
-	for (const waypoint of plan.waypoints) {
+	for (const waypoint of photosOfKind(plan, 'grid')) {
 		if (waypoint.rowBoundary === 'start' || waypoint.rowBoundary === 'single') rows.push([]);
 		rows.at(-1).push(waypoint);
 		assert.equal('local' in waypoint, false, 'local coordinates must stay internal');
 	}
-	let distinguishesDegrees = false;
 	for (let index = 1; index < rows.length; index += 1) {
 		const previous = rows[index - 1].at(-1);
 		const first = rows[index][0];
 		const last = rows[index].at(-1);
-		const distance = (point, metric) =>
+		const distance = (point) =>
 			Math.hypot(
-				(point.longitude - previous.longitude) * (metric ? longitudeScale : 1),
-				(point.latitude - previous.latitude) * (metric ? latitudeScale : 1)
+				(point.longitude - previous.longitude) * longitudeScale,
+				(point.latitude - previous.latitude) * latitudeScale
 			);
-		assert.ok(distance(first, true) <= distance(last, true) + 1e-6);
-		if (distance(first, false) > distance(last, false)) distinguishesDegrees = true;
+		assert.ok(distance(first) <= distance(last) + 1e-6);
 	}
-	assert.ok(
-		distinguishesDegrees,
-		'the fixture must distinguish metre distances from degree distances'
+});
+
+test('preview generation retains an optional launch reference and rejects unavailable terrain', () => {
+	const options = { terrainElevationAt: terrain };
+	assert.equal(generateFlightPlan(sector, options).metadata.startElevation, undefined);
+	assert.equal(
+		generateFlightPlan(sector, { ...options, startElevation: 0 }).metadata.startElevation,
+		0
+	);
+	assert.throws(
+		() => generateFlightPlan(sector, { ...options, startElevation: NaN }),
+		/Launch elevation/
+	);
+	assert.throws(
+		() => generateFlightPlan(sector, { terrainElevationAt: () => NaN }),
+		/finite elevation/
+	);
+	assert.throws(() => generateFlightPlan({ type: 'Point', coordinates: [11, 47] }), /Polygon/);
+	assert.throws(() => flightCamera('toString'), /Unsupported capture camera/);
+});
+
+test('camera frusta distinguish pitched views and tele detail coverage', () => {
+	const aircraft = [0, 0, 10];
+	assert.equal(cameraContainsTarget('wide', aircraft, 0, -45, [0, 10, 0]), true);
+	assert.equal(cameraContainsTarget('tele-6x', aircraft, 0, -45, [0, 10, 0]), true);
+	assert.equal(cameraContainsTarget('tele-6x', aircraft, 0, 0, [0, 10, 0]), false);
+	assert.equal(cameraContainsTarget('wide', aircraft, 0, -45, [3, 10, 0]), true);
+	assert.equal(cameraContainsTarget('tele-6x', aircraft, 0, -45, [3, 10, 0]), false);
+	assert.equal(cameraContainsTarget('wide', aircraft, 0, -45, [0, -10, 20]), false);
+	assert.throws(
+		() =>
+			generateFlightPlan({
+				type: 'Polygon',
+				coordinates: [
+					[
+						[11, 47],
+						[NaN, 47],
+						[11.001, 47.001],
+						[11, 47]
+					]
+				]
+			}),
+		/finite WGS84/
 	);
 });
 
-test('terrain cache reduces queries and refreshes for each generation', () => {
-	let queries = 0;
-	let elevation = 700;
-	const options = {
-		terrainElevationAt: () => {
-			queries += 1;
-			return elevation;
-		}
-	};
-	const first = generateFlightPlan(sector, options);
-	assert.equal(first.waypoints.length, 128);
-	assert.ok(queries < 60000, `expected reuse of terrain queries, got ${queries}`);
-	elevation = 800;
-	queries = 0;
-	const second = generateFlightPlan(sector, options);
-	assert.ok(queries > 0, 'a new generation must read fresh terrain');
-	assert.equal(second.waypoints.length, first.waypoints.length);
-	for (let index = 0; index < first.waypoints.length; index += 1) {
-		assert.equal(second.waypoints[index].altitude, first.waypoints[index].altitude + 100);
-		assert.equal(second.waypoints[index].longitude, first.waypoints[index].longitude);
-		assert.equal(second.waypoints[index].latitude, first.waypoints[index].latitude);
+test('detail controls distance and density independently of minimum clearance', () => {
+	const plans = [1, 0.7, 0.5].map((targetGsdCm) =>
+		generateFlightPlan(sector, {
+			targetGsdCm,
+			minimumFaceDistanceMeters: 2,
+			terrainElevationAt: terrain
+		})
+	);
+	for (const plan of plans) {
+		assert.equal(plan.metadata.minimumFaceDistanceMeters, 2);
+		assert.equal(plan.metadata.coverageStatus, 'modeled');
+		assert.equal(plan.metadata.spacingGapCount, 0);
 	}
+	assert.ok(plans[0].metadata.standOffMeters > plans[1].metadata.standOffMeters);
+	assert.ok(plans[1].metadata.standOffMeters > plans[2].metadata.standOffMeters);
+	assert.ok(plans[0].waypoints.length < plans[1].waypoints.length);
+	assert.ok(plans[1].waypoints.length < plans[2].waypoints.length);
+	assert.ok(plans[2].waypoints.length < 1000);
+});
+
+test('one grid supplies the face views while only the top needs extra photos on a planar wall', () => {
+	const plan = generateFlightPlan(sector, {
+		pattern: 'constant-distance-grid',
+		terrainElevationAt: (longitude, latitude) =>
+			700 + 20 * ramp(local(longitude, latitude)[1], -4, 4)
+	});
+	const grid = photosOfKind(plan, 'grid'),
+		extra = photosOfKind(plan, 'supplementary');
+	assert.equal(plan.metadata.coveragePasses, 1);
+	assert.equal(plan.metadata.coverageStatus, 'modeled');
+	assert.equal(extra.filter((waypoint) => waypoint.captureView === 'face').length, 0);
+	assert.ok(extra.some((waypoint) => waypoint.captureView === 'crest'));
+	assert.ok(extra.length < grid.length / 3);
+	assert.equal(plan.metadata.uncoveredTargetCount, 0);
+	assert.equal(plan.metadata.spacingGapCount, 0);
+	const level = generateFlightPlan(sector, { terrainElevationAt: () => 700 });
+	const poses = photosOfKind(level, 'grid').map((waypoint) =>
+		JSON.stringify([
+			waypoint.longitude,
+			waypoint.latitude,
+			waypoint.altitude,
+			waypoint.heading,
+			waypoint.gimbalPitch
+		])
+	);
+	assert.equal(
+		new Set(poses).size,
+		poses.length,
+		'zero-height rows must reuse photos rather than duplicate the flight line'
+	);
+});
+
+test('a narrow wall gets a targeted baseline instead of a second grid or duplicate endpoint views', () => {
+	const coordinates = [
+		[-1.5, -1],
+		[1.5, -1],
+		[1.5, 1],
+		[-1.5, 1],
+		[-1.5, -1]
+	].map(([x, y]) => coordinate(x, y));
+	const plan = generateFlightPlan(
+		{ type: 'Polygon', coordinates: [coordinates] },
+		{
+			pattern: 'constant-distance-grid',
+			terrainElevationAt: (longitude, latitude) =>
+				700 + 2 * ramp(local(longitude, latitude)[1], -0.5, 0.5)
+		}
+	);
+	assert.equal(plan.metadata.coverageStatus, 'modeled');
+	assert.equal(plan.metadata.coveragePasses, 1);
+	assert.ok(
+		photosOfKind(plan, 'supplementary').some(
+			(waypoint) => Math.abs(local(waypoint.longitude, waypoint.latitude)[0]) > 1.5
+		)
+	);
+	assert.equal(plan.metadata.uncoveredTargetCount, 0);
+	assert.equal(plan.metadata.spacingGapCount, 0);
 });

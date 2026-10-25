@@ -46,6 +46,7 @@ export function createSnapshotClearance(
 			positions[index * 3 + 2] = z[index];
 		}
 	const indices = new Uint32Array((width - 1) * (height - 1) * 6);
+	const interpolationErrors = new Float64Array((width - 1) * (height - 1));
 	let maxSlope = 0,
 		maxInterpolationError = 0;
 	for (let row = 0; row < height - 1; row++)
@@ -71,17 +72,17 @@ export function createSnapshotClearance(
 			const slopeY = (yChange * (1 + warp)) / (ys[row] - ys[row + 1]);
 			maxSlope = Math.max(maxSlope, Math.hypot(slopeX, slopeY));
 			// Bilinear-versus-triangle error plus the Mercator/local-latitude warp.
-			maxInterpolationError = Math.max(
-				maxInterpolationError,
-				Math.abs(z[nw] - z[ne] - z[sw] + z[se]) / 4 + yChange * warp
-			);
+			const interpolationError = Math.abs(z[nw] - z[ne] - z[sw] + z[se]) / 4 + yChange * warp;
+			interpolationErrors[row * (width - 1) + column] = interpolationError;
+			maxInterpolationError = Math.max(maxInterpolationError, interpolationError);
 		}
 	const geometry = new BufferGeometry();
 	geometry.setAttribute('position', new BufferAttribute(positions, 3));
 	geometry.setIndex(new BufferAttribute(indices, 1));
-	const bvh = new MeshBVH(geometry, { strategy: CENTER, targetLeafSize: 8 });
+	const bvh = new MeshBVH(geometry, { strategy: CENTER, targetLeafSize: 8, indirect: true });
 	const point = new Vector3(),
 		target = { point: new Vector3(), distance: 0, faceIndex: 0 };
+	const closest = new Vector3();
 	const stencil = Math.ceil((minimumDistance + spacing) / spacing) * spacing;
 	// Every moving-grid triangle lies within maxSlope * diagonal(spacing) of
 	// the bilinear DEM; the aligned triangles differ by maxInterpolationError.
@@ -98,35 +99,67 @@ export function createSnapshotClearance(
 		const [longitude, latitude] = geographicCoordinate(snapshot, local);
 		return snapshotElevationAt(snapshot, longitude, latitude);
 	};
+	const cache = new Map<string, number>();
+	const calculateClearance = (local: number[], altitude: number): number => {
+		const covered =
+			local[0] - stencil >= xs[0] &&
+			local[0] + stencil <= xs[width - 1] &&
+			local[1] - stencil >= ys[height - 1] &&
+			local[1] + stencil <= ys[0];
+		let sourceLowerBound = Infinity;
+		if (covered) {
+			point.set(local[0], local[1], altitude);
+			const distance =
+				bvh.closestPointToPoint(point, target, 0, minimumDistance + errorBound)?.distance ??
+				Infinity;
+			sourceLowerBound = Math.max(0, distance - maxInterpolationError - 1e-5);
+			if (sourceLowerBound < minimumDistance) {
+				// Distant rough cells must not penalize an otherwise clear local surface.
+				// Bound each patch separately; all skipped patches are farther than
+				// the required clearance even after their maximum possible error.
+				sourceLowerBound = minimumDistance;
+				bvh.shapecast({
+					intersectsBounds: (box) =>
+						box.distanceToPoint(point) <= minimumDistance + maxInterpolationError + 1e-5,
+					intersectsTriangle: (triangle, index) => {
+						triangle.closestPointToPoint(point, closest);
+						sourceLowerBound = Math.min(
+							sourceLowerBound,
+							Math.max(
+								0,
+								point.distanceTo(closest) - interpolationErrors[Math.floor(index / 2)] - 1e-5
+							)
+						);
+						return sourceLowerBound === 0;
+					}
+				});
+			}
+			if (distance >= minimumDistance + errorBound) {
+				stats.bvhAccepted++;
+				return minimumDistance;
+			}
+		}
+		stats.fallbackSamples++;
+		// Retain both the legacy stencil rejection and the conservative native
+		// raster bound. Neither sampling model may turn an unsafe sample safe.
+		return Math.min(
+			sourceLowerBound,
+			terrainSurfaceClearance(local, altitude, terrainAt, minimumDistance, spacing)
+		);
+	};
 	return {
 		stats,
 		clearance(local: number[], altitude: number): number {
-			const covered =
-				local[0] - stencil >= xs[0] &&
-				local[0] + stencil <= xs[width - 1] &&
-				local[1] - stencil >= ys[height - 1] &&
-				local[1] + stencil <= ys[0];
-			let sourceLowerBound = Infinity;
-			if (covered) {
-				point.set(local[0], local[1], altitude);
-				const distance =
-					bvh.closestPointToPoint(point, target, 0, minimumDistance + errorBound)?.distance ??
-					Infinity;
-				sourceLowerBound = Math.max(0, distance - maxInterpolationError - 1e-5);
-				if (distance >= minimumDistance + errorBound) {
-					stats.bvhAccepted++;
-					return minimumDistance;
-				}
-			}
-			stats.fallbackSamples++;
-			// Retain both the legacy stencil rejection and the conservative native
-			// raster bound. Neither sampling model may turn an unsafe sample safe.
-			return Math.min(
-				sourceLowerBound,
-				terrainSurfaceClearance(local, altitude, terrainAt, minimumDistance, spacing)
-			);
+			const key = `${local[0]}:${local[1]}:${altitude}`;
+			const cached = cache.get(key);
+			if (cached !== undefined) return cached;
+			const clearance = calculateClearance(local, altitude);
+			if (cache.size >= 65536) cache.clear();
+			cache.set(key, clearance);
+			return clearance;
 		},
 		dispose() {
+			cache.clear();
 			geometry.dispose();
 		}
 	};

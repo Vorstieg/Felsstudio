@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+const oetkGeometry = JSON.parse(
+	readFileSync(
+		new URL('../fixtures/flight-plan-terrain/oetk-klettergarten.json', import.meta.url),
+		'utf8'
+	)
+);
 const tile = readFileSync(
 	new URL('../fixtures/flight-plan-terrain/16-34823-22978.webp', import.meta.url)
 );
@@ -23,10 +29,9 @@ const geometry = {
 	]
 };
 const options = {
-	standOffMeters: 50,
+	standOffMeters: 10,
 	pointSpacingMeters: 5,
-	stripSpacingMeters: 10,
-	convergentPasses: 1
+	stripSpacingMeters: 10
 };
 
 test('real DEM pixels are decoded and calculated in a responsive background worker', async ({
@@ -162,4 +167,132 @@ test('source pixels stay continuous across a real two-tile boundary', async ({ p
 		'https://tiles.mapterhorn.com/16/34823/22978.webp',
 		'https://tiles.mapterhorn.com/16/34824/22978.webp'
 	]);
+});
+
+for (const minimumDistance of [2, 5]) {
+	test(`ÖTK constant-distance grid routes around terrain at ${minimumDistance} m`, async ({
+		page,
+		context
+	}) => {
+		test.setTimeout(60000);
+		const terrain = readFileSync(
+			new URL('../fixtures/flight-plan-terrain/16-35689-22827.webp', import.meta.url)
+		);
+		await context.route('https://tiles.mapterhorn.com/**', (route) =>
+			route.fulfill({
+				status: route.request().url().endsWith('/16/35689/22827.webp') ? 200 : 404,
+				body: terrain,
+				contentType: 'image/webp',
+				headers: { 'access-control-allow-origin': '*' }
+			})
+		);
+		await page.goto('/');
+		const result = await page.evaluate(
+			async ({ geometry, minimumDistance }) => {
+				const { generateFlightPlanInWorker } =
+					await import('/src/lib/assets/js/flight-plan-client.ts');
+				const { exportFlightPlanWaylinesWpml } =
+					await import('/src/lib/assets/js/flight-plan-kml.ts');
+				const plan = await generateFlightPlanInWorker(geometry, {
+					pattern: 'constant-distance-grid',
+					standOffMeters: minimumDistance,
+					minimumFaceDistanceMeters: minimumDistance
+				});
+				plan.metadata.startElevation = 830;
+				return { plan, wpml: exportFlightPlanWaylinesWpml(plan) };
+			},
+			{ geometry: oetkGeometry, minimumDistance }
+		);
+		const capture = result.plan.waypoints.filter((waypoint) => waypoint.phase === 'capture');
+		const transit = result.plan.waypoints.filter((waypoint) => waypoint.phase === 'transit');
+		expect(capture.length).toBeGreaterThan(10);
+		if (minimumDistance === 2) expect(transit.length).toBeGreaterThan(0);
+		expect(result.plan.metadata.photoCount).toBe(
+			capture.length + result.plan.metadata.detailPhotoCount
+		);
+		expect(result.plan.metadata.coverageStatus).toBe('modeled');
+		expect(result.plan.metadata.uncoveredTargetCount).toBe(0);
+		expect(result.plan.metadata.coveredCrestTargetCount).toBe(
+			result.plan.metadata.crestTargetCount
+		);
+		expect(result.plan.metadata.detailPhotoCount).toBeGreaterThan(0);
+		expect(result.plan.metadata.coveragePasses).toBe(1);
+		expect(capture.filter((waypoint) => waypoint.captureKind === 'grid')).toHaveLength(
+			result.plan.metadata.gridWaypointCount
+		);
+		expect(capture.filter((waypoint) => waypoint.captureKind === 'supplementary')).toHaveLength(
+			result.plan.metadata.supplementaryWaypointCount
+		);
+		expect(
+			capture.some((waypoint) => waypoint.captureView === 'crest' && waypoint.gimbalPitch < -20)
+		).toBe(true);
+		expect(result.plan.waypoints.map((waypoint) => waypoint.index)).toEqual(
+			result.plan.waypoints.map((_, index) => index)
+		);
+		const placemarks = result.wpml.match(/<Placemark>[\s\S]*?<\/Placemark>/g);
+		expect(placemarks).toHaveLength(result.plan.waypoints.length);
+		for (const [index, waypoint] of result.plan.waypoints.entries()) {
+			const photos =
+				placemarks[index].match(/<wpml:actionActuatorFunc>takePhoto<\/wpml:actionActuatorFunc>/g) ||
+				[];
+			expect(photos).toHaveLength(
+				waypoint.phase === 'capture' ? 1 + Number(Boolean(waypoint.detailCamera)) : 0
+			);
+			if (waypoint.phase === 'capture')
+				expect(placemarks[index]).toContain(
+					`<wpml:waypointGimbalPitchAngle>${waypoint.gimbalPitch.toFixed(8).replace(/(?:\.0+|(?<=\..*?)0+)$/, '')}</wpml:waypointGimbalPitchAngle>`
+				);
+		}
+	});
+}
+
+test('ÖTK detail presets reduce density while retaining complete modeled coverage', async ({
+	page,
+	context
+}) => {
+	test.setTimeout(90000);
+	const terrain = readFileSync(
+		new URL('../fixtures/flight-plan-terrain/16-35689-22827.webp', import.meta.url)
+	);
+	await context.route('https://tiles.mapterhorn.com/**', (route) =>
+		route.fulfill({
+			status: route.request().url().endsWith('/16/35689/22827.webp') ? 200 : 404,
+			body: terrain,
+			contentType: 'image/webp',
+			headers: { 'access-control-allow-origin': '*' }
+		})
+	);
+	await page.goto('/');
+	const results = await page.evaluate(async (geometry) => {
+		const { generateFlightPlanInWorker } = await import('/src/lib/assets/js/flight-plan-client.ts');
+		const results = [];
+		for (const targetGsdCm of [1, 0.7, 0.5]) {
+			const plan = await generateFlightPlanInWorker(geometry, {
+				pattern: 'constant-distance-grid',
+				targetGsdCm,
+				minimumFaceDistanceMeters: 2
+			});
+			results.push({ count: plan.waypoints.length, metadata: plan.metadata });
+		}
+		return results;
+	}, oetkGeometry);
+	for (const { count, metadata } of results) {
+		expect(count).toBeLessThan(400);
+		expect(metadata.coveragePasses).toBe(1);
+		expect(metadata.supplementaryWaypointCount).toBeLessThan(metadata.gridWaypointCount / 3);
+		expect(metadata.minimumFaceDistanceMeters).toBe(2);
+		expect(metadata.coverageStatus).toBe('modeled');
+		expect(metadata.spacingGapCount).toBe(0);
+		expect(metadata.uncoveredTargetCount).toBe(0);
+		expect(metadata.coveredCrestTargetCount).toBe(metadata.crestTargetCount);
+	}
+	expect(results[2].metadata.supplementaryWaypointCount).toBeGreaterThan(0);
+	expect(results[0].count).toBeLessThan(results[1].count);
+	expect(results[1].count).toBeLessThan(results[2].count);
+	expect(results[0].metadata.coverageTargetCount).toBeLessThan(
+		results[1].metadata.coverageTargetCount
+	);
+	expect(results[1].metadata.coverageTargetCount).toBeLessThan(
+		results[2].metadata.coverageTargetCount
+	);
 });

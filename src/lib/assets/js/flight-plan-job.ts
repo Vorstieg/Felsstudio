@@ -28,7 +28,7 @@ export function generateFlightPlanFromSnapshot(
 	snapshot = { ...snapshot, origin: flightPlanTerrainBounds(geometry, options).origin };
 	const mesh = createSnapshotClearance(
 		snapshot,
-		options.minimumFaceDistanceMeters ?? 2,
+		(options.minimumFaceDistanceMeters ?? 2) + (options.clearanceMarginMeters ?? 1),
 		options.terrainMeshSpacingMeters ?? 1
 	);
 	try {

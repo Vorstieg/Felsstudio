@@ -47,6 +47,15 @@
 		progress = '';
 	}
 	let cameraPreviewWaypointIndex = $derived(plan?.previewWaypointIndex ?? null);
+	let previewWaypoint = $derived(
+		plan?.waypoints.find((waypoint) => waypoint.index === cameraPreviewWaypointIndex)
+	);
+	let coverageBlocked = $derived(
+		plan?.metadata.coverageStatus === 'partial' || plan?.metadata.coverageStatus === 'unresolved'
+	);
+	let transitWaypointCount = $derived(
+		plan?.waypoints.filter((waypoint) => waypoint.phase === 'transit').length ?? 0
+	);
 	let rowStarts = $derived(
 		plan?.waypoints?.filter(
 			(waypoint) => waypoint.rowBoundary === 'start' || waypoint.rowBoundary === 'single'
@@ -62,13 +71,10 @@
 		generating = true;
 		error = '';
 		try {
-			const presets: Record<
-				Detail,
-				{ targetGsdCm: number; stripSpacingMeters: number; pointSpacingMeters: number }
-			> = {
-				standard: { targetGsdCm: 1, stripSpacingMeters: 14, pointSpacingMeters: 7 },
-				high: { targetGsdCm: 0.7, stripSpacingMeters: 12, pointSpacingMeters: 6 },
-				topo: { targetGsdCm: 0.5, stripSpacingMeters: 10, pointSpacingMeters: 5 }
+			const presets: Record<Detail, { targetGsdCm: number }> = {
+				standard: { targetGsdCm: 1 },
+				high: { targetGsdCm: 0.7 },
+				topo: { targetGsdCm: 0.5 }
 			};
 			const wallDistance = Number(minimumWallDistanceMeters);
 			if (!Number.isFinite(wallDistance) || wallDistance < 1) {
@@ -241,6 +247,10 @@
 				class="input-studio mt-0.5 w-full"
 			/>
 		</label>
+		<p class="text-[9px] leading-snug text-warm-gray-500">
+			Detail controls photo resolution and planned stand-off. Minimum wall distance limits how close
+			the aircraft may fly.
+		</p>
 		<button
 			type="button"
 			class="flex h-9 w-full items-center justify-center gap-1.5 rounded-sm bg-creator-blue px-3 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-creator-blue/90"
@@ -268,6 +278,30 @@
 	{/if}
 
 	{#if plan}
+		<section
+			aria-label="Capture plan legend"
+			class="rounded-sm border border-black/15 bg-white p-2 text-[10px] text-warm-gray-600"
+		>
+			<h4 class="!m-0 mb-2 font-semibold text-near-black">Map legend</h4>
+			<ul class="!m-0 grid list-none grid-cols-2 gap-x-3 gap-y-2 !p-0">
+				{#each [{ color: '#f59e0b', label: 'Capture waypoint', shape: 'dot' }, { color: '#0aa6eb', label: 'Transit waypoint', shape: 'dot' }, { color: '#16a34a', label: 'Row start / single point', shape: 'dot' }, { color: '#ef4444', label: 'Row end', shape: 'dot' }, { color: '#a855f7', label: 'Detected wall base', shape: 'line' }, { color: '#38bdf8', label: 'Detected wall top', shape: 'dashed' }, { color: '#facc15', label: 'Wall sample', shape: 'dot' }, { color: '#facc15', label: 'Camera field of view', shape: 'line' }, { color: '#94a3b8', label: 'Ground shadow / height guides', shape: 'line' }] as item}
+					<li class="flex items-center gap-2 leading-snug">
+						<span class="flex w-5 shrink-0 justify-center" aria-hidden="true">
+							<span
+								class={item.shape === 'dot' ? 'h-2.5 w-2.5 rounded-full' : 'w-5 border-t-2'}
+								style:background-color={item.shape === 'dot' ? item.color : undefined}
+								style:border-color={item.color}
+								style:border-top-style={item.shape === 'dashed' ? 'dashed' : undefined}
+							></span>
+						</span>
+						{item.label}
+					</li>
+				{/each}
+			</ul>
+			<p class="mb-0 mt-2 text-[9px] text-warm-gray-500">
+				Flight path segments use the color of their starting waypoint.
+			</p>
+		</section>
 		<div
 			class="rounded-sm border border-creator-blue/20 bg-creator-blue/5 p-2 text-[10px] text-warm-gray-600"
 		>
@@ -275,12 +309,22 @@
 				<span>Pattern</span><strong class="text-right capitalize text-near-black"
 					>{plan.metadata.pattern}</strong
 				>
-				<span>Capture passes</span><strong class="text-right text-near-black"
-					>{plan.metadata.convergentPasses}</strong
+				<span>Coverage grids</span><strong class="text-right text-near-black"
+					>{plan.metadata.coveragePasses ?? 1}</strong
 				>
+				{#if plan.metadata.supplementaryWaypointCount !== undefined}
+					<span>Supplementary views</span><strong class="text-right text-near-black"
+						>{plan.metadata.supplementaryWaypointCount}</strong
+					>
+				{/if}
 				<span>Waypoints</span><strong class="text-right text-near-black"
 					>{plan.waypoints.length}</strong
 				>
+				{#if transitWaypointCount > 0}
+					<span>Transit waypoints</span><strong class="text-right text-near-black"
+						>{transitWaypointCount}</strong
+					>
+				{/if}
 				<span>Detected wall</span>
 				<strong class="text-right text-near-black">
 					{plan.wallDetection.coordinates.length > 1
@@ -300,15 +344,37 @@
 				<span>Capture height</span><strong class="text-right text-near-black"
 					>{plan.metadata.captureHeightMeters.toFixed(1)} m</strong
 				>
+				<span>Target detail</span><strong class="text-right text-near-black"
+					>{plan.metadata.targetGsdCm} cm/pixel</strong
+				>
+				<span>Planned stand-off</span><strong class="text-right text-near-black"
+					>{plan.metadata.standOffMeters?.toFixed(1)} m</strong
+				>
 				<span>Camera</span><strong class="text-right text-near-black">{plan.metadata.camera}</strong
 				>
 				<span>Photos</span><strong class="text-right text-near-black"
 					>{plan.metadata.photoCount}</strong
 				>
+				{#if plan.metadata.coverageTargetCount !== undefined}
+					<span>Coverage samples</span><strong class="text-right text-near-black"
+						>{plan.metadata.coveredTargetCount}/{plan.metadata.coverageTargetCount}</strong
+					>
+					<span>Top coverage samples</span><strong class="text-right text-near-black"
+						>{plan.metadata.coveredCrestTargetCount}/{plan.metadata.crestTargetCount}</strong
+					>
+					<span>Tele detail photos</span><strong class="text-right text-near-black"
+						>{plan.metadata.detailPhotoCount ?? 0}</strong
+					>
+				{/if}
 				<span>Cliff clearance</span>
 				<strong class="text-right text-near-black">
 					≥ {plan.metadata.minimumFaceDistanceMeters.toFixed(1)} m
 				</strong>
+				{#if typeof plan.metadata.clearanceMarginMeters === 'number'}
+					<span>Planning margin</span><strong class="text-right text-near-black"
+						>+ {plan.metadata.clearanceMarginMeters.toFixed(1)} m</strong
+					>
+				{/if}
 				<span>Ground clearance</span>
 				<strong class="text-right text-near-black">
 					≥ {plan.metadata.minimumGroundClearanceMeters.toFixed(1)} m
@@ -334,6 +400,20 @@
 					>
 				{/if}
 			</div>
+			{#if coverageBlocked}
+				<p
+					role="alert"
+					class="mt-2 rounded-sm border border-amber-200 bg-amber-50 p-2 text-amber-800"
+				>
+					The selected wall is not fully covered by clear camera views. Increase wall distance or
+					adjust the capture area before exporting.
+				</p>
+			{/if}
+			<p class="mt-2 text-[9px] leading-snug text-warm-gray-500">
+				One overlapping grid covers the wall. Extra oblique and top views are added only where
+				coverage needs them. Terrain data cannot resolve overhangs, hidden recesses, vegetation or
+				small obstacles.
+			</p>
 			<label class="mt-2 block text-ui-label text-warm-gray-500">
 				Camera view
 				<select
@@ -343,10 +423,19 @@
 				>
 					<option value="">Off</option>
 					{#each rowStarts as waypoint, row}
-						<option value={waypoint.index}>Row {row + 1}</option>
+						<option value={waypoint.index}
+							>Row {row + 1}{waypoint.captureView === 'crest' ? ' · Top edge' : ''}</option
+						>
 					{/each}
 				</select>
 			</label>
+			{#if previewWaypoint}
+				<p class="mt-1 text-[9px] text-warm-gray-500">
+					Pitch {previewWaypoint.gimbalPitch?.toFixed(1)}° · {previewWaypoint.camera}{previewWaypoint.detailCamera
+						? ` + ${previewWaypoint.detailCamera} detail`
+						: ''}
+				</p>
+			{/if}
 			<label class="mt-2 block text-ui-label text-warm-gray-500">
 				Launch elevation (m AMSL)
 				<input
@@ -367,6 +456,7 @@
 				type="button"
 				class="mt-2 flex h-9 w-full items-center justify-center gap-1.5 rounded-sm border border-creator-blue/30 bg-white px-3 text-[10px] font-bold uppercase tracking-widest text-creator-blue hover:bg-creator-blue/5"
 				onclick={download}
+				disabled={generating || coverageBlocked}
 			>
 				<i class="fa-solid fa-download text-xs"></i>
 				Download Mavic 4 Pro KMZ
@@ -382,7 +472,8 @@
 			<p class="mt-1.5 text-[9px] leading-snug text-warm-gray-500">
 				Map preview: yellow dots and the purple line mark the DEM-detected wall base; the dashed
 				cyan line marks its clipped top. The constant-distance grid stays between these boundaries.
-				Amber is the capture path; green and red mark each row’s start and end.
+				Amber is the capture path; green and red mark each row’s start and end. Blue dots mark
+				transit waypoints, where no photos are taken.
 			</p>
 		</div>
 	{/if}

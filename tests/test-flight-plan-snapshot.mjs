@@ -178,3 +178,20 @@ test('fixed snapshot generation retains conservative clearances on real terrain'
 		}
 	}
 });
+
+test('distant raster roughness does not reject clearance above a flat local patch', () => {
+	const data = fixtures.cases[0];
+	const snapshot = { ...data, elevations: new Float64Array(data.width * data.height).fill(700) };
+	snapshot.elevations[2 * data.width + 2] = 740;
+	const local = localCoordinate(
+		snapshot,
+		...pixelCoordinate(data.firstPixelX + 32, data.firstPixelY + 32, data.zoom)
+	);
+	const mesh = createSnapshotClearance(snapshot, 2, 1);
+	try {
+		assert.ok(mesh.clearance(local, 703) >= 2);
+		assert.ok(mesh.clearance(local, 701) < 2);
+	} finally {
+		mesh.dispose();
+	}
+});

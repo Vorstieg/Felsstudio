@@ -3,7 +3,7 @@ export const FLIGHT_LIMITS = {
 	waypoints: 10000,
 	wallSamples: 100000,
 	pathSamples: 100000,
-	terrainQueries: 2000000,
+	terrainQueries: 8000000,
 	meshVertices: 250000,
 	tiles: 32
 } as const;

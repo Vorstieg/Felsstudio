@@ -21,7 +21,7 @@ it('restores a generated mission after remounting and clears its preview on a fa
 		wallDetection: { coordinates: [] },
 		metadata: {
 			pattern: 'facade-grid',
-			convergentPasses: 1,
+			coveragePasses: 1,
 			sectorMinimumElevation: 400,
 			sectorMaximumElevation: 420,
 			captureHeightMeters: 20,
@@ -161,4 +161,65 @@ it('aborts background work when the panel is unmounted', async () => {
 	await fireEvent.click(screen.getByRole('button', { name: /Generate/ }));
 	view.unmount();
 	expect(signal.aborted).toBe(true);
+});
+
+it('keeps an incomplete plan inspectable and blocks its download', () => {
+	const plan = {
+		waypoints: [],
+		wallDetection: { coordinates: [] },
+		metadata: {
+			coverageStatus: 'partial',
+			coverageTargetCount: 12,
+			coveredTargetCount: 10,
+			crestTargetCount: 4,
+			coveredCrestTargetCount: 2,
+			detailPhotoCount: 3,
+			startElevation: 680,
+			standOffMeters: 9,
+			clearanceMarginMeters: 1,
+			sectorMinimumElevation: 700,
+			sectorMaximumElevation: 720,
+			captureHeightMeters: 20,
+			minimumFaceDistanceMeters: 2,
+			minimumGroundClearanceMeters: 3
+		}
+	};
+	render(CragFlightPlanPanel, { props: { plan } });
+	expect(screen.getByRole('button', { name: /Download/ }).disabled).toBe(true);
+	expect(screen.getByRole('alert').textContent).toMatch(/not fully covered/);
+	expect(screen.getByText('10/12')).toBeTruthy();
+	expect(screen.getByText('2/4')).toBeTruthy();
+});
+
+it('passes each detail target without overriding optical photo spacing', async () => {
+	render(CragFlightPlanPanel, {
+		props: {
+			entry: {
+				geometry: {
+					type: 'Polygon',
+					coordinates: [
+						[
+							[11, 47],
+							[11.001, 47],
+							[11, 47.001],
+							[11, 47]
+						]
+					]
+				}
+			}
+		}
+	});
+	for (const [detail, targetGsdCm] of [
+		['standard', 1],
+		['high', 0.7],
+		['topo', 0.5]
+	]) {
+		await fireEvent.change(screen.getByLabelText('Detail'), { target: { value: detail } });
+		await fireEvent.click(screen.getByRole('button', { name: /Generate/ }));
+		const options = vi.mocked(generateFlightPlanInWorker).mock.lastCall[1];
+		expect(options.targetGsdCm).toBe(targetGsdCm);
+		expect(options.minimumFaceDistanceMeters).toBe(2);
+		expect(options.pointSpacingMeters).toBeUndefined();
+		expect(options.stripSpacingMeters).toBeUndefined();
+	}
 });

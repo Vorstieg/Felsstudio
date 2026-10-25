@@ -2,18 +2,27 @@
  * Deterministic, terrain-relative capture plans for a sector footprint.
  *
  * A sector polygon supplies the face extent and the MapTerhorn DEM supplies the estimated 3D
- * surface. Capture height is the elevation difference between the sector vertices. We use the
- * longest axis for the capture curtain and reject waypoints that are too close to that sampled
- * terrain surface. Altitude in the result is AMSL.
+ * surface. Local profiles include the complete detected face and its crest. Camera footprints
+ * bound capture spacing; aircraft and sightlines are checked against the sampled terrain. Altitude in the result is AMSL.
  */
 
 import type { FlightPlan, FlightWaypoint } from './flight-plan-types.ts';
 import type { Polygon } from 'geojson';
 import { terrainSurfaceClearance } from './flight-plan-terrain.ts';
 import { FLIGHT_LIMITS, checkFlightWork } from './flight-plan-limits.ts';
+import {
+	cameraFootprint,
+	cameraDistanceAtGsd,
+	cameraContainsTarget,
+	flightCamera,
+	selectCoverageCamera
+} from './flight-plan-camera.ts';
 
 type LocalWaypoint = Omit<FlightWaypoint, 'longitude' | 'latitude'> & { local: LocalPoint };
-type DraftWaypoint = Omit<LocalWaypoint, 'index' | 'rowBoundary'> & { sampleIndex: number };
+type DraftWaypoint = Omit<LocalWaypoint, 'index' | 'rowBoundary'> & {
+	sampleIndex: number;
+	coverageKey: string;
+};
 type WallCandidate = { along: number; across: number; topAcross: number; slope: number };
 type LocalPoint = number[];
 type TerrainAt = (point: LocalPoint) => number;
@@ -23,11 +32,11 @@ const DEFAULTS = {
 	pattern: 'facade-grid',
 	targetGsdCm: 0.5,
 	standOffMeters: 2,
-	stripSpacingMeters: 10,
-	pointSpacingMeters: 5,
 	speed: 2.5,
 	transitSpeed: 5,
-	camera: 'tele-6x',
+	camera: 'auto',
+	captureOverlap: 0.7,
+	clearanceMarginMeters: 1,
 	minimumFaceDistanceMeters: 2,
 	minimumGroundClearanceMeters: 3,
 	captureAltitudeToleranceMeters: 5,
@@ -36,14 +45,16 @@ const DEFAULTS = {
 	wallDetectionCrossSectionSpacingMeters: 0.5,
 	minimumWallSlope: 0.5,
 	wallSurfaceSampleSpacingMeters: 0.5,
-	convergentPasses: 2,
-	convergentOffsetMeters: 2,
+	obliqueOffsetMeters: 2,
 	terrainElevationAt: (_longitude: number, _latitude: number) => 0
 };
 
 export type FlightPlanOptions = Partial<Omit<typeof DEFAULTS, 'terrainElevationAt'>> & {
 	name?: string;
 	cragName?: string;
+	/** Optional upper bounds; automatic planning uses the camera footprint. */
+	pointSpacingMeters?: number;
+	stripSpacingMeters?: number;
 	/** Launch elevation in metres AMSL, using the same datum as the terrain. */
 	startElevation?: number;
 	terrainElevationAt?: (longitude: number, latitude: number) => number;
@@ -65,9 +76,19 @@ function openRing(geometry: Polygon | null | undefined): number[][] {
 		FLIGHT_LIMITS.polygonVertices,
 		'Polygon vertices'
 	);
-	const ring = geometry.coordinates[0].filter(
-		(point) => Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1])
-	);
+	const ring = geometry.coordinates[0];
+	if (
+		ring.some(
+			(point) =>
+				!Array.isArray(point) ||
+				!Number.isFinite(point[0]) ||
+				!Number.isFinite(point[1]) ||
+				Math.abs(point[0]) > 180 ||
+				Math.abs(point[1]) > 90
+		)
+	) {
+		throw new TypeError('The sector polygon must contain finite WGS84 coordinates.');
+	}
 	if (ring.length < 3) throw new TypeError('The sector polygon needs at least three coordinates.');
 	const first = ring[0];
 	const last = ring[ring.length - 1];
@@ -264,7 +285,7 @@ function detectWall(
 	for (let index = 0; index <= steps; index += 1) {
 		const along = minAlong + ((maxAlong - minAlong) * index) / steps;
 		const range = crossSectionRange(localRing, axis, normal, along);
-		if (!range) continue;
+		if (!range || range[1] - range[0] < 1e-6) continue;
 		const [minimumAcross, maximumAcross] = range;
 		const samples = Math.max(1, Math.ceil((maximumAcross - minimumAcross) / crossSectionStep));
 		checkFlightWork(samples, FLIGHT_LIMITS.wallSamples, 'Wall section samples');
@@ -299,29 +320,19 @@ function detectWall(
 			0
 		);
 		const steepest = slopeSamples[steepestIndex];
-		if (steepest.slope < options.minimumWallSlope) continue;
+		if (!Number.isFinite(steepest.slope) || steepest.slope < options.minimumWallSlope) continue;
 
-		// Starting at the face's steepest part, walk downhill until the terrain
-		// becomes shallow again. That last steep sample is the toe/base of the wall,
-		// rather than the middle of its steepest DEM ramp.
+		// Use every steep band in the selected section. Stopping at the first
+		// terrace would omit ledges and the upper part of a structured wall.
 		const downhillDirection = steepest.elevationChange <= 0 ? 1 : -1;
-		let baseIndex = steepestIndex;
-		while (
-			baseIndex + downhillDirection >= 0 &&
-			baseIndex + downhillDirection < slopeSamples.length &&
-			slopeSamples[baseIndex + downhillDirection].slope >= options.minimumWallSlope
-		) {
-			baseIndex += downhillDirection;
-		}
+		const steepIndices = slopeSamples.flatMap((sample, index) =>
+			sample.slope >= options.minimumWallSlope ? [index] : []
+		);
+		const firstSteep = steepIndices[0];
+		const lastSteep = steepIndices[steepIndices.length - 1];
+		const baseIndex = downhillDirection > 0 ? lastSteep : firstSteep;
+		const topIndex = downhillDirection > 0 ? firstSteep : lastSteep;
 		const baseSample = slopeSamples[baseIndex];
-		let topIndex = steepestIndex;
-		while (
-			topIndex - downhillDirection >= 0 &&
-			topIndex - downhillDirection < slopeSamples.length &&
-			slopeSamples[topIndex - downhillDirection].slope >= options.minimumWallSlope
-		) {
-			topIndex -= downhillDirection;
-		}
 		const topSample = slopeSamples[topIndex];
 		candidates.push({
 			along,
@@ -403,123 +414,196 @@ function wallFrameAt(
 }
 
 function createWallSurfaceSampler(terrainAt: TerrainAt, options: typeof DEFAULTS) {
-	type SurfaceSample = { local: LocalPoint; elevation: number };
-	type Profile = { samples: SurfaceSample[]; maxima: number[]; count: number };
-	const profiles = new Map<string, Profile>();
-	return (base: LocalPoint, top: LocalPoint, height: number): SurfaceSample | null => {
+	type Sample = { local: LocalPoint; elevation: number; distance: number };
+	const profiles = new Map<string, Sample[]>();
+	return (base: LocalPoint, top: LocalPoint, fraction: number) => {
 		const key = `${base[0]}:${base[1]}:${top[0]}:${top[1]}`;
-		let profile = profiles.get(key);
-		if (!profile) {
-			const elevation = terrainAt(base);
-			profile = {
-				samples: [{ local: base, elevation }],
-				maxima: [-Infinity],
-				count: Math.max(
-					1,
-					Math.ceil(
-						Math.hypot(top[0] - base[0], top[1] - base[1]) / options.wallSurfaceSampleSpacingMeters
-					)
+		let samples = profiles.get(key);
+		if (!samples) {
+			const count = Math.max(
+				1,
+				Math.ceil(
+					Math.hypot(top[0] - base[0], top[1] - base[1]) / options.wallSurfaceSampleSpacingMeters
 				)
-			};
-			profiles.set(key, profile);
+			);
+			checkFlightWork(count, FLIGHT_LIMITS.wallSamples, 'Wall profile samples');
+			samples = [{ local: base, elevation: terrainAt(base), distance: 0 }];
+			for (let index = 1; index <= count; index++) {
+				const local = [
+					base[0] + ((top[0] - base[0]) * index) / count,
+					base[1] + ((top[1] - base[1]) * index) / count
+				];
+				const elevation = terrainAt(local);
+				const previous = samples[index - 1];
+				samples.push({
+					local,
+					elevation,
+					distance:
+						previous.distance +
+						Math.hypot(
+							local[0] - previous.local[0],
+							local[1] - previous.local[1],
+							elevation - previous.elevation
+						)
+				});
+			}
+			profiles.set(key, samples);
 		}
-		const { samples, maxima, count } = profile;
-		checkFlightWork(count, FLIGHT_LIMITS.wallSamples, 'Wall profile samples');
-		if (height <= 0) return samples[0];
-		const targetElevation = samples[0].elevation + height;
-		// Extend only as far as requested, so unused terrain is never queried.
-		while (maxima[maxima.length - 1] < targetElevation && samples.length <= count) {
-			const sample = samples.length;
-			const local = [
-				base[0] + ((top[0] - base[0]) * sample) / count,
-				base[1] + ((top[1] - base[1]) * sample) / count
-			];
-			const elevation = terrainAt(local);
-			samples.push({ local, elevation });
-			maxima.push(Math.max(maxima[maxima.length - 1], elevation));
-		}
-		if (maxima[maxima.length - 1] < targetElevation) return null;
-		// Prefix maxima preserve the first crossing even on non-monotonic walls.
-		let low = 1;
-		let high = samples.length - 1;
+		const length = samples[samples.length - 1].distance;
+		if (fraction <= 0 || length === 0) return { ...samples[0], length };
+		if (fraction >= 1) return { ...samples[samples.length - 1], length };
+		const distance = fraction * length;
+		let low = 1,
+			high = samples.length - 1;
 		while (low < high) {
 			const middle = (low + high) >>> 1;
-			if (maxima[middle] >= targetElevation) high = middle;
+			if (samples[middle].distance >= distance) high = middle;
 			else low = middle + 1;
 		}
-		const previous = samples[low - 1];
-		const current = samples[low];
-		const elevationSpan = current.elevation - previous.elevation;
-		const fraction =
-			elevationSpan === 0 ? 1 : (targetElevation - previous.elevation) / elevationSpan;
-		return {
-			local: [
-				previous.local[0] + (current.local[0] - previous.local[0]) * fraction,
-				previous.local[1] + (current.local[1] - previous.local[1]) * fraction
-			],
-			elevation: targetElevation
-		};
+		const first = samples[low - 1],
+			second = samples[low];
+		const ratio = (distance - first.distance) / (second.distance - first.distance);
+		const local = [
+			first.local[0] + (second.local[0] - first.local[0]) * ratio,
+			first.local[1] + (second.local[1] - first.local[1]) * ratio
+		];
+		return { local, elevation: terrainAt(local), length };
 	};
+}
+
+/** Target a short band behind the lip, clipped to the selected footprint. */
+function crestSurfaceTarget(
+	along: number,
+	frame: ReturnType<typeof wallFrameAt>,
+	surfaceAt: ReturnType<typeof createWallSurfaceSampler>,
+	terrainAt: TerrainAt,
+	localRing: LocalPoint[],
+	axis: LocalPoint,
+	normal: LocalPoint,
+	standOff: number
+) {
+	const crest = surfaceAt(frame.target, frame.topTarget, 1);
+	const range = crossSectionRange(localRing, axis, normal, along);
+	const direction =
+		(frame.topTarget[0] - frame.target[0]) * normal[0] +
+		(frame.topTarget[1] - frame.target[1]) * normal[1];
+	if (!range || Math.abs(direction) < 1e-6) return crest;
+	const across = clamp(
+		crest.local[0] * normal[0] +
+			crest.local[1] * normal[1] +
+			Math.sign(direction) * Math.min(2, standOff / 4),
+		range[0],
+		range[1]
+	);
+	const local = [axis[0] * along + normal[0] * across, axis[1] * along + normal[1] * across];
+	return { ...crest, local, elevation: terrainAt(local) };
 }
 
 function resolveCapturePlacement(
 	along: number,
-	height: number,
+	fraction: number,
 	curveDepth: number,
 	lateralOffset: number,
 	axis: LocalPoint,
 	normal: LocalPoint,
 	detectedWall: ReturnType<typeof detectWall>,
 	terrainAt: TerrainAt,
-	wallSurfacePointAtHeight: ReturnType<typeof createWallSurfaceSampler>,
-	options: typeof DEFAULTS
+	surfaceAt: ReturnType<typeof createWallSurfaceSampler>,
+	options: typeof DEFAULTS,
+	crest: boolean,
+	localRing: LocalPoint[]
 ) {
-	// Shift a convergent constant-distance pass along the wall before
-	// applying the local normal, preserving its horizontal stand-off.
-	const frameAlong = options.pattern === 'constant-distance-grid' ? along + lateralOffset : along;
-	const wallFrame = wallFrameAt(frameAlong, axis, normal, detectedWall);
-	const surfacePoint =
-		options.pattern === 'constant-distance-grid'
-			? wallSurfacePointAtHeight(wallFrame.target, wallFrame.topTarget, height)
-			: null;
-	if (options.pattern === 'constant-distance-grid' && !surfacePoint) {
-		return null;
-	}
-	const target = surfacePoint?.local || wallFrame.target;
-	let cameraTarget = target;
-	if (options.pattern === 'constant-distance-grid' && lateralOffset !== 0) {
-		// Placement follows the shifted wall frame to retain stand-off.
-		// Aim back at the original coverage sample for a convergent view.
-		const captureFrame = wallFrameAt(along, axis, normal, detectedWall);
-		const captureSurface = wallSurfacePointAtHeight(
-			captureFrame.target,
-			captureFrame.topTarget,
-			height
-		);
-		if (!captureSurface) {
-			return null;
-		}
-		cameraTarget = captureSurface.local;
-	}
+	const offset = lateralOffset * (1 + curveDepth / options.standOffMeters);
+	const captureFrame = wallFrameAt(along, axis, normal, detectedWall);
+	const cameraTarget = crest
+		? crestSurfaceTarget(
+				along,
+				captureFrame,
+				surfaceAt,
+				terrainAt,
+				localRing,
+				axis,
+				normal,
+				options.standOffMeters
+			)
+		: surfaceAt(captureFrame.target, captureFrame.topTarget, fraction);
+	const frameAlong = options.pattern === 'constant-distance-grid' ? along + offset : along;
+	const frame = wallFrameAt(frameAlong, axis, normal, detectedWall);
+	const points = detectedWall.localPoints;
+	const endOffset =
+		options.pattern === 'constant-distance-grid' && points.length >= 2
+			? frameAlong - clamp(frameAlong, points[0].along, points[points.length - 1].along)
+			: 0;
+	const surface = surfaceAt(frame.target, frame.topTarget, fraction);
+	const target = options.pattern === 'constant-distance-grid' ? surface.local : frame.target;
 	const local = [
 		target[0] +
-			(options.pattern === 'constant-distance-grid' ? 0 : wallFrame.axis[0] * lateralOffset) +
-			wallFrame.normal[0] * (options.standOffMeters + curveDepth),
+			frame.axis[0] * (options.pattern === 'constant-distance-grid' ? endOffset : offset) +
+			frame.normal[0] * (options.standOffMeters + curveDepth),
 		target[1] +
-			(options.pattern === 'constant-distance-grid' ? 0 : wallFrame.axis[1] * lateralOffset) +
-			wallFrame.normal[1] * (options.standOffMeters + curveDepth)
+			frame.axis[1] * (options.pattern === 'constant-distance-grid' ? endOffset : offset) +
+			frame.normal[1] * (options.standOffMeters + curveDepth)
 	];
-	// The DEM includes the ground at the wall's toe. Preserve horizontal
-	// stand-off while lifting the aircraft above that surface at the base.
-	const plannedAltitude = surfacePoint
-		? surfacePoint.elevation + options.minimumFaceDistanceMeters + 0.1
-		: terrainAt(local) + options.standOffMeters + height;
 	const altitude = Math.max(
-		plannedAltitude,
-		terrainAt(local) + options.minimumGroundClearanceMeters
+		surface.elevation +
+			(crest ? Math.max(options.standOffMeters, options.minimumGroundClearanceMeters) : 0),
+		terrainAt(local) + options.minimumGroundClearanceMeters + options.clearanceMarginMeters
 	);
 	return { local, altitude, cameraTarget };
 }
+
+function cameraCanSeeTarget(
+	local: LocalPoint,
+	altitude: number,
+	target: { local: LocalPoint; elevation: number },
+	terrainAt: TerrainAt,
+	spacing: number
+) {
+	const distance = Math.hypot(target.local[0] - local[0], target.local[1] - local[1]);
+	const count = Math.max(1, Math.ceil(distance / spacing));
+	checkFlightWork(count, FLIGHT_LIMITS.pathSamples, 'Camera sightline samples');
+	for (let index = 1; index < count; index++) {
+		const fraction = index / count;
+		const point = [
+			local[0] + (target.local[0] - local[0]) * fraction,
+			local[1] + (target.local[1] - local[1]) * fraction
+		];
+		if (altitude + (target.elevation - altitude) * fraction + 0.05 < terrainAt(point)) return false;
+	}
+	return true;
+}
+
+function fitCaptureView(
+	placement: ReturnType<typeof resolveCapturePlacement>,
+	options: typeof DEFAULTS,
+	terrainAt: TerrainAt,
+	clearanceAt: (local: number[], altitude: number) => number
+) {
+	const requiredClearance = options.minimumFaceDistanceMeters + options.clearanceMarginMeters;
+	const { local, cameraTarget } = placement;
+	const horizontal = Math.hypot(cameraTarget.local[0] - local[0], cameraTarget.local[1] - local[1]);
+	for (const lift of [0, requiredClearance, options.standOffMeters]) {
+		const altitude = placement.altitude + lift;
+		const pitch = toDegrees(Math.atan2(cameraTarget.elevation - altitude, horizontal));
+		const distance = Math.hypot(horizontal, cameraTarget.elevation - altitude);
+		if (pitch < -90 || pitch > 70 || distance < flightCamera(options.camera).minimumFocus) continue;
+		if (!(clearanceAt(local, altitude) + 1e-6 >= requiredClearance)) continue;
+		if (
+			!cameraCanSeeTarget(
+				local,
+				altitude,
+				cameraTarget,
+				terrainAt,
+				Math.min(options.wallSurfaceSampleSpacingMeters, 0.25)
+			)
+		)
+			continue;
+		return { altitude, pitch, distance, heading: headingTo(cameraTarget.local, local) };
+	}
+	return null;
+}
+
+class UnsafeFlightPathError extends RangeError {}
 
 /** Check the final straight segments, including connections between rows and passes. */
 function validateFlightPath(
@@ -538,7 +622,10 @@ function validateFlightPath(
 		const from = first.local;
 		const to = second.local;
 		const distance = Math.hypot(to[0] - from[0], to[1] - from[1], second.altitude - first.altitude);
-		const samples = Math.max(1, Math.ceil(distance / (options.terrainMeshSpacingMeters / 2)));
+		const samples = Math.max(
+			1,
+			Math.ceil(distance / Math.min(options.terrainMeshSpacingMeters / 4, 0.25))
+		);
 		pathSamples += samples + 1;
 		checkFlightWork(pathSamples, FLIGHT_LIMITS.pathSamples, 'Flight path samples');
 		// The preceding segment already checked this segment's starting waypoint.
@@ -555,10 +642,11 @@ function validateFlightPath(
 			const groundClearance = altitude - terrainAt(local);
 			const faceClearance = clearanceAt(local, altitude);
 			if (
-				groundClearance + 1e-6 < options.minimumGroundClearanceMeters ||
-				faceClearance + 1e-6 < options.minimumFaceDistanceMeters
+				groundClearance + 1e-6 <
+					options.minimumGroundClearanceMeters + options.clearanceMarginMeters ||
+				faceClearance + 1e-6 < options.minimumFaceDistanceMeters + options.clearanceMarginMeters
 			) {
-				throw new RangeError(
+				throw new UnsafeFlightPathError(
 					`Unsafe flight path between waypoints ${index} and ${index + 1}: terrain clearance is insufficient. Increase stand-off or change the capture area.`
 				);
 			}
@@ -566,10 +654,86 @@ function validateFlightPath(
 	}
 }
 
+/** Keep capture positions fixed and bridge blocked connections with photo-free transits. */
+function connectFlightCaptures(
+	waypoints: LocalWaypoint[],
+	terrainAt: TerrainAt,
+	options: typeof DEFAULTS,
+	clearanceAt: (local: number[], altitude: number) => number
+): LocalWaypoint[] {
+	const connected = [waypoints[0]];
+	for (let index = 1; index < waypoints.length; index++) {
+		const first = waypoints[index - 1];
+		const second = waypoints[index];
+		try {
+			validateFlightPath([first, second], terrainAt, options, clearanceAt);
+		} catch (error) {
+			if (!(error instanceof UnsafeFlightPathError)) throw error;
+			const samples = Math.max(
+				1,
+				Math.ceil(
+					Math.hypot(second.local[0] - first.local[0], second.local[1] - first.local[1]) /
+						(options.terrainMeshSpacingMeters / 2)
+				)
+			);
+			checkFlightWork(samples, FLIGHT_LIMITS.pathSamples, 'Transit path samples');
+			let highestTerrain = -Infinity;
+			for (let sample = 0; sample <= samples; sample++) {
+				const fraction = sample / samples;
+				highestTerrain = Math.max(
+					highestTerrain,
+					terrainAt([
+						first.local[0] + (second.local[0] - first.local[0]) * fraction,
+						first.local[1] + (second.local[1] - first.local[1]) * fraction
+					])
+				);
+			}
+			const altitude =
+				Math.max(first.altitude, second.altitude, highestTerrain) +
+				options.minimumGroundClearanceMeters +
+				options.minimumFaceDistanceMeters +
+				2 * options.clearanceMarginMeters;
+			let detour: LocalWaypoint[] | null = null;
+			for (const offset of [
+				0,
+				options.minimumFaceDistanceMeters + options.minimumGroundClearanceMeters,
+				Math.max(options.standOffMeters, 10)
+			]) {
+				const transit = [first, second].map((waypoint) => ({
+					...waypoint,
+					altitude,
+					phase: 'transit' as const,
+					local: [
+						waypoint.local[0] - Math.sin(toRadians(waypoint.heading)) * offset,
+						waypoint.local[1] - Math.cos(toRadians(waypoint.heading)) * offset
+					],
+					speed: options.transitSpeed,
+					rowBoundary: null,
+					detailCamera: undefined,
+					captureTarget: undefined,
+					captureView: undefined,
+					captureKind: undefined
+				}));
+				try {
+					validateFlightPath([first, ...transit, second], terrainAt, options, clearanceAt);
+					detour = transit;
+					break;
+				} catch (detourError) {
+					if (!(detourError instanceof UnsafeFlightPathError)) throw detourError;
+				}
+			}
+			if (!detour) throw error;
+			connected.push(...detour);
+		}
+		connected.push(second);
+		checkFlightWork(connected.length, FLIGHT_LIMITS.waypoints, 'Flight waypoints');
+	}
+	return connected.map((waypoint, index) => ({ ...waypoint, index }));
+}
+
 /**
- * Create a terrain-following façade mission with a direct coverage pass and optional convergent
- * pass. The latter shifts the aircraft laterally while looking back to the same surface samples,
- * giving SfM a useful second viewing angle without changing the planned coverage grid.
+ * Create one overlapping capture grid, adding only the extra viewpoints needed
+ * to satisfy the modeled surface coverage and independent-view requirements.
  */
 export function generateFlightPlan(
 	geometry: Polygon | null | undefined,
@@ -639,82 +803,135 @@ export function generateFlightPlan(
 			? detectedWall.localPoints[detectedWall.localPoints.length - 1].along
 			: maxAlong;
 	const corridorWidth = corridorMaxAlong - corridorMinAlong;
-	const corridorCenter = (corridorMinAlong + corridorMaxAlong) / 2;
 	const corridorHalfWidth = corridorWidth / 2;
 	const sectorElevation = sectorElevationRange(localRing, terrainAt);
 	const captureHeightMeters = sectorElevation.height;
-	const rowCount = Math.max(2, Math.ceil(captureHeightMeters / options.stripSpacingMeters) + 1);
-	const rowLength =
-		options.pattern === 'facade-grid' || options.pattern === 'constant-distance-grid'
-			? corridorWidth
-			: Math.PI * corridorHalfWidth;
-	const pointsPerRow = Math.max(3, Math.ceil(rowLength / options.pointSpacingMeters) + 1);
-	checkFlightWork(
-		rowCount * pointsPerRow * options.convergentPasses,
-		FLIGHT_LIMITS.waypoints,
-		'Capture waypoints'
+	const surfaceAt = createWallSurfaceSampler(terrainAt, options);
+	const footprint = cameraFootprint(options.camera, options.standOffMeters);
+	// Keep the requested image overlap. Actual camera frusta and sightlines
+	// validate coverage below, without an additional blanket density reserve.
+	const pointSpacing = Math.min(
+		options.pointSpacingMeters ?? Infinity,
+		footprint.width * (1 - options.captureOverlap)
 	);
-	const wallSurfacePointAtHeight = createWallSurfaceSampler(terrainAt, options);
-	const rows: DraftWaypoint[][] = [];
-	let droppedWaypointCount = 0;
-	let unresolvedWallSurfaceCount = 0;
-
-	for (let pass = 0; pass < options.convergentPasses; pass += 1) {
-		const lateralOffset =
-			pass === 0 ? 0 : (pass % 2 === 1 ? 1 : -1) * options.convergentOffsetMeters;
-		for (let row = 0; row < rowCount; row += 1) {
-			const height = (row / (rowCount - 1)) * captureHeightMeters;
-			const rowWaypoints: DraftWaypoint[] = [];
-			for (let point = 0; point < pointsPerRow; point += 1) {
-				const progress = point / (pointsPerRow - 1);
-				const direction = row % 2 === 0 ? progress : 1 - progress;
-				const angle = Math.PI * direction;
-				const along =
-					options.pattern === 'facade-grid' || options.pattern === 'constant-distance-grid'
-						? corridorMaxAlong - direction * corridorWidth
-						: corridorCenter + Math.cos(angle) * corridorHalfWidth;
-				const curveDepth =
-					options.pattern === 'half-helix'
-						? Math.sin(angle) * corridorHalfWidth * 0.45
-						: options.pattern === 'curved-sweep'
-							? Math.sin(angle) * options.standOffMeters * 0.2
-							: 0;
-				const placement = resolveCapturePlacement(
-					along,
-					height,
-					curveDepth,
-					lateralOffset,
-					axis,
-					normal,
-					detectedWall,
-					terrainAt,
-					wallSurfacePointAtHeight,
-					options
-				);
-				if (!placement) {
-					unresolvedWallSurfaceCount += 1;
-					continue;
-				}
-				const { local, altitude, cameraTarget } = placement;
-				const clearance = clearanceAt(local, altitude);
-				if (clearance < options.minimumFaceDistanceMeters) {
-					droppedWaypointCount += 1;
-					continue;
-				}
-				rowWaypoints.push({
-					local,
-					altitude,
-					phase: 'capture',
-					speed: options.speed,
-					heading: headingTo(cameraTarget, local),
-					gimbalPitch: -8,
-					camera: options.camera,
-					sampleIndex: point
-				});
-			}
-			if (rowWaypoints.length) rows.push(rowWaypoints);
+	const stripSpacing = Math.min(
+		options.stripSpacingMeters ?? Infinity,
+		footprint.height * (1 - options.captureOverlap)
+	);
+	const pointCount = Math.max(3, Math.ceil(corridorWidth / pointSpacing) + 1);
+	checkFlightWork(pointCount, FLIGHT_LIMITS.waypoints, 'Capture waypoints');
+	const alongPositions = Array.from(
+		{ length: pointCount },
+		(_, index) => corridorMinAlong + (corridorWidth * index) / (pointCount - 1)
+	);
+	const targetAt = (along: number, fraction: number) => {
+		const frame = wallFrameAt(along, axis, normal, detectedWall);
+		return surfaceAt(frame.target, frame.topTarget, fraction);
+	};
+	const crestAt = (along: number) =>
+		crestSurfaceTarget(
+			along,
+			wallFrameAt(along, axis, normal, detectedWall),
+			surfaceAt,
+			terrainAt,
+			localRing,
+			axis,
+			normal,
+			options.standOffMeters
+		);
+	// Refine lateral intervals where varying wall height or shape stretches the
+	// surface beyond the selected camera's overlapping footprint.
+	for (let index = 1; index < alongPositions.length; index++) {
+		let gap = 0;
+		for (const fraction of [0, 0.25, 0.5, 0.75, 1]) {
+			const first = targetAt(alongPositions[index - 1], fraction);
+			const second = targetAt(alongPositions[index], fraction);
+			gap = Math.max(
+				gap,
+				Math.hypot(
+					second.local[0] - first.local[0],
+					second.local[1] - first.local[1],
+					second.elevation - first.elevation
+				)
+			);
+		}
+		if (
+			gap > pointSpacing * 1.01 &&
+			alongPositions[index] - alongPositions[index - 1] > options.wallSurfaceSampleSpacingMeters
+		) {
+			checkFlightWork(alongPositions.length + 1, FLIGHT_LIMITS.waypoints, 'Capture waypoints');
+			alongPositions.splice(index, 0, (alongPositions[index - 1] + alongPositions[index]) / 2);
+			index--;
 		}
 	}
+	const profileLength = Math.max(...alongPositions.map((along) => targetAt(along, 1).length));
+	const rowCount = Math.max(2, Math.ceil(profileLength / stripSpacing) + 1);
+	const crestRows = detectedWall.localPoints.length >= 2 ? 1 : 0;
+	const pointsPerRow = alongPositions.length;
+	checkFlightWork(rowCount * pointsPerRow, FLIGHT_LIMITS.waypoints, 'Capture waypoints');
+	const rows: DraftWaypoint[][] = [];
+	let droppedWaypointCount = 0;
+	const unresolvedWallSurfaceCount = 0;
+	const curveAt = (column: number) => {
+		const angle = (Math.PI * column) / (pointsPerRow - 1);
+		return options.pattern === 'half-helix'
+			? Math.sin(angle) * corridorHalfWidth * 0.45
+			: options.pattern === 'curved-sweep'
+				? Math.sin(angle) * options.standOffMeters * 0.2
+				: 0;
+	};
+	for (let row = 0; row < rowCount; row++) {
+		const fraction = row / (rowCount - 1);
+		const rowWaypoints: DraftWaypoint[] = [];
+		for (let point = 0; point < pointsPerRow; point++) {
+			const column = row % 2 === 0 ? pointsPerRow - 1 - point : point;
+			const placement = resolveCapturePlacement(
+				alongPositions[column],
+				fraction,
+				curveAt(column),
+				0,
+				axis,
+				normal,
+				detectedWall,
+				terrainAt,
+				surfaceAt,
+				options,
+				false,
+				localRing
+			);
+			const pose = fitCaptureView(placement, options, terrainAt, clearanceAt);
+			if (!pose) {
+				droppedWaypointCount++;
+				continue;
+			}
+			const { altitude, pitch, distance, heading } = pose;
+			const { local, cameraTarget } = placement;
+			const [longitude, latitude] = projection.toLngLat(cameraTarget.local);
+			rowWaypoints.push({
+				local,
+				altitude,
+				phase: 'capture',
+				speed: options.speed,
+				heading,
+				gimbalPitch: pitch,
+				camera: options.camera,
+				detailCamera:
+					options.camera !== 'tele-6x' &&
+					distance >= flightCamera('tele-6x').minimumFocus &&
+					column % 4 === 0 &&
+					(row === rowCount - 1 || row % 4 === 0)
+						? 'tele-6x'
+						: undefined,
+				captureTarget: { longitude, latitude, altitude: cameraTarget.elevation },
+				captureView: 'face',
+				captureKind: 'grid',
+				sampleIndex: point,
+				coverageKey: `${row}:${column}`
+			});
+		}
+		if (rowWaypoints.length) rows.push(rowWaypoints);
+	}
+
 	if (rows.reduce((count, row) => count + row.length, 0) < 2) {
 		throw new RangeError(
 			`No usable flight path remains after enforcing the ${options.minimumFaceDistanceMeters} m cliff-face clearance.`
@@ -724,11 +941,16 @@ export function generateFlightPlan(
 		...rows.map((row) => Math.min(...row.map((waypoint) => waypoint.altitude)))
 	);
 	const captureAltitudeCeiling =
-		lowestCaptureAltitude + captureHeightMeters + options.captureAltitudeToleranceMeters;
+		Math.max(...alongPositions.map((along) => targetAt(along, 1).elevation)) +
+		Math.max(options.standOffMeters, options.minimumGroundClearanceMeters) +
+		options.standOffMeters +
+		options.minimumGroundClearanceMeters +
+		options.clearanceMarginMeters +
+		options.captureAltitudeToleranceMeters;
 	let altitudeCappedWaypointCount = 0;
 	const replannedRows: DraftWaypoint[][] = [];
 	let fragmentedRowCount = 0;
-	let discardedFragmentWaypointCount = 0;
+	const discardedFragmentWaypointCount = 0;
 	for (const candidates of rows) {
 		const row = candidates.filter((waypoint) => waypoint.altitude <= captureAltitudeCeiling);
 		altitudeCappedWaypointCount += candidates.length - row.length;
@@ -742,19 +964,18 @@ export function generateFlightPlan(
 			}
 			return all;
 		}, []);
-		const bestSegment = segments.reduce(
-			(best, segment) => (segment.length > best.length ? segment : best),
-			segments[0]
-		);
-		if (segments.length > 1) fragmentedRowCount += 1;
-		discardedFragmentWaypointCount += row.length - bestSegment.length;
-		replannedRows.push(bestSegment);
+		if (segments.length > 1) fragmentedRowCount++;
+		replannedRows.push(...segments);
 	}
+	const targetViews = new Map<string, LocalWaypoint[]>();
 	const localWaypoints: LocalWaypoint[] = [];
+	const gridByPose = new Map<string, LocalWaypoint>();
+	const poseKey = (waypoint: DraftWaypoint) =>
+		`${waypoint.local[0]}:${waypoint.local[1]}:${waypoint.altitude}:${waypoint.heading}:${waypoint.gimbalPitch}:${waypoint.camera}`;
 	let previousWaypoint: DraftWaypoint | null = null;
 	for (const row of replannedRows) {
-		const first = row[0];
-		const last = row[row.length - 1];
+		const first = row[0],
+			last = row[row.length - 1];
 		const shouldReverse: boolean =
 			previousWaypoint !== null &&
 			Math.hypot(
@@ -766,32 +987,296 @@ export function generateFlightPlan(
 					first.local[1] - previousWaypoint.local[1]
 				);
 		const plannedRow: DraftWaypoint[] = shouldReverse ? [...row].reverse() : row;
-		plannedRow.forEach(({ sampleIndex: _sampleIndex, ...waypoint }, rowIndex) => {
-			localWaypoints.push({
-				...waypoint,
-				index: localWaypoints.length,
-				rowBoundary:
-					plannedRow.length === 1
-						? 'single'
-						: rowIndex === 0
-							? 'start'
-							: rowIndex === plannedRow.length - 1
-								? 'end'
-								: null
-			});
+		const seen = new Set<string>();
+		const fresh = plannedRow.filter((waypoint) => {
+			const key = poseKey(waypoint);
+			if (gridByPose.has(key) || seen.has(key)) return false;
+			seen.add(key);
+			return true;
 		});
-		previousWaypoint = plannedRow[plannedRow.length - 1];
+		fresh.forEach(
+			({ sampleIndex: _sampleIndex, coverageKey: _coverageKey, ...waypoint }, rowIndex) => {
+				const view: LocalWaypoint = {
+					...waypoint,
+					index: localWaypoints.length,
+					rowBoundary:
+						fresh.length === 1
+							? 'single'
+							: rowIndex === 0
+								? 'start'
+								: rowIndex === fresh.length - 1
+									? 'end'
+									: null
+				};
+				gridByPose.set(poseKey(fresh[rowIndex]), view);
+				localWaypoints.push(view);
+			}
+		);
+		for (const waypoint of plannedRow) {
+			const view = gridByPose.get(poseKey(waypoint))!;
+			view.detailCamera ||= waypoint.detailCamera;
+			targetViews.set(waypoint.coverageKey, [view]);
+		}
+		if (fresh.length) previousWaypoint = fresh[fresh.length - 1];
 	}
+
 	if (localWaypoints.length < 2) {
 		throw new RangeError(
 			`No usable flight path remains after enforcing the ${options.minimumFaceDistanceMeters} m cliff-face clearance.`
 		);
 	}
-	validateFlightPath(localWaypoints, terrainAt, options, clearanceAt);
-	const waypoints: FlightWaypoint[] = localWaypoints.map(({ local, ...waypoint }) => {
+
+	const requiredViews = 2;
+	type SurfaceTarget = ReturnType<typeof targetAt>;
+	type CoverageRegion = {
+		row: number;
+		column: number;
+		fraction: number;
+		along: number;
+		center: SurfaceTarget;
+		probes: SurfaceTarget[];
+		top: boolean;
+	};
+	const extraViews: LocalWaypoint[] = [];
+	const insertions = new Map<number, LocalWaypoint[]>();
+	const regions: CoverageRegion[] = [];
+	const nodeRegions: CoverageRegion[] = [];
+	for (let row = 0; row < rowCount + crestRows; row++) {
+		for (let column = 0; column < pointsPerRow; column++) {
+			const top = row === rowCount;
+			const fraction = top ? 1 : row / (rowCount - 1);
+			const center = top
+				? crestAt(alongPositions[column])
+				: targetAt(alongPositions[column], fraction);
+			nodeRegions.push({
+				row,
+				column,
+				fraction,
+				along: alongPositions[column],
+				center,
+				probes: [center],
+				top
+			});
+		}
+	}
+	for (let row = 0; row < rowCount - 1 + crestRows; row++) {
+		for (let column = 0; column < pointsPerRow - 1; column++) {
+			const top = row === rowCount - 1;
+			const along = (alongPositions[column] + alongPositions[column + 1]) / 2;
+			const fraction = top ? 1 : (row + 0.5) / (rowCount - 1);
+			let center = targetAt(along, fraction);
+			if (top) {
+				const inset = crestAt(along);
+				const local = [
+					(center.local[0] + inset.local[0]) / 2,
+					(center.local[1] + inset.local[1]) / 2
+				];
+				center = { ...center, local, elevation: terrainAt(local) };
+			}
+			const corners = [
+				[row, column],
+				[row, column + 1],
+				[row + 1, column],
+				[row + 1, column + 1]
+			];
+			const probes = [
+				...corners.map(([r, c]) =>
+					r === rowCount
+						? crestAt(alongPositions[c])
+						: targetAt(alongPositions[c], r / (rowCount - 1))
+				),
+				center
+			];
+			regions.push({ row, column, fraction, along, center, probes, top });
+		}
+	}
+	const nearbyViews = (region: CoverageRegion) => {
+		const views: LocalWaypoint[] = [];
+		// Overlapping neighboring photos already provide different camera
+		// positions. They count even when aimed at other surface samples.
+		for (
+			let row = Math.max(0, region.row - 2);
+			row <= Math.min(rowCount - 1, region.row + 2);
+			row++
+		) {
+			for (
+				let column = Math.max(0, region.column - 2);
+				column <= Math.min(pointsPerRow - 1, region.column + 2);
+				column++
+			) {
+				views.push(...(targetViews.get(`${row}:${column}`) ?? []));
+			}
+		}
+		return [...views, ...extraViews];
+	};
+	const viewDirection = (view: LocalWaypoint, target: SurfaceTarget) => {
+		const delta = [
+			target.local[0] - view.local[0],
+			target.local[1] - view.local[1],
+			target.elevation - view.altitude
+		];
+		const length = Math.hypot(...delta);
+		return delta.map((value) => value / length);
+	};
+	const separated = (first: number[], second: number[]) =>
+		first.reduce((sum, value, axis) => sum + value * second[axis], 0) < Math.cos(toRadians(8));
+	const covers = (view: LocalWaypoint, region: CoverageRegion) => {
+		if (region.top) {
+			// A level ray along the plateau is not a useful view of its top.
+			const horizontal = Math.hypot(
+				region.center.local[0] - view.local[0],
+				region.center.local[1] - view.local[1]
+			);
+			if (
+				view.altitude - Math.max(...region.probes.map((probe) => probe.elevation)) <
+				horizontal * Math.tan(toRadians(20))
+			)
+				return false;
+		}
+		if (
+			!region.probes.every((probe) =>
+				cameraContainsTarget(
+					view.camera,
+					[...view.local, view.altitude],
+					view.heading,
+					view.gimbalPitch,
+					[...probe.local, probe.elevation]
+				)
+			)
+		)
+			return false;
+		return region.probes.every((probe) =>
+			cameraCanSeeTarget(
+				view.local,
+				view.altitude,
+				probe,
+				terrainAt,
+				Math.min(options.wallSurfaceSampleSpacingMeters, 0.25)
+			)
+		);
+	};
+	const coveringViews = (region: CoverageRegion) => {
+		const visible: LocalWaypoint[] = [];
+		for (const view of nearbyViews(region)) {
+			if (!covers(view, region)) continue;
+			const partner = visible.find((previous) =>
+				separated(viewDirection(previous, region.center), viewDirection(view, region.center))
+			);
+			if (partner) return [partner, view];
+			visible.push(view);
+		}
+		return visible.slice(0, 1);
+	};
+	// Cells first, then any remaining boundary samples. Every added photo
+	// must resolve a concrete visibility, frustum or viewing-angle deficit.
+	for (const region of [...regions, ...nodeRegions]) {
+		const accepted = coveringViews(region);
+		if (accepted.length >= requiredViews) continue;
+		const candidates = [
+			{ offset: 0, lift: 0 },
+			{ offset: options.obliqueOffsetMeters, lift: 0 },
+			{ offset: -options.obliqueOffsetMeters, lift: 0 },
+			{ offset: 0, lift: options.standOffMeters / 2 },
+			{ offset: options.obliqueOffsetMeters, lift: options.standOffMeters / 2 },
+			{ offset: -options.obliqueOffsetMeters, lift: options.standOffMeters / 2 }
+		];
+		for (const candidate of candidates) {
+			const placement = resolveCapturePlacement(
+				region.along,
+				region.fraction,
+				curveAt(region.column + (region.probes.length === 1 ? 0 : 0.5)),
+				candidate.offset,
+				axis,
+				normal,
+				detectedWall,
+				terrainAt,
+				surfaceAt,
+				options,
+				region.top,
+				localRing
+			);
+			placement.altitude += candidate.lift;
+			const pose = fitCaptureView(placement, options, terrainAt, clearanceAt);
+			if (!pose) continue;
+			const [longitude, latitude] = projection.toLngLat(placement.cameraTarget.local);
+			const view: LocalWaypoint = {
+				local: placement.local,
+				altitude: pose.altitude,
+				heading: pose.heading,
+				gimbalPitch: pose.pitch,
+				phase: 'capture',
+				speed: options.speed,
+				camera: options.camera,
+				captureTarget: { longitude, latitude, altitude: placement.cameraTarget.elevation },
+				captureView: region.top ? 'crest' : 'face',
+				captureKind: 'supplementary',
+				index: localWaypoints.length + extraViews.length,
+				rowBoundary: 'single'
+			};
+			if (
+				accepted.some(
+					(previous) =>
+						!separated(viewDirection(previous, region.center), viewDirection(view, region.center))
+				) ||
+				!covers(view, region)
+			)
+				continue;
+			const reference = localWaypoints.reduce((best, waypoint) =>
+				Math.hypot(
+					waypoint.local[0] - view.local[0],
+					waypoint.local[1] - view.local[1],
+					waypoint.altitude - view.altitude
+				) <
+				Math.hypot(
+					best.local[0] - view.local[0],
+					best.local[1] - view.local[1],
+					best.altitude - view.altitude
+				)
+					? waypoint
+					: best
+			);
+			const inserted = insertions.get(reference.index) ?? [];
+			inserted.push(view);
+			insertions.set(reference.index, inserted);
+			extraViews.push(view);
+			accepted.push(view);
+			checkFlightWork(
+				localWaypoints.length + extraViews.length,
+				FLIGHT_LIMITS.waypoints,
+				'Capture waypoints'
+			);
+			if (accepted.length >= requiredViews) break;
+		}
+	}
+	const coverageTargetCount = nodeRegions.length;
+	const coveredTargetCount = nodeRegions.filter(
+		(region) => coveringViews(region).length >= requiredViews
+	).length;
+	const coveredCrestTargetCount = nodeRegions.filter(
+		(region) => region.top && coveringViews(region).length >= requiredViews
+	).length;
+	const spacingGapCount = regions.filter(
+		(region) => coveringViews(region).length < requiredViews
+	).length;
+
+	const orderedCaptures = localWaypoints.flatMap((waypoint) => [
+		waypoint,
+		...(insertions.get(waypoint.index) ?? [])
+	]);
+	const connectedWaypoints = connectFlightCaptures(
+		orderedCaptures,
+		terrainAt,
+		options,
+		clearanceAt
+	);
+	validateFlightPath(connectedWaypoints, terrainAt, options, clearanceAt);
+	const waypoints: FlightWaypoint[] = connectedWaypoints.map(({ local, ...waypoint }) => {
 		const [longitude, latitude] = projection.toLngLat(local);
 		return { ...waypoint, longitude, latitude };
 	});
+	const detailPhotoCount = waypoints.filter(
+		(waypoint) => waypoint.phase === 'capture' && waypoint.detailCamera
+	).length;
 	return {
 		name: suppliedOptions.name || 'Crag capture plan',
 		cragName: suppliedOptions.cragName || '',
@@ -801,16 +1286,37 @@ export function generateFlightPlan(
 				? { startElevation: suppliedOptions.startElevation }
 				: {}),
 			camera: options.camera,
-			photoCount: waypoints.length,
+			speed: options.speed,
+			transitSpeed: options.transitSpeed,
+			photoCount:
+				waypoints.filter((waypoint) => waypoint.phase === 'capture').length + detailPhotoCount,
+			detailPhotoCount,
+			supplementaryWaypointCount: extraViews.length,
+			gridWaypointCount: localWaypoints.length,
+			captureOverlap: options.captureOverlap,
+			coverageStatus:
+				detectedWall.localPoints.length < 2
+					? 'unresolved'
+					: coveredTargetCount < coverageTargetCount || spacingGapCount > 0
+						? 'partial'
+						: 'modeled',
+			spacingGapCount,
+			coverageTargetCount,
+			coveredTargetCount,
+			uncoveredTargetCount: coverageTargetCount - coveredTargetCount,
+			crestTargetCount: crestRows * pointsPerRow,
+			coveredCrestTargetCount,
 			pattern: options.pattern,
-			strategy: 'terrain-following-facade-with-convergent-pass',
+			strategy: 'single-grid-with-targeted-views',
 			targetGsdCm: options.targetGsdCm,
 			standOffMeters: options.standOffMeters,
 			terrainSource: 'https://tiles.mapterhorn.com/tilejson.json',
 			captureHeightMeters,
 			sectorMinimumElevation: sectorElevation.minimum,
 			sectorMaximumElevation: sectorElevation.maximum,
-			stripSpacingMeters: options.stripSpacingMeters,
+			stripSpacingMeters: stripSpacing,
+			pointSpacingMeters: pointSpacing,
+			clearanceMarginMeters: options.clearanceMarginMeters,
 			minimumFaceDistanceMeters: options.minimumFaceDistanceMeters,
 			minimumGroundClearanceMeters: options.minimumGroundClearanceMeters,
 			captureAltitudeToleranceMeters: options.captureAltitudeToleranceMeters,
@@ -821,8 +1327,8 @@ export function generateFlightPlan(
 			fragmentedRowCount,
 			discardedFragmentWaypointCount,
 			terrainMeshSpacingMeters: options.terrainMeshSpacingMeters,
-			convergentPasses: options.convergentPasses,
-			convergentOffsetMeters: options.convergentOffsetMeters,
+			coveragePasses: 1,
+			obliqueOffsetMeters: options.obliqueOffsetMeters,
 			droppedWaypointCount
 		},
 		wallDetection: {
@@ -843,13 +1349,27 @@ export function generateFlightPlan(
 
 export function validateFlightPlanOptions(suppliedOptions: FlightPlanOptions = {}) {
 	const options = { ...DEFAULTS, ...suppliedOptions };
+	if (!Number.isFinite(options.clearanceMarginMeters) || options.clearanceMarginMeters < 0)
+		throw new TypeError('clearanceMarginMeters must be zero or greater.');
+	if (
+		!Number.isFinite(options.captureOverlap) ||
+		options.captureOverlap < 0.5 ||
+		options.captureOverlap > 0.9
+	)
+		throw new TypeError('captureOverlap must be between 0.5 and 0.9.');
+	if (!Number.isFinite(options.targetGsdCm) || options.targetGsdCm <= 0)
+		throw new TypeError('targetGsdCm must be greater than zero.');
+
 	for (const key of [
 		'stripSpacingMeters',
 		'pointSpacingMeters',
 		'speed',
 		'transitSpeed'
 	] as const) {
-		if (!Number.isFinite(options[key]) || options[key] <= 0) {
+		const value = options[key];
+		if ((key === 'pointSpacingMeters' || key === 'stripSpacingMeters') && value === undefined)
+			continue;
+		if (value === undefined || !Number.isFinite(value) || value <= 0) {
 			throw new TypeError(`${key} must be greater than zero.`);
 		}
 	}
@@ -904,11 +1424,8 @@ export function validateFlightPlanOptions(suppliedOptions: FlightPlanOptions = {
 	) {
 		throw new TypeError('Wall surface sampling spacing must be greater than zero.');
 	}
-	if (!Number.isInteger(options.convergentPasses) || options.convergentPasses < 1) {
-		throw new TypeError('convergentPasses must be a positive integer.');
-	}
-	if (!Number.isFinite(options.convergentOffsetMeters) || options.convergentOffsetMeters < 0) {
-		throw new TypeError('convergentOffsetMeters must be zero or greater.');
+	if (!Number.isFinite(options.obliqueOffsetMeters) || options.obliqueOffsetMeters < 0) {
+		throw new TypeError('obliqueOffsetMeters must be zero or greater.');
 	}
 	if (
 		suppliedOptions.startElevation !== undefined &&
@@ -916,6 +1433,22 @@ export function validateFlightPlanOptions(suppliedOptions: FlightPlanOptions = {
 	) {
 		throw new TypeError('Launch elevation must be a finite number in metres AMSL.');
 	}
+	if (options.camera === 'auto') {
+		// Detail determines photo distance independently of minimum clearance.
+		// A 45-degree crest view is sqrt(2) farther from its subject than a
+		// normal view, so reserve that factor when estimating resolution.
+		options.standOffMeters = Math.max(
+			options.standOffMeters,
+			cameraDistanceAtGsd('wide', options.targetGsdCm) / Math.SQRT2,
+			options.minimumFaceDistanceMeters +
+				2 * options.minimumGroundClearanceMeters +
+				options.clearanceMarginMeters
+		);
+		options.camera = selectCoverageCamera(options.standOffMeters, options.targetGsdCm);
+	}
+	flightCamera(options.camera);
+	if (suppliedOptions.obliqueOffsetMeters === undefined)
+		options.obliqueOffsetMeters = options.standOffMeters * Math.tan(toRadians(20));
 	return options;
 }
 
@@ -940,13 +1473,21 @@ export function flightPlanTerrainBounds(
 				: 0;
 	const stencil =
 		Math.ceil(
-			(options.minimumFaceDistanceMeters + options.terrainMeshSpacingMeters) /
+			(options.minimumFaceDistanceMeters +
+				options.clearanceMarginMeters +
+				options.terrainMeshSpacingMeters) /
 				options.terrainMeshSpacingMeters
 		) * options.terrainMeshSpacingMeters;
+	const transitPad = Math.max(
+		options.minimumFaceDistanceMeters + options.minimumGroundClearanceMeters,
+		options.standOffMeters,
+		10
+	);
 	const pad =
+		transitPad +
 		Math.max(options.standOffMeters, 10) +
 		curve +
-		options.convergentOffsetMeters +
+		options.obliqueOffsetMeters * (1 + curve / options.standOffMeters) +
 		stencil * Math.SQRT2 +
 		2;
 	const corners = [];
