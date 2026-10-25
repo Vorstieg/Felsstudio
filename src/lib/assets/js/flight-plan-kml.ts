@@ -11,8 +11,19 @@ import JSZip from 'jszip';
 import type { FlightPlan, FlightWaypoint } from './flight-plan-types';
 
 type WaypointInput = Record<string, unknown>;
-type NormalizedWaypoint = WaypointInput &
-	Pick<FlightWaypoint, 'longitude' | 'latitude' | 'altitude'>;
+type NormalizedWaypoint = Pick<
+	FlightWaypoint,
+	'longitude' | 'latitude' | 'altitude' | 'heading' | 'gimbalPitch' | 'phase'
+> & {
+	speed: number;
+	focalLength: number;
+};
+type NormalizedMission = {
+	waypoints: NormalizedWaypoint[];
+	startElevation: number;
+	transitSpeed: number;
+	captureSpeed: number;
+};
 type FlightPlanFilenameInput = Partial<Pick<FlightPlan, 'name' | 'cragName'>>;
 
 const KML_NAMESPACE = 'http://www.opengis.net/kml/2.2';
@@ -28,7 +39,12 @@ function number(value: unknown, fieldName: string, index: number): number {
 	return parsed;
 }
 
-function normaliseWaypoint(waypoint: unknown, index: number): NormalizedWaypoint {
+function optionalNumber(value: unknown): number | undefined {
+	const parsed = Number(value);
+	return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function normaliseWaypoint(waypoint: unknown, index: number) {
 	if (!waypoint || typeof waypoint !== 'object') {
 		throw new TypeError(`Waypoint ${index + 1} must be an object.`);
 	}
@@ -41,28 +57,44 @@ function normaliseWaypoint(waypoint: unknown, index: number): NormalizedWaypoint
 		throw new RangeError(`Waypoint ${index + 1} is outside WGS84 bounds.`);
 	}
 
-	return { ...input, longitude, latitude, altitude };
+	return {
+		longitude,
+		latitude,
+		altitude,
+		heading: normaliseHeading(optionalNumber(input.heading) ?? 0),
+		gimbalPitch: optionalNumber(input.gimbalPitch) ?? -8,
+		speed: optionalNumber(input.speed),
+		phase: input.phase === 'capture' ? ('capture' as const) : ('transit' as const),
+		focalLength: cameraFocalLength(input.camera)
+	};
 }
 
-function formattedNumber(value: unknown): string {
-	return Number(value)
-		.toFixed(8)
-		.replace(/(?:\.0+|(?<=\..*?)0+)$/, '');
+function formattedNumber(value: number): string {
+	return value.toFixed(8).replace(/(?:\.0+|(?<=\..*?)0+)$/, '');
 }
 
 /** DJI Fly manual waypoint headings use the signed -180°…+180° convention. */
-function normaliseHeading(value: unknown): number {
-	const heading = ((((Number(value) + 180) % 360) + 360) % 360) - 180;
+function normaliseHeading(value: number): number {
+	const heading = ((((value + 180) % 360) + 360) % 360) - 180;
 	// Avoid serialising JavaScript's `-0`, which is needlessly ambiguous in WPML.
 	return Object.is(heading, -0) ? 0 : heading;
 }
 
-function missionWaypoints(plan: FlightPlan): NormalizedWaypoint[] {
+function normaliseMission(plan: FlightPlan): NormalizedMission {
 	if (!plan || typeof plan !== 'object') throw new TypeError('A flight plan is required.');
 	if (!Array.isArray(plan.waypoints) || plan.waypoints.length < 2) {
 		throw new TypeError('A flight plan requires at least two waypoints.');
 	}
-	return plan.waypoints.map(normaliseWaypoint);
+	const waypoints = plan.waypoints.map(normaliseWaypoint);
+	return {
+		startElevation: relativeStartElevation(plan),
+		transitSpeed: optionalNumber(plan.metadata?.transitSpeed) || waypoints[0].speed || 5,
+		captureSpeed:
+			optionalNumber(plan.metadata?.speed) ||
+			waypoints.find((waypoint) => waypoint.phase === 'capture')?.speed ||
+			2.5,
+		waypoints: waypoints.map((waypoint) => ({ ...waypoint, speed: waypoint.speed ?? 2.5 }))
+	};
 }
 
 function relativeStartElevation(plan: FlightPlan): number {
@@ -109,9 +141,6 @@ function waypointActions(
 	waypoint: NormalizedWaypoint,
 	actionId: number
 ): { xml: string; nextActionId: number } {
-	const gimbalPitch = Number.isFinite(Number(waypoint.gimbalPitch))
-		? Number(waypoint.gimbalPitch)
-		: -8;
 	const actions = [
 		actionXml(
 			actionId++,
@@ -120,7 +149,7 @@ function waypointActions(
               <wpml:gimbalHeadingYawBase>aircraft</wpml:gimbalHeadingYawBase>
               <wpml:gimbalRotateMode>absoluteAngle</wpml:gimbalRotateMode>
               <wpml:gimbalPitchRotateEnable>1</wpml:gimbalPitchRotateEnable>
-              <wpml:gimbalPitchRotateAngle>${formattedNumber(gimbalPitch)}</wpml:gimbalPitchRotateAngle>
+              <wpml:gimbalPitchRotateAngle>${formattedNumber(waypoint.gimbalPitch)}</wpml:gimbalPitchRotateAngle>
               <wpml:gimbalRollRotateEnable>0</wpml:gimbalRollRotateEnable>
               <wpml:gimbalRollRotateAngle>0</wpml:gimbalRollRotateAngle>
               <wpml:gimbalYawRotateEnable>0</wpml:gimbalYawRotateEnable>
@@ -133,14 +162,14 @@ function waypointActions(
 			actionId++,
 			'zoom',
 			`
-              <wpml:focalLength>${cameraFocalLength(waypoint.camera)}</wpml:focalLength>
+              <wpml:focalLength>${waypoint.focalLength}</wpml:focalLength>
               <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>`
 		)
 	];
 
 	// A native takePhoto action at each planned capture position is more
 	// portable than interval actions, whose support varies by payload/firmware.
-	if (waypoint.phase === 'capture' || waypoint.action === 'photo') {
+	if (waypoint.phase === 'capture') {
 		actions.push(
 			actionXml(
 				actionId++,
@@ -171,16 +200,17 @@ function missionConfigXml(speed: number): string {
 
 /** Build Mavic 4 Pro's template.kml from a validated plan. */
 export function exportFlightPlanTemplateKml(plan: FlightPlan): string {
-	const waypoints = missionWaypoints(plan);
-	relativeStartElevation(plan);
+	return templateKml(normaliseMission(plan));
+}
+
+function templateKml(mission: NormalizedMission): string {
 	const now = Date.now();
-	const speed = Number(plan.metadata?.transitSpeed) || Number(waypoints[0].speed) || 5;
 	return `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="${KML_NAMESPACE}" xmlns:wpml="${WPML_NAMESPACE}">
   <Document>
     <wpml:author>Felsstudio</wpml:author>
     <wpml:createTime>${now}</wpml:createTime>
-    <wpml:updateTime>${now}</wpml:updateTime>${missionConfigXml(speed)}
+    <wpml:updateTime>${now}</wpml:updateTime>${missionConfigXml(mission.transitSpeed)}
   </Document>
 </kml>
 `;
@@ -188,31 +218,26 @@ export function exportFlightPlanTemplateKml(plan: FlightPlan): string {
 
 /** Build Mavic 4 Pro's executable waylines.wpml from a validated plan. */
 export function exportFlightPlanWaylinesWpml(plan: FlightPlan): string {
-	const waypoints = missionWaypoints(plan);
-	const startElevation = relativeStartElevation(plan);
+	return waylinesWpml(normaliseMission(plan));
+}
+
+function waylinesWpml({ waypoints, startElevation, captureSpeed }: NormalizedMission): string {
 	let actionId = 1;
 	let actionGroupId = 1;
 	const placemarks = waypoints
 		.map((waypoint, index) => {
 			const actions = waypointActions(waypoint, actionId);
 			actionId = actions.nextActionId;
-			const heading = Number.isFinite(Number(waypoint.heading))
-				? normaliseHeading(waypoint.heading)
-				: 0;
-			const speed = Number.isFinite(Number(waypoint.speed)) ? Number(waypoint.speed) : 2.5;
-			const pitch = Number.isFinite(Number(waypoint.gimbalPitch))
-				? Number(waypoint.gimbalPitch)
-				: -8;
 			const turnMode = 'toPointAndStopWithDiscontinuityCurvature';
 			return `
       <Placemark>
         <Point><coordinates>${formattedNumber(waypoint.longitude)},${formattedNumber(waypoint.latitude)}</coordinates></Point>
         <wpml:index>${index}</wpml:index>
         <wpml:executeHeight>${formattedNumber(waypointHeight(waypoint, startElevation))}</wpml:executeHeight>
-        <wpml:waypointSpeed>${formattedNumber(speed)}</wpml:waypointSpeed>
+        <wpml:waypointSpeed>${formattedNumber(waypoint.speed)}</wpml:waypointSpeed>
         <wpml:waypointHeadingParam>
           <wpml:waypointHeadingMode>manually</wpml:waypointHeadingMode>
-          <wpml:waypointHeadingAngle>${formattedNumber(heading)}</wpml:waypointHeadingAngle>
+          <wpml:waypointHeadingAngle>${formattedNumber(waypoint.heading)}</wpml:waypointHeadingAngle>
           <wpml:waypointHeadingAngleEnable>1</wpml:waypointHeadingAngleEnable>
           <wpml:waypointHeadingPathMode>followBadArc</wpml:waypointHeadingPathMode>
         </wpml:waypointHeadingParam>
@@ -229,26 +254,22 @@ export function exportFlightPlanWaylinesWpml(plan: FlightPlan): string {
           <wpml:actionTrigger><wpml:actionTriggerType>reachPoint</wpml:actionTriggerType></wpml:actionTrigger>${actions.xml}
         </wpml:actionGroup>
         <wpml:waypointGimbalHeadingParam>
-          <wpml:waypointGimbalPitchAngle>${formattedNumber(pitch)}</wpml:waypointGimbalPitchAngle>
+          <wpml:waypointGimbalPitchAngle>${formattedNumber(waypoint.gimbalPitch)}</wpml:waypointGimbalPitchAngle>
           <wpml:waypointGimbalYawAngle>0</wpml:waypointGimbalYawAngle>
         </wpml:waypointGimbalHeadingParam>
       </Placemark>`;
 		})
 		.join('');
-	const speed =
-		Number(plan.metadata?.speed) ||
-		Number(waypoints.find((waypoint) => waypoint.phase === 'capture')?.speed) ||
-		2.5;
 	return `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="${KML_NAMESPACE}" xmlns:wpml="${WPML_NAMESPACE}">
-  <Document>${missionConfigXml(speed)}
+  <Document>${missionConfigXml(captureSpeed)}
     <Folder>
       <wpml:templateId>0</wpml:templateId>
       <wpml:executeHeightMode>relativeToStartPoint</wpml:executeHeightMode>
       <wpml:waylineId>0</wpml:waylineId>
       <wpml:distance>0</wpml:distance>
       <wpml:duration>0</wpml:duration>
-      <wpml:autoFlightSpeed>${formattedNumber(speed)}</wpml:autoFlightSpeed>${placemarks}
+      <wpml:autoFlightSpeed>${formattedNumber(captureSpeed)}</wpml:autoFlightSpeed>${placemarks}
     </Folder>
   </Document>
 </kml>
@@ -276,9 +297,10 @@ export function flightPlanKmzFilename(plan: FlightPlanFilenameInput = {}): strin
 
 /** Create a DJI-native Mavic 4 Pro KMZ archive. */
 export async function createFlightPlanKmz(plan: FlightPlan): Promise<Blob> {
+	const mission = normaliseMission(plan);
 	const zip = new JSZip();
-	zip.file('template.kml', exportFlightPlanTemplateKml(plan));
-	zip.file('waylines.wpml', exportFlightPlanWaylinesWpml(plan));
+	zip.file('template.kml', templateKml(mission));
+	zip.file('waylines.wpml', waylinesWpml(mission));
 	zip.folder('res');
 	return zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
 }

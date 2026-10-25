@@ -108,8 +108,8 @@ function detectedWallFeatureCollection(flightPlan: FlightPlan | null): FeatureCo
 }
 
 function waypointColor(waypoint: FlightWaypoint): string {
-	if (waypoint.action === 'startInterval') return '#16a34a';
-	if (waypoint.action === 'stopInterval') return '#ef4444';
+	if (waypoint.rowBoundary === 'start' || waypoint.rowBoundary === 'single') return '#16a34a';
+	if (waypoint.rowBoundary === 'end') return '#ef4444';
 	return waypoint.phase === 'transit' ? '#0aa6eb' : '#f59e0b';
 }
 

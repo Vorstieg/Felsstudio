@@ -125,7 +125,6 @@
 					bind:plan={flightPlan}
 					entry={activeFlightPlanEntry}
 					entryName={activeEntryProperties?.name || activeEntryProperties?.id || ''}
-					{map}
 					onPlanGenerated={actions.handleFlightPlanGenerated}
 				/>
 			{/key}

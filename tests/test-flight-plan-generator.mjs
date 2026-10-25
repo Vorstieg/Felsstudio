@@ -34,10 +34,10 @@ test('generates valid deterministic flight plans', () => {
 			(waypoint) => waypoint.phase === 'capture' && waypoint.camera === 'tele-6x'
 		)
 	);
-	assert.equal(plan.waypoints[0].action, 'startInterval');
+	assert.equal(plan.waypoints[0].rowBoundary, 'start');
 	assert.ok(plan.waypoints.every((waypoint) => waypoint.altitude >= 703));
-	assert.ok(plan.waypoints.some((waypoint) => waypoint.action === 'startInterval'));
-	assert.ok(plan.waypoints.some((waypoint) => waypoint.action === 'stopInterval'));
+	assert.ok(plan.waypoints.some((waypoint) => waypoint.rowBoundary === 'start'));
+	assert.ok(plan.waypoints.some((waypoint) => waypoint.rowBoundary === 'end'));
 	const directOnlyPlan = generateFlightPlan(sector, { ...options, convergentPasses: 1 });
 	assert.equal(
 		plan.waypoints.length,
@@ -188,7 +188,7 @@ test('preserves clearance-rejection gaps when selecting continuous row fragments
 	assert.ok(plan.metadata.discardedFragmentWaypointCount > 0);
 	const firstRow = plan.waypoints.slice(
 		0,
-		plan.waypoints.findIndex((waypoint) => waypoint.action === 'stopInterval') + 1
+		plan.waypoints.findIndex((waypoint) => waypoint.rowBoundary === 'end') + 1
 	);
 	assert.ok(firstRow.length > 1);
 	assert.ok(
@@ -251,7 +251,7 @@ for (const pattern of ['facade-grid', 'constant-distance-grid']) {
 		assert.equal(plan.metadata.droppedWaypointCount, 0);
 		const rows = [];
 		for (const waypoint of plan.waypoints) {
-			if (waypoint.action === 'startInterval') rows.push([]);
+			if (waypoint.rowBoundary === 'start') rows.push([]);
 			rows.at(-1).push(waypoint);
 		}
 		const rowsPerPass = rows.length / 2;
@@ -283,3 +283,78 @@ for (const pattern of ['facade-grid', 'constant-distance-grid']) {
 		}
 	});
 }
+
+test('orders row transitions by distance in metres at high latitudes', () => {
+	const latitude = 80;
+	const latitudeScale = (Math.PI / 180) * 6378137;
+	const longitudeScale = latitudeScale * Math.cos((latitude * Math.PI) / 180);
+	const cosine = 0.5;
+	const sine = -Math.sqrt(3) / 2;
+	const coordinate = (along, across) => [
+		11 + (cosine * along - sine * across) / longitudeScale,
+		latitude + (sine * along + cosine * across) / latitudeScale
+	];
+	const ring = [coordinate(-20, -15), coordinate(20, -15), coordinate(20, 15), coordinate(-20, 15)];
+	const plan = generateFlightPlan(
+		{ type: 'Polygon', coordinates: [[...ring, ring[0]]] },
+		{
+			pattern: 'constant-distance-grid',
+			standOffMeters: 10,
+			stripSpacingMeters: 8,
+			pointSpacingMeters: 10,
+			terrainElevationAt: (longitude, latitudeAt) => {
+				const x = (longitude - 11) * longitudeScale;
+				const y = (latitudeAt - latitude) * latitudeScale;
+				const across = -sine * x + cosine * y;
+				return 700 + (Math.max(0, Math.min(30, across + 15)) * 50) / 30;
+			}
+		}
+	);
+	const rows = [];
+	for (const waypoint of plan.waypoints) {
+		if (waypoint.rowBoundary === 'start' || waypoint.rowBoundary === 'single') rows.push([]);
+		rows.at(-1).push(waypoint);
+		assert.equal('local' in waypoint, false, 'local coordinates must stay internal');
+	}
+	let distinguishesDegrees = false;
+	for (let index = 1; index < rows.length; index += 1) {
+		const previous = rows[index - 1].at(-1);
+		const first = rows[index][0];
+		const last = rows[index].at(-1);
+		const distance = (point, metric) =>
+			Math.hypot(
+				(point.longitude - previous.longitude) * (metric ? longitudeScale : 1),
+				(point.latitude - previous.latitude) * (metric ? latitudeScale : 1)
+			);
+		assert.ok(distance(first, true) <= distance(last, true) + 1e-6);
+		if (distance(first, false) > distance(last, false)) distinguishesDegrees = true;
+	}
+	assert.ok(
+		distinguishesDegrees,
+		'the fixture must distinguish metre distances from degree distances'
+	);
+});
+
+test('terrain cache reduces queries and refreshes for each generation', () => {
+	let queries = 0;
+	let elevation = 700;
+	const options = {
+		terrainElevationAt: () => {
+			queries += 1;
+			return elevation;
+		}
+	};
+	const first = generateFlightPlan(sector, options);
+	assert.equal(first.waypoints.length, 128);
+	assert.ok(queries < 60000, `expected reuse of terrain queries, got ${queries}`);
+	elevation = 800;
+	queries = 0;
+	const second = generateFlightPlan(sector, options);
+	assert.ok(queries > 0, 'a new generation must read fresh terrain');
+	assert.equal(second.waypoints.length, first.waypoints.length);
+	for (let index = 0; index < first.waypoints.length; index += 1) {
+		assert.equal(second.waypoints[index].altitude, first.waypoints[index].altitude + 100);
+		assert.equal(second.waypoints[index].longitude, first.waypoints[index].longitude);
+		assert.equal(second.waypoints[index].latitude, first.waypoints[index].latitude);
+	}
+});

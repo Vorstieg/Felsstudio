@@ -8,12 +8,8 @@ export type FlightWaypoint = {
 	heading: number;
 	gimbalPitch: number;
 	camera: string;
-	action: string | null;
-	photoInterval: number | null;
-	triggerDistance: number | null;
+	rowBoundary: 'start' | 'end' | 'single' | null;
 	id?: string | number;
-	relativeAltitude?: number;
-	executeHeight?: number;
 };
 
 export type FlightPlanMetadata = {
@@ -51,7 +47,6 @@ export type FlightPlanMetadata = {
 export type FlightPlan = {
 	name: string;
 	cragName: string;
-	filename?: string;
 	metadata: FlightPlanMetadata;
 	wallDetection: {
 		confidence: number;

@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
 // Cross-origin cookies still need verification against a running Felslager service.
 export default defineConfig({
 	testDir: './tests/e2e',
-	testMatch: ['auth.spec.js', 'shared-drafts.spec.js', 'reviews.spec.js'],
+	testMatch: ['auth.spec.js', 'shared-drafts.spec.js', 'reviews.spec.js', 'flight-plan.spec.js'],
 	fullyParallel: true,
 	workers: process.env.CI ? 2 : 3,
 	retries: process.env.CI ? 1 : 0,
