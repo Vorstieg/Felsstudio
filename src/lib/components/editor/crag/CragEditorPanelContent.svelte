@@ -35,7 +35,6 @@
 
 	let {
 		showTabs = true,
-		map = null,
 		flightPlan = $bindable(null),
 		activeTab = $bindable('info'),
 		detectedAssets = [],

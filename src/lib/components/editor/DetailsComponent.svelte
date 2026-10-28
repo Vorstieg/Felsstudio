@@ -19,7 +19,6 @@
 
 	let {
 		title = 'Properties',
-		subtitle = '',
 		tabs = [],
 		activeTab = $bindable(''),
 		onTabChange = (tab: string) => (activeTab = tab),
@@ -27,7 +26,6 @@
 		shadow = true,
 		visualSuperseded = false,
 		footer,
-		headerActions,
 		children
 	}: Props = $props();
 
