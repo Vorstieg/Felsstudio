@@ -215,3 +215,51 @@ async function expectCompactActions(page) {
 	expect(save.x).toBeGreaterThanOrEqual(0);
 	await page.screenshot({ path: test.info().outputPath('toolbar.png') });
 }
+
+test('ÖTK polygon capture planning stays visible in the inspector', async ({ page }) => {
+	const id = await seedDraft(page);
+	await page.evaluate(async (id) => {
+		const { draftsState } = await import('/src/lib/state/drafts.svelte.ts');
+		const draft = await draftsState.get(id);
+		draft.workspace.entry.properties.name = 'ÖTK-Klettergarten';
+		draft.workspace.entry.geometry = {
+			type: 'Polygon',
+			coordinates: [
+				[
+					[16.048, 47.82983],
+					[16.048078, 47.829933],
+					[16.048078, 47.829984],
+					[16.048, 47.830011],
+					[16.047828, 47.83007],
+					[16.047467, 47.830193],
+					[16.047303, 47.830193],
+					[16.047246, 47.83007],
+					[16.047388, 47.82997],
+					[16.047805, 47.829841],
+					[16.048, 47.82983]
+				]
+			]
+		};
+		await draftsState.save(draft);
+	}, id);
+	await page.goto(`/crags/editor?draft=${id}`);
+	for (const viewport of [
+		{ width: 1440, height: 1000 },
+		{ width: 390, height: 844 }
+	]) {
+		await page.setViewportSize(viewport);
+		const tab = page.getByRole('button', { name: 'Capture plan', exact: true });
+		await expect(tab).toBeVisible();
+		const fits = await tab.evaluate((element) => {
+			const bounds = element.getBoundingClientRect();
+			const parent = element.parentElement.getBoundingClientRect();
+			return (
+				bounds.left >= parent.left && bounds.right <= parent.right && bounds.right <= innerWidth
+			);
+		});
+		expect(fits).toBe(true);
+		await tab.click();
+		await expect(page.getByText('Drone capture plan', { exact: true })).toBeVisible();
+		await expect(page.getByText('Plan a façade mission for ÖTK-Klettergarten.')).toBeVisible();
+	}
+});

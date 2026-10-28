@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
 import JSZip from 'jszip';
+import { generateFlightPlan } from '../src/lib/assets/js/flight-plan-generator.ts';
 import {
 	createFlightPlanKmz,
 	exportFlightPlanKml,
@@ -29,7 +30,7 @@ test('exports valid KML and KMZ flight plans', async () => {
 				altitude: 822.5,
 				phase: 'transit',
 				speed: 6,
-				action: 'none'
+				rowBoundary: null
 			},
 			{
 				longitude: 15.123556789,
@@ -40,9 +41,7 @@ test('exports valid KML and KMZ flight plans', async () => {
 				heading: 270,
 				gimbalPitch: -12,
 				camera: 'tele-6x',
-				action: 'startInterval',
-				photoInterval: 2,
-				triggerDistance: 1.5
+				rowBoundary: 'start'
 			}
 		]
 	};
@@ -77,6 +76,7 @@ test('exports valid KML and KMZ flight plans', async () => {
 	);
 	assert.match(
 		exportFlightPlanKml({
+			metadata: { startElevation: 700 },
 			waypoints: [
 				{ longitude: 15, latitude: 47, altitude: 800, heading: -270 },
 				{ longitude: 15.001, latitude: 47.001, altitude: 800, heading: 540 }
@@ -99,4 +99,121 @@ test('exports valid KML and KMZ flight plans', async () => {
 	assert.match(archivedTemplate, /<wpml:createTime>\d+<\/wpml:createTime>/);
 	assert.match(archivedTemplate, /<wpml:droneEnumValue>68<\/wpml:droneEnumValue>/);
 	assert.equal(await extracted.file('waylines.wpml').async('string'), waylinesWpml);
+});
+
+test('requires an explicit finite launch elevation and exports straight stopped segments', () => {
+	const plan = {
+		metadata: { standOffMeters: 2 },
+		waypoints: [
+			{ longitude: 15, latitude: 47, altitude: 703, relativeAltitude: 99 },
+			{ longitude: 15.001, latitude: 47, altitude: 713, executeHeight: 99 }
+		]
+	};
+	for (const startElevation of [undefined, null, '', NaN, Infinity]) {
+		plan.metadata.startElevation = startElevation;
+		assert.throws(() => exportFlightPlanWaylinesWpml(plan), /launch elevation/);
+		assert.throws(() => exportFlightPlanTemplateKml(plan), /launch elevation/);
+	}
+	plan.metadata.startElevation = 680;
+	const xml = exportFlightPlanWaylinesWpml(plan);
+	assert.match(xml, /<wpml:executeHeight>23<\/wpml:executeHeight>/);
+	assert.match(xml, /<wpml:executeHeight>33<\/wpml:executeHeight>/);
+	assert.equal((xml.match(/toPointAndStopWithDiscontinuityCurvature/g) || []).length, 2);
+	assert.equal((xml.match(/<wpml:useStraightLine>1/g) || []).length, 2);
+	plan.metadata.startElevation = 0;
+	assert.match(exportFlightPlanWaylinesWpml(plan), /<wpml:executeHeight>703<\/wpml:executeHeight>/);
+});
+
+test('exports overview and detail photos with the generated camera pitches', () => {
+	const plan = generateFlightPlan(
+		{
+			type: 'Polygon',
+			coordinates: [
+				[
+					[11, 47],
+					[11.0004, 47],
+					[11.0004, 47.0001],
+					[11, 47.0001],
+					[11, 47]
+				]
+			]
+		},
+		{
+			startElevation: 680,
+			terrainElevationAt: (_longitude, latitude) =>
+				700 + Math.max(0, Math.min(1, (latitude - 47.00002) / 0.00006)) * 20
+		}
+	);
+	assert.equal(plan.metadata.camera, 'wide');
+	assert.equal(
+		plan.metadata.photoCount,
+		plan.waypoints.filter((waypoint) => waypoint.phase === 'capture').length +
+			plan.metadata.detailPhotoCount
+	);
+	assert.ok(plan.metadata.detailPhotoCount > 0);
+	assert.equal(plan.previewWaypointIndex, plan.waypoints[0].index);
+	const xml = exportFlightPlanWaylinesWpml(plan);
+	assert.equal(
+		(xml.match(/<wpml:actionActuatorFunc>takePhoto</g) || []).length,
+		plan.metadata.photoCount
+	);
+	assert.equal((xml.match(/<wpml:focalLength>28</g) || []).length, plan.waypoints.length);
+	assert.equal((xml.match(/<wpml:focalLength>168</g) || []).length, plan.metadata.detailPhotoCount);
+	assert.ok(plan.waypoints.some((waypoint) => waypoint.gimbalPitch !== -8));
+});
+
+test('normalizes export numbers and defaults consistently across waypoint actions and mission files', async () => {
+	const plan = {
+		metadata: { startElevation: 700 },
+		waypoints: [
+			{
+				longitude: '11',
+				latitude: '47',
+				altitude: '703',
+				phase: 'capture',
+				heading: '450',
+				speed: '3',
+				gimbalPitch: '-12',
+				camera: '6x'
+			},
+			{
+				longitude: 11.001,
+				latitude: 47,
+				altitude: 713,
+				phase: 'capture',
+				heading: NaN,
+				speed: Infinity,
+				gimbalPitch: NaN
+			}
+		]
+	};
+	const xml = exportFlightPlanWaylinesWpml(plan);
+	const placemarks = [...xml.matchAll(/<Placemark>([\s\S]*?)<\/Placemark>/g)].map(
+		(match) => match[1]
+	);
+	assert.match(placemarks[0], /<wpml:waypointHeadingAngle>90</);
+	assert.match(placemarks[0], /<wpml:waypointSpeed>3</);
+	assert.match(placemarks[0], /<wpml:focalLength>168</);
+	assert.match(placemarks[1], /<wpml:waypointHeadingAngle>0</);
+	assert.match(placemarks[1], /<wpml:waypointSpeed>2.5</);
+	assert.match(placemarks[1], /<wpml:focalLength>28</);
+	for (const [index, pitch] of [
+		[0, -12],
+		[1, -8]
+	]) {
+		assert.ok(
+			placemarks[index].includes(
+				`<wpml:gimbalPitchRotateAngle>${pitch}</wpml:gimbalPitchRotateAngle>`
+			)
+		);
+		assert.ok(
+			placemarks[index].includes(
+				`<wpml:waypointGimbalPitchAngle>${pitch}</wpml:waypointGimbalPitchAngle>`
+			)
+		);
+	}
+	const archive = await JSZip.loadAsync(await (await createFlightPlanKmz(plan)).arrayBuffer());
+	assert.equal(await archive.file('waylines.wpml').async('string'), xml);
+	const template = await archive.file('template.kml').async('string');
+	assert.match(template, /<wpml:globalTransitionalSpeed>3</);
 });

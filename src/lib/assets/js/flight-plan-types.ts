@@ -8,17 +8,17 @@ export type FlightWaypoint = {
 	heading: number;
 	gimbalPitch: number;
 	camera: string;
-	action: string | null;
-	photoInterval: number | null;
-	triggerDistance: number | null;
+	detailCamera?: string;
+	captureTarget?: { longitude: number; latitude: number; altitude: number };
+	captureView?: 'face' | 'crest';
+	captureKind?: 'grid' | 'supplementary';
+	rowBoundary: 'start' | 'end' | 'single' | null;
 	id?: string | number;
-	relativeAltitude?: number;
-	executeHeight?: number;
 };
 
 export type FlightPlanMetadata = {
 	pattern: string;
-	strategy: 'terrain-following-facade-with-convergent-pass';
+	strategy: 'single-grid-with-targeted-views';
 	targetGsdCm: number;
 	standOffMeters: number;
 	terrainSource: string;
@@ -36,21 +36,32 @@ export type FlightPlanMetadata = {
 	fragmentedRowCount: number;
 	discardedFragmentWaypointCount: number;
 	terrainMeshSpacingMeters: number;
-	convergentPasses: number;
-	convergentOffsetMeters: number;
+	coveragePasses: number;
+	obliqueOffsetMeters: number;
 	droppedWaypointCount: number;
+	/** Actual launch elevation in metres AMSL, in the terrain elevation datum. */
 	startElevation?: number;
 	speed?: number;
 	transitSpeed?: number;
 	camera?: string;
 	photoCount?: number;
+	detailPhotoCount?: number;
+	supplementaryWaypointCount?: number;
+	gridWaypointCount?: number;
+	captureOverlap?: number;
+	coverageStatus?: 'modeled' | 'partial' | 'unresolved';
+	coverageTargetCount?: number;
+	coveredTargetCount?: number;
+	uncoveredTargetCount?: number;
+	crestTargetCount?: number;
+	coveredCrestTargetCount?: number;
+	spacingGapCount?: number;
 	[key: string]: unknown;
 };
 
 export type FlightPlan = {
 	name: string;
 	cragName: string;
-	filename?: string;
 	metadata: FlightPlanMetadata;
 	wallDetection: {
 		confidence: number;
