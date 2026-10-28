@@ -3,6 +3,7 @@ name: Deploy Felsstudio
 on:
   push:
     branches: [main]
+  pull_request:
 
 permissions:
   contents: read
@@ -28,6 +29,7 @@ jobs:
       - run: npm run build
 
   deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: ci
     runs-on: self-hosted
     steps:
