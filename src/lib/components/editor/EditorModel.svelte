@@ -3,6 +3,7 @@
 	import { MeshLineGeometry, MeshLineMaterial, interactivity } from '@threlte/extras';
 	import * as THREE from 'three';
 	import { CatmullRomCurve3, Vector3, TubeGeometry } from 'three';
+	import { transformClusteringGeometry } from '$lib/assets/js/model-view.ts';
 	import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 	import { onMount, type Snippet } from 'svelte';
 	import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh';
@@ -206,6 +207,11 @@
 				];
 			}
 		});
+
+		Object.assign(
+			topoSession.clustering,
+			transformClusteringGeometry(topoSession.clustering, bakeMatrix)
+		);
 
 		// Reset state transformations
 		topoSession.ui.modelRotation = [0, 0, 0];

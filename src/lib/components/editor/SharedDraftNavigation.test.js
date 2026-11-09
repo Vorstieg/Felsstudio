@@ -20,13 +20,13 @@ it('only renders controller state and routes editor selection through it', async
 		ready: true,
 		busy: false,
 		error: 'Storage full',
-		href: (route) => `/${route}?draft=one&node=two`
+		href: (route) => `/${route}?draft=one`
 	};
 	mocks.draft = draft;
 	const view = render(SharedDraftNavigation);
 	expect(view.getByRole('combobox')).toHaveValue('2d');
 	await fireEvent.change(view.getByRole('combobox'), { target: { value: '3d' } });
-	expect(goto).toHaveBeenCalledWith('/topos/3d/editor?draft=one&node=two');
+	expect(goto).toHaveBeenCalledWith('/topos/3d/editor?draft=one');
 	expect(view.getByRole('alert')).toHaveTextContent('Storage full');
 	expect(view.getByRole('option', { name: '2D', exact: true })).toBeDisabled();
 	expect(view.getByRole('combobox')).toHaveValue('2d');

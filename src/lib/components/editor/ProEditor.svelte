@@ -4,6 +4,7 @@
 	import { Mesh, MeshStandardMaterial, Vector3, WebGLRenderer } from 'three';
 	import type { Group } from 'three';
 	import type { OrbitControls as OrbitControlsInstance } from 'three/examples/jsm/controls/OrbitControls.js';
+	import { getInitialModelView, getModelMatrix } from '$lib/assets/js/model-view.ts';
 	import { createGltfLoader } from '$lib/assets/js/gltf-loader.ts';
 	import { onMount, untrack, type Snippet } from 'svelte';
 	import { _ } from 'svelte-i18n';
@@ -126,6 +127,7 @@
 	let controlsTarget = $derived($targetPosStore);
 
 	let controlsRef = $state<OrbitControlsInstance | undefined>();
+	let cameraFar = $state(1000);
 	let lastSelectedClusterId: string | number | null = null;
 
 	$effect(() => {
@@ -134,14 +136,10 @@
 			lastSelectedClusterId = clusterId;
 			const cluster = topoSession.clustering.clusters.find((c) => c.id === clusterId);
 			if (cluster && cluster.members.length > 0) {
-				const offset = topoSession.ui.modelOffset || [0, 0, 0];
+				const matrix = getModelMatrix(topoSession.ui);
 
 				// Calculate Anchor (Target)
-				const anchor: Point3 = [
-					cluster.anchor[0] + offset[0],
-					cluster.anchor[1] + offset[1],
-					cluster.anchor[2] + offset[2]
-				];
+				const anchor = new Vector3(...cluster.anchor).applyMatrix4(matrix).toArray() as Point3;
 				topoSession.transient.targetControlsTarget = new Vector3(...anchor);
 
 				// Calculate "Front-Facing" Camera Position
@@ -150,7 +148,7 @@
 					hts.reduce((a, b) => a + b.cam_pos[0], 0) / hts.length,
 					hts.reduce((a, b) => a + b.cam_pos[1], 0) / hts.length,
 					hts.reduce((a, b) => a + b.cam_pos[2], 0) / hts.length
-				).add(new Vector3(...offset));
+				).applyMatrix4(matrix);
 
 				const anchorVec = new Vector3(...anchor);
 				const viewDir = new Vector3().subVectors(avgCamPos, anchorVec).normalize();
@@ -232,6 +230,18 @@
 			});
 
 			loadedGltfScene = gltf.scene;
+			const view = getInitialModelView(
+				gltf.scene,
+				topoSession.ui,
+				topoSession.clustering.cameraPositions,
+				topoSession.clustering.rawHits,
+				window.innerWidth / Math.max(window.innerHeight, 1)
+			);
+			if (view) {
+				cameraFar = view.far;
+				cameraPosStore.set(view.position, { duration: 0 });
+				targetPosStore.set(view.target, { duration: 0 });
+			}
 		} catch (err) {
 			console.error('Error loading GLB from state URL', err);
 		}
@@ -572,7 +582,7 @@
 		style="position: absolute; top: 0; left: 0; width: 100%; pointer-events: none; height: 100%; z-index: 1;"
 	></div>
 	<Canvas {createRenderer} dpr={browser ? window.devicePixelRatio : 1}>
-		<T.PerspectiveCamera makeDefault position={cameraPosition} fov={75} near={0.1} far={1000}>
+		<T.PerspectiveCamera makeDefault position={cameraPosition} fov={75} near={0.1} far={cameraFar}>
 			<OrbitControls
 				bind:ref={controlsRef}
 				enableZoom={true}

@@ -46,9 +46,7 @@
 			const route = (
 				{ crag: 'crags/editor', '2d': 'topos/2d/editor', '3d': 'topos/3d/editor' } as const
 			)[draft.lastEditor];
-			await goto(
-				`${base}/${route}?draft=${encodeURIComponent(draft.id)}&node=${encodeURIComponent(draft.activeNodeId)}`
-			);
+			await goto(`${base}/${route}?draft=${encodeURIComponent(draft.id)}`);
 		} catch (cause) {
 			error = cause instanceof Error ? cause.message : String(cause);
 		} finally {

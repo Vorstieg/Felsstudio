@@ -144,7 +144,7 @@ test('uploaded images, backgrounds, and models survive a real IndexedDB reload',
 	});
 });
 
-test('a fresh topo has its draft and node IDs before the first editor switch', async ({ page }) => {
+test('a fresh topo keeps its active entry without a node query parameter', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.route('**/api/auth/get-session', (route) =>
 		route.fulfill({ contentType: 'application/json', body: 'null' })
@@ -160,7 +160,7 @@ test('a fresh topo has its draft and node IDs before the first editor switch', a
 	await expect(page.getByLabel('Name', { exact: true })).toHaveValue('New Crag');
 	await expectCompactActions(page);
 	expect(new URL(page.url()).searchParams.get('draft')).toBe(id);
-	expect(new URL(page.url()).searchParams.get('node')).toBeTruthy();
+	expect(new URL(page.url()).searchParams.has('node')).toBe(false);
 	await expect(page.getByRole('searchbox')).toBeVisible();
 });
 

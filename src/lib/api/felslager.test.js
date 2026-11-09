@@ -63,3 +63,17 @@ describe('Felslager API client', () => {
 		);
 	});
 });
+
+it('revalidates file downloads even when an older response was cached as immutable', async () => {
+	const { readFile } = await import('./felslager.ts');
+	vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+	await readFile('wall/model.glb');
+	expect(fetch).toHaveBeenCalledWith(`${baseUrl}/wall/model.glb`, { cache: 'no-cache' });
+});
+
+it('revalidates file downloads even when an older response was cached as immutable', async () => {
+	const { readFile } = await import('./felslager.ts');
+	vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+	await readFile('wall/model.glb');
+	expect(fetch).toHaveBeenCalledWith(`${baseUrl}/wall/model.glb`, { cache: 'no-cache' });
+});

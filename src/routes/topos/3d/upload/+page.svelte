@@ -10,7 +10,11 @@
 		provideTopo2DEditorState
 	} from '$lib/state/topo-2d-editor-state.svelte.ts';
 	import Topo3DUploadForm from '$lib/components/editor/wizard/Topo3DUploadForm.svelte';
-	import { parse3DUploadProject } from '$lib/components/editor/wizard/parse-3d-upload-project.ts';
+	import {
+		getUploadCameraPositions,
+		getUploadModelTransform,
+		parse3DUploadProject
+	} from '$lib/components/editor/wizard/parse-3d-upload-project.ts';
 
 	let isLoading = $state(false);
 	const topoSession = provideTopo2DEditorState(createTopo2DEditorState());
@@ -78,13 +82,8 @@
 			if (projectFile) {
 				const project = parse3DUploadProject(JSON.parse(await projectFile.text()) as unknown);
 				topoSession.clustering.rawHits = project.hits;
-				const cameras: Record<string, [number, number, number]> = {};
-				for (const hit of project.hits) {
-					const match = hit.img?.match(/[fF](\d+)/);
-					const index = match ? parseInt(match[1]) : hit.img;
-					if (index && !cameras[index]) cameras[index] = hit.cam_pos;
-				}
-				topoSession.clustering.cameraPositions = cameras;
+				topoSession.clustering.cameraPositions = getUploadCameraPositions(project);
+				Object.assign(topoSession.ui, getUploadModelTransform(project, topoSession.ui.modelOffset));
 				const gpsData: typeof topoSession.clustering.gpsData = {};
 				for (const gps of project.gps) {
 					const index = gps.frame_index ?? gps.img?.match(/[fF](\d+)/)?.[1];

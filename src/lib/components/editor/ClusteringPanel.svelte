@@ -29,7 +29,10 @@
 			conf: conf[0] === Infinity || conf[0] === conf[1] ? [0, 1] : conf,
 			edge: edge[0] === Infinity || edge[0] === edge[1] ? [0, 1.2] : edge,
 			angle: angle[0] === Infinity || angle[0] === angle[1] ? [0, 1] : angle,
-			cam: cam[0] === Infinity || cam[0] === cam[1] ? [1, 100] : cam
+			cam:
+				cam[0] === Infinity
+					? [1, 100]
+					: [Math.floor(cam[0]), Math.max(Math.floor(cam[0]) + 1, Math.ceil(cam[1]))]
 		};
 	});
 
@@ -44,7 +47,7 @@
 				bounds.edge[0] + (bounds.edge[1] - bounds.edge[0]) * 0.66;
 			topoSession.clustering.minAngleCos =
 				bounds.angle[0] + (bounds.angle[1] - bounds.angle[0]) * 0.33;
-			topoSession.clustering.maxCamDist = Math.round(
+			topoSession.clustering.maxCamDist = Math.ceil(
 				bounds.cam[0] + (bounds.cam[1] - bounds.cam[0]) * 0.66
 			);
 		}

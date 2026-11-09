@@ -15,6 +15,17 @@ export type SharedDraft = {
 	workspace: FelsEntryWorkspace;
 	contexts: Record<string, Omit<TopoSessionInput, 'topo'>>;
 	media: Record<string, { background?: Blob; crops: Record<string, Blob> }>;
+	processingImports?: Record<
+		string,
+		{
+			processingId: string;
+			captureId: string;
+			entryPath: string;
+			engine: string;
+			files: Record<string, Blob>;
+			pendingFiles?: string[];
+		}
+	>;
 	reviewId?: string;
 	/** Production has been saved; only deletion of the review archive remains. */
 	reviewProductionSaved?: boolean;

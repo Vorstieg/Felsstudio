@@ -136,6 +136,15 @@
 			</div>
 			<div class="p-2 not-first:border-t not-first:border-black/10">
 				<a
+					class="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-xs text-near-black hover:bg-black/5 focus-visible:outline-2! focus-visible:-outline-offset-2! focus-visible:outline-creator-blue! disabled:cursor-default disabled:opacity-40 [&>i]:w-4 [&>i]:text-center [&>i]:text-warm-gray-500 aria-disabled:cursor-default aria-disabled:opacity-40"
+					aria-disabled={!draft.ready || draft.busy}
+					href={draft.ready && !draft.busy
+						? `${base}/felslager/captures${draft.entryPath ? '/' + draft.entryPath.split('/').map(encodeURIComponent).join('/') : ''}?draft=${draft.id}`
+						: undefined}
+					onclick={closeMenu}
+					><i class="fa-solid fa-camera" aria-hidden="true"></i>{$_('processing.captures_title')}</a
+				>
+				<a
 					class="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-xs text-near-black hover:bg-black/5 focus-visible:outline-2! focus-visible:-outline-offset-2! focus-visible:outline-creator-blue! disabled:cursor-default disabled:opacity-40 [&>i]:w-4 [&>i]:text-center [&>i]:text-warm-gray-500"
 					href={`${base}/felslager/reviews`}
 					><i class="fa-solid fa-inbox" aria-hidden="true"></i>Review inbox</a

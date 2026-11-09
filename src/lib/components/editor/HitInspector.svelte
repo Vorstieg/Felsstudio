@@ -1,4 +1,5 @@
 <script lang="ts">
+	import CropImage from './CropImage.svelte';
 	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
 	import type { ClusteringHit } from '$lib/state/clustering-types.ts';
 	const topoSession = getTopo2DEditorState();
@@ -101,7 +102,8 @@
 	<div
 		class="fixed bottom-20 left-2 z-[100] panel p-2 animate-in fade-in slide-in-from-bottom-2 pointer-events-none w-80 shadow-modal bg-white border-black/15"
 	>
-		<img
+		<CropImage
+			eager
 			src={getCropSrc(previewHit)}
 			alt="Zoomed crop"
 			class="w-full aspect-square object-contain rounded-sm bg-black/5 mb-2 border border-black/15"
@@ -176,7 +178,7 @@
 					onmouseenter={() => (hoveredHitIdx = i)}
 					onmouseleave={() => (hoveredHitIdx = null)}
 				>
-					<img
+					<CropImage
 						src={getCropSrc(hit)}
 						alt="Detection"
 						class="w-full h-full object-cover grayscale-[0.4] hover:grayscale-0"

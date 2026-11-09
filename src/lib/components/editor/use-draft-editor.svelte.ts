@@ -1,3 +1,4 @@
+import { createProcessingAssetLoader } from '$lib/assets/js/processing-assets';
 import { getContext, onMount, setContext } from 'svelte';
 import { beforeNavigate, goto } from '$app/navigation';
 import { base } from '$app/paths';
@@ -145,6 +146,25 @@ export function useDraftEditor({
 	let bypass = false;
 	let timeout: ReturnType<typeof setTimeout> | undefined;
 	const resources = createDraftResources();
+	let assetLoader: ReturnType<typeof createProcessingAssetLoader> | undefined;
+	let assetFrame: number | undefined;
+	let cacheTimer: ReturnType<typeof setTimeout> | undefined;
+	const pendingAssets = new Map<
+		string,
+		{ id: string; nodeId: string; processingId: string; files: Record<string, Blob> }
+	>();
+	async function saveAssets() {
+		clearTimeout(cacheTimer);
+		cacheTimer = undefined;
+		const batches = [...pendingAssets.values()];
+		pendingAssets.clear();
+		await Promise.all(
+			batches.map((batch) =>
+				draftsState.cacheProcessingFiles(batch.id, batch.nodeId, batch.processingId, batch.files)
+			)
+		);
+	}
+
 	const fail = (cause: unknown) => {
 		error = cause instanceof Error ? cause.message : String(cause);
 	};
@@ -158,6 +178,12 @@ export function useDraftEditor({
 	}
 	const controller = {
 		mode,
+		loadProcessingCrop(source: string) {
+			return assetLoader?.load(source) || Promise.reject(new Error('Images are still loading'));
+		},
+		get entryPath() {
+			return draft ? workspaceNodePath(draftNode(draft)) : null;
+		},
 		get id() {
 			return draft?.id || null;
 		},
@@ -217,7 +243,7 @@ export function useDraftEditor({
 		flush,
 		href(route: string) {
 			adapter.capture(draft!);
-			return `${base}/${route}?draft=${encodeURIComponent(draft!.id)}&node=${encodeURIComponent(draft!.activeNodeId)}`;
+			return `${base}/${route}?draft=${encodeURIComponent(draft!.id)}`;
 		}
 	};
 	onMount(() => {
@@ -235,16 +261,42 @@ export function useDraftEditor({
 			if (id && !stored) throw new Error('Draft not found');
 			if (disposed) return;
 			draft = stored ? resources.restore(stored) : createDraft(mode, source);
-			draft.activeNodeId = url.searchParams.get('node') || draft.activeNodeId;
 
 			await adapter.load(draft);
 			if (disposed) return;
 			ready = true;
 			if (!stored) await flush();
 			url.searchParams.set('draft', draft.id);
-			url.searchParams.set('node', draft.activeNodeId);
+			url.searchParams.delete('node');
 			window.history.replaceState(window.history.state, '', url);
+			assetLoader = createProcessingAssetLoader(draft, (nodeId, files) => {
+				const result = draft?.processingImports?.[nodeId];
+				if (!draft || !result) return;
+				Object.assign(result.files, files);
+				result.pendingFiles = result.pendingFiles?.filter((path) => !result.files[path]);
+				const key = `${draft.id}:${nodeId}`;
+				const batch = pendingAssets.get(key) || {
+					id: draft.id,
+					nodeId,
+					processingId: result.processingId,
+					files: {}
+				};
+				Object.assign(batch.files, files);
+				pendingAssets.set(key, batch);
+				if (!cacheTimer)
+					cacheTimer = setTimeout(() => {
+						cacheTimer = undefined;
+						void saveAssets().catch(fail);
+					}, 500);
+			});
 			await onReady?.();
+			// Let the editor paint before occupying network slots with optional assets.
+			assetFrame = requestAnimationFrame(() => {
+				if (disposed) return;
+				assetFrame = requestAnimationFrame(() => {
+					if (!disposed) assetLoader?.start();
+				});
+			});
 		})().catch(fail);
 		const onHide = () => {
 			if (ready && !reviewing && document.visibilityState === 'hidden') void flush().catch(fail);
@@ -253,6 +305,9 @@ export function useDraftEditor({
 		window.addEventListener('pagehide', onHide);
 		return () => {
 			disposed = true;
+			if (assetFrame !== undefined) cancelAnimationFrame(assetFrame);
+			assetLoader?.stop();
+			void saveAssets().catch(fail);
 			clearTimeout(timeout);
 			resources.release();
 			document.removeEventListener('visibilitychange', onHide);

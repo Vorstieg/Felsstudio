@@ -34,7 +34,7 @@ export async function listDir(
 
 export async function readFile(path: string): Promise<Response> {
 	const url = `${BASE_URL}/${normalizePath(path)}`;
-	const res = await fetch(url);
+	const res = await fetch(url, { cache: 'no-cache' });
 	if (!res.ok) throw new Error(`Failed to read ${path}: ${res.status} ${res.statusText}`);
 	return res;
 }

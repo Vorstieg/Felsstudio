@@ -1,3 +1,4 @@
+import { createProcessingAssetLoader } from './processing-assets';
 import JSZip from 'jszip';
 import type { SharedDraft } from '$lib/state/shared-draft';
 import { workspaceNodes } from '$lib/state/shared-draft';
@@ -71,6 +72,8 @@ export async function createReviewPackage(draft: SharedDraft): Promise<Blob> {
 		throw new Error('Choose a production location in the crag editor before submitting.');
 	const errors = validateWorkspaceHierarchy(draft.workspace);
 	if (errors.length) throw new Error(errors[0].message);
+	// Review archives must remain self-contained, including any background files still pending.
+	await createProcessingAssetLoader(draft).complete();
 	const zip = new JSZip();
 	const assets: Asset[] = [];
 	async function encode(value: unknown, keys: string[]): Promise<unknown> {

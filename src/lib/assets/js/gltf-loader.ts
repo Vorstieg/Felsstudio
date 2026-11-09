@@ -1,3 +1,5 @@
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import { base } from '$app/paths';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { Box3, Group, Vector3 } from 'three';
@@ -7,9 +9,14 @@ type TopoModelSession = {
 	ui: { modelOffset: [number, number, number] };
 };
 
+// Share the bounded worker pool across uploads and model views for this page's lifetime.
+let draco: DRACOLoader | undefined;
+
 export function createGltfLoader(): GLTFLoader {
 	const loader = new GLTFLoader();
 	loader.setMeshoptDecoder(MeshoptDecoder);
+	draco ??= new DRACOLoader().setDecoderPath(`${base}/draco/`);
+	loader.setDRACOLoader(draco);
 	return loader;
 }
 

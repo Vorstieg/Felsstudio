@@ -1,5 +1,6 @@
 module.exports = {
 	root: true,
+	ignorePatterns: ['static/draco/**'],
 	extends: ['eslint:recommended', 'plugin:svelte/recommended', 'prettier'],
 	parserOptions: {
 		sourceType: 'module',

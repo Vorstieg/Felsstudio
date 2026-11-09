@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parse3DUploadProject } from './parse-3d-upload-project.ts';
+import {
+	getUploadCameraPositions,
+	getUploadModelTransform,
+	parse3DUploadProject
+} from './parse-3d-upload-project.ts';
 
 const hit = {
 	pos: [1, 2, 3],
@@ -41,4 +45,33 @@ describe('parse3DUploadProject', () => {
 			'Hit 1 gps must be a three-number position'
 		);
 	});
+});
+
+it('imports standalone cameras and legacy observations including frame zero', () => {
+	const project = parse3DUploadProject({
+		cameras: { 'F0.jpg': [0, 0, 0], 'folder/photo.jpg': [1, 2, 3] },
+		hits: [hit]
+	});
+	expect(getUploadCameraPositions(project)).toEqual({
+		'0': [0, 0, 0],
+		'folder/photo.jpg': [1, 2, 3],
+		'12': [4, 5, 6]
+	});
+	expect(getUploadCameraPositions(parse3DUploadProject({ cameras: project.cameras }))).toEqual({
+		'0': [0, 0, 0],
+		'folder/photo.jpg': [1, 2, 3]
+	});
+	expect(() => parse3DUploadProject({ cameras: { photo: [1, 'bad', 3] } })).toThrow(
+		'Project cameras'
+	);
+});
+it('converts Z-up model orientation and centering together', () => {
+	expect(
+		getUploadModelTransform(parse3DUploadProject({ coordinateSystem: 'Z_UP' }), [-10, -20, -30])
+	).toEqual({ modelRotation: [-Math.PI / 2, 0, 0], modelOffset: [-10, -30, 20] });
+	expect(getUploadModelTransform(parse3DUploadProject({}), [-10, -20, -30])).toEqual({
+		modelRotation: [0, 0, 0],
+		modelOffset: [-10, -20, -30]
+	});
+	expect(() => parse3DUploadProject({ coordinateSystem: 'bad' })).toThrow('coordinateSystem');
 });

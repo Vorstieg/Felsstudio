@@ -3,6 +3,8 @@ import type { ClusteringHit, Point3 } from '$lib/state/clustering-types.ts';
 
 export type UploadProject = {
 	hits: ClusteringHit[];
+	cameras?: Record<string, Point3>;
+	coordinateSystem?: 'Z_UP' | 'Y_UP';
 	name?: string;
 	gps: Array<TopoGpsPosition & { frame_index?: number | string; img?: string }>;
 };
@@ -86,9 +88,43 @@ export function parse3DUploadProject(value: unknown): UploadProject {
 		throw new Error('Project gps must be an array');
 	if (value.name !== undefined && typeof value.name !== 'string')
 		throw new Error('Project name must be a string');
+	if (
+		value.coordinateSystem !== undefined &&
+		value.coordinateSystem !== 'Z_UP' &&
+		value.coordinateSystem !== 'Y_UP'
+	)
+		throw new Error('Project coordinateSystem must be Z_UP or Y_UP');
+	if (
+		value.cameras !== undefined &&
+		(!isRecord(value.cameras) || !Object.values(value.cameras).every(isPoint3))
+	)
+		throw new Error('Project cameras must map image names to three-number positions');
 	return {
+		...(value.coordinateSystem !== undefined ? { coordinateSystem: value.coordinateSystem } : {}),
+		...(value.cameras !== undefined ? { cameras: value.cameras as Record<string, Point3> } : {}),
 		hits: (value.hits ?? []).map(parseHit),
 		gps: (value.gps ?? []).map(parseGps),
 		...(value.name !== undefined ? { name: value.name } : {})
 	};
+}
+
+export function getUploadCameraPositions(project: UploadProject): Record<string, Point3> {
+	const cameras: Record<string, Point3> = {};
+	const key = (name: string) => {
+		const match = name.match(/[fF](\d+)/);
+		return match ? String(parseInt(match[1])) : name;
+	};
+	for (const [image, position] of Object.entries(project.cameras ?? {}))
+		cameras[key(image)] = position;
+	for (const hit of project.hits)
+		if (!(key(hit.img) in cameras)) cameras[key(hit.img)] = hit.cam_pos;
+	return cameras;
+}
+export function getUploadModelTransform(project: UploadProject, offset: Point3) {
+	return project.coordinateSystem === 'Z_UP'
+		? {
+				modelRotation: [-Math.PI / 2, 0, 0] as Point3,
+				modelOffset: [offset[0], offset[2], -offset[1]] as Point3
+			}
+		: { modelRotation: [0, 0, 0] as Point3, modelOffset: offset };
 }
