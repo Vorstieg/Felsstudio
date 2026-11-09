@@ -93,7 +93,7 @@ describe('one draft lifecycle', () => {
 			routes: []
 		});
 	});
-	it('builds the next editor URL from the current crag selection', async () => {
+	it('retains the current crag selection when building the next editor URL', async () => {
 		const stored = createDraft('crag');
 		const child = structuredClone(stored.workspace);
 		child.clientId = 'selected-child';
@@ -106,7 +106,11 @@ describe('one draft lifecycle', () => {
 		await ready(view);
 		await fireEvent.click(view.getByTestId('select-child'));
 		await fireEvent.click(view.getByTestId('switch'));
-		expect(window.location.hash).toContain('node=selected-child');
+		expect(view.getByTestId('node-id')).toHaveTextContent('selected-child');
+		expect(window.location.hash).toBe(`#/topos/2d/editor?draft=${stored.id}`);
+		await fireEvent.click(view.getByTestId('save'));
+		await waitFor(() => expect(mocks.save).toHaveBeenCalledOnce());
+		expect(mocks.save.mock.calls[0][0].activeNodeId).toBe('selected-child');
 	});
 	it('waits for the draft commit before continuing navigation', async () => {
 		const view = render(AutosaveHarness);

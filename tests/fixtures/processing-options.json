@@ -1,157 +1,135 @@
 {
-  "version": 1,
-  "preparing": {
-    "videoFrameIntervalSeconds": {
-      "type": "number",
-      "default": 1,
-      "minimum": 0.1,
-      "maximum": 60,
-      "label": "Video sampling interval",
-      "unit": "seconds",
-      "description": "Extract one frame per interval. Smaller intervals increase processing time."
-    },
-    "videoStartSeconds": {
-      "type": "number",
-      "default": 0,
-      "minimum": 0,
-      "maximum": 86400,
-      "label": "Video start",
-      "unit": "seconds",
-      "description": "Start extracting each video at this time."
-    },
-    "videoEndSeconds": {
-      "type": "number",
-      "default": null,
-      "minimum": 0,
-      "maximum": 86400,
-      "nullable": true,
-      "label": "Video end",
-      "unit": "seconds",
-      "description": "Stop extracting each video at this time; empty uses the whole video."
-    },
-    "excludedPaths": {
-      "type": "array",
-      "default": [],
-      "label": "Excluded files",
-      "advanced": true,
-      "description": "Capture-relative file paths to skip during preparation."
-    }
-  },
-  "reconstructing": {
-    "maxMeshVertices": {
-      "type": "integer",
-      "default": null,
-      "nullable": true,
-      "minimum": 10000,
-      "maximum": 5000000,
-      "engines": [
-        "odm"
-      ],
-      "advanced": true,
-      "label": "Maximum mesh vertices",
-      "description": "Override the quality preset mesh limit for ODM; empty uses the preset."
-    },
-    "textureResolution": {
-      "type": "integer",
-      "enum": [
-        1024,
-        2048,
-        4096,
-        8192,
-        16384
-      ],
-      "default": null,
-      "nullable": true,
-      "engines": [
-        "meshroom"
-      ],
-      "advanced": true,
-      "label": "Texture resolution",
-      "unit": "pixels",
-      "description": "Texture atlas side length for Meshroom; empty uses the engine template."
-    },
-    "quality": {
-      "type": "string",
-      "enum": [
-        "preview",
-        "standard",
-        "detailed"
-      ],
-      "default": "standard",
-      "label": "Reconstruction quality",
-      "description": "Higher quality increases processing time and memory use. Results vary by engine."
-    }
-  },
-  "detecting": {
-    "confidence": {
-      "type": "number",
-      "default": 0.25,
-      "minimum": 0.01,
-      "maximum": 1,
-      "label": "Minimum confidence",
-      "description": "Lower values find more candidates, including more false detections."
-    },
-    "tileOverlap": {
-      "type": "number",
-      "default": 0.2,
-      "minimum": 0,
-      "maximum": 0.5,
-      "advanced": true,
-      "label": "Tile overlap",
-      "description": "Fraction shared between image tiles. More overlap increases inference time."
-    },
-    "suppressionIoU": {
-      "type": "number",
-      "default": 0.5,
-      "minimum": 0.01,
-      "maximum": 1,
-      "advanced": true,
-      "label": "Duplicate suppression",
-      "description": "Overlap threshold for suppressing duplicate boxes. Lower values suppress more boxes."
-    }
-  },
-  "positioning": {
-    "method": {
-      "type": "string",
-      "enum": [
-        "triangle",
-        "multiview",
-        "vertex"
-      ],
-      "default": "triangle",
-      "label": "Placement method",
-      "description": "Triangle intersects the surface. Multiview is experimental; vertex is a legacy advanced method.",
-      "experimentalValues": [
-        "multiview"
-      ],
-      "advancedValues": [
-        "vertex"
-      ]
-    },
-    "minViews": {
-      "type": "integer",
-      "default": 3,
-      "minimum": 3,
-      "maximum": 64,
-      "advanced": true,
-      "label": "Minimum supporting views",
-      "description": "Minimum distinct images required for multiview refinement.",
-      "when": {
-        "method": "multiview"
-      }
-    },
-    "maxReprojectionErrorPixels": {
-      "type": "number",
-      "default": 6,
-      "minimum": 0.5,
-      "maximum": 20,
-      "advanced": true,
-      "label": "Reprojection tolerance",
-      "unit": "calibration pixels",
-      "description": "Maximum pixel error allowed for multiview matches.",
-      "when": {
-        "method": "multiview"
-      }
-    }
-  }
+	"version": 1,
+	"preparing": {
+		"videoFrameIntervalSeconds": {
+			"type": "number",
+			"default": 1,
+			"minimum": 0.1,
+			"maximum": 60,
+			"label": "Video sampling interval",
+			"unit": "seconds",
+			"description": "Extract one frame per interval. Smaller intervals increase processing time."
+		},
+		"videoStartSeconds": {
+			"type": "number",
+			"default": 0,
+			"minimum": 0,
+			"maximum": 86400,
+			"label": "Video start",
+			"unit": "seconds",
+			"description": "Start extracting each video at this time."
+		},
+		"videoEndSeconds": {
+			"type": "number",
+			"default": null,
+			"minimum": 0,
+			"maximum": 86400,
+			"nullable": true,
+			"label": "Video end",
+			"unit": "seconds",
+			"description": "Stop extracting each video at this time; empty uses the whole video."
+		},
+		"excludedPaths": {
+			"type": "array",
+			"default": [],
+			"label": "Excluded files",
+			"advanced": true,
+			"description": "Capture-relative file paths to skip during preparation."
+		}
+	},
+	"reconstructing": {
+		"maxMeshVertices": {
+			"type": "integer",
+			"default": null,
+			"nullable": true,
+			"minimum": 10000,
+			"maximum": 5000000,
+			"engines": ["odm"],
+			"advanced": true,
+			"label": "Maximum mesh vertices",
+			"description": "Override the quality preset mesh limit for ODM; empty uses the preset."
+		},
+		"textureResolution": {
+			"type": "integer",
+			"enum": [1024, 2048, 4096, 8192, 16384],
+			"default": null,
+			"nullable": true,
+			"engines": ["meshroom"],
+			"advanced": true,
+			"label": "Texture resolution",
+			"unit": "pixels",
+			"description": "Texture atlas side length for Meshroom; empty uses the engine template."
+		},
+		"quality": {
+			"type": "string",
+			"enum": ["preview", "standard", "detailed"],
+			"default": "standard",
+			"label": "Reconstruction quality",
+			"description": "Higher quality increases processing time and memory use. Results vary by engine."
+		}
+	},
+	"detecting": {
+		"confidence": {
+			"type": "number",
+			"default": 0.25,
+			"minimum": 0.01,
+			"maximum": 1,
+			"label": "Minimum confidence",
+			"description": "Lower values find more candidates, including more false detections."
+		},
+		"tileOverlap": {
+			"type": "number",
+			"default": 0.2,
+			"minimum": 0,
+			"maximum": 0.5,
+			"advanced": true,
+			"label": "Tile overlap",
+			"description": "Fraction shared between image tiles. More overlap increases inference time."
+		},
+		"suppressionIoU": {
+			"type": "number",
+			"default": 0.5,
+			"minimum": 0.01,
+			"maximum": 1,
+			"advanced": true,
+			"label": "Duplicate suppression",
+			"description": "Overlap threshold for suppressing duplicate boxes. Lower values suppress more boxes."
+		}
+	},
+	"positioning": {
+		"method": {
+			"type": "string",
+			"enum": ["triangle", "multiview", "vertex"],
+			"default": "triangle",
+			"label": "Placement method",
+			"description": "Triangle intersects the surface. Multiview is experimental; vertex is a legacy advanced method.",
+			"experimentalValues": ["multiview"],
+			"advancedValues": ["vertex"]
+		},
+		"minViews": {
+			"type": "integer",
+			"default": 3,
+			"minimum": 3,
+			"maximum": 64,
+			"advanced": true,
+			"label": "Minimum supporting views",
+			"description": "Minimum distinct images required for multiview refinement.",
+			"when": {
+				"method": "multiview"
+			}
+		},
+		"maxReprojectionErrorPixels": {
+			"type": "number",
+			"default": 6,
+			"minimum": 0.5,
+			"maximum": 20,
+			"advanced": true,
+			"label": "Reprojection tolerance",
+			"unit": "calibration pixels",
+			"description": "Maximum pixel error allowed for multiview matches.",
+			"when": {
+				"method": "multiview"
+			}
+		}
+	}
 }
