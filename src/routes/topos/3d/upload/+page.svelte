@@ -76,7 +76,7 @@
 				if (Object.keys(cropsMap).length) topoSession.clustering.cropsMap = cropsMap;
 			}
 
-			if (!glbFile) throw new Error('GLB Model is required');
+			if (!glbFile) throw new Error($_('editor.glb_model_is_required'));
 			await loadGlbIntoEditorState(glbFile, topoSession);
 
 			if (projectFile) {

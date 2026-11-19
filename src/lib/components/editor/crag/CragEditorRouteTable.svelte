@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import type { Route } from '@vorstieg/fels-types/types';
 	import type { CragSelection, RouteDocument, RouteEntry } from './crag-route-types.ts';
 	type Selection = CragSelection | null;
@@ -36,9 +37,9 @@
 <table class="w-full text-left text-micro-data">
 	<thead class="text-warm-gray-400">
 		<tr>
-			<th class="pb-1 font-bold">Route</th>
-			<th class="pb-1 font-bold">Type</th>
-			<th class="pb-1 font-bold">Paths</th>
+			<th class="pb-1 font-bold">{$_('editor.route_label')}</th>
+			<th class="pb-1 font-bold">{$_('editor.type')}</th>
+			<th class="pb-1 font-bold">{$_('editor.paths')}</th>
 			<th></th>
 		</tr>
 	</thead>
@@ -58,15 +59,15 @@
 							onSelectRoute(document.path, route.id);
 						}}
 					>
-						{route.name || 'Unnamed route'}
+						{route.name || $_('editor.unnamed_route')}
 					</button>
 				</td>
-				<td>{route.type || 'route'}</td>
+				<td>{route.type ? $_('types.' + route.type) : $_('editor.route_label')}</td>
 				<td>{routePathCount(document, route)}</td>
 				<td>
 					<button
 						class="text-warm-gray-300 hover:text-rose-600"
-						title="Delete route"
+						title={$_('editor.delete_route')}
 						onclick={(event) => {
 							event.stopPropagation();
 							onDeleteRoute(document.path, route.id);
@@ -86,7 +87,7 @@
 	>
 		<i class={`fa-solid ${collapsed ? 'fa-chevron-down' : 'fa-chevron-up'} text-[10px]`}></i>
 		{collapsed
-			? `Show ${routes.length - 3} more route${routes.length === 4 ? '' : 's'}`
-			: 'Show fewer routes'}
+			? $_('editor.show_more_routes', { values: { count: routes.length - 3 } })
+			: $_('editor.show_fewer_routes')}
 	</button>
 {/if}

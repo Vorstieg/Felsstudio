@@ -1,3 +1,5 @@
+import { get } from 'svelte/store';
+import { _ } from 'svelte-i18n';
 import { createProcessingAssetLoader } from './processing-assets';
 import JSZip from 'jszip';
 import type { SharedDraft } from '$lib/state/shared-draft';
@@ -12,7 +14,12 @@ export type ReviewAction = {
 	destination?: string;
 };
 type Asset = { keys: string[]; path: string; type: string; name?: string };
-type ReviewPackage = { version: 1; draft: SharedDraft; assets: Asset[]; actions: ReviewAction[] };
+type ReviewPackage = {
+	version: 1;
+	draft: SharedDraft;
+	assets: Asset[];
+	actions: ReviewAction[];
+};
 export function validReviewPath(path: unknown): path is string {
 	return (
 		typeof path === 'string' &&
@@ -68,8 +75,7 @@ export async function reviewActions(draft: SharedDraft): Promise<ReviewAction[]>
 }
 
 export async function createReviewPackage(draft: SharedDraft): Promise<Blob> {
-	if (!draft.placed)
-		throw new Error('Choose a production location in the crag editor before submitting.');
+	if (!draft.placed) throw new Error(get(_)('editor.review_location_required'));
 	const errors = validateWorkspaceHierarchy(draft.workspace);
 	if (errors.length) throw new Error(errors[0].message);
 	// Review archives must remain self-contained, including any background files still pending.

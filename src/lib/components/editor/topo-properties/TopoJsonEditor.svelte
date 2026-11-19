@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	type Props = {
 		id?: string;
 		text?: string;
@@ -6,24 +7,30 @@
 		onformat: () => void;
 		onapply: () => void;
 	};
-	let { id = 'topo-json-editor', text = $bindable(''), error = '', onformat, onapply }: Props = $props();
+	let {
+		id = 'topo-json-editor',
+		text = $bindable(''),
+		error = '',
+		onformat,
+		onapply
+	}: Props = $props();
 </script>
 
 <div class="rounded-sm border border-black/15 bg-near-black p-2 shadow-sm">
 	<div class="mb-1.5 flex items-center justify-between gap-2">
-		<label for={id} class="text-ui-label block text-white/80">Topo JSON</label>
+		<label for={id} class="text-ui-label block text-white/80">{$_('editor.topo_json')}</label>
 		<div class="flex items-center gap-1">
 			<button
 				class="rounded-sm border border-white/15 bg-white/10 px-2 py-1 text-micro-data font-bold text-white/80 hover:bg-white/20"
 				onclick={onformat}
 			>
-				Format
+				{$_('editor.format')}
 			</button>
 			<button
 				class="rounded-sm bg-white px-2 py-1 text-micro-data font-bold text-near-black hover:bg-warm-white"
 				onclick={onapply}
 			>
-				Apply
+				{$_('editor.apply')}
 			</button>
 		</div>
 	</div>

@@ -141,7 +141,7 @@
 		}
 
 		if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
-			topoJsonError = 'Topo JSON must be an object.';
+			topoJsonError = $_('editor.topo_json_must_be_an_object');
 			return;
 		}
 
@@ -177,8 +177,8 @@
 		<button
 			class="h-6 w-6 rounded-sm text-warm-gray-300 hover:bg-black/5 hover:text-near-black"
 			onclick={toggleJsonEditor}
-			title="Edit topo JSON"
-			aria-label="Edit topo JSON"><i class="fa-solid fa-code text-[10px]"></i></button
+			title={$_('editor.edit_topo_json')}
+			aria-label={$_('editor.edit_topo_json')}><i class="fa-solid fa-code text-[10px]"></i></button
 		>
 	{/snippet}
 	{#snippet children({ mobile })}

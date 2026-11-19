@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import { getDraftEditor } from './use-draft-editor.svelte';
 	let {
 		src,
@@ -65,5 +66,7 @@
 
 <img bind:this={element} src={resolved} {alt} class={className} decoding="async" />
 {#if eager && failed}
-	<button class="pointer-events-auto text-xs underline" onclick={() => retry++}>Retry image</button>
+	<button class="pointer-events-auto text-xs underline" onclick={() => retry++}
+		>{$_('editor.retry_image')}</button
+	>
 {/if}

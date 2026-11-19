@@ -1,3 +1,5 @@
+import { get } from 'svelte/store';
+import { _ } from 'svelte-i18n';
 import { createProcessingAssetLoader } from '$lib/assets/js/processing-assets';
 import { getContext, onMount, setContext } from 'svelte';
 import { beforeNavigate, goto } from '$app/navigation';
@@ -48,7 +50,7 @@ export function topoDraftAdapter(
 			let model = context.glbBlob;
 			if (!model && mode === '3d' && node.modelPath) {
 				const response = await fetch(fileUrl(node.modelSourcePath || node.modelPath));
-				if (!response.ok) throw new Error('Could not load the entry model');
+				if (!response.ok) throw new Error(get(_)('editor.error_could_not_load_the_entry_model'));
 				model = await response.blob();
 			}
 			editor.loadSession({
@@ -151,7 +153,12 @@ export function useDraftEditor({
 	let cacheTimer: ReturnType<typeof setTimeout> | undefined;
 	const pendingAssets = new Map<
 		string,
-		{ id: string; nodeId: string; processingId: string; files: Record<string, Blob> }
+		{
+			id: string;
+			nodeId: string;
+			processingId: string;
+			files: Record<string, Blob>;
+		}
 	>();
 	async function saveAssets() {
 		clearTimeout(cacheTimer);
@@ -170,7 +177,7 @@ export function useDraftEditor({
 	};
 	async function flush() {
 		clearTimeout(timeout);
-		if (!ready || !draft) throw new Error('Draft is still loading');
+		if (!ready || !draft) throw new Error(get(_)('editor.error_draft_is_still_loading'));
 		adapter.capture(draft);
 		draft.lastEditor = mode;
 		await draftsState.save(draft);
@@ -179,7 +186,10 @@ export function useDraftEditor({
 	const controller = {
 		mode,
 		loadProcessingCrop(source: string) {
-			return assetLoader?.load(source) || Promise.reject(new Error('Images are still loading'));
+			return (
+				assetLoader?.load(source) ||
+				Promise.reject(new Error(get(_)('editor.error_images_are_still_loading')))
+			);
 		},
 		get entryPath() {
 			return draft ? workspaceNodePath(draftNode(draft)) : null;
@@ -256,9 +266,9 @@ export function useDraftEditor({
 				id = draftsState.drafts.find((item) => item.lastEditor === mode)?.id || null;
 			}
 			const source = !id && entryPath ? await loadCragEditorEntry(entryPath) : null;
-			if (entryPath && !id && !source) throw new Error('Entry not found');
+			if (entryPath && !id && !source) throw new Error(get(_)('editor.error_entry_not_found'));
 			const stored = id ? await draftsState.get(id) : null;
-			if (id && !stored) throw new Error('Draft not found');
+			if (id && !stored) throw new Error(get(_)('editor.error_draft_not_found'));
 			if (disposed) return;
 			draft = stored ? resources.restore(stored) : createDraft(mode, source);
 
@@ -337,7 +347,9 @@ export function useDraftEditor({
 		void flush()
 			.then(() => {
 				bypass = true;
-				return goto(navigation.to!.url, { replaceState: navigation.type === 'popstate' });
+				return goto(navigation.to!.url, {
+					replaceState: navigation.type === 'popstate'
+				});
 			})
 			.catch((cause) => {
 				bypass = false;

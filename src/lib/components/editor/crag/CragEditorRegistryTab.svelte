@@ -149,10 +149,10 @@
 
 	function accessFeatureLabel(feature: AccessFeature): string {
 		const kindLabels: Record<AccessKind, string> = {
-			parking: 'Parking',
-			hut: 'Hut',
-			transit: 'Transit',
-			approach: 'Approach'
+			parking: $_('editor.parking'),
+			hut: $_('editor.hut'),
+			transit: $_('editor.transit'),
+			approach: $_('editor.approach')
 		};
 		const kindLabel = kindLabels[feature.properties.kind];
 		return feature?.properties?.name
@@ -178,7 +178,7 @@
 			class="flex items-center gap-2 rounded-sm border border-creator-blue/20 bg-creator-blue/5 p-2 text-ui-label text-creator-blue"
 		>
 			<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
-			<span>Searching nearby access points…</span>
+			<span>{$_('editor.searching_nearby_access_points')}</span>
 		</div>
 	{/if}
 	{#if isDetectionZoomLimited}
@@ -186,8 +186,7 @@
 			class="flex items-start gap-2 rounded-sm border border-amber-500/30 bg-amber-50 p-2 text-ui-label text-amber-800"
 		>
 			<i class="fa-solid fa-triangle-exclamation mt-0.5" aria-hidden="true"></i>
-			<span>Nearby access data is unavailable at this zoom level. Zoom in to find suggestions.</span
-			>
+			<span>{$_('editor.nearby_access_zoom_hint')}</span>
 		</div>
 	{/if}
 	{#if detectedAssets.length > 0}
@@ -228,7 +227,7 @@
 						<button
 							class="px-2 py-1 bg-near-black text-white rounded-sm text-micro-data font-bold hover:bg-black"
 							onclick={() => onAddDetectedAsset(asset)}
-							>Add
+							>{$_('editor.add')}
 						</button>
 					</div>
 				{/each}
@@ -238,7 +237,7 @@
 	{#if accessFeatures.length === 0 && detectedAssets.length === 0}
 		<div class="bg-warm-white rounded-sm p-6 text-center border border-black/15 mt-2">
 			<i class="fa-solid fa-layer-group text-2xl text-warm-gray-300 mb-2 block"></i>
-			<p class="text-ui-label text-warm-gray-500">Inventory Empty</p>
+			<p class="text-ui-label text-warm-gray-500">{$_('editor.inventory_empty')}</p>
 		</div>
 	{/if}
 	{#each transitFeatures as point}
@@ -250,24 +249,24 @@
 					>
 						<i class="fa-solid fa-bus text-[10px]"></i>
 					</div>
-					<span class="text-ui-label text-near-black !m-0">Transit Point</span>
+					<span class="text-ui-label text-near-black !m-0">{$_('editor.transit_point')}</span>
 				</div>
 				<button
 					onclick={() => onRemoveAccessFeature(point.id)}
-					aria-label="Remove transit point"
+					aria-label={$_('editor.remove_transit_point')}
 					class="w-6 h-6 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600"
 					><i class="fa-solid fa-trash-can text-[10px]"></i></button
 				>
 			</div>
 			<div class="flex gap-1.5">
 				<select bind:value={point.properties.mode} class="input-studio w-16 !px-1 appearance-none">
-					<option value="bus">Bus</option>
-					<option value="train">Train</option>
+					<option value="bus">{$_('editor.bus')}</option>
+					<option value="train">{$_('editor.train')}</option>
 				</select><input
 					type="text"
 					bind:value={point.properties.name}
 					class="input-studio flex-1"
-					placeholder="Station Name"
+					placeholder={$_('editor.station_name')}
 				/>
 			</div>
 		</div>
@@ -282,11 +281,11 @@
 				>
 					<i class="fa-solid fa-square-parking text-[10px]"></i>
 				</div>
-				<span class="text-ui-label text-near-black !m-0">Parking Space</span>
+				<span class="text-ui-label text-near-black !m-0">{$_('editor.parking_space')}</span>
 			</div>
 			<button
 				onclick={() => onRemoveAccessFeature(point.id)}
-				aria-label="Remove parking space"
+				aria-label={$_('editor.remove_parking_space')}
 				class="w-6 h-6 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600"
 				><i class="fa-solid fa-trash-can text-[10px]"></i></button
 			>
@@ -301,11 +300,11 @@
 					>
 						<i class="fa-solid fa-house text-[10px]"></i>
 					</div>
-					<span class="text-ui-label text-near-black !m-0">Mountain Hut</span>
+					<span class="text-ui-label text-near-black !m-0">{$_('editor.mountain_hut')}</span>
 				</div>
 				<button
 					onclick={() => onRemoveAccessFeature(hut.id)}
-					aria-label="Remove mountain hut"
+					aria-label={$_('editor.remove_mountain_hut')}
 					class="w-6 h-6 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600"
 					><i class="fa-solid fa-trash-can text-[10px]"></i></button
 				>
@@ -314,7 +313,7 @@
 				type="text"
 				bind:value={hut.properties.name}
 				class="input-studio w-full"
-				placeholder="Hut Name"
+				placeholder={$_('editor.hut_name')}
 			/>
 		</div>
 	{/each}
@@ -339,7 +338,7 @@
 					>
 						<i class="fa-solid fa-route text-[10px]"></i>
 					</div>
-					<span class="text-ui-label text-near-black !m-0">Approach Track</span>
+					<span class="text-ui-label text-near-black !m-0">{$_('editor.approach_track')}</span>
 				</div>
 				<div class="flex items-center gap-1">
 					<button
@@ -349,7 +348,7 @@
 							onEditTrack(track.id);
 						}}
 						class="w-6 h-6 text-warm-gray-400"
-						title="Edit approach track"
+						title={$_('editor.edit_approach_track')}
 					>
 						<i class="fa-solid fa-pen text-[10px]"></i></button
 					>
@@ -360,7 +359,8 @@
 							if (isSelectedApproach(track)) selectedObject = null;
 						}}
 						class="w-6 h-6 text-warm-gray-300 hover:text-rose-600"
-						title="Delete approach track"><i class="fa-solid fa-trash-can text-[10px]"></i></button
+						title={$_('editor.delete_approach_track')}
+						><i class="fa-solid fa-trash-can text-[10px]"></i></button
 					>
 				</div>
 			</div>
@@ -368,22 +368,22 @@
 				type="text"
 				bind:value={track.properties.name}
 				class="input-studio w-full"
-				placeholder="Track Name"
+				placeholder={$_('editor.track_name')}
 			/>
 			{#if topoEntries.length > 0}
 				<select
 					class="input-studio w-full"
-					aria-label="Move approach track to topo paths"
+					aria-label={$_('editor.move_approach_track_to_topo_paths')}
 					onchange={(event) => moveApproachTrack(event, track)}
 				>
-					<option value="" selected>Move to topo paths…</option>
+					<option value="" selected>{$_('editor.move_to_topo_paths')}</option>
 					{#each topoEntries as document}
 						<option value={document.path}>{document.path.split('/').at(-1)}</option>
 					{/each}
 				</select>
 			{:else}
 				<div class="text-micro-data text-warm-gray-500">
-					Add a route first to create a topo-path destination.
+					{$_('editor.add_a_route_first_to_create_a_topo_path_destination')}
 				</div>
 			{/if}
 		</div>
@@ -391,9 +391,9 @@
 	<div class="mt-3 space-y-2 border-t border-black/10 pt-3">
 		<div class="flex items-center justify-between">
 			<div>
-				<div class="text-ui-label">Topo paths</div>
+				<div class="text-ui-label">{$_('editor.topo_paths')}</div>
 				<div class="text-micro-data text-warm-gray-500">
-					{topoPathCount} path{topoPathCount === 1 ? '' : 's'}
+					{$_('editor.path_count', { values: { count: topoPathCount } })}
 				</div>
 			</div>
 		</div>
@@ -404,7 +404,7 @@
 						<div class="text-micro-data font-bold text-warm-gray-500">
 							{document.path.split('/').at(-1)}
 						</div>
-						<div class="text-micro-data text-warm-gray-400">Topo source</div>
+						<div class="text-micro-data text-warm-gray-400">{$_('editor.topo_source')}</div>
 					</div>
 					{#if document.data?.routes?.[0]}
 						<button
@@ -412,7 +412,8 @@
 							class="inline-flex shrink-0 items-center gap-1 rounded-sm bg-creator-blue px-2 py-1 text-micro-data font-bold text-white hover:bg-creator-blue/90"
 							onclick={() => onAddRoutePath(document.path, document.data.routes[0].id)}
 						>
-							<i class="fa-solid fa-pen-ruler text-[10px]"></i> Draw path
+							<i class="fa-solid fa-pen-ruler text-[10px]"></i>
+							{$_('editor.draw_path')}
 						</button>
 					{/if}
 				</div>
@@ -434,8 +435,8 @@
 							<input
 								class="path-name-input input-studio min-w-0 flex-1 !border-0 !bg-transparent !px-0 !py-0 text-body-text font-bold text-near-black focus:!ring-0"
 								value={feature.properties?.name || ''}
-								placeholder="Unnamed path"
-								aria-label="Path name"
+								placeholder={$_('editor.unnamed_path')}
+								aria-label={$_('editor.path_name')}
 								onchange={(event) => {
 									onUpdateRoutePathFeature(document.path, feature.id, {
 										name: event.currentTarget.value
@@ -444,20 +445,21 @@
 							/>
 							<span
 								class="shrink-0 rounded-full bg-black/5 px-1.5 py-0.5 text-micro-data text-warm-gray-500"
-								>{routes.length} route{routes.length === 1 ? '' : 's'}</span
+								>{$_('editor.route_count', { values: { count: routes.length } })}</span
 							>
 						</div>
 						<div class="flex min-w-0 items-center gap-2 text-micro-data text-warm-gray-500">
-							{#if routes.length > 0}Used by: {routes
-									.map((route) => route.name || route.id)
-									.join(', ')}{:else}Not assigned to a route
+							{#if routes.length > 0}{$_('editor.used_by')}
+								{routes.map((route) => route.name || route.id).join(', ')}{:else}{$_(
+									'editor.not_assigned_to_a_route'
+								)}
 							{/if}
 							<span id="route-edit-buttons" class="ml-auto inline-flex shrink-0 items-center gap-1">
 								<button
 									type="button"
 									class="action-button text-creator-blue"
-									title="Edit path"
-									aria-label="Edit path"
+									title={$_('editor.edit_path')}
+									aria-label={$_('editor.edit_path')}
 									onclick={(event) => {
 										event.stopPropagation();
 										editPath(document, feature, pathIndex);
@@ -468,8 +470,8 @@
 								<button
 									type="button"
 									class="action-button text-warm-gray-500 hover:text-creator-blue"
-									title="Duplicate path"
-									aria-label="Duplicate path"
+									title={$_('editor.duplicate_path')}
+									aria-label={$_('editor.duplicate_path')}
 									onclick={(event) => {
 										event.stopPropagation();
 										duplicatePath(document, feature);
@@ -480,8 +482,8 @@
 								<button
 									type="button"
 									class="action-button text-rose-600"
-									title="Delete path"
-									aria-label="Delete path"
+									title={$_('editor.delete_path')}
+									aria-label={$_('editor.delete_path')}
 									onclick={(event) => {
 										event.stopPropagation();
 										onDeleteRoutePath(document.path, feature.id, pathIndex);
@@ -495,14 +497,15 @@
 						<div class="space-y-1" onclick={(event) => event.stopPropagation()} role="presentation">
 							<label
 								class="text-micro-data font-bold uppercase tracking-wide text-warm-gray-400"
-								for={`path-description-${document.path}-${feature.id}`}>Path text</label
+								for={`path-description-${document.path}-${feature.id}`}
+								>{$_('editor.path_text')}</label
 							>
 							<textarea
 								id={`path-description-${document.path}-${feature.id}`}
 								class="input-studio w-full resize-none"
 								rows="3"
 								value={feature.properties?.description || ''}
-								placeholder="e.g. Approach path, not marked. Hohe Trittsicherheit erforderlich…"
+								placeholder={$_('editor.example_path')}
 								oninput={(event) =>
 									onUpdateRoutePathFeature(document.path, feature.id, {
 										description: event.currentTarget.value
@@ -512,7 +515,7 @@
 						{#if assignableAccessFeatures.length > 0}
 							<select
 								class="input-studio w-full"
-								aria-label="Assign access feature"
+								aria-label={$_('editor.assign_access_feature')}
 								value={feature.properties?.accessFeatureId || ''}
 								onclick={(event) => event.stopPropagation()}
 								onchange={(event) =>
@@ -520,7 +523,7 @@
 										accessFeatureId: event.currentTarget.value
 									})}
 							>
-								<option value="">No access feature</option>
+								<option value="">{$_('editor.no_access_feature')}</option>
 								{#each assignableAccessFeatures as accessFeature}
 									<option value={accessFeature.id}>{accessFeatureLabel(accessFeature)}</option>
 								{/each}

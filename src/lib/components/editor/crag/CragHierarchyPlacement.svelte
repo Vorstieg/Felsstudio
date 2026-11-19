@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import { onMount } from 'svelte';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 	const cragEditorState = getCragEditorSession();
@@ -40,7 +41,7 @@
 			knownFolders = folders;
 		} catch (err: unknown) {
 			console.error('Failed to load hierarchy options:', err);
-			hierarchyError = 'Could not load existing folders.';
+			hierarchyError = $_('editor.could_not_load_existing_folders');
 		}
 	}
 
@@ -76,7 +77,7 @@
 		);
 		if (node && entryPath !== destination) {
 			if (cragEditorState.getWorkspaceEntry(destination)) {
-				hierarchyError = `An entry already exists at ${destination}.`;
+				hierarchyError = $_('editor.destination_exists', { values: { destination } });
 				return;
 			}
 			checkingDestination = true;
@@ -88,12 +89,12 @@
 				);
 				if (checkId !== destinationCheck) return;
 				if (exists) {
-					hierarchyError = `An entry already exists at ${destination}.`;
+					hierarchyError = $_('editor.destination_exists', { values: { destination } });
 					return;
 				}
 			} catch (error) {
 				if (checkId !== destinationCheck) return;
-				hierarchyError = 'Could not check the destination folder.';
+				hierarchyError = $_('editor.could_not_check_the_destination_folder');
 				return;
 			} finally {
 				if (checkId === destinationCheck) checkingDestination = false;
@@ -111,17 +112,17 @@
 		type="button"
 		onclick={openModal}
 		class="rounded-sm px-1.5 py-1 text-micro-data font-bold text-creator-blue hover:bg-white"
-		title="Edit hierarchy placement"
+		title={$_('editor.edit_hierarchy_placement')}
 	>
-		<i class="fa-solid fa-pen text-[10px] mr-1"></i>Edit hierarchy
+		<i class="fa-solid fa-pen text-[10px] mr-1"></i>{$_('editor.edit_hierarchy')}
 	</button>
 {:else}
 	<div class="space-y-2 rounded-sm border border-black/10 bg-black/[0.03] p-2">
 		<div class="flex items-start justify-between gap-2">
 			<div>
-				<span class="text-ui-label block">Hierarchy Placement</span>
+				<span class="text-ui-label block">{$_('editor.hierarchy_placement')}</span>
 				<p class="text-micro-data text-warm-gray-400">
-					Choose the parent folder. The crag folder/slug stays stable when the display name changes.
+					{$_('editor.hierarchy_parent_hint')}
 				</p>
 			</div>
 		</div>
@@ -134,7 +135,9 @@
 			<div class="flex items-center justify-between gap-2">
 				<div class="min-w-0 flex-1">
 					{#if breadcrumbParts.length === 0}
-						<span class="text-micro-data text-warm-gray-400 italic">No folder selected</span>
+						<span class="text-micro-data text-warm-gray-400 italic"
+							>{$_('editor.no_folder_selected')}</span
+						>
 					{:else}
 						<div
 							class="flex flex-wrap items-center gap-1 text-[12px] font-mono font-medium text-near-black"
@@ -153,7 +156,7 @@
 				<span
 					class="text-ui-label text-creator-blue group-hover:text-creator-blue-active whitespace-nowrap"
 				>
-					<i class="fa-solid fa-pen text-[10px] mr-1"></i>Edit
+					<i class="fa-solid fa-pen text-[10px] mr-1"></i>{$_('editor.edit')}
 				</span>
 			</div>
 		</button>

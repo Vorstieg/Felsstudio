@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import type { PathFeature, Route } from '@vorstieg/fels-types/types';
 	import type { RouteEntry } from './crag-route-types.ts';
 	import PitchComponent from '$lib/components/editor/topo-properties/routes/PitchComponent.svelte';
@@ -153,7 +154,7 @@
 		<button
 			type="button"
 			class="absolute inset-0 cursor-default"
-			aria-label="Close route details"
+			aria-label={$_('editor.close_route_details')}
 			onclick={onClose}
 		></button>
 		<dialog
@@ -164,13 +165,13 @@
 		>
 			<header class="flex items-center justify-between border-b border-black/10 bg-white px-4 py-3">
 				<h2 id="route-detail-title" class="text-sm font-bold text-near-black">
-					{route.name || 'Route details'}
+					{route.name || $_('editor.route_details')}
 				</h2>
 				<button
 					type="button"
 					class="text-warm-gray-400 hover:text-near-black"
 					onclick={onClose}
-					aria-label="Close route details"
+					aria-label={$_('editor.close_route_details')}
 				>
 					<i class="fa-solid fa-xmark"></i>
 				</button>
@@ -179,30 +180,30 @@
 			<div class="space-y-4 overflow-y-auto p-4">
 				<div class="grid grid-cols-[1fr_7rem] gap-2">
 					<div>
-						<label class="text-ui-label block" for="route-name">Route name</label>
+						<label class="text-ui-label block" for="route-name">{$_('editor.route_name')}</label>
 						<input
 							id="route-name"
 							class="input-studio w-full"
 							value={route.name || ''}
 							oninput={(event) =>
 								onUpdateRoute(document.path, route.id, { name: event.currentTarget.value })}
-							placeholder="Route name"
+							placeholder={$_('editor.route_name')}
 						/>
 					</div>
 					<div>
-						<label class="text-ui-label block" for="route-type">Type</label>
+						<label class="text-ui-label block" for="route-type">{$_('editor.type')}</label>
 						<select
 							id="route-type"
 							class="input-studio w-full"
 							value={Array.isArray(route.type) ? route.type[0] : route.type || ''}
 							onchange={(event) => updateRouteType(event.currentTarget.value)}
 						>
-							<option value="sports-climbing">Sportklettern</option>
-							<option value="bouldering">Bouldern</option>
-							<option value="trad">Trad</option>
-							<option value="multi-pitch">Multipitch</option>
-							<option value="alpine-tour">Hochtour</option>
-							<option value="via-ferrata">Klettersteig</option>
+							<option value="sports-climbing">{$_('types.sports-climbing')}</option>
+							<option value="bouldering">{$_('types.bouldering')}</option>
+							<option value="trad">{$_('editor.trad')}</option>
+							<option value="multi-pitch">{$_('editor.multipitch')}</option>
+							<option value="alpine-tour">{$_('types.alpine-tour')}</option>
+							<option value="via-ferrata">{$_('types.via-ferrata')}</option>
 						</select>
 					</div>
 				</div>
@@ -210,11 +211,11 @@
 				{#if hasRouteType(route, 'multi-pitch')}
 					<div class="space-y-2">
 						<div class="flex items-center justify-between">
-							<span class="text-ui-label">Pitches</span>
+							<span class="text-ui-label">{$_('editor.pitches')}</span>
 							<button
 								type="button"
 								class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-creator-blue"
-								onclick={addPitch}>+ Add</button
+								onclick={addPitch}>{$_('editor.add_add')}</button
 							>
 						</div>
 						{#each route.pitches || [] as pitch, index}
@@ -231,11 +232,11 @@
 
 						<div class="space-y-2 border-t border-black/10 pt-2">
 							<div class="flex items-center justify-between">
-								<span class="text-ui-label">Variants</span>
+								<span class="text-ui-label">{$_('editor.variants')}</span>
 								<button
 									type="button"
 									class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-creator-blue"
-									onclick={addVariant}>+ Add</button
+									onclick={addVariant}>{$_('editor.add_add')}</button
 								>
 							</div>
 							{#each route.variants || [] as variant, index}
@@ -262,7 +263,9 @@
 				{/if}
 
 				<div>
-					<label class="text-ui-label block" for="route-description">Description</label>
+					<label class="text-ui-label block" for="route-description"
+						>{$_('editor.description')}</label
+					>
 					<textarea
 						id="route-description"
 						class="input-studio w-full resize-none"
@@ -270,33 +273,35 @@
 						value={route.description || ''}
 						oninput={(event) =>
 							onUpdateRoute(document.path, route.id, { description: event.currentTarget.value })}
-						placeholder="Description"
+						placeholder={$_('editor.description')}
 					></textarea>
 				</div>
 
 				<div class="space-y-1 border-t border-black/10 pt-3">
 					<div class="flex items-center justify-between gap-2">
-						<span class="text-ui-label">Paths</span>
+						<span class="text-ui-label">{$_('editor.paths')}</span>
 						<button
 							type="button"
 							class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-creator-blue"
 							onclick={() => onAddRoutePath(document.path, route.id)}
 						>
-							<i class="fa-solid fa-plus mr-1"></i>Add path
+							<i class="fa-solid fa-plus mr-1"></i>{$_('editor.add_path')}
 						</button>
 					</div>
 					{#if availablePaths().length > 0}
 						<div class="flex items-center gap-1">
 							<select
 								class="input-studio min-w-0 flex-1"
-								aria-label="Assign existing path"
+								aria-label={$_('editor.assign_existing_path')}
 								onchange={(event) => {
 									const pathId = event.currentTarget.value;
 									if (pathId) onAssignExistingRoutePath(document.path, route.id, pathId);
 									event.currentTarget.value = '';
 								}}
 							>
-								<option value="" disabled selected>Assign existing path…</option>
+								<option value="" disabled selected
+									>{$_('editor.assign_existing_path_ellipsis')}</option
+								>
 								{#each availablePaths() as feature}
 									<option value={feature.id}>{feature.properties?.name || feature.id}</option>
 								{/each}
@@ -306,21 +311,21 @@
 					{#if availableAccessPaths().length > 0}
 						<select
 							class="input-studio min-w-0"
-							aria-label="Create route path from access path"
+							aria-label={$_('editor.create_route_path_from_access_path')}
 							onchange={(event) => {
 								const accessId = event.currentTarget.value;
 								if (accessId) onCreateRoutePathFromAccess(document.path, route.id, accessId);
 								event.currentTarget.value = '';
 							}}
 						>
-							<option value="" disabled selected>Copy access path…</option>
+							<option value="" disabled selected>{$_('editor.copy_access_path')}</option>
 							{#each availableAccessPaths() as feature}
 								<option value={feature.id}>{feature.properties?.name || feature.id}</option>
 							{/each}
 						</select>
 					{/if}
 					{#if paths().length === 0}
-						<p class="text-micro-data text-warm-gray-500">No paths attached.</p>
+						<p class="text-micro-data text-warm-gray-500">{$_('editor.no_paths_attached')}</p>
 					{:else}
 						{#each paths() as pathAsset}
 							<div
@@ -334,15 +339,15 @@
 											role: event.currentTarget.value
 										})}
 								>
-									<option value="approach">Approach</option>
-									<option value="main">Main</option>
-									<option value="descent">Descent</option>
-									<option value="variant">Variant</option>
+									<option value="approach">{$_('editor.approach')}</option>
+									<option value="main">{$_('editor.main')}</option>
+									<option value="descent">{$_('editor.descent')}</option>
+									<option value="variant">{$_('editor.variant')}</option>
 								</select>
 								<input
 									class="input-studio min-w-0"
 									value={pathAsset.label || ''}
-									placeholder="Label"
+									placeholder={$_('editor.label')}
 									onchange={(event) =>
 										onUpdateRoutePath(document.path, route.id, pathAsset.pathId, {
 											label: event.currentTarget.value
@@ -354,28 +359,28 @@
 								<button
 									type="button"
 									class="text-warm-gray-400 hover:text-creator-blue"
-									title="Edit path"
+									title={$_('editor.edit_path')}
 									onclick={() => onEditRoutePath(document.path, route.id, pathAsset.pathId)}
 									><i class="fa-solid fa-pencil text-[10px]"></i></button
 								>
 								<button
 									type="button"
 									class="text-warm-gray-400 hover:text-creator-blue"
-									title="Duplicate path"
+									title={$_('editor.duplicate_path')}
 									onclick={() => onDuplicateRoutePath(document.path, pathAsset.pathId)}
 									><i class="fa-solid fa-copy text-[10px]"></i></button
 								>
 								<button
 									type="button"
 									class="text-warm-gray-300 hover:text-rose-600"
-									title="Unassign path"
+									title={$_('editor.unassign_path')}
 									onclick={() => onRemoveRoutePath(document.path, route.id, pathAsset.pathId)}
 									><i class="fa-solid fa-xmark text-[10px]"></i></button
 								>
 								<button
 									type="button"
 									class="text-warm-gray-300 hover:text-rose-600"
-									title="Delete shared path"
+									title={$_('editor.delete_shared_path')}
 									onclick={() => onDeleteRoutePath(document.path, pathAsset.pathId)}
 									><i class="fa-solid fa-trash text-[10px]"></i></button
 								>
@@ -383,7 +388,8 @@
 						{/each}
 					{/if}
 					<p class="text-micro-data text-warm-gray-500">
-						Stored in {document.path.split('/').at(-1)}
+						{$_('editor.stored_in')}
+						{document.path.split('/').at(-1)}
 					</p>
 				</div>
 			</div>

@@ -36,17 +36,17 @@
 	}: Props = $props();
 
 	let tools = $derived([
-		{ id: 'select', icon: 'fa-arrow-pointer', label: 'Select' },
+		{ id: 'select', icon: 'fa-arrow-pointer', label: $_('editor.select_label') },
 		{
 			id: 'geometry',
 			icon: 'fa-draw-polygon',
-			label: 'Edit Geometry',
+			label: $_('editor.edit_geometry'),
 			hasOptions: true,
 			openOptionsOnSelect: true
 		},
-		{ id: 'parking', icon: 'fa-square-parking', label: 'Parking Spot' },
-		{ id: 'hut', icon: 'fa-house', label: 'Mountain Hut' },
-		{ id: 'transit', icon: 'fa-bus', label: 'Transit Station' },
+		{ id: 'parking', icon: 'fa-square-parking', label: $_('editor.parking_spot') },
+		{ id: 'hut', icon: 'fa-house', label: $_('editor.mountain_hut') },
+		{ id: 'transit', icon: 'fa-bus', label: $_('editor.transit_station') },
 		{
 			id: 'track',
 			icon: 'fa-route',

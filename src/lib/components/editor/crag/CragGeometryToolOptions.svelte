@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
 	import type { FelsProperties } from '@vorstieg/fels-types/types';
 	import type { Point2D } from '@vorstieg/fels-types/types';
@@ -42,15 +43,17 @@
 		cragEditorState.commitGeometry(
 			cragEditorState.activeMetadataTarget,
 			translateGeometryTo(metadata.geometry, center),
-			'Update geometry coordinates'
+			$_('editor.update_geometry_coordinates')
 		);
 	}
 </script>
 
-<ToolOptions title="Edit Geometry" {open} {onClose}>
+<ToolOptions title={$_('editor.edit_geometry')} {open} {onClose}>
 	<div class="rounded-sm border border-black/10 bg-black/[0.03] p-2">
-		<p class="text-ui-label !m-0 truncate">{metadata.name || metadata.id || 'Active target'}</p>
-		<p class="mt-0.5 text-micro-data text-warm-gray-400">Entry</p>
+		<p class="text-ui-label !m-0 truncate">
+			{metadata.name || metadata.id || $_('editor.active_target')}
+		</p>
+		<p class="mt-0.5 text-micro-data text-warm-gray-400">{$_('editor.entry')}</p>
 	</div>
 
 	<div class="grid grid-cols-2 gap-1 rounded-sm border border-black/10 bg-black/5 p-0.5">
@@ -60,30 +63,32 @@
 				class="rounded-sm py-2 text-ui-label transition-none {metadata.geometry?.type === type
 					? 'bg-white text-creator-blue shadow-sm'
 					: 'text-warm-gray-500 hover:bg-black/5'}"
-				onclick={() => setGeometryType(type)}>{type}</button
+				onclick={() => setGeometryType(type)}
+				>{$_(type === 'Point' ? 'editor.geometry_point' : 'editor.geometry_polygon')}</button
 			>
 		{/each}
 	</div>
 
 	<div class="rounded-sm border border-black/10 bg-black/[0.03] p-2">
 		<div class="flex items-center justify-between gap-2">
-			<p class="text-ui-label !m-0">Position</p>
+			<p class="text-ui-label !m-0">{$_('editor.position')}</p>
 			<button
 				type="button"
 				onclick={() => geometryEditor.moveTargetToMapCenter()}
 				class="rounded-sm border border-black/10 bg-white px-2 py-1 text-micro-data font-bold text-creator-blue hover:bg-creator-blue/5"
-				title="Move this geometry to the current center of the map"
+				title={$_('editor.move_this_geometry_to_the_current_center_of_the_map')}
 			>
-				<i class="fa-solid fa-crosshairs"></i> Move to map center
+				<i class="fa-solid fa-crosshairs"></i>
+				{$_('editor.move_to_map_center')}
 			</button>
 		</div>
 		<p class="mt-1 text-micro-data text-warm-gray-400">
-			Pan to the destination, then move the entire geometry there.
+			{$_('editor.pan_to_the_destination_then_move_the_entire_geometry_there')}
 		</p>
 		<div class="mt-2 grid grid-cols-2 gap-2">
 			<div>
 				<label for="geometry-tool-longitude" class="text-micro-data text-warm-gray-500"
-					>Longitude</label
+					>{$_('editor.longitude')}</label
 				>
 				<input
 					id="geometry-tool-longitude"
@@ -96,7 +101,7 @@
 			</div>
 			<div>
 				<label for="geometry-tool-latitude" class="text-micro-data text-warm-gray-500"
-					>Latitude</label
+					>{$_('editor.latitude')}</label
 				>
 				<input
 					id="geometry-tool-latitude"
@@ -117,7 +122,8 @@
 				onclick={() => geometryEditor.deleteSelectedVertex()}
 				class="flex min-h-10 w-full items-center justify-center gap-2 rounded-sm border border-rose-200 bg-rose-50 px-3 py-2 text-ui-label font-bold text-rose-700 hover:bg-rose-100"
 			>
-				<i class="fa-solid fa-trash-can"></i> Delete selected vertex
+				<i class="fa-solid fa-trash-can"></i>
+				{$_('editor.delete_selected_vertex')}
 			</button>
 		{/if}
 	{/if}

@@ -1,3 +1,5 @@
+import { get } from 'svelte/store';
+import { _ } from 'svelte-i18n';
 import type {
 	AccessCollection,
 	CragEditorSession,
@@ -53,7 +55,10 @@ export function createFelsEntry(
 			...properties,
 			kind
 		},
-		geometry: { type: 'Point', coordinates: [16.37, 48.21] } as PointOrAreaGeometry
+		geometry: {
+			type: 'Point',
+			coordinates: [16.37, 48.21]
+		} as PointOrAreaGeometry
 	};
 }
 export const createInitialAccess = (): AccessCollection => ({
@@ -104,7 +109,7 @@ const validEntryId = (id: string) =>
 const invalidIdError = (key: string, kind: EntryKind, id: string): HierarchyValidationError => ({
 	key,
 	kind,
-	message: `Invalid entry ID “${id}”. Use a nonempty folder name without slashes.`
+	message: get(_)('editor.invalid_entry_id', { values: { id } })
 });
 const duplicateIdError = (
 	key: string,
@@ -114,7 +119,7 @@ const duplicateIdError = (
 ): HierarchyValidationError => ({
 	key,
 	kind,
-	message: `Duplicate child ID “${id}” under ${parentPath}.`
+	message: get(_)('editor.duplicate_entry_id', { values: { id, parentPath } })
 });
 
 export function validateWorkspaceHierarchy(
@@ -162,7 +167,11 @@ function markRelocatedNode(node: FelsEntryWorkspace, oldPath: string) {
 		const renamed = filename.startsWith(`${oldId}-image`)
 			? `${node.entry?.properties.id}${filename.slice(oldId.length)}`
 			: filename;
-		return { ...image, sourcePath, path: `${workspaceEntryPath(node)}/${renamed}` };
+		return {
+			...image,
+			sourcePath,
+			path: `${workspaceEntryPath(node)}/${renamed}`
+		};
 	});
 	node.auxiliaryFiles = (node.auxiliaryFiles || []).map((file) => {
 		return `${workspaceEntryPath(node)}/${file.split('/').at(-1)}`;

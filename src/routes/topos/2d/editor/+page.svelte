@@ -147,7 +147,7 @@
 
 			const fileName = resolveTopoSavePath(editorState.ui, initialEntryPath);
 			if (typeof fileName !== 'string' || !fileName)
-				throw new Error('Topo file path is unavailable');
+				throw new Error($_('editor.topo_file_path_is_unavailable'));
 			editorState.ui.topoFileName = fileName;
 			await publishTopoDocument(fileName, topoToSave);
 			editorState.markSaved();
@@ -167,8 +167,14 @@
 		const result = editor2D?.simplifySelectedOutline(outlineSimplifyTolerancePx);
 		if (!result) return;
 		outlineSimplifySummary = result.changed
-			? `${result.previousPointCount} → ${result.pointCount} vertices at ${result.tolerance}px.`
-			: `No further simplification at ${result.tolerance}px.`;
+			? $_('editor.outline_simplified', {
+					values: {
+						before: result.previousPointCount,
+						after: result.pointCount,
+						tolerance: result.tolerance
+					}
+				})
+			: $_('editor.outline_unchanged', { values: { tolerance: result.tolerance } });
 	}
 </script>
 

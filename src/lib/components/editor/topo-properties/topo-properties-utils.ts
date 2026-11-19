@@ -2,10 +2,10 @@ import type { FixPoint, Route, Variant } from '@vorstieg/fels-types/types';
 import { generateId, generateSymbolId } from '$lib/assets/js/id-utils.ts';
 
 export const routeLineStyles = [
-	{ id: 'red', label: 'Red' },
-	{ id: 'redDashed', label: 'Red dashed' },
-	{ id: 'redDotted', label: 'Red dotted' },
-	{ id: 'variant', label: 'Variant' }
+	{ id: 'red', labelKey: 'editor.route_style_red' },
+	{ id: 'redDashed', labelKey: 'editor.route_style_red_dashed' },
+	{ id: 'redDotted', labelKey: 'editor.route_style_red_dotted' },
+	{ id: 'variant', labelKey: 'editor.route_style_variant' }
 ] as const;
 
 type PathAssetItem = Pick<Route, 'pathRefs'>;

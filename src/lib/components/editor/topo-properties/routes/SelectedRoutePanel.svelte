@@ -24,11 +24,7 @@
 
 	const editorState = getTopo2DEditorState();
 
-	let {
-		route = $bindable(),
-		mobile = false,
-		onPathSelect = null
-	}: Props = $props();
+	let { route = $bindable(), mobile = false, onPathSelect = null }: Props = $props();
 
 	function hasRouteType(route: Pick<Route, 'type'>, type: string) {
 		return Array.isArray(route.type) ? route.type.includes(type) : route.type === type;
@@ -47,7 +43,7 @@
 	}
 
 	function updateRouteType(value: string) {
-		editorState.commit('Change route type', () => {
+		editorState.commit($_('editor.change_route_type'), () => {
 			convertRouteType(route, value);
 			return true;
 		});
@@ -91,7 +87,7 @@
 
 	function addVariant(route: Route) {
 		const variant = createVariant(route);
-		editorState.commit('Add route variant', () => {
+		editorState.commit($_('editor.add_route_variant'), () => {
 			route.variants = [...(route.variants || []), variant];
 			return true;
 		});
@@ -110,7 +106,9 @@
 	}
 
 	function duplicatePitchTargets(route: Route) {
-		return (editorState.topo.routes || []).filter((target) => String(target.id) !== String(route.id));
+		return (editorState.topo.routes || []).filter(
+			(target) => String(target.id) !== String(route.id)
+		);
 	}
 
 	function movePitch(route: Route, pitch: EditablePitch, direction: number) {
@@ -171,7 +169,9 @@
 
 	{#if hasRouteType(route, 'multi-pitch')}
 		<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
-			<label for={'route-line-style-' + route.id} class="text-ui-label block">Line style</label>
+			<label for={'route-line-style-' + route.id} class="text-ui-label block"
+				>{$_('editor.line_style')}</label
+			>
 			<select
 				id={'route-line-style-' + route.id}
 				value={route.lineStyle || 'red'}
@@ -179,7 +179,7 @@
 				class="input-studio w-full appearance-none"
 			>
 				{#each routeLineStyles as style}
-					<option value={style.id}>{style.label}</option>
+					<option value={style.id}>{$_(style.labelKey)}</option>
 				{/each}
 			</select>
 		</div>
@@ -187,14 +187,15 @@
 		<PitchComponent
 			pitch={route}
 			kind="single"
-			topoScale={editorState.ui.scale} fixPoints={editorState.topo.fixPoints}
+			topoScale={editorState.ui.scale}
+			fixPoints={editorState.topo.fixPoints}
 			onFieldChange={(field, value) => updateRoute({ [field]: value })}
 		/>
 	{/if}
 
-	<div class='space-y-1'>
+	<div class="space-y-1">
 		<div class="flex items-center justify-between gap-2">
-			<p class="text-ui-label block">Paths</p>
+			<p class="text-ui-label block">{$_('editor.paths')}</p>
 			<div class="flex items-center gap-1">
 				<button
 					class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-warm-gray-500 hover:bg-creator-blue hover:text-white transition-none"
@@ -203,12 +204,12 @@
 						selectPathAsset(route, pathId);
 					}}
 				>
-					+ Add
+					{$_('editor.add_add')}
 				</button>
 			</div>
 		</div>
 		{#if pathRefs().length === 0}
-			<p class="text-micro-data text-warm-gray-400">No paths attached.</p>
+			<p class="text-micro-data text-warm-gray-400">{$_('editor.no_paths_attached')}</p>
 		{/if}
 		<div class="space-y-1">
 			{#each pathRefs() as pathAsset}
@@ -228,18 +229,18 @@
 						bind:value={pathAsset.role}
 						class="col-span-4 rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none"
 					>
-						<option value="approach">Approach</option>
-						<option value="main">Main</option>
-						<option value="descent">Descent</option>
-						<option value="variant">Variant</option>
+						<option value="approach">{$_('editor.approach')}</option>
+						<option value="main">{$_('editor.main')}</option>
+						<option value="descent">{$_('editor.descent')}</option>
+						<option value="variant">{$_('editor.variant')}</option>
 					</select>
 					<input
 						bind:value={pathAsset.label}
 						class="col-span-7 rounded-sm border border-black/15 bg-transparent px-1 py-1 text-body-text outline-none"
-						placeholder="Label"
+						placeholder={$_('editor.label')}
 					/>
 					<button
-						aria-label="Remove path"
+						aria-label={$_('editor.remove_path')}
 						onclick={(event) => {
 							event.stopPropagation();
 							removePathAsset(route, pathAsset.pathId, pathDocument());
@@ -277,7 +278,8 @@
 					{pitch}
 					index={idx}
 					kind="pitch"
-					topoScale={editorState.ui.scale} fixPoints={editorState.topo.fixPoints}
+					topoScale={editorState.ui.scale}
+					fixPoints={editorState.topo.fixPoints}
 					onDraw={(pitch) => drawPitch(route, pitch)}
 					onDuplicate={(pitch, targetRouteId) => duplicatePitch(route, pitch, targetRouteId)}
 					duplicateTargets={duplicatePitchTargets(route)}
@@ -285,7 +287,7 @@
 					canMoveUp={idx > 0}
 					canMoveDown={idx < (route.pitches || []).length - 1}
 					onRemove={(pitch) => removePitch(route, pitch)}
-					onFieldChange={(field, value) => updatePitch(pitch.id,{ [field]: value })}
+					onFieldChange={(field, value) => updatePitch(pitch.id, { [field]: value })}
 				/>
 			{/each}
 
@@ -304,10 +306,11 @@
 						pitch={variant}
 						index={idx}
 						kind="variant"
-						topoScale={editorState.ui.scale} fixPoints={editorState.topo.fixPoints}
+						topoScale={editorState.ui.scale}
+						fixPoints={editorState.topo.fixPoints}
 						onDraw={(variant) => drawVariant(route, variant)}
 						onRemove={(variant) => removeVariant(route, variant)}
-						onFieldChange={(field, value) => updateVariant(variant.id,{ [field]: value })}
+						onFieldChange={(field, value) => updateVariant(variant.id, { [field]: value })}
 					/>
 				{/each}
 			</div>
@@ -315,7 +318,9 @@
 	{/if}
 
 	<div class={mobile ? 'space-y-1' : 'space-y-0.5'}>
-		<label for={'route-description-' + route.id} class="text-ui-label block">{$_('ui.description')}</label>
+		<label for={'route-description-' + route.id} class="text-ui-label block"
+			>{$_('ui.description')}</label
+		>
 		<textarea
 			id={'route-description-' + route.id}
 			value={route.description || ''}

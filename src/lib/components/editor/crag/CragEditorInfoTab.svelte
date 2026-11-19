@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.ts';
 	import {
@@ -92,18 +93,18 @@
 		if (!pendingCragImages.some((pending) => pending?.path === image?.path))
 			return {
 				icon: 'fa-cloud-check',
-				label: 'Saved',
+				label: $_('editor.saved'),
 				classes: 'bg-emerald-50 text-emerald-700 border-emerald-200'
 			};
 		if (saveStatus === 'saving')
 			return {
 				icon: 'fa-spinner fa-spin',
-				label: 'Uploading',
+				label: $_('editor.uploading_label'),
 				classes: 'bg-creator-blue/10 text-creator-blue border-creator-blue/20'
 			};
 		return {
 			icon: 'fa-clock',
-			label: 'Ready to save',
+			label: $_('editor.ready_to_save'),
 			classes: 'bg-amber-50 text-amber-700 border-amber-200'
 		};
 	}
@@ -112,7 +113,7 @@
 <div class="space-y-4">
 	<nav
 		class="flex flex-wrap items-center gap-1 rounded-sm border border-black/10 bg-black/[0.03] p-2"
-		aria-label="Metadata hierarchy"
+		aria-label={$_('editor.metadata_hierarchy')}
 	>
 		{#each breadcrumbs as breadcrumb, i}
 			{#if i > 0}<i class="fa-solid fa-chevron-right text-[9px] text-warm-gray-300"></i>{/if}
@@ -126,7 +127,9 @@
 				{breadcrumb.entry?.entry?.properties.name ||
 					breadcrumb.entry?.entry?.properties.id ||
 					breadcrumb.source.id}
-				<span class="opacity-60">({breadcrumb.entry?.entry?.properties.kind || 'area'})</span>
+				<span class="opacity-60"
+					>({$_('editor.hierarchy_' + (breadcrumb.entry?.entry?.properties.kind || 'area'))})</span
+				>
 			</button>
 		{/each}
 		{#if isCurrentEntry}
@@ -135,26 +138,28 @@
 	</nav>
 	<div class="space-y-3">
 		<div class="space-y-0.5">
-			<label for="metadata-name" class="text-ui-label block">Name</label>
+			<label for="metadata-name" class="text-ui-label block">{$_('editor.name')}</label>
 			<input
 				id="metadata-name"
 				type="text"
 				value={metadata.name}
 				oninput={(event) => cragEditorState.setMetadataField('name', event.currentTarget.value)}
 				class="input-studio w-full"
-				placeholder="e.g. Efeugrat"
+				placeholder={$_('editor.example_name')}
 			/>
 		</div>
 		<div class="grid grid-cols-2 gap-2">
 			<div class="space-y-0.5">
-				<label for="metadata-kind" class="text-ui-label block">Kind</label>
+				<label for="metadata-kind" class="text-ui-label block">{$_('editor.kind')}</label>
 				<select
 					id="metadata-kind"
 					value={metadata.kind}
 					onchange={(event) => cragEditorState.setMetadataField('kind', event.currentTarget.value)}
 					class="input-studio w-full appearance-none"
 				>
-					{#each HIERARCHY_KINDS as kind}<option value={kind}>{kind}</option>{/each}
+					{#each HIERARCHY_KINDS as kind}<option value={kind}
+							>{$_('editor.hierarchy_' + kind)}</option
+						>{/each}
 				</select>
 			</div>
 			<div class="space-y-0.5">
@@ -180,12 +185,14 @@
 			<div
 				class="rounded-sm border border-black/10 bg-black/[0.03] p-2 text-micro-data text-warm-gray-500"
 			>
-				Source: <span class="font-mono">{cragEditorState.getWorkspaceEntryPath(activeEntry)}</span> (read-only)
+				{$_('editor.source')}
+				<span class="font-mono">{cragEditorState.getWorkspaceEntryPath(activeEntry)}</span>
+				{$_('editor.read_only')}
 			</div>
 		{/if}
 		<div class="grid grid-cols-2 gap-2">
 			<div class="space-y-0.5">
-				<label for="crag-security" class="text-ui-label block">Security</label>
+				<label for="crag-security" class="text-ui-label block">{$_('editor.security')}</label>
 				<select
 					id="crag-security"
 					value={metadata.security || ''}
@@ -193,29 +200,30 @@
 						cragEditorState.setMetadataField('security', event.currentTarget.value)}
 					class="input-studio w-full appearance-none"
 				>
-					<option value="">Select...</option>
+					<option value="">{$_('editor.select')}</option>
 					{#each securityOptions as opt}
-						<option value={opt}>{opt}</option>
+						<option value={opt}>{$_('editor.security_' + opt)}</option>
 					{/each}
 				</select>
 			</div>
 			<div class="space-y-0.5">
-				<label for="crag-rock-type" class="text-ui-label block">Rock Type</label><select
+				<label for="crag-rock-type" class="text-ui-label block">{$_('editor.rock_type')}</label
+				><select
 					id="crag-rock-type"
 					value={metadata.rock_type || ''}
 					onchange={(event) =>
 						cragEditorState.setMetadataField('rock_type', event.currentTarget.value)}
 					class="input-studio w-full appearance-none"
 				>
-					<option value="">Select...</option>
+					<option value="">{$_('editor.select')}</option>
 					{#each rockTypes as opt}
-						<option value={opt}>{opt}</option>
+						<option value={opt}>{$_('rock_types.' + opt)}</option>
 					{/each}
 				</select>
 			</div>
 		</div>
 		<div class="space-y-0.5">
-			<p class="text-ui-label block">Crag Type</p>
+			<p class="text-ui-label block">{$_('editor.crag_type')}</p>
 			<TagSelector
 				selectedTags={metadata.type || []}
 				availableTags={cragTypes}
@@ -223,7 +231,7 @@
 			/>
 		</div>
 		<div class="space-y-0.5">
-			<p class="text-ui-label block">Tags</p>
+			<p class="text-ui-label block">{$_('editor.tags')}</p>
 			<TagSelector
 				selectedTags={metadata.tags || []}
 				{availableTags}
@@ -232,11 +240,11 @@
 		</div>
 		<div class="space-y-1 pt-2 border-t border-black/15">
 			<div class="flex justify-between items-center">
-				<p class="text-ui-label !m-0">Equipment</p>
+				<p class="text-ui-label !m-0">{$_('editor.equipment')}</p>
 				<button
 					onclick={onAddEquipmentItem}
 					class="text-ui-label text-creator-blue hover:text-creator-blue-active"
-					>+ Add
+					>{$_('editor.add_add')}
 				</button>
 			</div>
 			<div class="space-y-1">
@@ -266,7 +274,7 @@
 						/>
 						<button
 							onclick={() => onRemoveEquipmentItem(i)}
-							aria-label="Remove equipment item"
+							aria-label={$_('editor.remove_equipment_item')}
 							class="text-warm-gray-300 hover:text-rose-600 px-1.5"
 							><i class="fa-solid fa-trash-can text-[10px]"></i></button
 						>
@@ -277,15 +285,13 @@
 		<div class="space-y-2 pt-2 border-t border-black/15">
 			<div class="flex justify-between items-center">
 				<div>
-					<p class="text-ui-label !m-0">Pictures</p>
+					<p class="text-ui-label !m-0">{$_('editor.pictures')}</p>
 					{#if pendingCragImageCount > 0}<p class="text-micro-data text-amber-700 !m-0">
-							{pendingCragImageCount}
-							picture{pendingCragImageCount === 1 ? '' : 's'} ready to upload. Press Save before leaving
-							or reloading; draft storage cannot keep image files.
+							{$_('editor.images_pending', { values: { count: pendingCragImageCount } })}
 						</p>{/if}
 				</div>
 				<label class="text-ui-label text-creator-blue hover:text-creator-blue-active cursor-pointer"
-					>+ Add<input
+					>{$_('editor.add_add')}<input
 						type="file"
 						accept="image/*"
 						multiple
@@ -295,14 +301,14 @@
 				>
 			</div>
 			{#if (activeEntry?.images || []).length === 0}<p class="text-micro-data text-warm-gray-400">
-					No pictures added.
+					{$_('editor.no_pictures_added')}
 				</p>{:else}
 				<div class="grid grid-cols-2 gap-2">
 					{#each activeEntry?.images || [] as image, i}{@const imageStatus = getImageStatus(image)}
 						<div class="relative rounded-sm border border-black/15 bg-white p-1 shadow-sm">
 							{#if getImageSrc(image)}<img
 									src={getImageSrc(image)}
-									alt={image.name || 'Crag picture'}
+									alt={image.name || $_('editor.crag_picture')}
 									class="h-20 w-full rounded-sm object-cover"
 								/>{/if}
 							<div
@@ -317,7 +323,8 @@
 								type="button"
 								onclick={() => onRemoveCragImage(i)}
 								class="absolute right-1 top-1 h-5 w-5 rounded-sm bg-white/90 text-warm-gray-400 hover:text-rose-600"
-								title="Remove picture"><i class="fa-solid fa-xmark text-[10px]"></i></button
+								title={$_('editor.remove_picture')}
+								><i class="fa-solid fa-xmark text-[10px]"></i></button
 							>
 						</div>
 					{/each}
@@ -325,7 +332,9 @@
 			{/if}
 		</div>
 		<div class="space-y-0.5 pt-2 border-t border-black/15">
-			<label for="crag-description-de" class="text-ui-label block">Description (DE)</label><textarea
+			<label for="crag-description-de" class="text-ui-label block"
+				>{$_('editor.description_de')}</label
+			><textarea
 				id="crag-description-de"
 				rows="2"
 				oninput={(event) =>
@@ -335,7 +344,9 @@
 			></textarea>
 		</div>
 		<div class="space-y-0.5">
-			<label for="crag-description-en" class="text-ui-label block">Description (EN)</label><textarea
+			<label for="crag-description-en" class="text-ui-label block"
+				>{$_('editor.description_en')}</label
+			><textarea
 				id="crag-description-en"
 				value={metadata.description_en || ''}
 				oninput={(event) =>

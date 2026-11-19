@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	type MapStyle = 'transport' | 'satellite' | 'terrain';
 	type Props = {
 		mapStyle?: MapStyle;
@@ -37,7 +38,7 @@
 						showMenu = false;
 					}}
 				>
-					{style}
+					{$_('editor.map_' + style)}
 				</button>
 			{/each}
 		</div>
@@ -47,8 +48,8 @@
 		type="button"
 		class="flex h-10 w-10 items-center justify-center rounded-full border border-black/15 bg-white text-warm-gray-600 shadow-panel transition-none hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-creator-blue"
 		onclick={() => (showMenu = !showMenu)}
-		title="Change map style"
-		aria-label="Change map style"
+		title={$_('editor.change_map_style')}
+		aria-label={$_('editor.change_map_style')}
 		aria-expanded={showMenu}
 	>
 		<i class="fa-solid fa-layer-group text-sm"></i>

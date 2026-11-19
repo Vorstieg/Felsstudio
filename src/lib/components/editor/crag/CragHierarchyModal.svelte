@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import { onMount } from 'svelte';
 	import { normalizePath } from '$lib/components/editor/crag/crag-editor-paths.ts';
 	import TreeFolderSelector from './TreeFolderSelector.svelte';
@@ -61,7 +62,7 @@
 	onkeydown={handleBackdropKeydown}
 	role="button"
 	tabindex="-1"
-	aria-label="Close dialog"
+	aria-label={$_('editor.close_dialog')}
 >
 	<div
 		bind:this={modalCard}
@@ -79,13 +80,15 @@
 		>
 			<div>
 				<h2 id="hierarchy-modal-title" class="text-section-title leading-none mb-0.5">
-					Hierarchy Placement
+					{$_('editor.hierarchy_placement')}
 				</h2>
-				<p class="text-ui-label !m-0">Choose where this crag lives in the folder tree</p>
+				<p class="text-ui-label !m-0">
+					{$_('editor.choose_where_this_crag_lives_in_the_folder_tree')}
+				</p>
 			</div>
 			<button
 				onclick={onCancel}
-				aria-label="Close"
+				aria-label={$_('editor.close')}
 				class="w-7 h-7 flex items-center justify-center rounded-sm hover:bg-black/5 transition-none border border-transparent hover:border-black/10"
 			>
 				<i class="fa-solid fa-xmark text-near-black text-sm"></i>
@@ -96,12 +99,12 @@
 		<div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
 			<!-- Final path preview -->
 			<div class="rounded-sm border border-creator-blue/20 bg-creator-blue/5 p-2.5 space-y-1">
-				<span class="text-ui-label block">Final folder path</span>
+				<span class="text-ui-label block">{$_('editor.final_folder_path')}</span>
 				<div
 					class="flex flex-wrap items-center gap-1 text-[12px] font-mono font-medium text-near-black"
 				>
 					{#if breadcrumbParts.length === 0}
-						<span class="text-warm-gray-400 italic">No folder selected</span>
+						<span class="text-warm-gray-400 italic">{$_('editor.no_folder_selected')}</span>
 					{:else}
 						{#each breadcrumbParts as part, i}
 							{#if i > 0}
@@ -127,7 +130,7 @@
 		<div class="p-3 border-t border-black/15 bg-white flex justify-end flex-shrink-0 gap-2">
 			<button onclick={onClose} class="btn-primary !px-6 shadow-sm">
 				<i class="fa-solid fa-check mr-2 opacity-60"></i>
-				Done
+				{$_('editor.done')}
 			</button>
 		</div>
 	</div>

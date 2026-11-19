@@ -5,7 +5,7 @@
 	import '@fortawesome/fontawesome-free/css/fontawesome.css';
 	import '@fortawesome/fontawesome-free/css/brands.css';
 	import '@fortawesome/fontawesome-free/css/solid.css';
-	import { init, addMessages, _, getLocaleFromNavigator } from 'svelte-i18n';
+	import { init, addMessages, _, locale, getLocaleFromNavigator } from 'svelte-i18n';
 	import en from '$lib/i18n/locales/en.json';
 	import de from '$lib/i18n/locales/de.json';
 	import AuthPrompt from '$lib/components/ui/AuthPrompt.svelte';
@@ -26,8 +26,7 @@
 		const cleanupViewport = initViewport();
 		const refreshAuth = () => void authState.refresh();
 		const isLocalDevelopment =
-			import.meta.env.DEV &&
-			['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+			import.meta.env.DEV && ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
 		if (!isLocalDevelopment) {
 			refreshAuth();
 			window.addEventListener('focus', refreshAuth);
@@ -51,6 +50,10 @@
 	});
 
 	let { children }: { children?: Snippet } = $props();
+
+	$effect(() => {
+		if (browser && $locale) document.documentElement.lang = $locale;
+	});
 
 	let displayTitle = $derived($_('menu.creator') + ' | ' + $_('site.title'));
 	let showNavigationSpinner = $derived.by(() => {
@@ -89,7 +92,7 @@
 		>
 			<i class="fa-solid fa-spinner fa-spin text-creator-blue text-lg"></i>
 			<span class="text-micro-data font-bold text-near-black uppercase tracking-widest"
-				>Loading</span
+				>{$_('editor.loading')}</span
 			>
 		</div>
 	{/if}

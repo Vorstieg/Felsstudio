@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import {
 		createTopo2DEditorState,
 		getTopo2DEditorState
@@ -359,7 +360,7 @@
 		aria-pressed={editor.ui.mobileSelectionMode}
 		onclick={() => editor.setMobileSelectionMode(!editor.ui.mobileSelectionMode)}
 	>
-		{editor.ui.mobileSelectionMode ? 'Done selecting' : 'Select multiple'}
+		{editor.ui.mobileSelectionMode ? $_('editor.done_selecting') : $_('editor.select_multiple')}
 	</button>
 	<svg
 		data-testid="topo-2d-canvas"
@@ -369,7 +370,7 @@
 		class="w-full h-full cursor-{editor.ui.activeTool === 'eraser' ? 'crosshair' : 'crosshair'}"
 		style="touch-action: none;"
 		role="application"
-		aria-label="Topo Editor"
+		aria-label={$_('editor.topo_editor')}
 	>
 		<g bind:this={gElement}></g>
 	</svg>

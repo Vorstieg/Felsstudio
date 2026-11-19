@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import type { Map as MapLibreMap } from 'maplibre-gl';
 	import type { FlightPlan } from '$lib/assets/js/flight-plan-types.ts';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
@@ -41,27 +42,27 @@
 	}: Props = $props();
 
 	let tabs = $derived([
-		{ id: 'info', label: 'Metadata', icon: 'fa-circle-info' },
+		{ id: 'info', label: $_('editor.metadata'), icon: 'fa-circle-info' },
 		{
 			id: 'registry',
-			label: 'Registry',
+			label: $_('editor.registry'),
 			icon: 'fa-layer-group',
 			count: (cragEditorState.getWorkspaceAccess()?.features || []).length
 		},
 		{
 			id: 'sectors',
-			label: 'Children',
+			label: $_('editor.children'),
 			icon: 'fa-table-cells-large',
 			count: cragEditorState.getActiveSectors().length
 		},
 		...(cragEditorState.getActiveWorkspaceEntry()?.entry?.geometry?.type === 'Polygon'
-			? [{ id: 'capture', label: 'Capture plan', icon: 'fa-helicopter' }]
+			? [{ id: 'capture', label: $_('editor.capture_plan'), icon: 'fa-helicopter' }]
 			: [])
 	]);
 </script>
 
 <DetailsComponent
-	title="Properties"
+	title={$_('editor.properties')}
 	{tabs}
 	bind:activeTab
 	shadow={inspectorShadow}

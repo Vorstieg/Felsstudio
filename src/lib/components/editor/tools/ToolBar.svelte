@@ -88,7 +88,7 @@
 	}
 </script>
 
-<div class="fixed top-2 left-2 right-2 z-50" role="group" aria-label="Editor toolbar">
+<div class="fixed top-2 left-2 right-2 z-50" role="group" aria-label={$_('editor.editor_toolbar')}>
 	<div class="panel flex items-center justify-between gap-2 bg-white p-1.5 shadow-panel">
 		<div class="flex min-w-0 items-center gap-2.5">
 			{#if !isCompact}

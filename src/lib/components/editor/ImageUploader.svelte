@@ -45,7 +45,7 @@
 			document.image2D = imageData;
 			return true;
 		};
-		editorState.commit('Update background image', update);
+		editorState.commit($_('editor.update_background_image'), update);
 		hasEstablishedCanvas = true;
 	}
 
@@ -191,7 +191,7 @@
 		<div class="relative group">
 			<img
 				src={topo.image2D}
-				alt="Topo background"
+				alt={$_('editor.topo_background')}
 				class="w-full rounded-sm border border-black/10"
 			/>
 			<div

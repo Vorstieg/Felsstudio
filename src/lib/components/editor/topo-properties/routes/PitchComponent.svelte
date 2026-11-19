@@ -61,7 +61,6 @@
 	function hasInheritStyle() {
 		return kind !== 'single';
 	}
-
 </script>
 
 <div class="gap-1">
@@ -86,8 +85,8 @@
 								class="text-warm-gray-500 disabled:text-warm-gray-250"
 								disabled={!canMoveUp}
 								onclick={() => onMove(pitch, -1)}
-								title="Move pitch up"
-								aria-label="Move pitch up"
+								title={$_('editor.move_pitch_up')}
+								aria-label={$_('editor.move_pitch_up')}
 							>
 								<i class="fa-solid fa-arrow-up text-[9px]"></i>
 							</button>
@@ -95,8 +94,8 @@
 								class="text-warm-gray-500 disabled:text-warm-gray-250"
 								disabled={!canMoveDown}
 								onclick={() => onMove(pitch, 1)}
-								title="Move pitch down"
-								aria-label="Move pitch down"
+								title={$_('editor.move_pitch_down')}
+								aria-label={$_('editor.move_pitch_down')}
 							>
 								<i class="fa-solid fa-arrow-down text-[9px]"></i>
 							</button>
@@ -106,14 +105,14 @@
 						<select
 							class="max-w-28 rounded-sm border border-black/15 bg-white px-1 py-0.5 text-micro-data outline-none"
 							value=""
-							title="Duplicate pitch to route"
+							title={$_('editor.duplicate_pitch_to_route')}
 							onchange={(event) => {
 								const targetRouteId = event.currentTarget.value;
 								if (targetRouteId) onDuplicate(pitch, targetRouteId);
 								event.currentTarget.value = '';
 							}}
 						>
-							<option value="">Copy to…</option>
+							<option value="">{$_('editor.copy_to')}</option>
 							{#each duplicateTargets as target}
 								<option value={target.id}>{target.name || target.id}</option>
 							{/each}
@@ -144,22 +143,10 @@
 		</div>
 	{/if}
 
-	<GradeSelector
-		route={pitch}
-		grade={pitch.grade}
-		onFieldChange={onFieldChange}
-	/>
-	<div class='grid grid-cols-2 gap-2 mt-1'>
-		<RouteLength
-			route={pitch}
-			topoScale={topoScale ?? 1}
-			onFieldChange={onFieldChange}
-		/>
-		<BoltCount
-			route={pitch}
-			fixPoints={fixPoints ?? []}
-			onFieldChange={onFieldChange}
-		/>
+	<GradeSelector route={pitch} grade={pitch.grade} {onFieldChange} />
+	<div class="grid grid-cols-2 gap-2 mt-1">
+		<RouteLength route={pitch} topoScale={topoScale ?? 1} {onFieldChange} />
+		<BoltCount route={pitch} fixPoints={fixPoints ?? []} {onFieldChange} />
 	</div>
 	<select
 		value={pitch.lineStyle || defaultLineStyle()}
@@ -167,10 +154,10 @@
 		class="w-full rounded-sm border border-black/15 bg-white px-1 py-1 text-micro-data outline-none"
 	>
 		{#if hasInheritStyle()}
-			<option value="">Use route line style</option>
+			<option value="">{$_('editor.use_route_line_style')}</option>
 		{/if}
 		{#each routeLineStyles as style}
-			<option value={style.id}>{style.label}</option>
+			<option value={style.id}>{$_(style.labelKey)}</option>
 		{/each}
 	</select>
 </div>

@@ -1,3 +1,5 @@
+import { get } from 'svelte/store';
+import { _ } from 'svelte-i18n';
 import type { Point2D } from '@vorstieg/fels-types/types';
 
 export type GpxSegment = { name: string; points: Point2D[] };
@@ -6,7 +8,7 @@ export type GpxSegment = { name: string; points: Point2D[] };
 export function parseGpxSegments(text: string): GpxSegment[] {
 	const xml = new DOMParser().parseFromString(text, 'text/xml');
 	if (xml.querySelector('parsererror') || xml.documentElement.localName !== 'gpx')
-		throw new Error('Invalid GPX file.');
+		throw new Error(get(_)('editor.error_invalid_gpx_file'));
 	const read = (element: Element, tag: string): Point2D[] =>
 		Array.from(element.getElementsByTagNameNS('*', tag)).map((point) => {
 			const lng = Number(point.getAttribute('lon') ?? NaN);
@@ -17,7 +19,7 @@ export function parseGpxSegments(text: string): GpxSegment[] {
 				Math.abs(lng) > 180 ||
 				Math.abs(lat) > 90
 			)
-				throw new Error('Invalid GPX coordinates.');
+				throw new Error(get(_)('editor.error_invalid_gpx_coordinates'));
 			return [lng, lat] as Point2D;
 		});
 	const segments: GpxSegment[] = [];
@@ -38,7 +40,8 @@ export function parseGpxSegments(text: string): GpxSegment[] {
 			if (points.length >= 2) segments.push({ name: `Route ${index + 1}`, points });
 		}
 	}
-	if (!segments.length) throw new Error('GPX needs at least two track or route points.');
+	if (!segments.length)
+		throw new Error(get(_)('editor.error_gpx_needs_at_least_two_track_or_route_points'));
 	return segments;
 }
 

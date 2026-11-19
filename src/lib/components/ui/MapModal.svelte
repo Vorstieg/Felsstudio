@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import { onDestroy, onMount } from 'svelte';
 	import maplibregl, {
 		type CustomLayerInterface,
@@ -387,12 +388,12 @@
 			class="p-3 border-b border-black/15 flex justify-between items-center bg-white flex-shrink-0"
 		>
 			<div>
-				<h2 class="text-section-title leading-none mb-0.5">Geospatial Placement</h2>
-				<p class="text-ui-label !m-0">Coordinate & Orientation Studio</p>
+				<h2 class="text-section-title leading-none mb-0.5">{$_('editor.geospatial_placement')}</h2>
+				<p class="text-ui-label !m-0">{$_('editor.coordinate_orientation_studio')}</p>
 			</div>
 			<button
 				onclick={onClose}
-				aria-label="Close map"
+				aria-label={$_('editor.close_map')}
 				class="w-7 h-7 flex items-center justify-center rounded-sm hover:bg-black/5 transition-none border border-transparent hover:border-black/10"
 			>
 				<i class="fa-solid fa-xmark text-near-black text-sm"></i>
@@ -495,9 +496,11 @@
 			<div
 				class="absolute top-6 left-1/2 -translate-x-1/2 z-30 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full shadow-modal border border-black/15 text-sm font-medium text-warm-gray-500"
 			>
-				Use <kbd class="px-1.5 py-0.5 bg-black/5 rounded">T</kbd> to Translate,
+				{$_('editor.use')} <kbd class="px-1.5 py-0.5 bg-black/5 rounded">T</kbd>
+				{$_('editor.to_translate')}
 				<kbd class="px-1.5 py-0.5 bg-black/5 rounded">R</kbd>
-				to Rotate, <kbd class="px-1.5 py-0.5 bg-black/5 rounded">S</kbd> to Scale
+				{$_('editor.to_rotate')} <kbd class="px-1.5 py-0.5 bg-black/5 rounded">S</kbd>
+				{$_('editor.to_scale')}
 			</div>
 
 			<!-- Move Model Here Button -->
@@ -512,7 +515,7 @@
 					}}
 				>
 					<i class="fa-solid fa-location-crosshairs text-creator-blue"></i>
-					Move Model Here
+					{$_('editor.move_model_here')}
 				</button>
 			</div>
 
@@ -521,9 +524,9 @@
 				class="absolute right-6 top-1/2 -translate-y-1/2 z-30 bg-white/90 backdrop-blur-md rounded-full shadow-modal border border-black/15 flex flex-col items-center py-4 px-2 gap-3 w-12"
 			>
 				<div class="text-[9px] font-bold text-warm-gray-400 uppercase tracking-widest leading-none">
-					Scale
+					{$_('editor.scale')}
 				</div>
-				<label for="model-scale" class="sr-only">Model scale</label>
+				<label for="model-scale" class="sr-only">{$_('editor.model_scale')}</label>
 				<input
 					id="model-scale"
 					type="range"
@@ -543,7 +546,9 @@
 
 		<!-- Footer -->
 		<div class="p-2 border-t border-black/15 bg-white flex justify-end flex-shrink-0">
-			<button onclick={onClose} class="btn-primary !px-6 shadow-sm"> Save & Close </button>
+			<button onclick={onClose} class="btn-primary !px-6 shadow-sm">
+				{$_('editor.save_close')}
+			</button>
 		</div>
 	</div>
 </div>

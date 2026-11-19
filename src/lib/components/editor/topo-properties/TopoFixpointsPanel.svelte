@@ -9,7 +9,8 @@
 	let topo = $derived(editorState.topo);
 	const ui = editorState.ui;
 
-	let { aiSuggestions = [], mobile = false }: { aiSuggestions?: TopoCluster[]; mobile?: boolean } = $props();
+	let { aiSuggestions = [], mobile = false }: { aiSuggestions?: TopoCluster[]; mobile?: boolean } =
+		$props();
 
 	function toggleCluster(cluster: TopoCluster) {
 		if (editorState.clustering.lockedClusterId === cluster.id) {
@@ -94,7 +95,7 @@
 										? $_('ui.ai_anchor')
 										: $_('ui.ai_bolt')}
 									<span class="text-[10px] text-warm-gray-500 font-normal ml-0.5"
-									>({Math.round(cluster.conf)}
+										>({Math.round(cluster.conf)}
 										%)</span
 									>
 								</p>
@@ -120,9 +121,9 @@
 						onclick={(e) => {
 							e.stopPropagation();
 							addAiBolt(cluster);
-						}}>Add
-					</button
-					>
+						}}
+						>{$_('editor.add')}
+					</button>
 				</div>
 			{/each}
 		</div>
@@ -137,8 +138,7 @@
 	{#each topo.fixPoints as point, i (point.id)}
 		<div
 			id={'fixpoint-' + point.id}
-			class="panel p-3 flex items-center gap-3 border-2 {ui.selectedFixpointId ===
-			point.id
+			class="panel p-3 flex items-center gap-3 border-2 {ui.selectedFixpointId === point.id
 				? 'border-creator-blue'
 				: 'border-transparent'}"
 		>
@@ -162,7 +162,7 @@
 				{/each}
 			</select>
 			<button
-				aria-label="Remove fixpoint"
+				aria-label={$_('editor.remove_fixpoint')}
 				class="h-9 flex items-center justify-center gap-1.5 rounded-sm bg-rose-50 px-3 text-[11px] font-bold text-rose-700 transition-none hover:bg-rose-100"
 				onclick={() => removeFixpoint(point)}
 			>
@@ -177,9 +177,7 @@
 			<div
 				id={'fixpoint-' + point.id}
 				class={'panel-inner p-2 transition-none flex items-center gap-2 border ' +
-					(ui.selectedFixpointId === point.id
-						? 'border-creator-blue'
-						: 'border-transparent')}
+					(ui.selectedFixpointId === point.id ? 'border-creator-blue' : 'border-transparent')}
 			>
 				<div
 					class="w-6 h-6 rounded-sm bg-black/5 flex items-center justify-center text-warm-gray-500 text-micro-data font-bold border border-black/10 shadow-sm"
@@ -198,10 +196,10 @@
 					</select>
 				</div>
 				<button
-					aria-label="Remove fixpoint"
+					aria-label={$_('editor.remove_fixpoint')}
 					class="text-warm-gray-300 hover:text-rose-600 transition-none w-6 h-6 flex items-center justify-center rounded-sm hover:bg-rose-50"
 					onclick={() => removeFixpoint(point)}
-				><i class="fa-solid fa-trash-can text-[10px]"></i></button
+					><i class="fa-solid fa-trash-can text-[10px]"></i></button
 				>
 			</div>
 		{/each}

@@ -63,7 +63,7 @@
 </script>
 
 {#if selectedOutlineId != null}
-	<ToolOptions title="Outline tools" open={true} {onClose}>
+	<ToolOptions title={$_('editor.outline_tools')} open={true} {onClose}>
 		<div class="flex flex-col gap-2">
 			<label for="selected-outline-type" class="text-xs font-medium text-warm-gray-600"
 				>{$_('ui.outline_type')}</label
@@ -116,7 +116,7 @@
 				onCurveTensionChange={outlineCurveActions?.setCurveTension}
 			/>
 			<label class="text-xs font-medium text-warm-gray-600" for="outline-simplify-tolerance">
-				Simplify selected outline
+				{$_('editor.simplify_selected_outline')}
 			</label>
 			<div class="grid grid-cols-[1fr_auto] gap-1 items-center">
 				<input
@@ -126,16 +126,16 @@
 					min="0.5"
 					step="0.5"
 					class="input-studio w-full"
-					aria-label="Simplification tolerance in pixels"
+					aria-label={$_('editor.simplification_tolerance_in_pixels')}
 				/>
 				<button
 					type="button"
 					class="px-2 py-1 rounded-sm border border-black/15 bg-white text-ui-label text-warm-gray-500"
-					onclick={onSimplify}>Simplify</button
+					onclick={onSimplify}>{$_('editor.simplify')}</button
 				>
 			</div>
 			<p class="text-[10px] text-warm-gray-400">
-				Removes redundant vertices using a pixel tolerance. Undo restores the original.
+				{$_('editor.outline_simplify_hint')}
 			</p>
 			{#if simplifySummary}
 				<p class="text-[10px] text-warm-gray-500">{simplifySummary}</p>
@@ -143,7 +143,7 @@
 		</div>
 	</ToolOptions>
 {:else if selectedRoute}
-	<ToolOptions title="Route tools" open={true} {onClose}>
+	<ToolOptions title={$_('editor.route_tools')} open={true} {onClose}>
 		<PathDrawingOptions
 			snapToGrid={selectedRoute.routeEditTool?.snapToGrid}
 			gridSize={selectedRoute.routeEditTool?.gridSize}

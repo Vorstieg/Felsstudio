@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import { base } from '$app/paths';
 	import ReviewFileList from '$lib/components/editor/ReviewFileList.svelte';
 	import { goto } from '$app/navigation';
@@ -55,7 +56,7 @@
 		}
 	}
 	async function remove(review: Review) {
-		if (!window.confirm(`Delete “${review.name}” and its uploaded archive?`)) return;
+		if (!window.confirm($_('editor.delete_review', { values: { name: review.name } }))) return;
 		busy = true;
 		error = '';
 		try {
@@ -70,7 +71,7 @@
 	}
 </script>
 
-<svelte:head><title>Review inbox · Felslager</title></svelte:head>
+<svelte:head><title>{$_('editor.review_inbox_felslager')}</title></svelte:head>
 <main
 	class="h-full overflow-auto bg-warm-white font-sans text-[13px] leading-normal text-near-black"
 >
@@ -78,7 +79,7 @@
 		<div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 p-4">
 			<div class="flex flex-col gap-1">
 				<p class="text-ui-label text-warm-gray-500">Felslager</p>
-				<h1 class="text-section-title wrap-anywhere">Review inbox</h1>
+				<h1 class="text-section-title wrap-anywhere">{$_('editor.review_inbox')}</h1>
 			</div>
 			<SessionInfo />
 		</div>
@@ -87,20 +88,22 @@
 		{#if !authState.user}
 			<section
 				class="panel min-w-0 overflow-hidden flex min-h-40 flex-col items-center justify-center gap-3 p-4 text-center"
-				aria-label="Reviewer sign in"
+				aria-label={$_('editor.reviewer_sign_in')}
 			>
 				<span
 					class="flex h-10 w-10 items-center justify-center rounded-sm border border-black/10 bg-warm-white text-lg text-warm-gray-500"
 					><i class="fa-solid fa-inbox" aria-hidden="true"></i></span
 				>
 				<div class="flex flex-col gap-2">
-					<h2 class="text-section-title wrap-anywhere">Ready for review</h2>
-					<p class="text-warm-gray-500">Sign in to inspect and publish submissions.</p>
+					<h2 class="text-section-title wrap-anywhere">{$_('editor.ready_for_review')}</h2>
+					<p class="text-warm-gray-500">
+						{$_('editor.sign_in_to_inspect_and_publish_submissions')}
+					</p>
 				</div>
 				<button
 					class="btn-pill gap-2 whitespace-nowrap disabled:cursor-default disabled:opacity-40 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue!"
 					onclick={() => authState.requireAuth()}
-					>Sign in<i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button
+					>{$_('editor.sign_in')}<i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button
 				>
 			</section>
 		{:else}
@@ -120,7 +123,9 @@
 						class="flex flex-wrap items-center justify-between gap-2 border-b border-black/10 p-3"
 					>
 						<div class="flex items-center gap-2">
-							<h2 id="review-submissions-title" class="text-ui-label">Submissions</h2>
+							<h2 id="review-submissions-title" class="text-ui-label">
+								{$_('editor.submissions')}
+							</h2>
 						</div>
 					</div>
 					{#if busy && !reviews.length}
@@ -129,7 +134,7 @@
 								class="flex h-10 w-10 items-center justify-center rounded-sm border border-black/10 bg-warm-white text-lg text-warm-gray-500"
 								><i class="fa-solid fa-circle-notch animate-spin" aria-hidden="true"></i></span
 							>
-							<p role="status" class="text-warm-gray-500">Loading submissions…</p>
+							<p role="status" class="text-warm-gray-500">{$_('editor.loading_submissions')}</p>
 						</div>
 					{:else if !reviews.length}
 						<div class="flex min-h-40 flex-col items-center justify-center gap-3 p-4 text-center">
@@ -138,8 +143,8 @@
 								><i class="fa-solid fa-inbox" aria-hidden="true"></i></span
 							>
 							<div class="flex flex-col gap-2">
-								<p class="font-semibold">All caught up</p>
-								<p class="text-warm-gray-500">No submissions to review yet.</p>
+								<p class="font-semibold">{$_('editor.all_caught_up')}</p>
+								<p class="text-warm-gray-500">{$_('editor.no_submissions_to_review_yet')}</p>
 							</div>
 						</div>
 					{:else}
@@ -157,9 +162,9 @@
 											><time datetime={review.created}
 												>{new Date(review.created).toLocaleString()}</time
 											><span
-												>{review.actions.length} file {review.actions.length === 1
-													? 'action'
-													: 'actions'}</span
+												>{$_('editor.file_action_count', {
+													values: { count: review.actions.length }
+												})}</span
 											></span
 										>
 									</button>
@@ -168,13 +173,13 @@
 						</ul>
 					{/if}
 				</section>
-				<section class="panel min-w-0 overflow-hidden" aria-label="Submission details">
+				<section class="panel min-w-0 overflow-hidden" aria-label={$_('editor.submission_details')}>
 					{#if selected}
 						<div
 							class="flex flex-wrap items-center justify-between gap-2 border-b border-black/10 p-3"
 						>
 							<div class="flex min-w-0 flex-col gap-2">
-								<p class="text-ui-label text-warm-gray-500">Submission</p>
+								<p class="text-ui-label text-warm-gray-500">{$_('editor.submission')}</p>
 								<h2 class="text-section-title wrap-anywhere">{selected.name}</h2>
 							</div>
 						</div>
@@ -183,12 +188,12 @@
 								<time datetime={selected.created}
 									>{new Date(selected.created).toLocaleString()}</time
 								><span
-									>{selected.actions.length} file {selected.actions.length === 1
-										? 'action'
-										: 'actions'}</span
+									>{$_('editor.file_action_count', {
+										values: { count: selected.actions.length }
+									})}</span
 								>
 							</div>
-							<h3 class="text-ui-label">Affected files</h3>
+							<h3 class="text-ui-label">{$_('editor.affected_files')}</h3>
 							<ReviewFileList actions={selected.actions} />
 						</div>
 						<footer
@@ -198,13 +203,15 @@
 								class="btn-pill gap-2 whitespace-nowrap disabled:cursor-default disabled:opacity-40 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue!"
 								onclick={() => selected && open(selected)}
 								disabled={busy}
-								>Open in editor<i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"
+								>{$_('editor.open_in_editor')}<i
+									class="fa-solid fa-arrow-up-right-from-square"
+									aria-hidden="true"
 								></i></button
 							>
 							<button
 								class="rounded-sm px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 disabled:opacity-40 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue!"
 								onclick={() => selected && remove(selected)}
-								disabled={busy}>Delete</button
+								disabled={busy}>{$_('editor.delete')}</button
 							>
 						</footer>
 					{:else}
@@ -214,9 +221,9 @@
 								><i class="fa-solid fa-file-lines" aria-hidden="true"></i></span
 							>
 							<div class="flex flex-col gap-2">
-								<h2 class="text-section-title wrap-anywhere">Select a submission</h2>
+								<h2 class="text-section-title wrap-anywhere">{$_('editor.select_a_submission')}</h2>
 								<p class="text-warm-gray-500">
-									Inspect its files, then open a separate draft in the editor.
+									{$_('editor.inspect_its_files_then_open_a_separate_draft_in_the_editor')}
 								</p>
 							</div>
 						</div>

@@ -97,12 +97,12 @@
 		[activeWorkspace, ...activeSectors].flatMap((node) =>
 			node?.entry?.properties.id && node.topo
 				? [
-					{
-						node,
-						path: workspaceNodeDocumentPaths(node).topo,
-						data: node.topo
-					}
-				]
+						{
+							node,
+							path: workspaceNodeDocumentPaths(node).topo,
+							data: node.topo
+						}
+					]
 				: []
 		)
 	);
@@ -165,7 +165,9 @@
 			await loadFelsEntryWorkspaceDetails(cragEditorState.workspace, target);
 		} catch (error) {
 			saveStatus = 'error';
-			saveError = `Could not load ${target}: ${error instanceof Error ? error.message : String(error)}`;
+			saveError = $_('editor.load_entry_failed', {
+				values: { target, reason: error instanceof Error ? error.message : String(error) }
+			});
 			return false;
 		}
 		saveError = '';
@@ -289,7 +291,8 @@
 		adapter: cragDraftAdapter(cragEditorState),
 		beforeReview: () => {
 			if (!trackEditor.requestLeave(() => {})) throw new Error($_(trackEditor.message));
-			if (cragEditorState.hierarchyErrors.length) throw new Error(cragEditorState.hierarchyErrors[0].message);
+			if (cragEditorState.hierarchyErrors.length)
+				throw new Error(cragEditorState.hierarchyErrors[0].message);
 		},
 		onReady: () => {
 			selectedObject = { type: 'entry', key: cragEditorState.activeWorkspaceEntryPath! };
@@ -353,9 +356,9 @@
 				const distanceTo = (feature: (typeof features)[number]) =>
 					feature.geometry.type === 'Point'
 						? turf.distance(
-							turf.point(e.lngLat.toArray()),
-							turf.point(feature.geometry.coordinates)
-						)
+								turf.point(e.lngLat.toArray()),
+								turf.point(feature.geometry.coordinates)
+							)
 						: Infinity;
 				const closest = features.reduce((prev, curr) => {
 					const prevDist = distanceTo(prev);
@@ -444,8 +447,7 @@
 					duration: 500
 				});
 			},
-			() => {
-			},
+			() => {},
 			{ enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
 		);
 	}
@@ -542,8 +544,7 @@
 	}
 
 	async function saveToServer() {
-		if (!trackEditor.requestLeave(() => {
-		})) {
+		if (!trackEditor.requestLeave(() => {})) {
 			toolOptionsOpen = true;
 			saveStatus = 'error';
 			saveError = $_(trackEditor.message);
@@ -560,7 +561,7 @@
 		saveError = '';
 
 		try {
-			if (!cragEditorState.workspace) throw new Error('No entry workspace is open.');
+			if (!cragEditorState.workspace) throw new Error($_('editor.no_entry_workspace_is_open'));
 			try {
 				await saveCragWorkspace(cragEditorState.workspace, {
 					write: (path, data) =>
@@ -620,7 +621,7 @@
 				};
 			});
 		if (!uploads.length) return;
-		cragEditorState.commit('Add images', () => {
+		cragEditorState.commit($_('editor.add_images'), () => {
 			node.images = [
 				...(node.images || []),
 				...uploads.map(({ file, path, clientId }) => ({
@@ -639,7 +640,7 @@
 		const images = node.images || [];
 		const image = images[index];
 		if (!image) return;
-		cragEditorState.commit('Remove image', () => {
+		cragEditorState.commit($_('editor.remove_image'), () => {
 			if (
 				!cragEditorState
 					.getPendingImages(node)

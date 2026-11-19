@@ -80,7 +80,7 @@
 			desynchronized: true,
 			preserveDrawingBuffer: false
 		});
-		if (!context) throw new Error('WebGL2 is unavailable');
+		if (!context) throw new Error($_('editor.webgl2_is_unavailable'));
 
 		return new WebGLRenderer({
 			canvas,
@@ -374,7 +374,7 @@
 			// Save topo JSON to Felslager
 			const topoFileName = resolveTopoSavePath(topoSession.ui, initialEntryPath);
 			if (typeof topoFileName !== 'string' || !topoFileName) {
-				throw new Error('Topo file path is unavailable');
+				throw new Error($_('editor.topo_file_path_is_unavailable'));
 			}
 			topoSession.ui.topoFileName = topoFileName;
 			await publishTopoDocument(topoFileName, topoToSave);
@@ -421,7 +421,7 @@
 					<span>{$_('ui.set_vertex')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Dbl Click</kbd
+						>{$_('editor.dbl_click')}</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
@@ -443,7 +443,7 @@
 					<span>{$_('ui.vertex')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Dbl Click</kbd
+						>{$_('editor.dbl_click')}</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
@@ -472,7 +472,7 @@
 					<span>{$_('ui.place_point')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Dbl Click</kbd
+						>{$_('editor.dbl_click')}</kbd
 					>
 				</div>
 				<div class="w-px h-4 bg-black/10 mx-1"></div>
@@ -501,28 +501,28 @@
 				</div>
 			{:else if activeTool === 'crop'}
 				<div class="flex items-center gap-1.5 text-micro-data">
-					<span>Select Area</span>
+					<span>{$_('editor.select_area')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Shift + Drag</kbd
+						>{$_('editor.shift_drag')}</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
-					<span>Select Islands</span>
+					<span>{$_('editor.select_islands')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
 						>C</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
-					<span>Apply Cut</span>
+					<span>{$_('editor.apply_cut')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
-						>Delete</kbd
+						>{$_('editor.delete')}</kbd
 					>
 				</div>
 				<div class="flex items-center gap-1.5 text-micro-data">
-					<span>Reset</span>
+					<span>{$_('editor.reset')}</span>
 					<kbd
 						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
 						>Esc</kbd

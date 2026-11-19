@@ -117,7 +117,7 @@
 					error = errorMessage(e);
 				}
 			} else {
-				error = `Cannot open ${item.name}. Unsupported file type.`;
+				error = $_('editor.unsupported_file', { values: { name: item.name } });
 			}
 		}
 	}
@@ -182,7 +182,7 @@
 		const path = currentPath ? `${currentPath}/${file.name}` : file.name;
 		if (
 			items.some((item) => item.path === path) &&
-			!confirm(`${file.name} already exists. Replace it?`)
+			!confirm($_('editor.replace_file', { values: { name: file.name } }))
 		) {
 			return;
 		}
@@ -202,7 +202,7 @@
 
 	function renameItem(item: ApiListEntry, e: MouseEvent) {
 		e.stopPropagation();
-		const newName = prompt(`Enter new name for ${item.name}:`, item.name);
+		const newName = prompt($_('editor.rename_file', { values: { name: item.name } }), item.name);
 		if (!newName || newName === item.name) return;
 
 		const parts = item.path.split('/');
@@ -229,7 +229,7 @@
 
 	function deleteItem(item: ApiListEntry, e: MouseEvent) {
 		e.stopPropagation();
-		if (!confirm(`Are you sure you want to delete ${item.name}?`)) return;
+		if (!confirm($_('editor.delete_file', { values: { name: item.name } }))) return;
 		if (!authState.requireAuth(() => deleteItemAction(item))) return;
 		deleteItemAction(item);
 	}
@@ -273,7 +273,7 @@
 			<button
 				class="tool-btn"
 				onclick={() => (currentPath ? navigateUp() : goto(base + '/'))}
-				title={currentPath ? 'Go up' : $_('ui.back_to_launcher')}
+				title={currentPath ? $_('editor.go_up') : $_('ui.back_to_launcher')}
 			>
 				<i class="fa-solid fa-arrow-left"></i>
 			</button>
@@ -286,11 +286,11 @@
 			<a
 				class="flex items-center gap-2 rounded-sm px-3 py-1.5 text-ui-label hover:bg-black/5 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue!"
 				href={`${base}/felslager/reviews`}
-				><i class="fa-solid fa-inbox" aria-hidden="true"></i>Review inbox</a
+				><i class="fa-solid fa-inbox" aria-hidden="true"></i>{$_('editor.review_inbox')}</a
 			>
 			<input bind:this={uploadInput} type="file" class="hidden" onchange={handleUploadSelection} />
 			<button class="btn-secondary px-4" onclick={selectFileForUpload} disabled={uploading}>
-				{uploading ? 'Uploading…' : 'Add file'}
+				{uploading ? $_('editor.uploading') : $_('editor.add_file')}
 			</button>
 			{#if selectedFile && selectedFileType !== 'image'}
 				<SessionInfo />
@@ -314,13 +314,13 @@
 					<input
 						type="text"
 						class="input-studio w-full pl-9 py-2 rounded-sm bg-warm-gray-100 focus:bg-white"
-						placeholder={$_('ui.search_crags') || 'Search files and folders...'}
+						placeholder={$_('ui.search_crags') || $_('editor.search_files_and_folders')}
 						bind:value={searchQuery}
 					/>
 					{#if searchQuery}
 						<button
 							class="absolute right-3 top-1/2 -translate-y-1/2 text-warm-gray-300 hover:text-near-black flex items-center justify-center"
-							aria-label="Clear search"
+							aria-label={$_('editor.clear_search')}
 							onclick={() => (searchQuery = '')}
 						>
 							<i class="fa-solid fa-xmark"></i>
@@ -336,7 +336,7 @@
 				>
 					<button
 						class="text-warm-gray-500 hover:text-creator-blue transition-colors cursor-pointer flex items-center justify-center w-6 h-6 rounded-sm hover:bg-black/5"
-						aria-label="Go to root"
+						aria-label={$_('editor.go_to_root')}
 						onclick={() => {
 							const u = new URL(window.location.href);
 							u.searchParams.delete('path');
@@ -376,12 +376,12 @@
 						<div
 							class="p-6 text-center text-body-text text-warm-gray-500 italic flex items-center justify-center h-full"
 						>
-							{$_('ui.no_entries_found') || 'No entries found.'}
+							{$_('ui.no_entries_found') || $_('editor.no_entries_found')}
 						</div>
 					{:else}
 						<ul class="space-y-1">
 							<div class="px-3 py-1 mb-2 text-micro-data text-warm-gray-400 font-medium">
-								Search Results
+								{$_('editor.search_results')}
 							</div>
 							{#each searchResults as item}
 								<li>
@@ -426,7 +426,7 @@
 						<div
 							class="p-6 text-center text-body-text text-warm-gray-500 italic flex items-center justify-center h-full"
 						>
-							Empty directory
+							{$_('editor.empty_directory')}
 						</div>
 					{:else}
 						<ul class="space-y-1">
@@ -468,7 +468,7 @@
 											<button
 												class="text-warm-gray-300 hover:text-creator-blue hover:bg-creator-blue/10 w-10 h-10 rounded flex items-center justify-center transition-colors md:w-6 md:h-6"
 												onclick={(e) => renameItem(item, e)}
-												title="Rename"
+												title={$_('editor.rename')}
 											>
 												<i class="fa-solid fa-pen text-[11px]"></i>
 											</button>
@@ -500,7 +500,7 @@
 					<span class="font-medium">{error}</span>
 					<button
 						class="w-6 h-6 flex items-center justify-center rounded hover:bg-rose-100"
-						aria-label="Dismiss error"
+						aria-label={$_('editor.dismiss_error')}
 						onclick={() => (error = null)}
 					>
 						<i class="fa-solid fa-xmark"></i>
@@ -519,7 +519,7 @@
 					></i>
 					<span class="font-bold text-near-black">{selectedFile.name}</span>
 					<span class="text-warm-gray-300 ml-2"
-						>{selectedFileType === 'image' ? 'Viewing' : 'Editing'}</span
+						>{selectedFileType === 'image' ? $_('editor.viewing') : $_('editor.editing')}</span
 					>
 				</div>
 				<div class="flex-1 bg-warm-white p-4 overflow-hidden relative">
@@ -546,9 +546,9 @@
 					>
 						<i class="fa-solid fa-file text-2xl opacity-50"></i>
 					</div>
-					<p class="text-section-title text-warm-gray-500">Select a file</p>
+					<p class="text-section-title text-warm-gray-500">{$_('editor.select_a_file')}</p>
 					<p class="text-body-text mt-2 text-center max-w-xs">
-						Choose a file from the explorer to view or edit its contents.
+						{$_('editor.choose_a_file_from_the_explorer_to_view_or_edit_its_contents')}
 					</p>
 				</div>
 			{/if}

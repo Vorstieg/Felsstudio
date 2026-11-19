@@ -53,11 +53,11 @@
 		try {
 			if (publish) {
 				const done = await draft.publishReview();
-				if (done) message = 'Review published.';
+				if (done) message = $_('editor.review_published');
 			} else {
 				const result = await draft.submitReview();
 				if (result) {
-					message = 'Submitted for review.';
+					message = $_('editor.submitted_for_review');
 				}
 			}
 		} catch (cause) {
@@ -70,7 +70,7 @@
 	<div
 		class="relative flex flex-wrap items-center justify-end gap-2 font-sans text-xs leading-normal text-near-black"
 		role="group"
-		aria-label="Publishing actions"
+		aria-label={$_('editor.publishing_actions')}
 	>
 		{#if saveStatus === 'saving' || saveStatus === 'error'}<SaveStatus
 				status={saveStatus}
@@ -87,13 +87,13 @@
 					aria-hidden="true"
 				></i>
 				{draft.busy
-					? 'Working…'
+					? $_('editor.working')
 					: draft.reviewProductionSaved
-						? 'Retry review cleanup'
-						: 'Publish review'}
+						? $_('editor.retry_review_cleanup')
+						: $_('editor.publish_review')}
 			</button>
 			{#if draft.reviewProductionSaved}<span class="sr-only" role="note"
-					>Production files were saved. Retrying only removes the review and its archive.</span
+					>{$_('editor.review_cleanup_hint')}</span
 				>{/if}
 		{:else}
 			<button
@@ -103,13 +103,13 @@
 				><i
 					class={draft.busy ? 'fa-solid fa-circle-notch animate-spin' : 'fa-solid fa-paper-plane'}
 					aria-hidden="true"
-				></i>{draft.busy ? 'Submitting…' : 'Submit for review'}</button
+				></i>{draft.busy ? $_('editor.submitting') : $_('editor.submit_for_review')}</button
 			>
 		{/if}
 		<button
 			type="button"
 			class="tool-btn shrink-0 disabled:cursor-default disabled:opacity-40 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue! h-7 w-7"
-			aria-label="More editor actions"
+			aria-label={$_('editor.more_editor_actions')}
 			aria-expanded={menuOpen}
 			popovertarget="editor-actions-menu"
 			bind:this={menuButton}><i class="fa-solid fa-ellipsis" aria-hidden="true"></i></button
@@ -117,7 +117,7 @@
 		<section
 			id="editor-actions-menu"
 			class="panel fixed inset-auto top-14 right-2 m-0 w-68 max-w-[calc(100vw-1rem)] max-h-[calc(100dvh-5rem)] overflow-auto"
-			aria-label="Editor actions"
+			aria-label={$_('editor.editor_actions')}
 			popover="auto"
 			bind:this={menu}
 			use:containMenuKeys
@@ -147,7 +147,7 @@
 				<a
 					class="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-xs text-near-black hover:bg-black/5 focus-visible:outline-2! focus-visible:-outline-offset-2! focus-visible:outline-creator-blue! disabled:cursor-default disabled:opacity-40 [&>i]:w-4 [&>i]:text-center [&>i]:text-warm-gray-500"
 					href={`${base}/felslager/reviews`}
-					><i class="fa-solid fa-inbox" aria-hidden="true"></i>Review inbox</a
+					><i class="fa-solid fa-inbox" aria-hidden="true"></i>{$_('editor.review_inbox')}</a
 				>
 				{#if !draft.reviewId && onSave}
 					<button
@@ -157,7 +157,9 @@
 							onSave?.();
 						}}
 						disabled={!draft.ready || draft.busy || saveDisabled}
-						><i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i>Publish directly to server</button
+						><i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i>{$_(
+							'editor.publish_directly_to_server'
+						)}</button
 					>
 				{/if}
 			</div>
@@ -192,7 +194,7 @@
 		{#if error || message}
 			<section
 				class="panel fixed inset-auto top-16 right-2 z-60 m-0 w-90 max-w-[calc(100vw-1rem)] max-h-[calc(100dvh-5rem)] overflow-auto"
-				aria-label="Review update"
+				aria-label={$_('editor.review_update')}
 				popover="auto"
 				use:showReviewPopover
 				ontoggle={(event) => {
@@ -203,10 +205,10 @@
 				}}
 			>
 				<header class="flex items-center justify-between gap-3 border-b border-black/10 px-3 py-1">
-					<h2 class="text-ui-label">Review update</h2>
+					<h2 class="text-ui-label">{$_('editor.review_update')}</h2>
 					<button
 						class="tool-btn shrink-0 disabled:cursor-default disabled:opacity-40 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue! h-7 w-7"
-						aria-label="Dismiss review message"
+						aria-label={$_('editor.dismiss_review_message')}
 						onclick={() => {
 							error = '';
 							message = '';
@@ -228,7 +230,7 @@
 				<footer class="flex items-center justify-between gap-2 border-t border-black/10 p-3">
 					<a
 						class="text-xs font-medium text-creator-blue hover:underline focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue!"
-						href={`${base}/felslager/reviews`}>Review inbox</a
+						href={`${base}/felslager/reviews`}>{$_('editor.review_inbox')}</a
 					><i class="fa-solid fa-arrow-right text-creator-blue" aria-hidden="true"></i>
 				</footer>
 			</section>

@@ -1,3 +1,5 @@
+import { get } from 'svelte/store';
+import { _ } from 'svelte-i18n';
 import { processingCropSource } from './processing-assets';
 import { getProcessingResults, downloadResultFile } from '$lib/api/processing';
 import {
@@ -44,22 +46,30 @@ export async function downloadProcessingBundle(id: string) {
 	for (const hit of project.hits)
 		if (!paths.includes(validateResultPath(hit.crop)))
 			throw new Error(`Missing detection crop: ${hit.crop}`);
-	return { manifest, files, project, pendingFiles: paths.filter((path) => !files[path]) };
+	return {
+		manifest,
+		files,
+		project,
+		pendingFiles: paths.filter((path) => !files[path])
+	};
 }
 export async function importProcessingResult(id: string, sourceId?: string | null) {
 	const { manifest, files, project, pendingFiles } = await downloadProcessingBundle(id);
 	const resources = createDraftResources();
 	try {
 		const stored = sourceId ? await draftsState.get(sourceId) : null;
-		if (sourceId && !stored) throw new Error('Draft not found');
+		if (sourceId && !stored) throw new Error(get(_)('editor.error_draft_not_found'));
 		const draft = stored ? resources.restore(stored) : createDraft('3d');
 		const parent = draftNode(draft);
 		if (stored && workspaceNodePath(parent) !== manifest.entryPath)
-			throw new Error('Capture belongs to another entry');
+			throw new Error(get(_)('editor.error_capture_belongs_to_another_entry'));
 		const resultId = `reconstruction-${crypto.randomUUID().slice(0, 8)}`;
 		if (stored) {
 			const node = {
-				entry: createFelsEntry('sector', { id: resultId, name: project.name || resultId }),
+				entry: createFelsEntry('sector', {
+					id: resultId,
+					name: project.name || resultId
+				}),
 				path: workspaceNodePath(parent),
 				childEntries: [],
 				topo: null,
@@ -79,7 +89,10 @@ export async function importProcessingResult(id: string, sourceId?: string | nul
 		} else {
 			// Keep a distinct publication path for every run, including repeated imports.
 			parent.path = manifest.entryPath;
-			parent.entry = createFelsEntry('sector', { id: resultId, name: project.name || resultId });
+			parent.entry = createFelsEntry('sector', {
+				id: resultId,
+				name: project.name || resultId
+			});
 			parent.entry.geometry = { type: 'Point', coordinates: [0, 0] };
 			parent.dirtyPaths = [];
 			draft.placed = true;

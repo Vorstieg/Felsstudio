@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import type { PointOrAreaGeometry } from '@vorstieg/fels-types/types';
 	import { onDestroy } from 'svelte';
 	import { generateFlightPlanInWorker } from '$lib/assets/js/flight-plan-client.ts';
@@ -78,7 +79,7 @@
 			};
 			const wallDistance = Number(minimumWallDistanceMeters);
 			if (!Number.isFinite(wallDistance) || wallDistance < 1) {
-				throw new Error('Minimum wall distance must be at least 1 m.');
+				throw new Error($_('editor.minimum_wall_distance_must_be_at_least_1_m'));
 			}
 
 			const geometry = entry?.geometry?.type === 'Polygon' ? entry.geometry : null;
@@ -90,14 +91,14 @@
 								const longitude = position[0];
 								const latitude = position[1];
 								if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
-									throw new Error('Entry geometry contains an invalid coordinate.');
+									throw new Error($_('editor.entry_geometry_contains_an_invalid_coordinate'));
 								}
 								return [longitude, latitude];
 							})
 						)
 					}
 				: null;
-			if (!polygon) throw new Error('Select a polygon capture area first.');
+			if (!polygon) throw new Error($_('editor.select_a_polygon_capture_area_first'));
 			const generatedPlan = await generateFlightPlanInWorker(
 				polygon,
 				{
@@ -107,7 +108,7 @@
 					minimumFaceDistanceMeters: wallDistance,
 					cragName: entryName,
 					startElevation: plan?.metadata.startElevation,
-					name: `${entry?.name || entry?.id || entryName || 'Entry'} capture plan`
+					name: `${entry?.name || entry?.id || entryName || $_('editor.entry')} capture plan`
 				},
 				{
 					signal: controller.signal,
@@ -132,7 +133,7 @@
 			error =
 				generationError instanceof Error
 					? generationError.message
-					: 'Unable to generate a flight plan.';
+					: $_('editor.unable_to_generate_a_flight_plan');
 		} finally {
 			if (generation === controller) {
 				generating = false;
@@ -148,16 +149,14 @@
 		try {
 			const launchElevation = plan.metadata.startElevation;
 			if (typeof launchElevation !== 'number' || !Number.isFinite(launchElevation)) {
-				throw new Error(
-					'Enter the launch elevation in metres AMSL before exporting the capture plan.'
-				);
+				throw new Error($_('editor.launch_elevation_required'));
 			}
 			await downloadFlightPlanKmz(plan);
 		} catch (downloadError) {
 			error =
 				downloadError instanceof Error
 					? downloadError.message
-					: 'Unable to download the capture plan.';
+					: $_('editor.unable_to_download_the_capture_plan');
 		}
 	}
 
@@ -201,43 +200,45 @@
 			<i class="fa-solid fa-helicopter text-[10px]"></i>
 		</div>
 		<div>
-			<h3 class="text-ui-label text-near-black !m-0">Drone capture plan</h3>
-			<p class="text-[10px] text-warm-gray-400">One native Mavic 4 Pro façade mission.</p>
+			<h3 class="text-ui-label text-near-black !m-0">{$_('editor.drone_capture_plan')}</h3>
+			<p class="text-[10px] text-warm-gray-400">
+				{$_('editor.one_native_mavic_4_pro_fa_ade_mission')}
+			</p>
 		</div>
 	</div>
 
 	{#if !isPolygon}
 		<p class="rounded-sm border border-amber-200 bg-amber-50 p-2 text-[10px] text-amber-800">
-			Select an entry with polygon geometry before generating a capture plan.
+			{$_('editor.capture_polygon_required')}
 		</p>
 	{:else}
 		<label class="block text-ui-label text-warm-gray-500">
-			Detail
+			{$_('editor.detail')}
 			<select
 				bind:value={detail}
 				disabled={generating}
 				class="input-studio mt-0.5 w-full appearance-none"
 			>
-				<option value="standard">Standard</option>
-				<option value="high">High detail</option>
-				<option value="topo">Topo detail</option>
+				<option value="standard">{$_('editor.standard')}</option>
+				<option value="high">{$_('editor.high_detail')}</option>
+				<option value="topo">{$_('editor.topo_detail')}</option>
 			</select>
 		</label>
 		<label class="block text-ui-label text-warm-gray-500">
-			Pattern
+			{$_('editor.pattern')}
 			<select
 				bind:value={pattern}
 				disabled={generating}
 				class="input-studio mt-0.5 w-full appearance-none"
 			>
-				<option value="facade-grid">Façade grid</option>
-				<option value="constant-distance-grid">Constant-distance grid</option>
-				<option value="half-helix">Half helix</option>
-				<option value="curved-sweep">Curved sweep</option>
+				<option value="facade-grid">{$_('editor.fa_ade_grid')}</option>
+				<option value="constant-distance-grid">{$_('editor.constant_distance_grid')}</option>
+				<option value="half-helix">{$_('editor.half_helix')}</option>
+				<option value="curved-sweep">{$_('editor.curved_sweep')}</option>
 			</select>
 		</label>
 		<label class="block text-ui-label text-warm-gray-500">
-			Minimum wall distance (m)
+			{$_('editor.minimum_wall_distance_m')}
 			<input
 				type="number"
 				min="1"
@@ -248,8 +249,7 @@
 			/>
 		</label>
 		<p class="text-[9px] leading-snug text-warm-gray-500">
-			Detail controls photo resolution and planned stand-off. Minimum wall distance limits how close
-			the aircraft may fly.
+			{$_('editor.capture_detail_hint')}
 		</p>
 		<button
 			type="button"
@@ -258,15 +258,15 @@
 			disabled={generating}
 		>
 			<i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
-			Generate plan
+			{$_('editor.generate_plan')}
 		</button>
 	{/if}
 
 	{#if generating}
 		<div class="flex items-center justify-between gap-2 text-[10px]">
-			<span role="status">{progress || 'Starting flight calculation…'}</span>
+			<span role="status">{progress || $_('editor.starting_flight_calculation')}</span>
 			<button type="button" onclick={cancelGeneration} class="text-warm-gray-600 underline"
-				>Cancel</button
+				>{$_('editor.cancel')}</button
 			>
 		</div>
 	{/if}
@@ -279,12 +279,12 @@
 
 	{#if plan}
 		<section
-			aria-label="Capture plan legend"
+			aria-label={$_('editor.capture_plan_legend')}
 			class="rounded-sm border border-black/15 bg-white p-2 text-[10px] text-warm-gray-600"
 		>
-			<h4 class="!m-0 mb-2 font-semibold text-near-black">Map legend</h4>
+			<h4 class="!m-0 mb-2 font-semibold text-near-black">{$_('editor.map_legend')}</h4>
 			<ul class="!m-0 grid list-none grid-cols-2 gap-x-3 gap-y-2 !p-0">
-				{#each [{ color: '#f59e0b', label: 'Capture waypoint', shape: 'dot' }, { color: '#0aa6eb', label: 'Transit waypoint', shape: 'dot' }, { color: '#16a34a', label: 'Row start / single point', shape: 'dot' }, { color: '#ef4444', label: 'Row end', shape: 'dot' }, { color: '#a855f7', label: 'Detected wall base', shape: 'line' }, { color: '#38bdf8', label: 'Detected wall top', shape: 'dashed' }, { color: '#facc15', label: 'Wall sample', shape: 'dot' }, { color: '#facc15', label: 'Camera field of view', shape: 'line' }, { color: '#94a3b8', label: 'Ground shadow / height guides', shape: 'line' }] as item}
+				{#each [{ color: '#f59e0b', label: $_('editor.capture_waypoint'), shape: 'dot' }, { color: '#0aa6eb', label: $_('editor.transit_waypoint'), shape: 'dot' }, { color: '#16a34a', label: $_('editor.row_start_single_point'), shape: 'dot' }, { color: '#ef4444', label: $_('editor.row_end'), shape: 'dot' }, { color: '#a855f7', label: $_('editor.detected_wall_base'), shape: 'line' }, { color: '#38bdf8', label: $_('editor.detected_wall_top'), shape: 'dashed' }, { color: '#facc15', label: $_('editor.wall_sample'), shape: 'dot' }, { color: '#facc15', label: $_('editor.camera_field_of_view'), shape: 'line' }, { color: '#94a3b8', label: $_('editor.ground_shadow_height_guides'), shape: 'line' }] as item}
 					<li class="flex items-center gap-2 leading-snug">
 						<span class="flex w-5 shrink-0 justify-center" aria-hidden="true">
 							<span
@@ -299,102 +299,105 @@
 				{/each}
 			</ul>
 			<p class="mb-0 mt-2 text-[9px] text-warm-gray-500">
-				Flight path segments use the color of their starting waypoint.
+				{$_('editor.flight_segment_colors')}
 			</p>
 		</section>
 		<div
 			class="rounded-sm border border-creator-blue/20 bg-creator-blue/5 p-2 text-[10px] text-warm-gray-600"
 		>
 			<div class="grid grid-cols-2 gap-x-2 gap-y-1">
-				<span>Pattern</span><strong class="text-right capitalize text-near-black"
+				<span>{$_('editor.pattern')}</span><strong class="text-right capitalize text-near-black"
 					>{plan.metadata.pattern}</strong
 				>
-				<span>Coverage grids</span><strong class="text-right text-near-black"
+				<span>{$_('editor.coverage_grids')}</span><strong class="text-right text-near-black"
 					>{plan.metadata.coveragePasses ?? 1}</strong
 				>
 				{#if plan.metadata.supplementaryWaypointCount !== undefined}
-					<span>Supplementary views</span><strong class="text-right text-near-black"
+					<span>{$_('editor.supplementary_views')}</span><strong class="text-right text-near-black"
 						>{plan.metadata.supplementaryWaypointCount}</strong
 					>
 				{/if}
-				<span>Waypoints</span><strong class="text-right text-near-black"
+				<span>{$_('editor.waypoints')}</span><strong class="text-right text-near-black"
 					>{plan.waypoints.length}</strong
 				>
 				{#if transitWaypointCount > 0}
-					<span>Transit waypoints</span><strong class="text-right text-near-black"
+					<span>{$_('editor.transit_waypoints')}</span><strong class="text-right text-near-black"
 						>{transitWaypointCount}</strong
 					>
 				{/if}
-				<span>Detected wall</span>
+				<span>{$_('editor.detected_wall')}</span>
 				<strong class="text-right text-near-black">
 					{plan.wallDetection.coordinates.length > 1
 						? `${Math.round(plan.wallDetection.confidence * 100)}% confidence`
-						: 'Not detected'}
+						: $_('editor.not_detected')}
 				</strong>
-				<span>Wall shape</span>
+				<span>{$_('editor.wall_shape')}</span>
 				<strong class="text-right capitalize text-near-black">
-					{plan.wallDetection.coordinates.length > 1 ? plan.wallDetection.shape : 'Unknown'}
+					{plan.wallDetection.coordinates.length > 1
+						? $_('editor.shape_' + plan.wallDetection.shape)
+						: $_('editor.unknown')}
 				</strong>
-				<span>Vertex elevation min.</span><strong class="text-right text-near-black"
+				<span>{$_('editor.vertex_elevation_min')}</span><strong class="text-right text-near-black"
 					>{plan.metadata.sectorMinimumElevation.toFixed(1)} m</strong
 				>
-				<span>Vertex elevation max.</span><strong class="text-right text-near-black"
+				<span>{$_('editor.vertex_elevation_max')}</span><strong class="text-right text-near-black"
 					>{plan.metadata.sectorMaximumElevation.toFixed(1)} m</strong
 				>
-				<span>Capture height</span><strong class="text-right text-near-black"
+				<span>{$_('editor.capture_height')}</span><strong class="text-right text-near-black"
 					>{plan.metadata.captureHeightMeters.toFixed(1)} m</strong
 				>
-				<span>Target detail</span><strong class="text-right text-near-black"
+				<span>{$_('editor.target_detail')}</span><strong class="text-right text-near-black"
 					>{plan.metadata.targetGsdCm} cm/pixel</strong
 				>
-				<span>Planned stand-off</span><strong class="text-right text-near-black"
+				<span>{$_('editor.planned_stand_off')}</span><strong class="text-right text-near-black"
 					>{plan.metadata.standOffMeters?.toFixed(1)} m</strong
 				>
-				<span>Camera</span><strong class="text-right text-near-black">{plan.metadata.camera}</strong
+				<span>{$_('editor.camera')}</span><strong class="text-right text-near-black"
+					>{plan.metadata.camera}</strong
 				>
-				<span>Photos</span><strong class="text-right text-near-black"
+				<span>{$_('editor.photos')}</span><strong class="text-right text-near-black"
 					>{plan.metadata.photoCount}</strong
 				>
 				{#if plan.metadata.coverageTargetCount !== undefined}
-					<span>Coverage samples</span><strong class="text-right text-near-black"
+					<span>{$_('editor.coverage_samples')}</span><strong class="text-right text-near-black"
 						>{plan.metadata.coveredTargetCount}/{plan.metadata.coverageTargetCount}</strong
 					>
-					<span>Top coverage samples</span><strong class="text-right text-near-black"
+					<span>{$_('editor.top_coverage_samples')}</span><strong class="text-right text-near-black"
 						>{plan.metadata.coveredCrestTargetCount}/{plan.metadata.crestTargetCount}</strong
 					>
-					<span>Tele detail photos</span><strong class="text-right text-near-black"
+					<span>{$_('editor.tele_detail_photos')}</span><strong class="text-right text-near-black"
 						>{plan.metadata.detailPhotoCount ?? 0}</strong
 					>
 				{/if}
-				<span>Cliff clearance</span>
+				<span>{$_('editor.cliff_clearance')}</span>
 				<strong class="text-right text-near-black">
 					≥ {plan.metadata.minimumFaceDistanceMeters.toFixed(1)} m
 				</strong>
 				{#if typeof plan.metadata.clearanceMarginMeters === 'number'}
-					<span>Planning margin</span><strong class="text-right text-near-black"
+					<span>{$_('editor.planning_margin')}</span><strong class="text-right text-near-black"
 						>+ {plan.metadata.clearanceMarginMeters.toFixed(1)} m</strong
 					>
 				{/if}
-				<span>Ground clearance</span>
+				<span>{$_('editor.ground_clearance')}</span>
 				<strong class="text-right text-near-black">
 					≥ {plan.metadata.minimumGroundClearanceMeters.toFixed(1)} m
 				</strong>
 				{#if plan.metadata.droppedWaypointCount > 0}
-					<span>Waypoints removed</span>
+					<span>{$_('editor.waypoints_removed')}</span>
 					<strong class="text-right text-near-black">{plan.metadata.droppedWaypointCount}</strong>
 				{/if}
 				{#if plan.metadata.altitudeCappedWaypointCount > 0}
-					<span>Above height cap removed</span>
+					<span>{$_('editor.above_height_cap_removed')}</span>
 					<strong class="text-right text-near-black"
 						>{plan.metadata.altitudeCappedWaypointCount}</strong
 					>
 				{/if}
 				{#if plan.metadata.fragmentedRowCount > 0}
-					<span>Rows replanned</span>
+					<span>{$_('editor.rows_replanned')}</span>
 					<strong class="text-right text-near-black">{plan.metadata.fragmentedRowCount}</strong>
 				{/if}
 				{#if plan.metadata.discardedFragmentWaypointCount > 0}
-					<span>Disconnected points removed</span>
+					<span>{$_('editor.disconnected_points_removed')}</span>
 					<strong class="text-right text-near-black"
 						>{plan.metadata.discardedFragmentWaypointCount}</strong
 					>
@@ -405,39 +408,40 @@
 					role="alert"
 					class="mt-2 rounded-sm border border-amber-200 bg-amber-50 p-2 text-amber-800"
 				>
-					The selected wall is not fully covered by clear camera views. Increase wall distance or
-					adjust the capture area before exporting.
+					{$_('editor.capture_coverage_warning')}
 				</p>
 			{/if}
 			<p class="mt-2 text-[9px] leading-snug text-warm-gray-500">
-				One overlapping grid covers the wall. Extra oblique and top views are added only where
-				coverage needs them. Terrain data cannot resolve overhangs, hidden recesses, vegetation or
-				small obstacles.
+				{$_('editor.capture_coverage_hint')}
 			</p>
 			<label class="mt-2 block text-ui-label text-warm-gray-500">
-				Camera view
+				{$_('editor.camera_view')}
 				<select
 					value={cameraPreviewWaypointIndex ?? ''}
 					onchange={selectCameraPreview}
 					class="input-studio mt-0.5 w-full appearance-none"
 				>
-					<option value="">Off</option>
+					<option value="">{$_('editor.off')}</option>
 					{#each rowStarts as waypoint, row}
 						<option value={waypoint.index}
-							>Row {row + 1}{waypoint.captureView === 'crest' ? ' · Top edge' : ''}</option
+							>{$_('editor.row')}
+							{row + 1}{waypoint.captureView === 'crest'
+								? ' · ' + $_('editor.top_edge')
+								: ''}</option
 						>
 					{/each}
 				</select>
 			</label>
 			{#if previewWaypoint}
 				<p class="mt-1 text-[9px] text-warm-gray-500">
-					Pitch {previewWaypoint.gimbalPitch?.toFixed(1)}° · {previewWaypoint.camera}{previewWaypoint.detailCamera
+					{$_('editor.pitch')}
+					{previewWaypoint.gimbalPitch?.toFixed(1)}° · {previewWaypoint.camera}{previewWaypoint.detailCamera
 						? ` + ${previewWaypoint.detailCamera} detail`
 						: ''}
 				</p>
 			{/if}
 			<label class="mt-2 block text-ui-label text-warm-gray-500">
-				Launch elevation (m AMSL)
+				{$_('editor.launch_elevation_m_amsl')}
 				<input
 					type="number"
 					step="0.1"
@@ -448,9 +452,7 @@
 				/>
 			</label>
 			<p class="mt-1 text-[9px] leading-snug text-warm-gray-500">
-				Enter the actual takeoff elevation using the same elevation reference as the terrain.
-				Clearance checks cover the capture path; approach and return flights require separate
-				planning.
+				{$_('editor.launch_elevation_hint')}
 			</p>
 			<button
 				type="button"
@@ -459,7 +461,7 @@
 				disabled={generating || coverageBlocked}
 			>
 				<i class="fa-solid fa-download text-xs"></i>
-				Download Mavic 4 Pro KMZ
+				{$_('editor.download_mavic_4_pro_kmz')}
 			</button>
 			<button
 				type="button"
@@ -467,13 +469,10 @@
 				onclick={deleteFlightPath}
 			>
 				<i class="fa-solid fa-trash-can text-xs"></i>
-				Delete flight path
+				{$_('editor.delete_flight_path')}
 			</button>
 			<p class="mt-1.5 text-[9px] leading-snug text-warm-gray-500">
-				Map preview: yellow dots and the purple line mark the DEM-detected wall base; the dashed
-				cyan line marks its clipped top. The constant-distance grid stays between these boundaries.
-				Amber is the capture path; green and red mark each row’s start and end. Blue dots mark
-				transit waypoints, where no photos are taken.
+				{$_('editor.flight_map_preview_hint')}
 			</p>
 		</div>
 	{/if}

@@ -1,3 +1,5 @@
+import { get } from 'svelte/store';
+import { _ } from 'svelte-i18n';
 import { createFelsEntry } from './crag-session.svelte';
 import type { FelsEntryWorkspace, FelsEntryWorkspaceSnapshot } from '$lib/types/crag';
 import type { TopoSessionInput } from './topo-2d-editor-state.svelte';
@@ -76,7 +78,7 @@ export function createDraft(
 async function localBlob(url: string | null | undefined) {
 	if (!url || !(url.startsWith('blob:') || url.startsWith('data:image/'))) return undefined;
 	const response = await fetch(url);
-	if (!response.ok) throw new Error('Could not save a draft asset');
+	if (!response.ok) throw new Error(get(_)('editor.error_could_not_save_a_draft_asset'));
 	return response.blob();
 }
 /** Encode a plain snapshot once, at the IndexedDB boundary. Text is never interpreted as an asset. */

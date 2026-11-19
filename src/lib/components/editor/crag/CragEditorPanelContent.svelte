@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import type { Map as MapLibreMap } from 'maplibre-gl';
 	import type { FlightPlan } from '$lib/assets/js/flight-plan-types.ts';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
@@ -65,7 +66,8 @@
 				: 'text-warm-gray-500 hover:bg-black/5'}"
 			onclick={() => (activeTab = 'info')}
 		>
-			<i class="fa-solid fa-circle-info mr-1.5"></i> Metadata
+			<i class="fa-solid fa-circle-info mr-1.5"></i>
+			{$_('editor.metadata')}
 		</button>
 		<button
 			class="flex-1 px-2 py-1.5 rounded-sm text-ui-label transition-none {activeTab === 'registry'
@@ -73,7 +75,8 @@
 				: 'text-warm-gray-500 hover:bg-black/5'}"
 			onclick={() => (activeTab = 'registry')}
 		>
-			<i class="fa-solid fa-layer-group mr-1.5"></i> Registry
+			<i class="fa-solid fa-layer-group mr-1.5"></i>
+			{$_('editor.registry')}
 			<span class="ml-1 text-micro-data"
 				>{cragEditorState.getWorkspaceAccess()?.features?.length || 0}</span
 			>
@@ -84,7 +87,8 @@
 				: 'text-warm-gray-500 hover:bg-black/5'}"
 			onclick={() => (activeTab = 'sectors')}
 		>
-			<i class="fa-solid fa-table-cells-large mr-1.5"></i> Children
+			<i class="fa-solid fa-table-cells-large mr-1.5"></i>
+			{$_('editor.children')}
 			<span class="ml-1 text-micro-data">{cragEditorState.getActiveSectors().length}</span>
 		</button>
 		{#if isPolygonEntry}
@@ -94,7 +98,8 @@
 					: 'text-warm-gray-500 hover:bg-black/5'}"
 				onclick={() => (activeTab = 'capture')}
 			>
-				<i class="fa-solid fa-helicopter mr-1.5"></i> Capture plan
+				<i class="fa-solid fa-helicopter mr-1.5"></i>
+				{$_('editor.capture_plan')}
 			</button>
 		{/if}
 	</div>
@@ -115,9 +120,8 @@
 	{:else if activeTab === 'capture' && isPolygonEntry}
 		<div class="space-y-1">
 			<p class="text-micro-data text-warm-gray-400">
-				Plan a façade mission for {activeEntryProperties?.name ||
-					activeEntryProperties?.id ||
-					'this entry'}.
+				{$_('editor.plan_a_fa_ade_mission_for')}
+				{activeEntryProperties?.name || activeEntryProperties?.id || $_('editor.this_entry')}.
 			</p>
 			{#key cragEditorState.activeWorkspaceEntryPath}
 				<CragFlightPlanPanel

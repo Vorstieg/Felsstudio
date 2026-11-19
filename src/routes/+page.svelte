@@ -155,7 +155,7 @@
 									class="mt-2 flex items-center justify-between gap-2 rounded bg-rose-50 border border-rose-200 px-2 py-1.5"
 								>
 									<p class="text-micro-data text-rose-600 leading-tight">
-										Session data lost (browser storage cleared).
+										{$_('editor.session_data_lost_browser_storage_cleared')}
 									</p>
 									<button
 										class="text-micro-data text-rose-500 hover:text-rose-700 underline whitespace-nowrap transition-none"
@@ -164,7 +164,7 @@
 											draftsState.delete(draft.id);
 											brokenDraftId = null;
 										}}
-										>Remove
+										>{$_('editor.remove')}
 									</button>
 								</div>
 							{/if}

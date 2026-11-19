@@ -1,3 +1,5 @@
+import { get } from 'svelte/store';
+import { _ } from 'svelte-i18n';
 import { fileUrl, writeFile, writeJson } from '$lib/api/felslager';
 import { draftsState } from '$lib/state/drafts.svelte';
 import { workspaceNodes } from '$lib/state/shared-draft';
@@ -13,12 +15,16 @@ export async function publishTopoDocument(
 	const document = { ...topo };
 	if (document.image2D?.startsWith('blob:')) {
 		const response = await fetch(document.image2D);
-		if (!response.ok) throw new Error('Could not read the topo background');
+		if (!response.ok) throw new Error(get(_)('editor.error_could_not_read_the_topo_background'));
 		const blob = await response.blob();
 		const extension =
-			({ 'image/png': 'png', 'image/webp': 'webp', 'image/jpeg': 'jpg' } as Record<string, string>)[
-				blob.type
-			] || 'png';
+			(
+				{
+					'image/png': 'png',
+					'image/webp': 'webp',
+					'image/jpeg': 'jpg'
+				} as Record<string, string>
+			)[blob.type] || 'png';
 		const imagePath = path.replace(/-topo\.json$/, `-background.${extension}`);
 		await writeFile(imagePath, blob, blob.type);
 		document.image2D = fileUrl(imagePath);
@@ -29,7 +35,7 @@ export async function publishTopoDocument(
 /** Crag publishing also includes models added in the 3D editor. */
 export async function publishDraftModels(id: string) {
 	const draft = await draftsState.get(id);
-	if (!draft) throw new Error('Draft not found');
+	if (!draft) throw new Error(get(_)('editor.error_draft_not_found'));
 	for (const node of workspaceNodes(draft.workspace)) {
 		const model = draft.contexts[node.clientId!]?.glbBlob;
 		if (!model) continue;

@@ -105,7 +105,7 @@
 		<CropImage
 			eager
 			src={getCropSrc(previewHit)}
-			alt="Zoomed crop"
+			alt={$_('editor.zoomed_crop')}
 			class="w-full aspect-square object-contain rounded-sm bg-black/5 mb-2 border border-black/15"
 		/>
 
@@ -180,7 +180,7 @@
 				>
 					<CropImage
 						src={getCropSrc(hit)}
-						alt="Detection"
+						alt={$_('editor.detection')}
 						class="w-full h-full object-cover grayscale-[0.4] hover:grayscale-0"
 					/>
 				</button>
@@ -205,7 +205,7 @@
 			<div class="w-px h-5 bg-black/15"></div>
 			<button
 				onclick={close}
-				aria-label="Close inspector"
+				aria-label={$_('editor.close_inspector')}
 				class="w-8 h-8 flex items-center justify-center rounded-sm bg-black/5 hover:bg-rose-600 hover:text-white transition-none text-warm-gray-500 border border-black/10 shadow-sm cursor-pointer"
 			>
 				<i class="fa-solid fa-xmark text-sm"></i></button

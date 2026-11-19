@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import { onDestroy } from 'svelte';
 	import type { Map as MapLibreMap } from 'maplibre-gl';
 	import { maptilerApiKey } from '$lib/config';
@@ -63,7 +64,7 @@
 
 	async function searchPlaces(query: string): Promise<void> {
 		if (!maptilerApiKey) {
-			searchError = 'Search unavailable';
+			searchError = $_('editor.search_unavailable');
 			return;
 		}
 		abortController = new AbortController();
@@ -92,7 +93,7 @@
 		} catch (error: unknown) {
 			if (error instanceof Error && error.name === 'AbortError') return;
 			results = [];
-			searchError = 'Search unavailable';
+			searchError = $_('editor.search_unavailable');
 		} finally {
 			isSearching = false;
 		}
@@ -150,7 +151,11 @@
 
 	function getFeatureTitle(feature: GeocodingFeature): string {
 		return (
-			feature.text_de || feature.text_en || feature.text || feature.place_name || 'Unnamed place'
+			feature.text_de ||
+			feature.text_en ||
+			feature.text ||
+			feature.place_name ||
+			$_('editor.unnamed_place')
 		);
 	}
 
@@ -178,7 +183,7 @@
 			bind:value={searchQuery}
 			onkeydown={handleKeydown}
 			class="input-studio flex-1 !border-0 !shadow-none !bg-transparent !px-0"
-			placeholder="Search mountain, address, place..."
+			placeholder={$_('editor.search_mountain_address_place')}
 			autocomplete="off"
 			spellcheck="false"
 		/>
@@ -219,7 +224,7 @@
 		<div
 			class={`${resultPanelClass} border-t border-black/10 px-3 py-2 text-micro-data text-warm-gray-400 font-bold`}
 		>
-			No results
+			{$_('editor.no_results')}
 		</div>
 	{/if}
 </div>

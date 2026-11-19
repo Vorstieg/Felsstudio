@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import type { Map as MapLibreMap } from 'maplibre-gl';
 	import type { FlightPlan } from '$lib/assets/js/flight-plan-types.ts';
 	import MapSearch from '$lib/components/editor/MapSearch.svelte';
@@ -92,8 +93,8 @@
 			? 'calc(var(--mobile-tool-dock-height, 7.5rem) + var(--mobile-tool-options-height, 0px) + max(0.75rem, env(safe-area-inset-bottom)))'
 			: 'calc(var(--info-panel-height, 0px) + var(--mobile-tool-dock-height, 7.5rem) + max(0.75rem, env(safe-area-inset-bottom)))'}
 	onclick={onCenterMapOnUser}
-	title="Center map on current location"
-	aria-label="Center map on current location"
+	title={$_('editor.center_map_on_current_location')}
+	aria-label={$_('editor.center_map_on_current_location')}
 >
 	<i class="fa-solid fa-location-crosshairs text-sm"></i>
 </button>

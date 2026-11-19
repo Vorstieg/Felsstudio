@@ -1,3 +1,5 @@
+import { get } from 'svelte/store';
+import { _ } from 'svelte-i18n';
 import type { SharedDraft } from '$lib/state/shared-draft';
 import { workspaceNodes } from '$lib/state/shared-draft';
 import { writeFile, writeJson } from '$lib/api/felslager';
@@ -11,7 +13,7 @@ export async function publishReview(
 	draft: SharedDraft,
 	persist: () => Promise<void>
 ): Promise<boolean> {
-	if (!draft.reviewId) throw new Error('This draft is not linked to a review');
+	if (!draft.reviewId) throw new Error(get(_)('editor.error_this_draft_is_not_linked_to_a_review'));
 	if (!draft.reviewProductionSaved) {
 		await getReview(draft.reviewId);
 		await saveCragWorkspace(draft.workspace, {

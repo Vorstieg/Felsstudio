@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import { normalizePath } from '$lib/components/editor/crag/crag-editor-paths.ts';
 
 	type FolderItem = { path: string; depth: number; hasChildren: boolean };
@@ -85,20 +86,20 @@
 </script>
 
 <div class="space-y-0.5">
-	<label for="parent-folder-input" class="text-ui-label block">Parent folder</label>
+	<label for="parent-folder-input" class="text-ui-label block">{$_('editor.parent_folder')}</label>
 	<div class="space-y-2">
 		<input
 			id="parent-folder-input"
 			bind:value={selectedPath}
 			class="input-studio w-full font-mono"
-			placeholder="e.g. europe/austria/lower-austria"
+			placeholder={$_('editor.example_folder')}
 		/>
 
 		<div class="rounded-sm border border-black/15 bg-white p-1.5 shadow-panel">
 			<input
 				bind:value={search}
 				class="input-studio w-full font-mono mb-1.5"
-				placeholder="Filter folders..."
+				placeholder={$_('editor.filter_folders')}
 			/>
 			<div class="max-h-56 overflow-y-auto custom-scrollbar space-y-0.5">
 				{#each visibleFolders as item}
@@ -143,13 +144,15 @@
 					</button>
 				{:else}
 					<div class="px-1.5 py-2 text-center text-micro-data text-warm-gray-400">
-						No folders found
+						{$_('editor.no_folders_found')}
 					</div>
 				{/each}
 			</div>
 		</div>
 	</div>
 	{#if selectedPath && !selectedExists}
-		<p class="text-[10px] text-amber-600 font-bold">Parent folder does not exist yet.</p>
+		<p class="text-[10px] text-amber-600 font-bold">
+			{$_('editor.parent_folder_does_not_exist_yet')}
+		</p>
 	{/if}
 </div>
