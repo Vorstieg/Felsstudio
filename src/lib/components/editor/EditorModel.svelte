@@ -798,7 +798,7 @@
 			{#if topoSession.clustering.showAnnotations}
 				<CssObject position={cluster.anchor} scaleWithZoom={true}>
 					<div
-						class="annotation !bg-black/50 !text-white !p-1 !rounded !text-[8px] border border-white/20 {topoSession
+						class="annotation !bg-black/50 !text-white !p-1 !rounded-sm !text-[8px] border border-white/20 {topoSession
 							.clustering.selectedClusterId === cluster.id
 							? '!border-cyan-400 !bg-cyan-900/80'
 							: ''}"

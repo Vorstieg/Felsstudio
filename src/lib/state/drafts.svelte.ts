@@ -1,12 +1,16 @@
 import { draftStore } from '$lib/assets/js/db';
 import { encodeDraft, type SharedDraft } from './shared-draft';
 
-export type DraftMetadata = Pick<SharedDraft, 'id' | 'name' | 'updated' | 'lastEditor'>;
-const metadata = ({ id, name, updated, lastEditor }: SharedDraft): DraftMetadata => ({
+export type DraftMetadata = Pick<
+	SharedDraft,
+	'id' | 'name' | 'updated' | 'lastEditor' | 'reviewId'
+>;
+const metadata = ({ id, name, updated, lastEditor, reviewId }: SharedDraft): DraftMetadata => ({
 	id,
 	name,
 	updated,
-	lastEditor
+	lastEditor,
+	...(reviewId ? { reviewId } : {})
 });
 let pending: Promise<unknown> = Promise.resolve();
 function serial<T>(operation: () => Promise<T>) {

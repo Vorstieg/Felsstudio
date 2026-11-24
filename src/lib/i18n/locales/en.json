@@ -1071,6 +1071,20 @@
 		"route_style_red": "Red",
 		"route_style_red_dashed": "Red dashed",
 		"route_style_red_dotted": "Red dotted",
-		"route_style_variant": "Variant"
+		"route_style_variant": "Variant",
+		"language": "Language",
+		"workflows": "Workflows",
+		"review_badge": "Review",
+		"local_draft": "Local draft",
+		"unsaved_changes": "Unsaved changes",
+		"confirm": "Confirm",
+		"zoom_in": "Zoom in",
+		"zoom_out": "Zoom out",
+		"reset_zoom": "Reset zoom",
+		"no_file_selected": "No file selected",
+		"files_selected": "{count, plural, one {# file selected} other {# files selected}}",
+		"choose_folder": "Choose folder",
+		"review_inbox_desc": "Inspect submitted drafts and publish approved changes to Felslager.",
+		"captures_workspace_desc": "Upload drone captures, run 3D reconstructions, and import results."
 	}
 }

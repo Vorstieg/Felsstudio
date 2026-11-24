@@ -25,59 +25,69 @@
 	}: Props = $props();
 </script>
 
-{#if workSpaceWrapper.isCragEditor()}
-	<button class="btn-primary w-full" onclick={startNewEntry}>
-		<i class="fa-solid fa-plus mr-2"></i>{$_('ui.new_crag')}
-	</button>
-{/if}
-
-<div class="relative">
-	<i
-		class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-warm-gray-300 text-[11px]"
-	></i>
-	<input
-		type="text"
-		placeholder={$_('ui.search_crags')}
-		bind:value={searchQuery}
-		class="input-studio w-full pl-8!"
-	/>
-</div>
-
-<div class="overflow-y-auto space-y-1 pr-1 custom-scrollbar relative">
-	{#if isLoading}
-		<div
-			class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center rounded"
-		>
-			<div class="flex flex-col items-center gap-2">
-				<i class="fa-solid fa-spinner fa-spin text-creator-blue text-xl"></i>
-				<span class="text-micro-data font-bold text-near-black uppercase tracking-widest"
-					>{$_('ui.initializing')}</span
-				>
-			</div>
-		</div>
+<div class="space-y-3">
+	{#if workSpaceWrapper.isCragEditor()}
+		<button type="button" class="btn-primary w-full gap-2" onclick={startNewEntry}>
+			<i class="fa-solid fa-plus" aria-hidden="true"></i>{$_('ui.new_crag')}
+		</button>
 	{/if}
 
-	{#each filteredLocations as crag}
-		<div class="bg-white rounded border border-transparent hover:border-black/15 transition-none">
-			<button
-				class="w-full p-2.5 text-left hover:bg-black/5 rounded transition-none group flex items-center justify-between disabled:opacity-50"
-				onclick={() => loadFromEntry(crag)}
-				disabled={isLoading}
+	<div class="relative">
+		<i
+			class="fa-solid fa-magnifying-glass pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-xs text-warm-gray-400"
+			aria-hidden="true"
+		></i>
+		<input
+			type="search"
+			placeholder={$_('ui.search_crags')}
+			aria-label={$_('ui.search_crags')}
+			bind:value={searchQuery}
+			class="input-studio w-full pl-9!"
+		/>
+	</div>
+
+	<div class="custom-scrollbar relative max-h-[55dvh] space-y-1 overflow-y-auto pr-1">
+		{#if isLoading}
+			<div
+				class="absolute inset-0 z-10 flex items-center justify-center rounded-sm bg-white/70 backdrop-blur-[1px]"
 			>
-				<div>
-					<div class="text-body-text font-bold group-hover:text-creator-blue transition-none">
-						{crag.properties.name}
-					</div>
-					<div class="text-micro-data text-warm-gray-400">{crag.entryPath}</div>
+				<div class="flex flex-col items-center gap-2">
+					<i class="fa-solid fa-spinner fa-spin text-xl text-creator-blue" aria-hidden="true"></i>
+					<span class="text-micro-data font-semibold tracking-wider text-near-black uppercase">
+						{$_('ui.initializing')}
+					</span>
 				</div>
-				<i
-					class="fa-solid fa-chevron-right text-warm-gray-300 text-[10px] group-hover:text-creator-blue transition-none"
-				></i>
-			</button>
-		</div>
-	{:else}
-		<div class="text-center py-6 text-body-text text-warm-gray-500">
-			{$_('ui.no_entries_found')}
-		</div>
-	{/each}
+			</div>
+		{/if}
+
+		{#each filteredLocations as crag}
+			<div
+				class="rounded-sm border border-transparent bg-white transition-colors hover:border-black/10"
+			>
+				<button
+					type="button"
+					class="group flex w-full items-center justify-between gap-3 rounded-sm p-2.5 text-left transition-colors hover:bg-black/[0.04] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-creator-blue"
+					onclick={() => loadFromEntry(crag)}
+					disabled={isLoading}
+				>
+					<div class="min-w-0">
+						<div
+							class="text-body-text truncate font-semibold text-near-black transition-colors group-hover:text-creator-blue"
+						>
+							{crag.properties.name}
+						</div>
+						<div class="text-micro-data truncate text-warm-gray-400">{crag.entryPath}</div>
+					</div>
+					<i
+						class="fa-solid fa-chevron-right shrink-0 text-[10px] text-warm-gray-300 transition-colors group-hover:text-creator-blue"
+						aria-hidden="true"
+					></i>
+				</button>
+			</div>
+		{:else}
+			<div class="text-body-text py-8 text-center text-warm-gray-500">
+				{$_('ui.no_entries_found')}
+			</div>
+		{/each}
+	</div>
 </div>

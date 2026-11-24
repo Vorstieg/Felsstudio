@@ -110,28 +110,37 @@
 	}
 </script>
 
-<div class="space-y-4">
+<div class="space-y-3">
 	<nav
-		class="flex flex-wrap items-center gap-1 rounded-sm border border-black/10 bg-black/[0.03] p-2"
+		class="flex items-start justify-between gap-1.5 rounded-sm border border-black/10 bg-black/[0.03] px-2 py-1.5"
 		aria-label={$_('editor.metadata_hierarchy')}
 	>
-		{#each breadcrumbs as breadcrumb, i}
-			{#if i > 0}<i class="fa-solid fa-chevron-right text-[9px] text-warm-gray-300"></i>{/if}
-			<button
-				type="button"
-				onclick={() => selectBreadcrumb(breadcrumb)}
-				class="rounded-sm px-1.5 py-1 text-micro-data {activeEntry === breadcrumb.entry
-					? 'bg-white font-bold text-creator-blue shadow-sm'
-					: 'text-warm-gray-500 hover:bg-white'}"
-			>
-				{breadcrumb.entry?.entry?.properties.name ||
+		<div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-0.5 leading-tight">
+			{#each breadcrumbs as breadcrumb, i}
+				{@const entryName =
+					breadcrumb.entry?.entry?.properties.name ||
 					breadcrumb.entry?.entry?.properties.id ||
 					breadcrumb.source.id}
-				<span class="opacity-60"
-					>({$_('editor.hierarchy_' + (breadcrumb.entry?.entry?.properties.kind || 'area'))})</span
+				{@const entryKind = $_(
+					'editor.hierarchy_' + (breadcrumb.entry?.entry?.properties.kind || 'area')
+				)}
+				{#if i > 0}<i
+						class="fa-solid fa-chevron-right text-[8px] text-warm-gray-300"
+						aria-hidden="true"
+					></i>{/if}
+				<button
+					type="button"
+					onclick={() => selectBreadcrumb(breadcrumb)}
+					title={`${entryName} (${entryKind})`}
+					class="rounded-sm px-1 py-0.5 text-[10px] leading-tight transition-none {activeEntry ===
+					breadcrumb.entry
+						? 'bg-white font-bold text-creator-blue shadow-xs'
+						: 'text-warm-gray-500 hover:bg-white hover:text-near-black'}"
 				>
-			</button>
-		{/each}
+					{entryName}
+				</button>
+			{/each}
+		</div>
 		{#if isCurrentEntry}
 			<CragHierarchyPlacement compact />
 		{/if}

@@ -345,29 +345,29 @@
 
 		updateD3Rendering();
 	});
+
+	let canvasCursorClass = $derived(
+		editor.ui.activeTool === 'select'
+			? 'cursor-default'
+			: editor.ui.activeTool === 'text'
+				? 'cursor-text'
+				: editor.ui.activeTool === 'eraser'
+					? 'cursor-cell'
+					: 'cursor-crosshair'
+	);
 </script>
 
 <div
 	data-testid="topo-2d-editor"
-	class="relative w-full h-full bg-gray-100 rounded-lg overflow-hidden"
+	class="relative h-full w-full overflow-hidden bg-warm-white"
 	style="touch-action: none;"
 >
-	<button
-		type="button"
-		class="absolute right-3 top-3 z-10 rounded bg-white/95 px-3 py-2 text-sm font-semibold shadow md:hidden"
-		class:bg-creator-blue={editor.ui.mobileSelectionMode}
-		class:text-white={editor.ui.mobileSelectionMode}
-		aria-pressed={editor.ui.mobileSelectionMode}
-		onclick={() => editor.setMobileSelectionMode(!editor.ui.mobileSelectionMode)}
-	>
-		{editor.ui.mobileSelectionMode ? $_('editor.done_selecting') : $_('editor.select_multiple')}
-	</button>
 	<svg
 		data-testid="topo-2d-canvas"
 		bind:this={svgElement}
 		viewBox="0 0 {editor.viewport.baseWidth} {editor.viewport.baseHeight}"
 		preserveAspectRatio="xMidYMid meet"
-		class="w-full h-full cursor-{editor.ui.activeTool === 'eraser' ? 'crosshair' : 'crosshair'}"
+		class={`h-full w-full ${canvasCursorClass}`}
 		style="touch-action: none;"
 		role="application"
 		aria-label={$_('editor.topo_editor')}

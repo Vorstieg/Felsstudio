@@ -225,7 +225,7 @@
 							</p>
 						</div>
 						<button
-							class="px-2 py-1 bg-near-black text-white rounded-sm text-micro-data font-bold hover:bg-black"
+							class="px-2 py-1 bg-creator-blue text-white rounded-sm text-micro-data font-bold hover:bg-creator-blue-active"
 							onclick={() => onAddDetectedAsset(asset)}
 							>{$_('editor.add')}
 						</button>
@@ -444,7 +444,7 @@
 								}}
 							/>
 							<span
-								class="shrink-0 rounded-full bg-black/5 px-1.5 py-0.5 text-micro-data text-warm-gray-500"
+								class="shrink-0 rounded-sm bg-black/5 px-1.5 py-0.5 text-micro-data text-warm-gray-500"
 								>{$_('editor.route_count', { values: { count: routes.length } })}</span
 							>
 						</div>

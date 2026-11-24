@@ -116,8 +116,8 @@
 					{/if}
 					<button
 						class={mobile
-							? 'w-9 h-9 flex items-center justify-center rounded-sm bg-near-black text-white font-bold text-xs'
-							: 'px-2 py-1 bg-near-black text-white rounded-sm text-micro-data font-bold hover:bg-black'}
+							? 'w-9 h-9 flex items-center justify-center rounded-sm bg-creator-blue text-white font-bold text-xs hover:bg-creator-blue-active'
+							: 'px-2 py-1 bg-creator-blue text-white rounded-sm text-micro-data font-bold hover:bg-creator-blue-active'}
 						onclick={(e) => {
 							e.stopPropagation();
 							addAiBolt(cluster);

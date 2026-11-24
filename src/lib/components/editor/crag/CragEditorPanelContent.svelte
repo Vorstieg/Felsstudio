@@ -105,7 +105,7 @@
 	</div>
 {/if}
 
-<div class="overflow-y-auto flex-1 p-3 pt-0 custom-scrollbar bg-transparent">
+<div class={showTabs ? 'overflow-y-auto flex-1 p-3 pt-0 custom-scrollbar bg-transparent' : ''}>
 	{#if activeTab === 'info'}
 		<CragEditorInfoTab {saveStatus} />
 	{:else if activeTab === 'registry'}

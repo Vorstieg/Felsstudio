@@ -197,6 +197,9 @@ export function useDraftEditor({
 		get id() {
 			return draft?.id || null;
 		},
+		get name() {
+			return draft?.name || '';
+		},
 		get nodeId() {
 			return draft?.activeNodeId || null;
 		},

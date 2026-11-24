@@ -53,13 +53,13 @@ We use **Inter** (with specific letter-spacing adjustments) to create a premium,
 
 - **Surface:** White or Warm White.
 - **Border:** `1px solid rgba(0,0,0,0.1)`.
-- **Radius:** `1.5rem` (24px) for main panels, `1rem` (16px) for inner containers.
+- **Radius:** `2px` (`rounded-sm`) for main panels and inner containers.
 - **Shadow:** Level 2 (4-layer stack) for floating panels.
 
 ### Tool Palette
 
-- **Container:** Rounded pill or high-radius rectangle.
-- **Buttons:** 40x40px or 48x48px.
+- **Container:** Sharp rectangle with `2px` (`rounded-sm`) radius.
+- **Buttons:** 40x40px or 48x48px (`2px` / `rounded-sm` radius).
 - **Active State:** Creator Blue background with White icon.
 - **Hover State:** Soft warm gray tint (`rgba(0,0,0,0.05)`).
 
@@ -67,14 +67,14 @@ We use **Inter** (with specific letter-spacing adjustments) to create a premium,
 
 - **Background:** Warm Gray (`rgba(0,0,0,0.05)`).
 - **Focus:** 2px solid Creator Blue ring.
-- **Radius:** 8px.
+- **Radius:** `2px` (`rounded-sm`).
 - **Text:** 13px Inter.
 
 ### Buttons (Primary)
 
 - **Background:** Creator Blue (`#0075de`).
 - **Text:** White.
-- **Radius:** 4px (Subtle) or 9999px (Pill for Wizards).
+- **Radius:** `2px` (`rounded-sm`).
 - **Shadow:** Subtle shadow reinforcement on hover.
 
 ## 5. Layout Principles (The "Studio" Layout)

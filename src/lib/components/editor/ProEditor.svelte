@@ -35,6 +35,7 @@
 	import { fixpointSymbols } from '@vorstieg/topo-renderer';
 
 	import { goto } from '$app/navigation';
+	import { viewport } from '$lib/state/viewport.svelte.ts';
 	import type { Topo2DEditorDocument } from '$lib/state/topo-2d-editor-initial-state.ts';
 	import type { TopoDrawingTarget } from '$lib/state/topo-drawing-target.ts';
 
@@ -59,6 +60,7 @@
 	topoSession.ui.workspace = getInitialWorkspace();
 
 	let activeTool = $state(getInitialActiveTool());
+	let toolOptionsOpen = $state(true);
 	let modelComponent = $state<ReturnType<typeof Model> | null>(null);
 	let editorInternal = $state<ReturnType<typeof EditorInternal> | null>(null);
 	let drawingTarget = $state<TopoDrawingTarget | null>(null);
@@ -400,131 +402,133 @@
 	}
 </script>
 
-<div class="fixed top-2 left-2 right-2 z-50 'block'}">
-	<ToolPalette3D
-		{saveStatus}
-		{saveError}
-		{combinedExport}
-		bind:activeTool
-		bind:drawingTarget
-		bind:lassoPoints
-		bind:clustering={topoSession.clustering}
-	></ToolPalette3D>
-</div>
+<ToolPalette3D
+	{saveStatus}
+	{saveError}
+	{combinedExport}
+	bind:activeTool
+	bind:toolOptionsOpen
+	bind:drawingTarget
+	bind:lassoPoints
+	onUndo={() => topoSession.undo()}
+	onRedo={() => topoSession.redo()}
+	bind:clustering={topoSession.clustering}
+/>
 
 <!-- Floating Hint Panels for 3D Mode -->
-{#if activeTool && activeTool !== 'ai-bolts'}
-	<ToolOptions title={$_(`ui.${activeTool}`)} onClose={() => (activeTool = '')}>
+{#if activeTool && activeTool !== 'ai-bolts' && toolOptionsOpen}
+	<ToolOptions title={$_(`ui.${activeTool}`)} onClose={() => (toolOptionsOpen = false)}>
 		<div class="flex flex-col gap-2 text-warm-gray-500">
 			{#if activeTool === 'route'}
-				<div class="flex items-center gap-1.5 text-micro-data">
+				<div class="flex items-center justify-between gap-2 text-micro-data">
 					<span>{$_('ui.set_vertex')}</span>
 					<kbd
-						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+						class="rounded-sm border border-black/15 bg-black/5 px-1.5 py-0.5 font-mono text-[9px] font-bold text-near-black shadow-sm"
 						>{$_('editor.dbl_click')}</kbd
 					>
 				</div>
-				<div class="flex items-center gap-1.5 text-micro-data">
+				<div class="flex items-center justify-between gap-2 text-micro-data">
 					<span>{$_('ui.undo_vertex')}</span>
 					<kbd
-						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+						class="rounded-sm border border-black/15 bg-black/5 px-1.5 py-0.5 font-mono text-[9px] font-bold text-near-black shadow-sm"
 						>Backspace</kbd
 					>
 				</div>
-				<div class="flex items-center gap-1.5 text-micro-data">
+				<div class="flex items-center justify-between gap-2 text-micro-data">
 					<span>{$_('ui.finalize')}</span>
 					<kbd
-						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+						class="rounded-sm border border-black/15 bg-black/5 px-1.5 py-0.5 font-mono text-[9px] font-bold text-near-black shadow-sm"
 						>Enter</kbd
 					>
 				</div>
 			{:else if activeTool === 'multipitch'}
-				<div class="flex items-center gap-1.5 text-micro-data">
+				<div class="flex items-center justify-between gap-2 text-micro-data">
 					<span>{$_('ui.vertex')}</span>
 					<kbd
-						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+						class="rounded-sm border border-black/15 bg-black/5 px-1.5 py-0.5 font-mono text-[9px] font-bold text-near-black shadow-sm"
 						>{$_('editor.dbl_click')}</kbd
 					>
 				</div>
-				<div class="flex items-center gap-1.5 text-micro-data">
+				<div class="flex items-center justify-between gap-2 text-micro-data">
 					<span>{$_('ui.undo_vertex')}</span>
 					<kbd
-						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+						class="rounded-sm border border-black/15 bg-black/5 px-1.5 py-0.5 font-mono text-[9px] font-bold text-near-black shadow-sm"
 						>Backspace</kbd
 					>
 				</div>
-				<div class="flex items-center gap-1.5 text-micro-data">
+				<div class="flex items-center justify-between gap-2 text-micro-data">
 					<span>{$_('ui.place_belay')}</span>
 					<kbd
-						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+						class="rounded-sm border border-black/15 bg-black/5 px-1.5 py-0.5 font-mono text-[9px] font-bold text-near-black shadow-sm"
 						>B</kbd
 					>
 				</div>
-				<div class="flex items-center gap-1.5 text-micro-data">
+				<div class="flex items-center justify-between gap-2 text-micro-data">
 					<span>{$_('ui.finalize')}</span>
 					<kbd
-						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+						class="rounded-sm border border-black/15 bg-black/5 px-1.5 py-0.5 font-mono text-[9px] font-bold text-near-black shadow-sm"
 						>Enter</kbd
 					>
 				</div>
 			{:else if activeTool === 'fixpoint'}
-				<div class="flex items-center gap-1.5 text-micro-data">
+				<div class="flex items-center justify-between gap-2 text-micro-data">
 					<span>{$_('ui.place_point')}</span>
 					<kbd
-						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+						class="rounded-sm border border-black/15 bg-black/5 px-1.5 py-0.5 font-mono text-[9px] font-bold text-near-black shadow-sm"
 						>{$_('editor.dbl_click')}</kbd
 					>
 				</div>
-				<div class="w-px h-4 bg-black/10 mx-1"></div>
-				<div class="flex items-center gap-1">
+				<div class="h-px w-full bg-black/10 my-1"></div>
+				<div class="grid grid-cols-2 gap-1.5">
 					{#each fixpointSymbols as symbol}
 						<button
-							class="flex items-center gap-2 h-7 px-2.5 rounded-sm transition-none border {topoSession
+							type="button"
+							class="flex h-8 items-center gap-2 rounded-sm border px-2.5 transition-none {topoSession
 								.ui.selectedSymbol === symbol.id
-								? 'bg-creator-blue text-white border-creator-blue shadow-sm'
-								: 'bg-black/5 text-warm-gray-500 border-black/5 hover:bg-black/10 hover:text-near-black'}"
+								? 'border-creator-blue bg-creator-blue text-white shadow-xs'
+								: 'border-black/10 bg-black/[0.04] text-warm-gray-600 hover:bg-black/10 hover:text-near-black'}"
 							onclick={() => (topoSession.ui.selectedSymbol = symbol.id)}
 							title={$_(`topo.fixpoints.${symbol.id}`)}
 						>
 							<img
 								src={symbol.icon}
 								alt={symbol.name}
-								class="w-3 h-3 {topoSession.ui.selectedSymbol === symbol.id
+								class="h-3.5 w-3.5 shrink-0 {topoSession.ui.selectedSymbol === symbol.id
 									? 'invert brightness-0'
-									: 'opacity-70'}"
+									: 'opacity-75'}"
 							/>
-							<span class="text-[9px] font-bold uppercase tracking-tighter"
+							<span class="truncate text-[11px] font-semibold"
 								>{$_(`topo.fixpoints.${symbol.id}`)}</span
 							>
 						</button>
 					{/each}
 				</div>
 			{:else if activeTool === 'crop'}
-				<div class="flex items-center gap-1.5 text-micro-data">
+				<div class="flex items-center justify-between gap-2 text-micro-data">
 					<span>{$_('editor.select_area')}</span>
 					<kbd
-						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+						class="rounded-sm border border-black/15 bg-black/5 px-1.5 py-0.5 font-mono text-[9px] font-bold text-near-black shadow-sm"
 						>{$_('editor.shift_drag')}</kbd
 					>
 				</div>
-				<div class="flex items-center gap-1.5 text-micro-data">
+				<div class="flex items-center justify-between gap-2 text-micro-data">
 					<span>{$_('editor.select_islands')}</span>
 					<kbd
-						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+						class="rounded-sm border border-black/15 bg-black/5 px-1.5 py-0.5 font-mono text-[9px] font-bold text-near-black shadow-sm"
 						>C</kbd
 					>
 				</div>
-				<div class="flex items-center gap-1.5 text-micro-data">
+				<div class="flex items-center justify-between gap-2 text-micro-data">
 					<span>{$_('editor.apply_cut')}</span>
 					<kbd
-						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+						class="rounded-sm border border-black/15 bg-black/5 px-1.5 py-0.5 font-mono text-[9px] font-bold text-near-black shadow-sm"
 						>{$_('editor.delete')}</kbd
 					>
 				</div>
-				<div class="flex items-center gap-1.5 text-micro-data">
+				<div class="flex items-center justify-between gap-2 text-micro-data">
 					<span>{$_('editor.reset')}</span>
 					<kbd
-						class="px-1.5 py-0.5 bg-black/5 border border-black/15 rounded-sm text-[9px] font-mono text-near-black font-bold shadow-sm"
+						class="rounded-sm border border-black/15 bg-black/5 px-1.5 py-0.5 font-mono text-[9px] font-bold text-near-black shadow-sm"
 						>Esc</kbd
 					>
 				</div>
@@ -627,7 +631,11 @@
 {#if draft.ready && !topoSession.transient.glbBlob}
 	<button
 		type="button"
-		class="fixed bottom-14 left-2 z-[60] panel bg-white px-3 py-2 text-ui-label"
-		onclick={() => goto(draft.href('topos/3d/upload'))}>{$_('draft.add_model')}</button
+		class="btn-secondary fixed left-3 z-[60] gap-2 shadow-panel"
+		style:bottom={viewport.isExpanded
+			? '1rem'
+			: 'calc(var(--info-panel-height, 0px) + var(--mobile-tool-dock-height, 0px) + max(0.75rem, env(safe-area-inset-bottom)))'}
+		onclick={() => goto(draft.href('topos/3d/upload'))}
+		><i class="fa-solid fa-cube text-creator-blue" aria-hidden="true"></i>{$_('draft.add_model')}</button
 	>
 {/if}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { _ } from 'svelte-i18n';
+	import { base } from '$app/paths';
 	import type { Snippet } from 'svelte';
 	import ReviewActions from '../ReviewActions.svelte';
 	import { getDraftEditor } from '../use-draft-editor.svelte';
@@ -57,6 +58,14 @@
 
 	let isCompact = $derived(!viewport.isExpanded);
 	const draft = getDraftEditor();
+	let workspaceDotClass = $derived(
+		draft?.mode === 'crag'
+			? 'bg-workspace-crag'
+			: draft?.mode === '2d'
+				? 'bg-workspace-topo-2d'
+				: 'bg-workspace-topo-3d'
+	);
+
 	function observeMobileDock(node: HTMLDivElement) {
 		const updateDockHeight = () => {
 			document.documentElement.style.setProperty(
@@ -88,10 +97,38 @@
 	}
 </script>
 
-<div class="fixed top-2 left-2 right-2 z-50" role="group" aria-label={$_('editor.editor_toolbar')}>
-	<div class="panel flex items-center justify-between gap-2 bg-white p-1.5 shadow-panel">
-		<div class="flex min-w-0 items-center gap-2.5">
+<div class="fixed top-2 right-2 left-2 z-50" role="group" aria-label={$_('editor.editor_toolbar')}>
+	<div class="panel flex items-center justify-between gap-2 bg-white px-2 py-1.5 shadow-panel">
+		<div class="flex min-w-0 items-center gap-1.5">
+			<a
+				href={`${base}/`}
+				class="tool-btn shrink-0"
+				title={$_('ui.back_to_launcher')}
+				aria-label={$_('ui.back_to_launcher')}
+			>
+				<i class="fa-solid fa-house text-xs" aria-hidden="true"></i>
+			</a>
+
 			{#if !isCompact}
+				{#if draft?.ready}
+					<div
+						class="mr-1 hidden max-w-44 items-center gap-1.5 border-r border-black/10 pr-2.5 2xl:flex"
+					>
+						<span class={`h-2 w-2 shrink-0 rounded-full ${workspaceDotClass}`} aria-hidden="true"
+						></span>
+						<span class="truncate text-xs font-semibold text-near-black" title={draft.name}>
+							{draft.name || $_('ui.unnamed_topo')}
+						</span>
+						{#if draft.reviewId}
+							<span
+								class="shrink-0 rounded-sm bg-creator-blue/10 px-1.5 py-0.5 text-[9px] font-bold text-creator-blue uppercase"
+							>
+								{$_('editor.review_badge')}
+							</span>
+						{/if}
+					</div>
+				{/if}
+
 				<div class="flex items-center gap-1">
 					{#each tools.filter((tool) => !tool.hidden) as tool}
 						<ToolButton
@@ -103,6 +140,21 @@
 					{/each}
 				</div>
 				{@render controls?.()}
+			{:else if !mobileSearch && draft?.ready}
+				<div class="flex min-w-0 items-center gap-1.5">
+					<span class={`h-2 w-2 shrink-0 rounded-full ${workspaceDotClass}`} aria-hidden="true"
+					></span>
+					<span class="truncate text-xs font-semibold text-near-black" title={draft.name}>
+						{draft.name || $_('ui.unnamed_topo')}
+					</span>
+					{#if draft.reviewId}
+						<span
+							class="shrink-0 rounded-sm bg-creator-blue/10 px-1.5 py-0.5 text-[9px] font-bold text-creator-blue uppercase"
+						>
+							{$_('editor.review_badge')}
+						</span>
+					{/if}
+				</div>
 			{/if}
 		</div>
 
@@ -110,10 +162,10 @@
 			<div class="min-w-0 flex-1">{@render mobileSearch()}</div>
 		{/if}
 
-		<div class="flex shrink-0 items-center gap-1.5 md:gap-3">
+		<div class="flex shrink-0 items-center gap-1.5 md:gap-2.5">
 			{#if !isCompact}
 				{#if undo || redo}
-					<div class="flex items-center gap-1">
+					<div class="flex items-center gap-0.5 border-r border-black/10 pr-2">
 						{#each [undo, redo] as action, index}
 							{#if action}
 								<ToolActionButton
@@ -169,12 +221,12 @@
 
 {#if isCompact}
 	<div
-		class="mobile-toolbar fixed inset-x-0 z-50 flex justify-center pointer-events-none"
+		class="mobile-toolbar pointer-events-none fixed inset-x-0 z-50 flex justify-center"
 		style="bottom: calc(var(--info-panel-height, 0px) + var(--mobile-toolbar-gap, max(0.75rem, env(safe-area-inset-bottom)))); transition: var(--info-panel-transition, none); visibility: var(--mobile-toolbar-visibility, visible);"
 	>
 		<div
 			use:observeMobileDock
-			class="mobile-tool-dock flex w-full flex-col gap-0 pointer-events-auto"
+			class="mobile-tool-dock pointer-events-auto flex w-full flex-col gap-0"
 		>
 			<div
 				class={`panel flex w-full items-center justify-center overflow-x-auto rounded-none border-x-0 shadow-panel ${dense ? 'gap-0.5 p-1' : 'gap-1 p-1.5'}`}

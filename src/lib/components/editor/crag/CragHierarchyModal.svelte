@@ -70,7 +70,7 @@
 		aria-modal="true"
 		aria-labelledby="hierarchy-modal-title"
 		tabindex="-1"
-		class="bg-white w-full max-w-xl max-h-[85vh] rounded shadow-modal border border-black/15 flex flex-col overflow-hidden outline-none"
+		class="bg-white w-full max-w-xl max-h-[85vh] rounded-sm shadow-modal border border-black/15 flex flex-col overflow-hidden outline-none"
 		onclick={(e) => e.stopPropagation()}
 		onkeydown={handleKeydown}
 	>

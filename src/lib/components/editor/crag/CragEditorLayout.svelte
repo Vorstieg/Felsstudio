@@ -85,7 +85,7 @@
 
 <button
 	type="button"
-	class="fixed z-40 flex h-10 w-10 items-center justify-center rounded-full border border-black/15 bg-white text-warm-gray-600 shadow-panel transition-none hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-creator-blue"
+	class="fixed z-40 flex h-10 w-10 items-center justify-center rounded-sm border border-black/15 bg-white text-warm-gray-600 shadow-panel transition-none hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-creator-blue"
 	style:right={isExpanded ? 'calc(20rem + 1.25rem)' : '1.25rem'}
 	style:bottom={isExpanded
 		? '1.25rem'
@@ -99,16 +99,18 @@
 	<i class="fa-solid fa-location-crosshairs text-sm"></i>
 </button>
 
-{#if toolOptionsOpen && activeTool === 'geometry'}
-	<CragGeometryToolOptions open={toolOptionsOpen} onClose={() => (toolOptionsOpen = false)} />
-{/if}
+<div style="--tool-options-top: 7.5rem;">
+	{#if toolOptionsOpen && activeTool === 'geometry'}
+		<CragGeometryToolOptions open={toolOptionsOpen} onClose={() => (toolOptionsOpen = false)} />
+	{/if}
 
-{#if trackEditor.sessionActive}
-	<CragTrackPanel {map} {isExpanded} bind:open={toolOptionsOpen} />
-{/if}
+	{#if trackEditor.sessionActive}
+		<CragTrackPanel {map} {isExpanded} bind:open={toolOptionsOpen} />
+	{/if}
+</div>
 
 {#if isExpanded}
-	<div class="fixed top-14 left-2 z-50 w-[min(24rem,calc(100vw-1rem))]">
+	<div class="fixed top-16 left-2 z-50 w-80 max-w-[calc(100vw-1rem)]">
 		<MapSearch {map} />
 	</div>
 {/if}

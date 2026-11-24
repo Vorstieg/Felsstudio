@@ -1,5 +1,8 @@
 <script lang="ts">
 	import ProcessingStepOptions from './ProcessingStepOptions.svelte';
+	import LanguageSwitcher from '$lib/components/ui/LanguageSwitcher.svelte';
+	import SessionInfo from '$lib/components/ui/SessionInfo.svelte';
+	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import { processingOptionsForRun } from '$lib/assets/js/processing-options';
 	import { onMount, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
@@ -65,6 +68,9 @@
 	let uploaded = $state(0);
 	let busy = $state(false);
 	let error = $state('');
+	let pendingConfirm = $state<
+		{ kind: 'delete-capture' } | { kind: 'delete-run'; jobId: string } | null
+	>(null);
 	let engine = $state<ReconstructionEngine>('odm');
 	let detection = $state(false);
 	let controls = $state<ProcessingControls | null>(null);
@@ -242,11 +248,25 @@
 
 <div class="processing-studio reconstruction">
 	<header class="studio-header">
-		<h1>{$_('processing.captures_title')}</h1>
+		<div class="studio-header-title">
+			<a
+				href={`${base}/`}
+				class="tool-btn shrink-0"
+				title={$_('ui.back_to_launcher')}
+				aria-label={$_('ui.back_to_launcher')}
+			>
+				<i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+			</a>
+			<h1>{$_('processing.captures_title')}</h1>
+		</div>
 		{#if entryPath}<dl class="crag-context">
 				<dt>{$_('processing.entry_path')}</dt>
 				<dd>{entryPath}</dd>
 			</dl>{/if}
+		<div class="studio-header-utils">
+			<SessionInfo />
+			<LanguageSwitcher compact />
+		</div>
 	</header>
 	{#if !authState.user}
 		<div class="signed-out">
@@ -416,16 +436,11 @@
 									</li>{/each}
 							</ul>
 							<button
+								type="button"
 								class="text-body-text text-rose-700 underline"
 								disabled={busy || !!detail.activeJobIds?.length}
-								onclick={() => {
-									if (confirm($_('processing.delete_capture_confirm')))
-										void act(async () => {
-											await deleteCapture(selected);
-											selected = '';
-											detail = null;
-										});
-								}}>{$_('processing.delete_capture')}</button
+								onclick={() => (pendingConfirm = { kind: 'delete-capture' })}
+								>{$_('processing.delete_capture')}</button
 							>
 						{/if}
 					</section>
@@ -591,17 +606,11 @@
 										>
 									{:else}
 										<button
+											type="button"
 											class="reconstruction-secondary"
 											disabled={busy}
-											onclick={() => {
-												if (confirm($_('processing.delete_run_confirm')))
-													void act(async () => {
-														const { preserveProcessingImports } =
-															await import('$lib/assets/js/processing-assets');
-														await preserveProcessingImports(job.id);
-														await deleteProcessing(job.id);
-													});
-											}}>{$_('processing.delete_run')}</button
+											onclick={() => (pendingConfirm = { kind: 'delete-run', jobId: job.id })}
+											>{$_('processing.delete_run')}</button
 										>
 									{/if}
 									{#if job.status === 'completed'}<button
@@ -663,6 +672,37 @@
 	{/if}
 </div>
 
+<ConfirmModal
+	open={Boolean(pendingConfirm)}
+	title={pendingConfirm?.kind === 'delete-capture'
+		? $_('processing.delete_capture')
+		: $_('processing.delete_run')}
+	message={pendingConfirm?.kind === 'delete-capture'
+		? $_('processing.delete_capture_confirm')
+		: $_('processing.delete_run_confirm')}
+	confirmLabel={$_('ui.delete')}
+	destructive
+	onConfirm={async () => {
+		const target = pendingConfirm;
+		pendingConfirm = null;
+		if (!target) return;
+		if (target.kind === 'delete-capture') {
+			await act(async () => {
+				await deleteCapture(selected);
+				selected = '';
+				detail = null;
+			});
+		} else {
+			await act(async () => {
+				const { preserveProcessingImports } = await import('$lib/assets/js/processing-assets');
+				await preserveProcessingImports(target.jobId);
+				await deleteProcessing(target.jobId);
+			});
+		}
+	}}
+	onCancel={() => (pendingConfirm = null)}
+/>
+
 <style>
 	.processing-studio {
 		height: 100%;
@@ -672,22 +712,39 @@
 		font-family: var(--font-sans);
 	}
 	.studio-header {
-		min-height: 68px;
+		min-height: 60px;
 		display: flex;
 		align-items: center;
-		gap: 24px;
-		padding: 16px 24px;
-		border-bottom: 1px solid #dedbd7;
+		flex-wrap: wrap;
+		gap: 16px;
+		padding: 12px 20px;
+		border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 		background: white;
 	}
+	.studio-header-title {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		min-width: 0;
+	}
 	.studio-header h1 {
-		font-size: 16px;
+		font-size: 17px;
 		font-weight: 700;
+		letter-spacing: -0.25px;
+	}
+	.studio-header-utils {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		margin-left: auto;
+		flex-wrap: wrap;
 	}
 	.crag-context {
-		margin-left: auto;
-		text-align: right;
+		border-left: 1px solid rgba(0, 0, 0, 0.1);
+		padding-left: 16px;
+		text-align: left;
 		font-size: 12px;
+		min-width: 0;
 	}
 	.crag-context dt {
 		color: #615d59;
@@ -931,11 +988,16 @@
 		position: relative;
 		overflow: hidden;
 		padding: 10px 16px;
-		background: #191817;
+		border-radius: 2px;
+		background: var(--color-creator-blue);
 		color: white;
 		font-size: 12px;
 		font-weight: 600;
 		cursor: pointer;
+	}
+	.file-choice:hover {
+		background: var(--color-creator-blue-active);
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
 	}
 	.file-choice input {
 		position: absolute;
@@ -953,6 +1015,10 @@
 		background: white;
 		color: #191817;
 		border: 1px solid #c9c5c0;
+	}
+	.secondary-choice:hover {
+		background: rgba(0, 0, 0, 0.05);
+		box-shadow: none;
 	}
 	.selection-summary,
 	.section-heading {
@@ -1102,7 +1168,12 @@
 			flex-wrap: wrap;
 		}
 		.crag-context {
+			order: 3;
 			width: 100%;
+			border-left: 0;
+			border-top: 1px solid rgba(0, 0, 0, 0.08);
+			padding-left: 0;
+			padding-top: 8px;
 			text-align: left;
 		}
 		.studio-layout {
@@ -1150,7 +1221,7 @@
 	}
 	.reconstruction-panel {
 		border: 1px solid rgba(0, 0, 0, 0.1);
-		border-radius: 0;
+		border-radius: 2px;
 	}
 	.reconstruction-input {
 		border: 1px solid rgba(0, 0, 0, 0.1);

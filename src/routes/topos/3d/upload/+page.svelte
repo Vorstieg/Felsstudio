@@ -10,6 +10,7 @@
 		provideTopo2DEditorState
 	} from '$lib/state/topo-2d-editor-state.svelte.ts';
 	import Topo3DUploadForm from '$lib/components/editor/wizard/Topo3DUploadForm.svelte';
+	import LanguageSwitcher from '$lib/components/ui/LanguageSwitcher.svelte';
 	import {
 		getUploadCameraPositions,
 		getUploadModelTransform,
@@ -17,6 +18,7 @@
 	} from '$lib/components/editor/wizard/parse-3d-upload-project.ts';
 
 	let isLoading = $state(false);
+	let uploadError = $state('');
 	const topoSession = provideTopo2DEditorState(createTopo2DEditorState());
 	let zipFile = $state<File | null>(null);
 	let glbFile = $state<File | null>(null);
@@ -32,6 +34,7 @@
 	async function processFiles() {
 		if (!draft.ready) return;
 		isLoading = true;
+		uploadError = '';
 		// Keep the draft ID, document selection, paths, and edits while adding a model.
 		topoSession.ui.editorMode = '3d';
 
@@ -124,21 +127,29 @@
 			await goto(draft.href('topos/3d/editor'));
 		} catch (error) {
 			console.error(error);
-			alert(error instanceof Error ? error.message : String(error));
+			uploadError = error instanceof Error ? error.message : String(error);
 		} finally {
 			isLoading = false;
 		}
 	}
 </script>
 
-<div class="h-screen bg-warm-white flex flex-col items-center p-4 overflow-y-auto">
-	<div class="max-w-xl w-full mt-20">
+<div class="flex h-screen flex-col items-center overflow-y-auto bg-warm-white p-4 custom-scrollbar">
+	<div class="mt-6 w-full max-w-xl md:mt-16">
 		<div class="panel overflow-hidden">
-			<div class="p-4 border-b border-black/15 bg-white">
-				<h2 class="text-section-title leading-none">{$_('ui.3d_studio')}</h2>
+			<div class="flex items-center justify-between gap-3 border-b border-black/10 bg-white p-4">
+				<h1 class="text-section-title leading-none">{$_('ui.3d_studio')}</h1>
+				<LanguageSwitcher compact />
 			</div>
-			<div class="p-5 bg-white">
-				{#if draft.error}<p role="alert" class="text-rose-600">{draft.error}</p>{/if}
+			<div class="space-y-3 bg-white p-5">
+				{#if draft.error || uploadError}
+					<p
+						role="alert"
+						class="rounded-sm border border-rose-200 bg-rose-50 px-3 py-2 text-body-text text-rose-700"
+					>
+						{uploadError || draft.error}
+					</p>
+				{/if}
 				<Topo3DUploadForm
 					bind:zipFile
 					bind:glbFile

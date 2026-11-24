@@ -27,12 +27,12 @@
 >
 	{#if showMenu}
 		<div
-			class="absolute right-0 bottom-12 flex min-w-32 flex-col gap-0.5 rounded-lg border border-black/10 bg-white p-1.5 shadow-panel"
+			class="absolute right-0 bottom-12 flex min-w-32 flex-col gap-0.5 rounded-sm border border-black/10 bg-white p-1.5 shadow-panel"
 		>
 			{#each styles as style}
 				<button
 					type="button"
-					class={`rounded-md px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider ${mapStyle === style ? 'bg-creator-blue text-white' : 'text-warm-gray-600 hover:bg-black/5'}`}
+					class={`rounded-sm px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider ${mapStyle === style ? 'bg-creator-blue text-white' : 'text-warm-gray-600 hover:bg-black/5'}`}
 					onclick={() => {
 						mapStyle = style;
 						showMenu = false;
@@ -46,7 +46,7 @@
 
 	<button
 		type="button"
-		class="flex h-10 w-10 items-center justify-center rounded-full border border-black/15 bg-white text-warm-gray-600 shadow-panel transition-none hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-creator-blue"
+		class="flex h-10 w-10 items-center justify-center rounded-sm border border-black/15 bg-white text-warm-gray-600 shadow-panel transition-none hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-creator-blue"
 		onclick={() => (showMenu = !showMenu)}
 		title={$_('editor.change_map_style')}
 		aria-label={$_('editor.change_map_style')}

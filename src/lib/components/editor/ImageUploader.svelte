@@ -204,21 +204,18 @@
 		</div>
 		<div class="mt-2 space-y-1.5">
 			<div class="flex gap-1.5">
-				<button
-					class="btn-primary flex-1 !bg-white !text-near-black border border-black/15 hover:!bg-black/5"
-					onclick={() => fileInput?.click()}
-				>
+				<button class="btn-secondary flex-1" onclick={() => fileInput?.click()}>
 					<i class="fa-solid fa-arrow-right-arrow-left mr-2 opacity-60"></i>{$_('ui.replace_image')}
 				</button>
 				<button
-					class="btn-primary !bg-white !text-near-black border border-black/15 hover:!bg-black/5"
+					class="btn-secondary"
 					onclick={() => (showUrlInput = !showUrlInput)}
 					aria-label={$_('ui.load_url')}
 				>
 					<i class="fa-solid fa-link opacity-60"></i>
 				</button>
 				<button
-					class="btn-primary !bg-white !text-near-black border border-black/15 hover:!bg-black/5"
+					class="btn-secondary"
 					onclick={handleCameraCapture}
 					aria-label={$_('ui.camera')}
 				>
@@ -275,24 +272,15 @@
 			<p class="text-micro-data text-warm-gray-500 mb-3">{$_('ui.drag_drop_image')}</p>
 
 			<div class="flex flex-col gap-1.5">
-				<button
-					class="btn-primary !bg-white !text-near-black border border-black/15 hover:!bg-black/5"
-					onclick={() => fileInput?.click()}
-				>
+				<button class="btn-secondary" onclick={() => fileInput?.click()}>
 					<i class="fa-solid fa-folder-open mr-2 opacity-60"></i>{$_('ui.select_file')}
 				</button>
 
-				<button
-					class="btn-primary !bg-white !text-near-black border border-black/15 hover:!bg-black/5"
-					onclick={() => (showUrlInput = !showUrlInput)}
-				>
+				<button class="btn-secondary" onclick={() => (showUrlInput = !showUrlInput)}>
 					<i class="fa-solid fa-link mr-2 opacity-60"></i>{$_('ui.load_url')}
 				</button>
 
-				<button
-					class="btn-primary !bg-white !text-near-black border border-black/15 hover:!bg-black/5"
-					onclick={handleCameraCapture}
-				>
+				<button class="btn-secondary" onclick={handleCameraCapture}>
 					<i class="fa-solid fa-camera mr-2 opacity-60"></i>{$_('ui.camera')}
 				</button>
 			</div>

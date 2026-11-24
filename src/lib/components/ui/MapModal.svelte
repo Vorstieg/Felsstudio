@@ -381,7 +381,7 @@
 	class="fixed inset-0 z-[6000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
 >
 	<div
-		class="bg-white w-full max-w-5xl h-[85vh] rounded shadow-modal border border-black/15 flex flex-col overflow-hidden"
+		class="bg-white w-full max-w-5xl h-[85vh] rounded-sm shadow-modal border border-black/15 flex flex-col overflow-hidden"
 	>
 		<!-- Header -->
 		<div
@@ -494,19 +494,19 @@
 
 			<!-- Overlay Controls -->
 			<div
-				class="absolute top-6 left-1/2 -translate-x-1/2 z-30 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full shadow-modal border border-black/15 text-sm font-medium text-warm-gray-500"
+				class="absolute top-6 left-1/2 -translate-x-1/2 z-30 bg-white/90 backdrop-blur-md px-4 py-2 rounded-sm shadow-modal border border-black/15 text-sm font-medium text-warm-gray-500"
 			>
-				{$_('editor.use')} <kbd class="px-1.5 py-0.5 bg-black/5 rounded">T</kbd>
+				{$_('editor.use')} <kbd class="px-1.5 py-0.5 bg-black/5 rounded-sm">T</kbd>
 				{$_('editor.to_translate')}
-				<kbd class="px-1.5 py-0.5 bg-black/5 rounded">R</kbd>
-				{$_('editor.to_rotate')} <kbd class="px-1.5 py-0.5 bg-black/5 rounded">S</kbd>
+				<kbd class="px-1.5 py-0.5 bg-black/5 rounded-sm">R</kbd>
+				{$_('editor.to_rotate')} <kbd class="px-1.5 py-0.5 bg-black/5 rounded-sm">S</kbd>
 				{$_('editor.to_scale')}
 			</div>
 
 			<!-- Move Model Here Button -->
 			<div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
 				<button
-					class="bg-white px-5 py-2.5 rounded-full shadow-modal border border-black/15 text-body-text font-bold text-near-black hover:bg-black/5 transition-none flex items-center gap-2"
+					class="bg-white px-5 py-2.5 rounded-sm shadow-modal border border-black/15 text-body-text font-bold text-near-black hover:bg-black/5 transition-none flex items-center gap-2"
 					onclick={() => {
 						if (!map) return;
 						const center = map.getCenter();
@@ -521,7 +521,7 @@
 
 			<!-- Scale Control -->
 			<div
-				class="absolute right-6 top-1/2 -translate-y-1/2 z-30 bg-white/90 backdrop-blur-md rounded-full shadow-modal border border-black/15 flex flex-col items-center py-4 px-2 gap-3 w-12"
+				class="absolute right-6 top-1/2 -translate-y-1/2 z-30 bg-white/90 backdrop-blur-md rounded-sm shadow-modal border border-black/15 flex flex-col items-center py-4 px-2 gap-3 w-12"
 			>
 				<div class="text-[9px] font-bold text-warm-gray-400 uppercase tracking-widest leading-none">
 					{$_('editor.scale')}

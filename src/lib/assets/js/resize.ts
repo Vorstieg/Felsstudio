@@ -53,7 +53,7 @@ export function resize(element: HTMLElement) {
 		const nextHeight = targetHeights[wasExpanded ? 1 : 0];
 		element.style.top = `${window.innerHeight - nextHeight}px`;
 		element.style.height = `${nextHeight}px`;
-		element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+		element.style.borderRadius = `2px 2px 0 0`;
 		setPanelHeight(nextHeight);
 	}
 
@@ -118,7 +118,7 @@ export function resize(element: HTMLElement) {
 			element.style.height = `${closestHeight}px`;
 		} else {
 			// Partial height
-			element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+			element.style.borderRadius = `2px 2px 0 0`;
 			element.style.top = `${window.innerHeight - closestHeight}px`;
 			element.style.height = `${closestHeight}px`;
 		}
@@ -156,7 +156,7 @@ export function resize(element: HTMLElement) {
 		document.body.style.setProperty('--info-panel-transition', 'none');
 
 		// On interaction, ensure we are in partial-height style (rounded top only)
-		element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+		element.style.borderRadius = `2px 2px 0 0`;
 		// Remove inline margin to respect CSS class (w-auto left-0 right-0 -> 0 margin)
 		element.style.marginInline = '';
 
@@ -259,7 +259,7 @@ export function resize(element: HTMLElement) {
 
 				element.style.transition = 'border-radius 0.2s ease-out';
 				document.body.style.setProperty('--info-panel-transition', 'none');
-				element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+				element.style.borderRadius = `2px 2px 0 0`;
 				element.style.marginInline = '';
 			}
 		}
@@ -285,7 +285,7 @@ export function resize(element: HTMLElement) {
 		setPanelHeight(targetHeights[0]);
 		element.style.top = `${window.innerHeight - targetHeights[0]}px`;
 		element.style.height = `${targetHeights[0]}px`;
-		element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+		element.style.borderRadius = `2px 2px 0 0`;
 	}
 
 	grabber?.addEventListener('mousedown', onMousedown);
@@ -310,7 +310,7 @@ export function resize(element: HTMLElement) {
 		element.style.marginInline = ''; // Clear inline margin
 		const biggestHeight = targetHeights[targetHeights.length - 1];
 		element.style.top = `${window.innerHeight - biggestHeight}px`;
-		element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+		element.style.borderRadius = `2px 2px 0 0`;
 		element.style.height = `${biggestHeight}px`;
 		setPanelHeight(biggestHeight);
 
@@ -329,7 +329,7 @@ export function resize(element: HTMLElement) {
 		element.style.marginInline = '';
 		const smallestHeight = targetHeights[0];
 		element.style.top = `${window.innerHeight - smallestHeight}px`;
-		element.style.borderRadius = `1.5rem 1.5rem 0 0`;
+		element.style.borderRadius = `2px 2px 0 0`;
 		element.style.height = `${smallestHeight}px`;
 		setPanelHeight(smallestHeight);
 

@@ -87,7 +87,7 @@
 						class="flex items-center gap-2 p-1.5 rounded-sm bg-black/5 border border-black/15 shadow-sm"
 					>
 						<button
-							class="bg-near-black text-white hover:bg-black px-2.5 py-1.5 rounded-sm text-ui-label transition-none flex items-center gap-1.5 shadow-sm"
+							class="bg-creator-blue text-white hover:bg-creator-blue-active px-2.5 py-1.5 rounded-sm text-ui-label transition-none flex items-center gap-1.5 shadow-sm hover:shadow"
 							onclick={() => (showMapModal = true)}
 						>
 							<i class="fa-solid fa-map-location-dot opacity-60"></i>{$_('ui.open_map')}

@@ -1,10 +1,12 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import { base } from '$app/paths';
 	import ReviewFileList from '$lib/components/editor/ReviewFileList.svelte';
 	import { goto } from '$app/navigation';
 	import { authState } from '$lib/api/auth.svelte';
 	import SessionInfo from '$lib/components/ui/SessionInfo.svelte';
+	import LanguageSwitcher from '$lib/components/ui/LanguageSwitcher.svelte';
 	import { listReviews, downloadReview, deleteReview, type Review } from '$lib/api/reviews';
 	import { openReviewPackage } from '$lib/assets/js/review-package';
 	import { createDraftResources } from '$lib/state/shared-draft';
@@ -14,12 +16,16 @@
 	let error = $state('');
 	let selected = $state<Review | null>(null);
 	let generation = 0;
+	let userId = $derived(authState.user?.id || '');
+	onMount(() => {
+		void authState.refresh();
+	});
 	$effect(() => {
-		const user = authState.user;
+		const id = userId;
 		const request = ++generation;
 		reviews = [];
 		selected = null;
-		if (user) {
+		if (id) {
 			void refresh(request);
 		}
 	});
@@ -75,13 +81,26 @@
 <main
 	class="h-full overflow-auto bg-warm-white font-sans text-[13px] leading-normal text-near-black"
 >
-	<header class="border-b border-black/15 bg-white">
-		<div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 p-4">
-			<div class="flex flex-col gap-1">
-				<p class="text-ui-label text-warm-gray-500">Felslager</p>
-				<h1 class="text-section-title wrap-anywhere">{$_('editor.review_inbox')}</h1>
+	<header class="border-b border-black/10 bg-white">
+		<div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 p-4">
+			<div class="flex min-w-0 items-center gap-3">
+				<a
+					href={`${base}/`}
+					class="tool-btn shrink-0"
+					title={$_('ui.back_to_launcher')}
+					aria-label={$_('ui.back_to_launcher')}
+				>
+					<i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+				</a>
+				<div class="flex min-w-0 flex-col gap-0.5">
+					<p class="text-ui-label text-warm-gray-500">Felslager</p>
+					<h1 class="text-section-title wrap-anywhere">{$_('editor.review_inbox')}</h1>
+				</div>
 			</div>
-			<SessionInfo />
+			<div class="flex flex-wrap items-center gap-3">
+				<SessionInfo />
+				<LanguageSwitcher compact />
+			</div>
 		</div>
 	</header>
 	<div class="mx-auto flex max-w-6xl flex-col gap-4 p-4">

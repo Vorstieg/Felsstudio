@@ -111,10 +111,11 @@
 	<button
 		type="button"
 		onclick={openModal}
-		class="rounded-sm px-1.5 py-1 text-micro-data font-bold text-creator-blue hover:bg-white"
+		class="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-creator-blue transition-none hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-creator-blue"
 		title={$_('editor.edit_hierarchy_placement')}
+		aria-label={$_('editor.edit_hierarchy')}
 	>
-		<i class="fa-solid fa-pen text-[10px] mr-1"></i>{$_('editor.edit_hierarchy')}
+		<i class="fa-solid fa-pen text-[9px]" aria-hidden="true"></i>
 	</button>
 {:else}
 	<div class="space-y-2 rounded-sm border border-black/10 bg-black/[0.03] p-2">

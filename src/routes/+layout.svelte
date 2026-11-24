@@ -17,9 +17,20 @@
 	addMessages('en', en);
 	addMessages('de', de);
 
+	const storedLocale = browser
+		? (() => {
+				try {
+					const saved = localStorage.getItem('felsstudio_locale');
+					return saved === 'de' || saved === 'en' ? saved : null;
+				} catch {
+					return null;
+				}
+			})()
+		: null;
+
 	init({
 		fallbackLocale: 'de',
-		initialLocale: getLocaleFromNavigator()
+		initialLocale: storedLocale || getLocaleFromNavigator()
 	});
 
 	onMount(() => {

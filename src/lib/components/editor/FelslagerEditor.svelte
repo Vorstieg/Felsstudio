@@ -13,6 +13,9 @@
 	} from '$lib/api/felslager.ts';
 	import { authState } from '$lib/api/auth.svelte.ts';
 	import SessionInfo from '$lib/components/ui/SessionInfo.svelte';
+	import SaveStatus from '$lib/components/ui/SaveStatus.svelte';
+	import LanguageSwitcher from '$lib/components/ui/LanguageSwitcher.svelte';
+	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import type { ApiListEntry } from '$lib/types/api.ts';
 
 	const errorMessage = (value: unknown) => (value instanceof Error ? value.message : String(value));
@@ -24,6 +27,8 @@
 	let selectedFile = $state<ApiListEntry | null>(null);
 	let selectedFileType = $state<'image' | 'json' | 'text' | null>(null);
 	let fileContent = $state('');
+	let savedFileContent = $state('');
+	let saveStatus = $state<'idle' | 'saving' | 'success' | 'error'>('idle');
 	let saving = $state(false);
 	let uploading = $state(false);
 	let error = $state<string | null>(null);
@@ -33,6 +38,17 @@
 	let searchResults = $state<ApiListEntry[]>([]);
 	let isSearching = $state(false);
 	let allFilesCache: ApiListEntry[] | null = null;
+
+	type ModalState =
+		| { kind: 'replace'; file: File }
+		| { kind: 'rename'; item: ApiListEntry }
+		| { kind: 'delete'; item: ApiListEntry };
+	let modalState = $state<ModalState | null>(null);
+	let modalInputValue = $state('');
+
+	let isDirty = $derived(
+		Boolean(selectedFile && selectedFileType !== 'image' && fileContent !== savedFileContent)
+	);
 
 	$effect(() => {
 		if (searchQuery.trim().length > 0) {
@@ -88,6 +104,8 @@
 			selectedFile = null;
 			selectedFileType = null;
 			fileContent = '';
+			savedFileContent = '';
+			saveStatus = 'idle';
 			const url = new URL(window.location.href);
 			url.searchParams.set('path', item.path);
 			goto(url.toString(), { keepFocus: true });
@@ -105,13 +123,18 @@
 				selectedFile = item;
 				selectedFileType = 'image';
 				fileContent = '';
+				savedFileContent = '';
+				saveStatus = 'idle';
 				error = null;
 			} else if (!isBinary) {
 				try {
 					const res = await readFile(item.path);
-					fileContent = await res.text();
+					const text = await res.text();
+					fileContent = text;
+					savedFileContent = text;
 					selectedFile = item;
 					selectedFileType = isJson ? 'json' : 'text';
+					saveStatus = 'idle';
 					error = null;
 				} catch (e) {
 					error = errorMessage(e);
@@ -129,6 +152,8 @@
 		selectedFile = null;
 		selectedFileType = null;
 		fileContent = '';
+		savedFileContent = '';
+		saveStatus = 'idle';
 
 		const newPath = parts.join('/');
 		const url = new URL(window.location.href);
@@ -149,6 +174,7 @@
 	async function saveFileAction() {
 		if (!selectedFile) return;
 		saving = true;
+		saveStatus = 'saving';
 		error = null;
 		try {
 			if (selectedFileType === 'json') {
@@ -158,8 +184,14 @@
 			} else {
 				await writeFile(selectedFile.path, fileContent, 'text/plain');
 			}
+			savedFileContent = fileContent;
+			saveStatus = 'success';
+			setTimeout(() => {
+				if (saveStatus === 'success') saveStatus = 'idle';
+			}, 3000);
 		} catch (e) {
 			error = errorMessage(e);
+			saveStatus = 'error';
 		} finally {
 			saving = false;
 		}
@@ -174,18 +206,18 @@
 		event.currentTarget.value = '';
 		if (!file) return;
 
+		const path = currentPath ? `${currentPath}/${file.name}` : file.name;
+		if (items.some((item) => item.path === path)) {
+			modalState = { kind: 'replace', file };
+			return;
+		}
+
 		if (!authState.requireAuth(() => uploadFile(file))) return;
-		uploadFile(file);
+		void uploadFile(file);
 	}
 
 	async function uploadFile(file: File) {
 		const path = currentPath ? `${currentPath}/${file.name}` : file.name;
-		if (
-			items.some((item) => item.path === path) &&
-			!confirm($_('editor.replace_file', { values: { name: file.name } }))
-		) {
-			return;
-		}
 
 		uploading = true;
 		error = null;
@@ -202,16 +234,8 @@
 
 	function renameItem(item: ApiListEntry, e: MouseEvent) {
 		e.stopPropagation();
-		const newName = prompt($_('editor.rename_file', { values: { name: item.name } }), item.name);
-		if (!newName || newName === item.name) return;
-
-		const parts = item.path.split('/');
-		parts.pop();
-		const basePath = parts.join('/');
-		const newPath = basePath ? `${basePath}/${newName}` : newName;
-
-		if (!authState.requireAuth(() => renameItemAction(item, newPath))) return;
-		renameItemAction(item, newPath);
+		modalInputValue = item.name;
+		modalState = { kind: 'rename', item };
 	}
 
 	async function renameItemAction(item: ApiListEntry, newPath: string) {
@@ -221,6 +245,7 @@
 				selectedFile.path = newPath;
 				selectedFile.name = newPath.split('/').pop() || newPath;
 			}
+			allFilesCache = null;
 			await loadDirectory(currentPath);
 		} catch (err) {
 			error = errorMessage(err);
@@ -229,9 +254,7 @@
 
 	function deleteItem(item: ApiListEntry, e: MouseEvent) {
 		e.stopPropagation();
-		if (!confirm($_('editor.delete_file', { values: { name: item.name } }))) return;
-		if (!authState.requireAuth(() => deleteItemAction(item))) return;
-		deleteItemAction(item);
+		modalState = { kind: 'delete', item };
 	}
 
 	async function deleteItemAction(item: ApiListEntry) {
@@ -241,10 +264,36 @@
 				selectedFile = null;
 				selectedFileType = null;
 				fileContent = '';
+				savedFileContent = '';
+				saveStatus = 'idle';
 			}
+			allFilesCache = null;
 			await loadDirectory(currentPath);
 		} catch (err) {
 			error = errorMessage(err);
+		}
+	}
+
+	async function handleModalConfirm(value: string) {
+		const current = modalState;
+		modalState = null;
+		if (!current) return;
+
+		if (current.kind === 'replace') {
+			if (!authState.requireAuth(() => uploadFile(current.file))) return;
+			await uploadFile(current.file);
+		} else if (current.kind === 'rename') {
+			const newName = value.trim();
+			if (!newName || newName === current.item.name) return;
+			const parts = current.item.path.split('/');
+			parts.pop();
+			const basePath = parts.join('/');
+			const newPath = basePath ? `${basePath}/${newName}` : newName;
+			if (!authState.requireAuth(() => renameItemAction(current.item, newPath))) return;
+			await renameItemAction(current.item, newPath);
+		} else if (current.kind === 'delete') {
+			if (!authState.requireAuth(() => deleteItemAction(current.item))) return;
+			await deleteItemAction(current.item);
 		}
 	}
 
@@ -263,67 +312,90 @@
 </script>
 
 <div
-	class="creator-studio flex flex-col w-full h-full bg-warm-white text-body-text text-near-black"
+	class="creator-studio flex h-full w-full flex-col bg-warm-white text-body-text text-near-black"
 >
 	<!-- Header -->
 	<header
-		class="flex items-center justify-between px-3 py-3 bg-white border-b border-black/15 shadow-panel z-10 md:px-4"
+		class="z-10 flex flex-wrap items-center justify-between gap-2 border-b border-black/10 bg-white px-3 py-2.5 shadow-xs md:px-4"
 	>
-		<div class="flex min-w-0 items-center gap-2 md:gap-4">
+		<div class="flex min-w-0 items-center gap-2 md:gap-3">
 			<button
-				class="tool-btn"
-				onclick={() => (currentPath ? navigateUp() : goto(base + '/'))}
+				type="button"
+				class="tool-btn shrink-0"
+				onclick={() => (currentPath ? navigateUp() : goto(`${base}/`))}
 				title={currentPath ? $_('editor.go_up') : $_('ui.back_to_launcher')}
+				aria-label={currentPath ? $_('editor.go_up') : $_('ui.back_to_launcher')}
 			>
-				<i class="fa-solid fa-arrow-left"></i>
+				<i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
 			</button>
 			<div class="min-w-0">
-				<h1 class="text-section-title leading-tight">{$_('ui.felslager_studio')}</h1>
-				<p class="text-micro-data text-warm-gray-500 mt-0.5">{$_('ui.data_management')}</p>
+				<h1 class="text-section-title truncate leading-tight">{$_('ui.felslager_studio')}</h1>
+				<p class="text-micro-data mt-0.5 truncate text-warm-gray-500">
+					{$_('ui.data_management')}
+				</p>
 			</div>
 		</div>
-		<div class="flex gap-2">
+		<div class="flex flex-wrap items-center justify-end gap-2">
 			<a
-				class="flex items-center gap-2 rounded-sm px-3 py-1.5 text-ui-label hover:bg-black/5 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue!"
+				class="btn-secondary gap-1.5 px-3 py-1.5 text-xs"
 				href={`${base}/felslager/reviews`}
-				><i class="fa-solid fa-inbox" aria-hidden="true"></i>{$_('editor.review_inbox')}</a
+				><i class="fa-solid fa-inbox text-warm-gray-500" aria-hidden="true"></i>{$_(
+					'editor.review_inbox'
+				)}</a
 			>
 			<input bind:this={uploadInput} type="file" class="hidden" onchange={handleUploadSelection} />
-			<button class="btn-secondary px-4" onclick={selectFileForUpload} disabled={uploading}>
+			<button
+				type="button"
+				class="btn-secondary gap-1.5 px-3 py-1.5 text-xs"
+				onclick={selectFileForUpload}
+				disabled={uploading}
+			>
+				<i class="fa-solid fa-upload text-warm-gray-500" aria-hidden="true"></i>
 				{uploading ? $_('editor.uploading') : $_('editor.add_file')}
 			</button>
 			{#if selectedFile && selectedFileType !== 'image'}
 				<SessionInfo />
-				<button class="btn-primary px-4" onclick={saveFile} disabled={saving}>
+				<SaveStatus status={saveStatus} errorMessage={error || ''} />
+				<button
+					type="button"
+					class="btn-primary px-3.5 py-1.5 text-xs"
+					onclick={saveFile}
+					disabled={saving}
+				>
 					{saving ? $_('save.saving') : $_('save.save_to_server')}
 				</button>
 			{/if}
+			<LanguageSwitcher compact />
 		</div>
 	</header>
 
-	<div class="flex flex-1 min-h-0 flex-col overflow-hidden gap-2 p-2 md:flex-row md:gap-4 md:p-4">
+	<div class="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-2 md:flex-row md:gap-4 md:p-4">
 		<!-- Left Pane: File Explorer -->
 		<div
-			class="h-[35dvh] min-h-60 w-full shrink-0 panel flex flex-col overflow-hidden shadow-panel md:h-auto md:min-h-0 md:w-1/3"
+			class="panel flex h-[35dvh] min-h-56 w-full shrink-0 flex-col overflow-hidden md:h-auto md:min-h-0 md:w-1/3"
 		>
 			<!-- Search Bar -->
-			<div class="p-3 border-b border-black/15 bg-white">
+			<div class="border-b border-black/10 bg-white p-3">
 				<div class="relative">
-					<i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-warm-gray-300"
+					<i
+						class="fa-solid fa-magnifying-glass pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-xs text-warm-gray-400"
+						aria-hidden="true"
 					></i>
 					<input
 						type="text"
-						class="input-studio w-full pl-9 py-2 rounded-sm bg-warm-gray-100 focus:bg-white"
-						placeholder={$_('ui.search_crags') || $_('editor.search_files_and_folders')}
+						class="input-studio w-full pr-8 pl-9"
+						placeholder={$_('editor.search_files_and_folders')}
+						aria-label={$_('editor.search_files_and_folders')}
 						bind:value={searchQuery}
 					/>
 					{#if searchQuery}
 						<button
-							class="absolute right-3 top-1/2 -translate-y-1/2 text-warm-gray-300 hover:text-near-black flex items-center justify-center"
+							type="button"
+							class="absolute top-1/2 right-2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-sm text-warm-gray-400 hover:bg-black/5 hover:text-near-black"
 							aria-label={$_('editor.clear_search')}
 							onclick={() => (searchQuery = '')}
 						>
-							<i class="fa-solid fa-xmark"></i>
+							<i class="fa-solid fa-xmark text-xs" aria-hidden="true"></i>
 						</button>
 					{/if}
 				</div>
@@ -332,10 +404,11 @@
 			<!-- Breadcrumbs -->
 			{#if !searchQuery}
 				<div
-					class="px-3 py-2 border-b border-black/15 bg-warm-gray-100 flex items-center gap-2 overflow-x-auto text-micro-data whitespace-nowrap"
+					class="flex items-center gap-1.5 overflow-x-auto border-b border-black/10 bg-warm-white/70 px-3 py-1.5 text-micro-data whitespace-nowrap"
 				>
 					<button
-						class="text-warm-gray-500 hover:text-creator-blue transition-colors cursor-pointer flex items-center justify-center w-6 h-6 rounded-sm hover:bg-black/5"
+						type="button"
+						class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-sm text-warm-gray-500 transition-colors hover:bg-black/5 hover:text-creator-blue"
 						aria-label={$_('editor.go_to_root')}
 						onclick={() => {
 							const u = new URL(window.location.href);
@@ -343,12 +416,13 @@
 							goto(u.toString(), { keepFocus: true });
 						}}
 					>
-						<i class="fa-solid fa-house"></i>
+						<i class="fa-solid fa-house" aria-hidden="true"></i>
 					</button>
 					{#each breadcrumbs as part, i}
-						<span class="text-black/30">/</span>
+						<span class="text-warm-gray-300">/</span>
 						<button
-							class="text-warm-gray-500 hover:text-creator-blue transition-colors cursor-pointer px-1.5 py-1 rounded-sm hover:bg-black/5"
+							type="button"
+							class="cursor-pointer rounded-sm px-1.5 py-0.5 text-warm-gray-600 transition-colors hover:bg-black/5 hover:text-creator-blue"
 							onclick={() => {
 								const u = new URL(window.location.href);
 								u.searchParams.set('path', breadcrumbs.slice(0, i + 1).join('/'));
@@ -362,50 +436,55 @@
 			{/if}
 
 			<!-- List -->
-			<div class="flex-1 overflow-y-auto p-2 custom-scrollbar bg-white">
+			<div class="custom-scrollbar flex-1 overflow-y-auto bg-white p-2">
 				{#if searchQuery}
 					<!-- Search Results -->
 					{#if isSearching}
 						<div
-							class="p-6 text-center text-ui-label flex flex-col items-center justify-center h-full gap-3"
+							class="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-ui-label"
 						>
-							<i class="fa-solid fa-spinner fa-spin text-xl text-warm-gray-300"></i>
+							<i class="fa-solid fa-spinner fa-spin text-xl text-warm-gray-300" aria-hidden="true"
+							></i>
 							<span>{$_('ui.loading')}</span>
 						</div>
 					{:else if searchResults.length === 0}
 						<div
-							class="p-6 text-center text-body-text text-warm-gray-500 italic flex items-center justify-center h-full"
+							class="flex h-full items-center justify-center p-6 text-center text-body-text text-warm-gray-500 italic"
 						>
 							{$_('ui.no_entries_found') || $_('editor.no_entries_found')}
 						</div>
 					{:else}
-						<ul class="space-y-1">
-							<div class="px-3 py-1 mb-2 text-micro-data text-warm-gray-400 font-medium">
+						<ul class="m-0! list-none! space-y-1 p-0!">
+							<li class="mb-2 px-3 py-1 text-micro-data font-medium text-warm-gray-400">
 								{$_('editor.search_results')}
-							</div>
+							</li>
 							{#each searchResults as item}
 								<li>
 									<div
 										role="button"
 										tabindex="0"
-										class="w-full flex flex-col px-3 py-2 rounded-sm hover:bg-black/5 text-left group transition-colors cursor-pointer {selectedFile?.path ===
+										class="group flex w-full cursor-pointer flex-col rounded-sm px-3 py-2 text-left transition-colors hover:bg-black/5 {selectedFile?.path ===
 										item.path
 											? 'bg-creator-blue/10 text-creator-blue'
 											: ''}"
 										onclick={() => openItem(item)}
 										onkeydown={(e) => {
-											if (e.key === 'Enter') openItem(item);
+											if (e.key === 'Enter' || e.key === ' ') {
+												e.preventDefault();
+												void openItem(item);
+											}
 										}}
 									>
 										<div class="flex items-center gap-3">
-											<i class="fa-solid {getFileIcon(item)} w-4 text-center"></i>
+											<i class="fa-solid {getFileIcon(item)} w-4 text-center" aria-hidden="true"
+											></i>
 											<span
 												class="font-medium {selectedFile?.path === item.path
 													? 'text-creator-blue'
 													: 'text-near-black'}">{item.name}</span
 											>
 										</div>
-										<span class="text-micro-data text-warm-gray-400 mt-1 truncate pl-7">
+										<span class="mt-0.5 truncate pl-7 text-micro-data text-warm-gray-400">
 											{item.path}
 										</span>
 									</div>
@@ -417,26 +496,31 @@
 					<!-- Standard Directory Listing -->
 					{#if loadingItems}
 						<div
-							class="p-6 text-center text-ui-label flex flex-col items-center justify-center h-full gap-3"
+							class="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-ui-label"
 						>
-							<i class="fa-solid fa-spinner fa-spin text-xl text-warm-gray-300"></i>
+							<i class="fa-solid fa-spinner fa-spin text-xl text-warm-gray-300" aria-hidden="true"
+							></i>
 							<span>{$_('ui.loading')}</span>
 						</div>
 					{:else if items.length === 0}
 						<div
-							class="p-6 text-center text-body-text text-warm-gray-500 italic flex items-center justify-center h-full"
+							class="flex h-full items-center justify-center p-6 text-center text-body-text text-warm-gray-500 italic"
 						>
 							{$_('editor.empty_directory')}
 						</div>
 					{:else}
-						<ul class="space-y-1">
+						<ul class="m-0! list-none! space-y-0.5 p-0!">
 							{#if currentPath}
 								<li>
 									<button
-										class="w-full flex items-center gap-3 px-3 py-2.5 rounded-sm hover:bg-black/5 text-left text-body-text group transition-colors md:py-2"
+										type="button"
+										class="group flex w-full items-center gap-3 rounded-sm px-3 py-2.5 text-left text-body-text transition-colors hover:bg-black/5 md:py-2"
 										onclick={navigateUp}
 									>
-										<i class="fa-solid fa-level-up-alt text-warm-gray-300 w-4 text-center"></i>
+										<i
+											class="fa-solid fa-level-up-alt w-4 text-center text-warm-gray-400"
+											aria-hidden="true"
+										></i>
 										<span class="font-medium text-warm-gray-500">..</span>
 									</button>
 								</li>
@@ -446,38 +530,50 @@
 								return a.name.localeCompare(b.name);
 							}) as item}
 								<li>
-									<!-- svelte-ignore a11y_interactive_supports_focus -->
-									<!-- svelte-ignore a11y_click_events_have_key_events -->
 									<div
 										role="button"
-										class="w-full flex items-center justify-between px-3 py-2.5 rounded-sm hover:bg-black/5 text-left text-body-text group transition-colors cursor-pointer md:py-2 {selectedFile?.path ===
+										tabindex="0"
+										class="group flex w-full cursor-pointer items-center justify-between rounded-sm px-3 py-2 text-left text-body-text transition-colors hover:bg-black/5 {selectedFile?.path ===
 										item.path
 											? 'bg-creator-blue/10 text-creator-blue'
 											: ''}"
 										onclick={() => openItem(item)}
+										onkeydown={(e) => {
+											if (e.key === 'Enter' || e.key === ' ') {
+												e.preventDefault();
+												void openItem(item);
+											}
+										}}
 									>
-										<div class="flex items-center gap-3 truncate">
-											<i class="fa-solid {getFileIcon(item)} w-4 text-center"></i>
+										<div class="flex min-w-0 items-center gap-3">
+											<i
+												class="fa-solid {getFileIcon(item)} w-4 shrink-0 text-center"
+												aria-hidden="true"
+											></i>
 											<span
 												class="truncate font-medium {selectedFile?.path === item.path
 													? 'text-creator-blue'
 													: 'text-near-black'}">{item.name}</span
 											>
 										</div>
-										<div class="flex items-center gap-1">
+										<div class="flex shrink-0 items-center gap-1">
 											<button
-												class="text-warm-gray-300 hover:text-creator-blue hover:bg-creator-blue/10 w-10 h-10 rounded flex items-center justify-center transition-colors md:w-6 md:h-6"
+												type="button"
+												class="flex h-8 w-8 items-center justify-center rounded-sm text-warm-gray-400 transition-colors hover:bg-creator-blue/10 hover:text-creator-blue md:h-7 md:w-7"
 												onclick={(e) => renameItem(item, e)}
 												title={$_('editor.rename')}
+												aria-label={$_('editor.rename')}
 											>
-												<i class="fa-solid fa-pen text-[11px]"></i>
+												<i class="fa-solid fa-pen text-[11px]" aria-hidden="true"></i>
 											</button>
 											<button
-												class="text-warm-gray-300 hover:text-rose-600 hover:bg-rose-50 w-10 h-10 rounded flex items-center justify-center transition-colors md:w-6 md:h-6"
+												type="button"
+												class="flex h-8 w-8 items-center justify-center rounded-sm text-warm-gray-400 transition-colors hover:bg-rose-50 hover:text-rose-600 md:h-7 md:w-7"
 												onclick={(e) => deleteItem(item, e)}
 												title={$_('ui.delete')}
+												aria-label={$_('ui.delete')}
 											>
-												<i class="fa-solid fa-trash-can text-[11px]"></i>
+												<i class="fa-solid fa-trash-can text-[11px]" aria-hidden="true"></i>
 											</button>
 										</div>
 									</div>
@@ -490,64 +586,79 @@
 		</div>
 
 		<!-- Right Pane: Editor -->
-		<div
-			class="min-h-0 w-full flex-1 panel flex flex-col relative overflow-hidden shadow-panel md:w-2/3"
-		>
+		<div class="panel relative flex min-h-0 w-full flex-1 flex-col overflow-hidden md:w-2/3">
 			{#if error}
 				<div
-					class="absolute top-4 left-4 right-4 bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-sm shadow-sm z-20 text-body-text flex justify-between items-center"
+					role="alert"
+					class="absolute top-3 right-3 left-3 z-20 flex items-center justify-between gap-2 rounded-sm border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-body-text text-rose-700 shadow-xs"
 				>
 					<span class="font-medium">{error}</span>
 					<button
-						class="w-6 h-6 flex items-center justify-center rounded hover:bg-rose-100"
+						type="button"
+						class="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm hover:bg-rose-100"
 						aria-label={$_('editor.dismiss_error')}
 						onclick={() => (error = null)}
 					>
-						<i class="fa-solid fa-xmark"></i>
+						<i class="fa-solid fa-xmark" aria-hidden="true"></i>
 					</button>
 				</div>
 			{/if}
 
 			{#if selectedFile}
-				<div class="flex items-center gap-2 p-3 border-b border-black/15 bg-white text-micro-data">
-					<i
-						class="fa-solid {selectedFileType === 'image'
-							? 'fa-image text-emerald-500'
-							: selectedFileType === 'json'
-								? 'fa-file-code text-creator-blue'
-								: 'fa-file-lines text-warm-gray-400'}"
-					></i>
-					<span class="font-bold text-near-black">{selectedFile.name}</span>
-					<span class="text-warm-gray-300 ml-2"
-						>{selectedFileType === 'image' ? $_('editor.viewing') : $_('editor.editing')}</span
-					>
+				<div
+					class="flex flex-wrap items-center justify-between gap-2 border-b border-black/10 bg-white px-4 py-2.5 text-micro-data"
+				>
+					<div class="flex min-w-0 items-center gap-2">
+						<i
+							class="fa-solid {selectedFileType === 'image'
+								? 'fa-image text-emerald-500'
+								: selectedFileType === 'json'
+									? 'fa-file-code text-creator-blue'
+									: 'fa-file-lines text-warm-gray-400'}"
+							aria-hidden="true"
+						></i>
+						<span class="truncate font-semibold text-near-black">{selectedFile.name}</span>
+						<span class="text-warm-gray-400">
+							{selectedFileType === 'image' ? $_('editor.viewing') : $_('editor.editing')}
+						</span>
+					</div>
+					{#if isDirty}
+						<span
+							class="inline-flex items-center gap-1.5 rounded-sm bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700"
+						>
+							<span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+							{$_('editor.unsaved_changes')}
+						</span>
+					{/if}
 				</div>
-				<div class="flex-1 bg-warm-white p-4 overflow-hidden relative">
+				<div class="relative flex-1 overflow-hidden bg-warm-white p-3 md:p-4">
 					{#if selectedFileType === 'image'}
-						<div class="absolute inset-4 bg-white panel-inner flex items-center justify-center p-4">
+						<div
+							class="panel-inner absolute inset-3 flex items-center justify-center bg-white p-4 md:inset-4"
+						>
 							<img
 								src={fileUrl(selectedFile.path)}
 								alt={selectedFile.name}
-								class="max-w-full max-h-full object-contain"
+								class="max-h-full max-w-full object-contain"
 							/>
 						</div>
 					{:else}
 						<textarea
-							class="absolute inset-4 bg-white panel-inner p-4 font-sans text-body-text leading-relaxed resize-none custom-scrollbar outline-none focus:ring-1 focus:ring-creator-blue focus:border-creator-blue transition-shadow"
+							class="panel-inner custom-scrollbar absolute inset-3 resize-none bg-white p-4 font-mono text-[13px] leading-relaxed text-near-black outline-none focus:border-creator-blue focus:ring-2 focus:ring-creator-blue/20 md:inset-4"
 							bind:value={fileContent}
 							spellcheck="false"
 						></textarea>
 					{/if}
 				</div>
 			{:else}
-				<div class="flex-1 flex flex-col items-center justify-center text-warm-gray-300 bg-white">
+				<div class="flex flex-1 flex-col items-center justify-center bg-white p-6 text-center">
 					<div
-						class="w-16 h-16 rounded-full bg-warm-gray-100 flex items-center justify-center mb-4"
+						class="mb-4 flex h-14 w-14 items-center justify-center rounded-sm border border-black/10 bg-warm-white text-warm-gray-400"
 					>
-						<i class="fa-solid fa-file text-2xl opacity-50"></i>
+						<i class="fa-solid fa-file-lines text-xl" aria-hidden="true"></i>
 					</div>
-					<p class="text-section-title text-warm-gray-500">{$_('editor.select_a_file')}</p>
-					<p class="text-body-text mt-2 text-center max-w-xs">
+					<p class="text-section-title text-near-black">{$_('editor.select_a_file')}</p>
+					<p class="text-body-text mt-1.5 max-w-xs text-warm-gray-500">
 						{$_('editor.choose_a_file_from_the_explorer_to_view_or_edit_its_contents')}
 					</p>
 				</div>
@@ -555,3 +666,29 @@
 		</div>
 	</div>
 </div>
+
+<ConfirmModal
+	open={Boolean(modalState)}
+	title={modalState?.kind === 'rename'
+		? $_('editor.rename')
+		: modalState?.kind === 'delete'
+			? $_('ui.delete')
+			: $_('editor.add_file')}
+	message={modalState?.kind === 'replace'
+		? $_('editor.replace_file', { values: { name: modalState.file.name } })
+		: modalState?.kind === 'delete'
+			? $_('editor.delete_file', { values: { name: modalState.item.name } })
+			: modalState?.kind === 'rename'
+				? $_('editor.rename_file', { values: { name: modalState.item.name } })
+				: ''}
+	inputLabel={modalState?.kind === 'rename' ? $_('editor.name') : ''}
+	bind:inputValue={modalInputValue}
+	confirmLabel={modalState?.kind === 'delete'
+		? $_('ui.delete')
+		: modalState?.kind === 'rename'
+			? $_('editor.rename')
+			: $_('editor.confirm')}
+	destructive={modalState?.kind === 'delete'}
+	onConfirm={handleModalConfirm}
+	onCancel={() => (modalState = null)}
+/>

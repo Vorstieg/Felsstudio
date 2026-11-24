@@ -3,8 +3,13 @@
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
 	import EntryPicker from '$lib/components/editor/wizard/EntryPicker.svelte';
+	import LanguageSwitcher from '$lib/components/ui/LanguageSwitcher.svelte';
 	import { createCragEditorSession } from '$lib/state/crag-session.svelte.ts';
-	import { getCragEditorPath, getCragEntryPath, getTopoEditorPath } from '$lib/assets/js/editor-entry-paths.ts';
+	import {
+		getCragEditorPath,
+		getCragEntryPath,
+		getTopoEditorPath
+	} from '$lib/assets/js/editor-entry-paths.ts';
 	import { fetchCragsFromManifest } from '$lib/assets/js/fetchCrags.ts';
 
 	type Location = Awaited<ReturnType<typeof fetchCragsFromManifest>>[number];
@@ -73,28 +78,31 @@
 	}
 </script>
 
-<div class="h-screen bg-warm-white flex flex-col items-center p-4 overflow-y-auto">
-	<div class="max-w-xl w-full mt-20">
+<div class="flex h-screen flex-col items-center overflow-y-auto bg-warm-white p-4 custom-scrollbar">
+	<div class="mt-6 w-full max-w-xl md:mt-16">
 		<div class="panel overflow-hidden">
-			<div class="p-4 border-b border-black/15 bg-white flex items-center justify-between">
-				<div class="flex items-center gap-3">
+			<div class="flex items-center justify-between gap-3 border-b border-black/10 bg-white p-4">
+				<div class="flex min-w-0 items-center gap-3">
 					<button
-						onclick={() => goto('/')}
-						class="w-8 h-8 rounded border border-transparent hover:border-black/15 hover:bg-black/5 flex items-center justify-center text-near-black transition-none"
+						type="button"
+						onclick={() => goto(`${base}/`)}
+						class="tool-btn shrink-0"
 						title={$_('ui.back_to_launcher')}
+						aria-label={$_('ui.back_to_launcher')}
 					>
-						<i class="fa-solid fa-arrow-left"></i>
+						<i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
 					</button>
-					<div>
-						<h2 class="text-section-title leading-none">{$_(titleKey)}</h2>
-						<p class="text-micro-data text-creator-blue mt-0.5">
+					<div class="min-w-0">
+						<h1 class="text-section-title truncate leading-tight">{$_(titleKey)}</h1>
+						<p class="text-micro-data mt-0.5 text-creator-blue">
 							{$_('ui.workspace_label')}: {$_(actionLabelKey)}
 						</p>
 					</div>
 				</div>
+				<LanguageSwitcher compact />
 			</div>
 
-			<div class="p-5 bg-white">
+			<div class="bg-white p-5">
 				<EntryPicker
 					{workSpaceWrapper}
 					{filteredLocations}

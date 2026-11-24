@@ -108,7 +108,7 @@
 {#if selectedPoint && editor.draftPoints.length > 2}
 	<button
 		type="button"
-		class="fixed z-40 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-red-600 text-white shadow-panel hover:bg-red-700 disabled:opacity-40"
+		class="fixed z-40 flex h-9 w-9 items-center justify-center rounded-sm border-2 border-white bg-red-600 text-white shadow-panel hover:bg-red-700 disabled:opacity-40"
 		style:left={`${selectedPoint.x + 12}px`}
 		style:top={`${selectedPoint.y - 40}px`}
 		disabled={busy}

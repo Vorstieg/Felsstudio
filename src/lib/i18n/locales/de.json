@@ -1072,6 +1072,20 @@
 		"route_style_red": "Rot",
 		"route_style_red_dashed": "Rot gestrichelt",
 		"route_style_red_dotted": "Rot gepunktet",
-		"route_style_variant": "Variante"
+		"route_style_variant": "Variante",
+		"language": "Sprache",
+		"workflows": "Arbeitsabläufe",
+		"review_badge": "Prüfung",
+		"local_draft": "Lokaler Entwurf",
+		"unsaved_changes": "Ungespeicherte Änderungen",
+		"confirm": "Bestätigen",
+		"zoom_in": "Vergrößern",
+		"zoom_out": "Verkleinern",
+		"reset_zoom": "Ansicht zurücksetzen",
+		"no_file_selected": "Keine Datei ausgewählt",
+		"files_selected": "{count, plural, one {# Datei ausgewählt} other {# Dateien ausgewählt}}",
+		"choose_folder": "Ordner wählen",
+		"review_inbox_desc": "Eingereichte Entwürfe prüfen und freigegebene Änderungen im Felslager veröffentlichen.",
+		"captures_workspace_desc": "Drohnenaufnahmen hochladen, 3D-Rekonstruktionen starten und Ergebnisse importieren."
 	}
 }

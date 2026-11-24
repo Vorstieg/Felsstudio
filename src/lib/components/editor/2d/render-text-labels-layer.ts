@@ -160,7 +160,7 @@ export function renderTextLabelsLayer({
 				.style('height', '100%')
 				.style('resize', 'none')
 				.style('border', '2px solid #2563eb')
-				.style('border-radius', '3px')
+				.style('border-radius', '2px')
 				.style('background', 'rgba(255,255,255,0.96)')
 				.style('padding', '4px')
 				.style('outline', 'none')

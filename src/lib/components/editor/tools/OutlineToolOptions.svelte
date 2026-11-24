@@ -162,7 +162,7 @@
 						type="checkbox"
 						checked={outlineTool.followPhotoEdges}
 						onchange={(event) => actions.setFollowPhotoEdges(event.currentTarget.checked)}
-						class="h-4 w-4 rounded border-black/20 text-creator-blue focus:ring-creator-blue"
+						class="h-4 w-4 rounded-sm border-black/20 text-creator-blue focus:ring-creator-blue"
 					/>
 					<span>{$_('ui.follow_photo_edges')}</span>
 				</label>

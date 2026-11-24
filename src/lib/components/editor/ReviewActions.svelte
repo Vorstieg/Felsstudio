@@ -3,6 +3,7 @@
 	import { _ } from 'svelte-i18n';
 	import SharedDraftNavigation from './SharedDraftNavigation.svelte';
 	import SaveStatus from '$lib/components/ui/SaveStatus.svelte';
+	import LanguageSwitcher from '$lib/components/ui/LanguageSwitcher.svelte';
 	import { getDraftEditor } from './use-draft-editor.svelte';
 	import { authState } from '$lib/api/auth.svelte';
 	let {
@@ -68,7 +69,7 @@
 
 {#if draft}
 	<div
-		class="relative flex flex-wrap items-center justify-end gap-2 font-sans text-xs leading-normal text-near-black"
+		class="relative flex flex-wrap items-center justify-end gap-1.5 font-sans text-xs leading-normal text-near-black"
 		role="group"
 		aria-label={$_('editor.publishing_actions')}
 	>
@@ -78,7 +79,8 @@
 			/>{/if}
 		{#if draft.reviewId}
 			<button
-				class="btn-pill gap-2 whitespace-nowrap disabled:cursor-default disabled:opacity-40 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue! h-7 px-3 py-1 text-[11px]"
+				type="button"
+				class="btn-pill h-8 gap-2 px-3 py-1 text-[11px] whitespace-nowrap disabled:cursor-default disabled:opacity-40 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue!"
 				onclick={() => run(true)}
 				disabled={!draft.ready || draft.busy || disabled}
 			>
@@ -97,7 +99,8 @@
 				>{/if}
 		{:else}
 			<button
-				class="btn-pill gap-2 whitespace-nowrap disabled:cursor-default disabled:opacity-40 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue! h-7 px-3 py-1 text-[11px]"
+				type="button"
+				class="btn-pill h-8 gap-2 px-3 py-1 text-[11px] whitespace-nowrap disabled:cursor-default disabled:opacity-40 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue!"
 				onclick={() => run()}
 				disabled={!draft.ready || draft.busy || disabled}
 				><i
@@ -108,7 +111,7 @@
 		{/if}
 		<button
 			type="button"
-			class="tool-btn shrink-0 disabled:cursor-default disabled:opacity-40 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue! h-7 w-7"
+			class="tool-btn h-8 w-8 shrink-0 disabled:cursor-default disabled:opacity-40 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue!"
 			aria-label={$_('editor.more_editor_actions')}
 			aria-expanded={menuOpen}
 			popovertarget="editor-actions-menu"
@@ -116,7 +119,7 @@
 		>
 		<section
 			id="editor-actions-menu"
-			class="panel fixed inset-auto top-14 right-2 m-0 w-68 max-w-[calc(100vw-1rem)] max-h-[calc(100dvh-5rem)] overflow-auto"
+			class="panel fixed inset-auto top-14 right-2 m-0 max-h-[calc(100dvh-5rem)] w-72 max-w-[calc(100vw-1rem)] overflow-auto"
 			aria-label={$_('editor.editor_actions')}
 			popover="auto"
 			bind:this={menu}
@@ -131,12 +134,39 @@
 				}
 			}}
 		>
+			{#if draft.ready}
+				<div class="border-b border-black/10 bg-warm-white/60 px-3 py-2.5">
+					<div class="flex items-center justify-between gap-2">
+						<p class="truncate text-xs font-semibold text-near-black">
+							{draft.name || $_('ui.unnamed_topo')}
+						</p>
+						<span
+							class={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-bold ${
+								draft.reviewId
+									? 'bg-creator-blue/10 text-creator-blue'
+									: 'bg-black/[0.06] text-warm-gray-500'
+							}`}
+						>
+							{$_(draft.reviewId ? 'editor.review_badge' : 'editor.local_draft')}
+						</span>
+					</div>
+					{#if draft.entryPath}
+						<p class="text-micro-data text-warm-gray-400 mt-0.5 truncate">{draft.entryPath}</p>
+					{/if}
+				</div>
+			{/if}
 			<div class="p-2 not-first:border-t not-first:border-black/10">
 				<SharedDraftNavigation />
 			</div>
 			<div class="p-2 not-first:border-t not-first:border-black/10">
 				<a
-					class="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-xs text-near-black hover:bg-black/5 focus-visible:outline-2! focus-visible:-outline-offset-2! focus-visible:outline-creator-blue! disabled:cursor-default disabled:opacity-40 [&>i]:w-4 [&>i]:text-center [&>i]:text-warm-gray-500 aria-disabled:cursor-default aria-disabled:opacity-40"
+					class="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-xs text-near-black hover:bg-black/5 focus-visible:outline-2! focus-visible:-outline-offset-2! focus-visible:outline-creator-blue! [&>i]:w-4 [&>i]:text-center [&>i]:text-warm-gray-500"
+					href={`${base}/`}
+					onclick={closeMenu}
+					><i class="fa-solid fa-house" aria-hidden="true"></i>{$_('ui.back_to_launcher')}</a
+				>
+				<a
+					class="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-xs text-near-black hover:bg-black/5 focus-visible:outline-2! focus-visible:-outline-offset-2! focus-visible:outline-creator-blue! aria-disabled:cursor-default aria-disabled:opacity-40 [&>i]:w-4 [&>i]:text-center [&>i]:text-warm-gray-500"
 					aria-disabled={!draft.ready || draft.busy}
 					href={draft.ready && !draft.busy
 						? `${base}/felslager/captures${draft.entryPath ? '/' + draft.entryPath.split('/').map(encodeURIComponent).join('/') : ''}?draft=${draft.id}`
@@ -145,13 +175,14 @@
 					><i class="fa-solid fa-camera" aria-hidden="true"></i>{$_('processing.captures_title')}</a
 				>
 				<a
-					class="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-xs text-near-black hover:bg-black/5 focus-visible:outline-2! focus-visible:-outline-offset-2! focus-visible:outline-creator-blue! disabled:cursor-default disabled:opacity-40 [&>i]:w-4 [&>i]:text-center [&>i]:text-warm-gray-500"
+					class="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-xs text-near-black hover:bg-black/5 focus-visible:outline-2! focus-visible:-outline-offset-2! focus-visible:outline-creator-blue! [&>i]:w-4 [&>i]:text-center [&>i]:text-warm-gray-500"
 					href={`${base}/felslager/reviews`}
 					><i class="fa-solid fa-inbox" aria-hidden="true"></i>{$_('editor.review_inbox')}</a
 				>
 				{#if !draft.reviewId && onSave}
 					<button
-						class="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-xs text-near-black hover:bg-black/5 focus-visible:outline-2! focus-visible:-outline-offset-2! focus-visible:outline-creator-blue! disabled:cursor-default disabled:opacity-40 [&>i]:w-4 [&>i]:text-center [&>i]:text-warm-gray-500"
+						type="button"
+						class="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-xs text-near-black hover:bg-black/5 disabled:cursor-default disabled:opacity-40 focus-visible:outline-2! focus-visible:-outline-offset-2! focus-visible:outline-creator-blue! [&>i]:w-4 [&>i]:text-center [&>i]:text-warm-gray-500"
 						onclick={() => {
 							closeMenu();
 							onSave?.();
@@ -163,14 +194,23 @@
 					>
 				{/if}
 			</div>
+			<div
+				class="flex items-center justify-between gap-2 px-4 py-2 not-first:border-t not-first:border-black/10"
+			>
+				<span class="text-micro-data text-warm-gray-500">{$_('editor.language')}</span>
+				<LanguageSwitcher compact />
+			</div>
 			<div class="p-2 not-first:border-t not-first:border-black/10">
 				{#if authState.user}
 					<div class="px-3 py-2 wrap-anywhere">
-						<p class="text-ui-label">{authState.user.name || authState.user.email}</p>
-						<p class="text-micro-data">{authState.user.email}</p>
+						<p class="text-ui-label text-near-black">
+							{authState.user.name || authState.user.email}
+						</p>
+						<p class="text-micro-data text-warm-gray-400">{authState.user.email}</p>
 					</div>
 					<button
-						class="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-xs text-near-black hover:bg-black/5 focus-visible:outline-2! focus-visible:-outline-offset-2! focus-visible:outline-creator-blue! disabled:cursor-default disabled:opacity-40 [&>i]:w-4 [&>i]:text-center [&>i]:text-warm-gray-500"
+						type="button"
+						class="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-xs text-near-black hover:bg-black/5 disabled:cursor-default disabled:opacity-40 focus-visible:outline-2! focus-visible:-outline-offset-2! focus-visible:outline-creator-blue! [&>i]:w-4 [&>i]:text-center [&>i]:text-warm-gray-500"
 						onclick={logout}
 						disabled={authState.busy}
 						><i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i>{$_(
@@ -179,7 +219,8 @@
 					>
 				{:else}
 					<button
-						class="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-xs text-near-black hover:bg-black/5 focus-visible:outline-2! focus-visible:-outline-offset-2! focus-visible:outline-creator-blue! disabled:cursor-default disabled:opacity-40 [&>i]:w-4 [&>i]:text-center [&>i]:text-warm-gray-500"
+						type="button"
+						class="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-xs text-near-black hover:bg-black/5 disabled:cursor-default disabled:opacity-40 focus-visible:outline-2! focus-visible:-outline-offset-2! focus-visible:outline-creator-blue! [&>i]:w-4 [&>i]:text-center [&>i]:text-warm-gray-500"
 						onclick={() => {
 							closeMenu();
 							authState.requireAuth();
@@ -193,7 +234,7 @@
 		</section>
 		{#if error || message}
 			<section
-				class="panel fixed inset-auto top-16 right-2 z-60 m-0 w-90 max-w-[calc(100vw-1rem)] max-h-[calc(100dvh-5rem)] overflow-auto"
+				class="panel fixed inset-auto top-16 right-2 z-60 m-0 max-h-[calc(100dvh-5rem)] w-90 max-w-[calc(100vw-1rem)] overflow-auto"
 				aria-label={$_('editor.review_update')}
 				popover="auto"
 				use:showReviewPopover
@@ -204,10 +245,11 @@
 					}
 				}}
 			>
-				<header class="flex items-center justify-between gap-3 border-b border-black/10 px-3 py-1">
+				<header class="flex items-center justify-between gap-3 border-b border-black/10 px-3 py-1.5">
 					<h2 class="text-ui-label">{$_('editor.review_update')}</h2>
 					<button
-						class="tool-btn shrink-0 disabled:cursor-default disabled:opacity-40 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue! h-7 w-7"
+						type="button"
+						class="tool-btn h-7 w-7 shrink-0 disabled:cursor-default disabled:opacity-40 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-creator-blue!"
 						aria-label={$_('editor.dismiss_review_message')}
 						onclick={() => {
 							error = '';
@@ -218,7 +260,7 @@
 				<div class="flex flex-col gap-3 p-3">
 					{#if error}<p
 							role="alert"
-							class="rounded-sm border border-rose-200 bg-rose-50 p-3 text-xs text-rose-600 wrap-anywhere"
+							class="rounded-sm border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 wrap-anywhere"
 						>
 							{error}
 						</p>{/if}

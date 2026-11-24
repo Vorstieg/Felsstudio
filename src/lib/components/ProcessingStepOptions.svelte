@@ -159,7 +159,7 @@
 <div bind:this={form} class="space-y-4">
 	{#each processingSteps.slice(processingSteps.indexOf(fromStep)) as step}
 		{#if detection || !['detecting', 'positioning'].includes(step)}
-			<fieldset class="space-y-3 rounded-lg border border-black/10 p-3" {disabled}>
+			<fieldset class="space-y-3 rounded-sm border border-black/10 p-3" {disabled}>
 				<legend class="px-1 text-ui-label">{$_(`processing.stage_${step}`)}</legend>
 				{#each Object.entries(controls[step]).filter(([, control]) => !control.advanced) as [key, control]}
 					{#if visible(step, control)}{@render field(step, key, control)}{/if}
@@ -180,7 +180,7 @@
 <style>
 	.reconstruction-input {
 		border: 1px solid rgba(0, 0, 0, 0.1);
-		border-radius: 8px;
+		border-radius: 2px;
 		background: rgba(0, 0, 0, 0.05);
 		padding: 8px;
 		color: rgba(0, 0, 0, 0.95);
