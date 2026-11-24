@@ -8,6 +8,7 @@
 	import {
 		createPolygonAround,
 		getGeometryCenter,
+		isAreaGeometry,
 		translateGeometryTo
 	} from '$lib/assets/js/sector-utils.ts';
 
@@ -20,8 +21,11 @@
 	);
 	let geometryCenter = $derived<Point2D>(getGeometryCenter(metadata.geometry) || [0, 0]);
 	let selectedGeometryVertex = $derived(geometryEditor.selectedVertex);
+	let isArea = $derived(isAreaGeometry(metadata.geometry));
 
 	function setGeometryType(type: string) {
+		if (type === 'Polygon' && isArea) return;
+		if (type === 'Point' && metadata.geometry?.type === 'Point') return;
 		const center: Point2D = getGeometryCenter(metadata.geometry) ||
 			getGeometryCenter(cragEditorState.getActiveEntry()?.geometry) || [0, 0];
 		cragEditorState.commitGeometry(
@@ -60,7 +64,9 @@
 		{#each ['Point', 'Polygon'] as type}
 			<button
 				type="button"
-				class="rounded-sm py-2 text-ui-label transition-none {metadata.geometry?.type === type
+				class="rounded-sm py-2 text-ui-label transition-none {(
+					type === 'Polygon' ? isArea : metadata.geometry?.type === type
+				)
 					? 'bg-white text-creator-blue shadow-sm'
 					: 'text-warm-gray-500 hover:bg-black/5'}"
 				onclick={() => setGeometryType(type)}
@@ -115,7 +121,7 @@
 		</div>
 	</div>
 
-	{#if metadata.geometry?.type === 'Polygon'}
+	{#if isArea}
 		{#if selectedGeometryVertex}
 			<button
 				type="button"

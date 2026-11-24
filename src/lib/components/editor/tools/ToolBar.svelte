@@ -99,7 +99,7 @@
 
 <div class="fixed top-2 right-2 left-2 z-50" role="group" aria-label={$_('editor.editor_toolbar')}>
 	<div class="panel flex items-center justify-between gap-2 bg-white px-2 py-1.5 shadow-panel">
-		<div class="flex min-w-0 items-center gap-1.5">
+		<div class="flex min-w-0 flex-1 items-center gap-1.5">
 			<a
 				href={`${base}/`}
 				class="tool-btn shrink-0"
@@ -112,7 +112,7 @@
 			{#if !isCompact}
 				{#if draft?.ready}
 					<div
-						class="mr-1 hidden max-w-44 items-center gap-1.5 border-r border-black/10 pr-2.5 2xl:flex"
+						class="mr-1 hidden max-w-36 shrink-0 items-center gap-1.5 border-r border-black/10 pr-2.5 xl:flex"
 					>
 						<span class={`h-2 w-2 shrink-0 rounded-full ${workspaceDotClass}`} aria-hidden="true"
 						></span>
@@ -129,7 +129,7 @@
 					</div>
 				{/if}
 
-				<div class="flex items-center gap-1">
+				<div class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto custom-scrollbar">
 					{#each tools.filter((tool) => !tool.hidden) as tool}
 						<ToolButton
 							{tool}

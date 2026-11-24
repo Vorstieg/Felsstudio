@@ -73,7 +73,6 @@
 					pitchNumber: (route.pitches?.length || 0) + 1,
 					points: [],
 					grade: null,
-					length: 0,
 					lineStyle: '',
 					type: 'pitch'
 				}
@@ -127,10 +126,17 @@
 		if (!document || !route) return;
 		if (field === 'grade')
 			onUpdateRoute(document.path, route.id, { grade: value as Route['grade'] });
-		else if (field === 'length') onUpdateRoute(document.path, route.id, { length: Number(value) });
-		else if (field === 'boltAmount')
-			onUpdateRoute(document.path, route.id, { boltAmount: Number(value) });
-		else if (field === 'lineStyle')
+		else if (field === 'length') {
+			const parsed = value === '' || value == null ? undefined : Number(value);
+			onUpdateRoute(document.path, route.id, {
+				length: parsed != null && Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+			});
+		} else if (field === 'boltAmount') {
+			const parsed = value === '' || value == null ? undefined : Number(value);
+			onUpdateRoute(document.path, route.id, {
+				boltAmount: parsed != null && Number.isFinite(parsed) ? parsed : undefined
+			});
+		} else if (field === 'lineStyle')
 			onUpdateRoute(document.path, route.id, { lineStyle: String(value) });
 	}
 

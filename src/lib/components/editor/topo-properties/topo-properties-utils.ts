@@ -52,13 +52,12 @@ export function removePathAsset(
 
 export function createVariant(
 	route: Pick<Route, 'variants'>
-): Variant & { name: string; grade: null; length: number; points: never[]; type: 'variant' } {
+): Variant & { name: string; grade: null; points: never[]; type: 'variant' } {
 	return {
 		id: generateId('variant'),
 		name: `Variant ${(route.variants?.length ?? 0) + 1}`,
 		points: [],
 		grade: null,
-		length: 0,
 		lineStyle: 'variant',
 		type: 'variant'
 	};

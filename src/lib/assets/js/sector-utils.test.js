@@ -39,4 +39,37 @@ describe('translateGeometryTo', () => {
 		]);
 		expect(geometry.coordinates[1][0]).toEqual([1, 1, 42]);
 	});
+
+	it('moves every polygon in a MultiPolygon by the same delta', () => {
+		const geometry = {
+			type: 'MultiPolygon',
+			coordinates: [
+				[
+					[
+						[0, 0],
+						[2, 0],
+						[2, 2],
+						[0, 2],
+						[0, 0]
+					]
+				],
+				[
+					[
+						[10, 10],
+						[14, 10],
+						[14, 14],
+						[12, 16],
+						[10, 14],
+						[10, 10]
+					]
+				]
+			]
+		};
+
+		const translated = translateGeometryTo(geometry, [22, 23]);
+
+		expect(translated.coordinates[0][0][0]).toEqual([10, 10.2]);
+		expect(translated.coordinates[1][0][0]).toEqual([20, 20.2]);
+		expect(geometry.coordinates[0][0][0]).toEqual([0, 0]);
+	});
 });

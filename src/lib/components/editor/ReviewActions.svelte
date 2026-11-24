@@ -69,7 +69,7 @@
 
 {#if draft}
 	<div
-		class="relative flex flex-wrap items-center justify-end gap-1.5 font-sans text-xs leading-normal text-near-black"
+		class="relative flex flex-nowrap items-center justify-end gap-1.5 font-sans text-xs leading-normal text-near-black"
 		role="group"
 		aria-label={$_('editor.publishing_actions')}
 	>
@@ -77,6 +77,9 @@
 				status={saveStatus}
 				errorMessage={saveError}
 			/>{/if}
+		<div class="mr-0.5 hidden items-center border-r border-black/10 pr-2 lg:flex">
+			<SharedDraftNavigation variant="bar" />
+		</div>
 		{#if draft.reviewId}
 			<button
 				type="button"
@@ -130,7 +133,7 @@
 					const bottom = menuButton.getBoundingClientRect().bottom;
 					menu.style.top = `${bottom + 8}px`;
 					menu.style.maxHeight = `${window.innerHeight - bottom - 24}px`;
-					menu.querySelector<HTMLElement>('select')?.focus();
+					menu.querySelector<HTMLElement>('button, a')?.focus();
 				}
 			}}
 		>
@@ -155,8 +158,9 @@
 					{/if}
 				</div>
 			{/if}
-			<div class="p-2 not-first:border-t not-first:border-black/10">
-				<SharedDraftNavigation />
+			<div class="p-2 lg:hidden not-first:border-t not-first:border-black/10">
+				<p class="text-ui-label mb-1.5 px-1 text-warm-gray-400">{$_('draft.editors')}</p>
+				<SharedDraftNavigation variant="menu" onNavigate={closeMenu} />
 			</div>
 			<div class="p-2 not-first:border-t not-first:border-black/10">
 				<a

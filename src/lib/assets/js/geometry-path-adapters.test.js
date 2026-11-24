@@ -130,4 +130,46 @@ describe('geometry path adapters', () => {
 			editGeometryPath(geometry, (path, closed) => removePathVertex(path, 0, { closed }))
 		).toEqual(geometry);
 	});
+
+	it('extracts and edits a specific polygon inside a MultiPolygon without altering sibling polygons', () => {
+		const geometry = {
+			type: 'MultiPolygon',
+			coordinates: [
+				[
+					[
+						[0, 0],
+						[2, 0],
+						[2, 2],
+						[0, 0]
+					]
+				],
+				[
+					[
+						[10, 10],
+						[12, 10],
+						[12, 12],
+						[10, 10]
+					]
+				]
+			]
+		};
+		expect(getGeometryPath(geometry, 1)).toEqual([
+			[10, 10],
+			[12, 10],
+			[12, 12],
+			[10, 10]
+		]);
+		const moved = editGeometryPath(
+			geometry,
+			(path, closed) => movePathVertex(path, 0, [11, 11], { closed }),
+			1
+		);
+		expect(moved.coordinates[0]).toBe(geometry.coordinates[0]);
+		expect(moved.coordinates[1][0]).toEqual([
+			[11, 11],
+			[12, 10],
+			[12, 12],
+			[11, 11]
+		]);
+	});
 });

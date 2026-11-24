@@ -19,7 +19,11 @@ import {
 	removePathVertex
 } from '$lib/assets/js/path-geometry.ts';
 import { getGeometryPath, editGeometryPath } from '$lib/assets/js/geometry-path-adapters.ts';
-import { getGeometryCenter, translateGeometryTo } from '$lib/assets/js/sector-utils.ts';
+import {
+	getGeometryCenter,
+	isAreaGeometry,
+	translateGeometryTo
+} from '$lib/assets/js/sector-utils.ts';
 import { initMapPointDragHandlers } from '$lib/components/editor/map-point-drag-handlers.ts';
 
 const SOURCE_ID = 'geometry-editor-data';
@@ -35,15 +39,18 @@ const LAYERS = {
 
 type GeometryEditorProperties = {
 	handle: 'point' | 'display-point' | 'polygon' | 'center' | 'vertex' | 'midpoint';
+	polygonIndex?: number;
 	vertexIndex?: number;
 	insertIndex?: number;
 	selected?: boolean;
 };
 type GeometryEditorFeature = Feature<Geometry, GeometryEditorProperties>;
+type SelectedVertexRef = number | { polygonIndex?: number; vertexIndex: number } | null;
 type GeometryEditorDrag = {
 	target: MetadataTarget | null;
 	geometry: PointOrAreaGeometry;
 	kind: 'point' | 'center' | 'vertex' | 'midpoint';
+	polygonIndex: number;
 	vertexIndex: number;
 };
 type GeometryEditorLayerEvent = MapLayerMouseEvent | MapLayerTouchEvent;
@@ -72,7 +79,7 @@ export function cloneGeoJsonGeometry<T extends PointOrAreaGeometry | null | unde
 
 export function buildGeometryEditorFeatures(
 	geometry: PointOrAreaGeometry | null | undefined,
-	selectedVertex: number | null = null,
+	selectedVertex: SelectedVertexRef = null,
 	editable = true
 ): GeometryEditorFeature[] {
 	if (!geometry) return [];
@@ -85,9 +92,16 @@ export function buildGeometryEditorFeatures(
 			} as GeometryEditorFeature
 		];
 	}
-	if (geometry.type !== 'Polygon') return [];
-	const path = getGeometryPath(geometry);
-	const editablePath = getEditablePath(path, { closed: true });
+	if (!isAreaGeometry(geometry)) return [];
+	const selected =
+		typeof selectedVertex === 'number'
+			? { polygonIndex: 0, vertexIndex: selectedVertex }
+			: selectedVertex
+				? {
+						polygonIndex: selectedVertex.polygonIndex ?? 0,
+						vertexIndex: selectedVertex.vertexIndex
+					}
+				: null;
 	const features: GeometryEditorFeature[] = [
 		{ type: 'Feature', geometry, properties: { handle: 'polygon' } } as GeometryEditorFeature
 	];
@@ -99,23 +113,36 @@ export function buildGeometryEditorFeatures(
 			geometry: { type: 'Point', coordinates: center },
 			properties: { handle: 'center' }
 		} as GeometryEditorFeature);
-	for (const [vertexIndex, point] of editablePath.entries()) {
-		features.push({
-			type: 'Feature',
-			geometry: { type: 'Point', coordinates: point },
-			properties: {
-				handle: 'vertex',
-				vertexIndex,
-				selected: selectedVertex === vertexIndex
-			}
-		} as GeometryEditorFeature);
-	}
-	for (const midpoint of getPathMidpoints(path, { closed: true })) {
-		features.push({
-			type: 'Feature',
-			geometry: { type: 'Point', coordinates: midpoint.point },
-			properties: { handle: 'midpoint', insertIndex: midpoint.insertIndex }
-		} as GeometryEditorFeature);
+	const multi = geometry as unknown as { type?: string; coordinates?: unknown[][][] };
+	const polygonCount =
+		multi.type === 'MultiPolygon' && Array.isArray(multi.coordinates)
+			? multi.coordinates.length
+			: 1;
+	for (let polygonIndex = 0; polygonIndex < polygonCount; polygonIndex += 1) {
+		const path = getGeometryPath(geometry, polygonIndex);
+		const editablePath = getEditablePath(path, { closed: true });
+		for (const [vertexIndex, point] of editablePath.entries()) {
+			features.push({
+				type: 'Feature',
+				geometry: { type: 'Point', coordinates: point },
+				properties: {
+					handle: 'vertex',
+					polygonIndex,
+					vertexIndex,
+					selected:
+						selected !== null &&
+						selected.polygonIndex === polygonIndex &&
+						selected.vertexIndex === vertexIndex
+				}
+			} as GeometryEditorFeature);
+		}
+		for (const midpoint of getPathMidpoints(path, { closed: true })) {
+			features.push({
+				type: 'Feature',
+				geometry: { type: 'Point', coordinates: midpoint.point },
+				properties: { handle: 'midpoint', polygonIndex, insertIndex: midpoint.insertIndex }
+			} as GeometryEditorFeature);
+		}
 	}
 	return features;
 }
@@ -126,7 +153,11 @@ export function useCragGeometryEditor({
 	getActiveTool,
 	setSuppressNextMapClick = () => {}
 }: GeometryEditorOptions) {
-	let selectedVertex = $state<{ targetKey: string; vertexIndex: number } | null>(null);
+	let selectedVertex = $state<{
+		targetKey: string;
+		polygonIndex: number;
+		vertexIndex: number;
+	} | null>(null);
 	let previewGeometry: PointOrAreaGeometry | null = null;
 	let dragState: GeometryEditorDrag | null = null;
 	let lastTargetKey = '';
@@ -247,11 +278,7 @@ export function useCragGeometryEditor({
 		const geometry = previewGeometry || activeGeometry();
 		const tool = getActiveTool();
 		const features = ['select', 'geometry'].includes(tool)
-			? buildGeometryEditorFeatures(
-					geometry,
-					selectedVertex?.vertexIndex ?? null,
-					tool === 'geometry'
-				)
+			? buildGeometryEditorFeatures(geometry, selectedVertex, tool === 'geometry')
 			: [];
 		(map.getSource(SOURCE_ID) as GeoJSONSource | undefined)?.setData({
 			type: 'FeatureCollection',
@@ -280,8 +307,10 @@ export function useCragGeometryEditor({
 		const selectVertex = (event: MapLayerMouseEvent) => {
 			if (getActiveTool() !== 'geometry') return;
 			const vertexIndex = Number(event.features?.[0]?.properties?.vertexIndex);
+			const rawPolygonIndex = Number(event.features?.[0]?.properties?.polygonIndex);
+			const polygonIndex = Number.isInteger(rawPolygonIndex) ? rawPolygonIndex : 0;
 			if (!Number.isInteger(vertexIndex)) return;
-			selectedVertex = { targetKey: targetKey(activeTarget()), vertexIndex };
+			selectedVertex = { targetKey: targetKey(activeTarget()), polygonIndex, vertexIndex };
 			setSuppressNextMapClick(true);
 			syncDrawing();
 		};
@@ -308,6 +337,8 @@ export function useCragGeometryEditor({
 							: layerId === LAYERS.midpoints
 								? 'midpoint'
 								: 'vertex';
+				const rawPolygonIndex = Number(properties.polygonIndex);
+				const polygonIndex = Number.isInteger(rawPolygonIndex) ? rawPolygonIndex : 0;
 				const vertexIndex = Number(
 					kind === 'midpoint' ? properties.insertIndex : properties.vertexIndex
 				);
@@ -316,6 +347,7 @@ export function useCragGeometryEditor({
 					target,
 					geometry: cloneGeoJsonGeometry(geometry),
 					kind,
+					polygonIndex,
 					vertexIndex
 				};
 			},
@@ -325,12 +357,18 @@ export function useCragGeometryEditor({
 				dragState = drag;
 				previewGeometry =
 					drag.kind === 'midpoint'
-						? editGeometryPath(drag.geometry, (path, closed) =>
-								insertPathVertex(path, drag.vertexIndex, coordinate, { closed })
+						? editGeometryPath(
+								drag.geometry,
+								(path, closed) => insertPathVertex(path, drag.vertexIndex, coordinate, { closed }),
+								drag.polygonIndex
 							)
 						: drag.geometry;
 				if (drag.kind === 'midpoint' || drag.kind === 'vertex')
-					selectedVertex = { targetKey: targetKey(drag.target), vertexIndex: drag.vertexIndex };
+					selectedVertex = {
+						targetKey: targetKey(drag.target),
+						polygonIndex: drag.polygonIndex,
+						vertexIndex: drag.vertexIndex
+					};
 				syncDrawing();
 			},
 			onDragMove: (drag: GeometryEditorDrag, event: GeometryEditorEvent) => {
@@ -339,8 +377,10 @@ export function useCragGeometryEditor({
 				previewGeometry =
 					drag.kind === 'point' || drag.kind === 'center'
 						? translateGeometryTo(drag.geometry, coordinate)
-						: editGeometryPath(previewGeometry, (path, closed) =>
-								movePathVertex(path, drag.vertexIndex, coordinate, { closed })
+						: editGeometryPath(
+								previewGeometry,
+								(path, closed) => movePathVertex(path, drag.vertexIndex, coordinate, { closed }),
+								drag.polygonIndex
 							);
 				syncDrawing();
 			},
@@ -364,12 +404,14 @@ export function useCragGeometryEditor({
 		if (getActiveTool() !== 'geometry' || !selectedVertex) return false;
 		if (selectedVertex.targetKey !== targetKey(target)) return false;
 		const geometry = activeGeometry();
-		const path = getGeometryPath(geometry);
-		if (geometry?.type !== 'Polygon' || getEditablePath(path, { closed: true }).length <= 3)
+		const { polygonIndex, vertexIndex } = selectedVertex;
+		const path = getGeometryPath(geometry, polygonIndex);
+		if (!isAreaGeometry(geometry) || getEditablePath(path, { closed: true }).length <= 3)
 			return false;
-		const { vertexIndex } = selectedVertex;
-		const next = editGeometryPath(geometry, (path, closed) =>
-			removePathVertex(path, vertexIndex, { closed })
+		const next = editGeometryPath(
+			geometry,
+			(ringPath, closed) => removePathVertex(ringPath, vertexIndex, { closed }),
+			polygonIndex
 		);
 		state.commitGeometry(target, next, 'Delete polygon vertex');
 		selectedVertex = null;

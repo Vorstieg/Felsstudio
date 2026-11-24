@@ -4,6 +4,7 @@ import type { PointOrAreaGeometry } from '@vorstieg/fels-types/types';
 import {
 	createPolygonAround,
 	getGeometryCenter,
+	isAreaGeometry,
 	translateGeometryTo
 } from '$lib/assets/js/sector-utils.ts';
 import { createFelsEntry } from '$lib/state/crag-session.svelte.ts';
@@ -75,7 +76,7 @@ export function createCragSectorTool({
 		const features = state.getActiveSectors().flatMap((node) => {
 			const sector = node.entry?.properties;
 			const geometry = node.entry?.geometry;
-			if (!sector || geometry?.type !== 'Polygon') return [];
+			if (!sector || !isAreaGeometry(geometry)) return [];
 			const path = state.getWorkspaceEntryPath(node);
 			const selection = getSelection();
 			return [

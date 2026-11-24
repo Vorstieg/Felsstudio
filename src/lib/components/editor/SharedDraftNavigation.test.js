@@ -10,11 +10,13 @@ beforeEach(() => {
 	goto.mockReset();
 	addMessages('en', {
 		draft: { editors: 'Draft editors', save_failed: 'Could not save draft' },
-		ui: { crag_studio: 'Crag', '2d_studio': '2D', '3d_studio': '3D' }
+		ui: { crag_studio: 'Crag Studio', '2d_studio': '2D Studio', '3d_studio': '3D Studio' },
+		editor: { studio_tab_crag: 'Crag', studio_tab_2d: '2D Topo', studio_tab_3d: '3D Topo' }
 	});
 	init({ fallbackLocale: 'en', initialLocale: 'en' });
 });
 it('only renders controller state and routes editor selection through it', async () => {
+	const onNavigate = vi.fn();
 	const draft = {
 		mode: '2d',
 		ready: true,
@@ -23,11 +25,14 @@ it('only renders controller state and routes editor selection through it', async
 		href: (route) => `/${route}?draft=one`
 	};
 	mocks.draft = draft;
-	const view = render(SharedDraftNavigation);
-	expect(view.getByRole('combobox')).toHaveValue('2d');
-	await fireEvent.change(view.getByRole('combobox'), { target: { value: '3d' } });
+	const view = render(SharedDraftNavigation, { onNavigate });
+	const activeTab = view.getByRole('button', { name: '2D Topo' });
+	const targetTab = view.getByRole('button', { name: '3D Topo' });
+	expect(activeTab).toBeDisabled();
+	expect(activeTab).toHaveAttribute('aria-current', 'page');
+	expect(targetTab).not.toBeDisabled();
+	await fireEvent.click(targetTab);
+	expect(onNavigate).toHaveBeenCalledOnce();
 	expect(goto).toHaveBeenCalledWith('/topos/3d/editor?draft=one');
 	expect(view.getByRole('alert')).toHaveTextContent('Storage full');
-	expect(view.getByRole('option', { name: '2D', exact: true })).toBeDisabled();
-	expect(view.getByRole('combobox')).toHaveValue('2d');
 });

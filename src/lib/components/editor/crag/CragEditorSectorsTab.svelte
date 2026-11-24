@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { _ } from 'svelte-i18n';
+	import { goto } from '$app/navigation';
 	import type { FelsEntryWorkspace } from '$lib/types/crag';
 	import type { CragSelection, RouteDocument } from './crag-route-types.ts';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.ts';
+	import { getDraftEditor } from '../use-draft-editor.svelte';
 	import { workspaceNodeDocumentPaths } from '$lib/assets/js/workspace-paths.ts';
 	const cragEditorState = getCragEditorSession();
+	const draft = getDraftEditor();
 	const { sectorTool, routeTool, actions } = getCragEditorTools();
 	const {
 		createSector: onAddSector,
@@ -58,6 +61,18 @@
 		selectedObject = { type: 'entry', key };
 		onFocusSector(sectorNode, { select: false });
 	}
+
+	async function open2DTopo(sectorNode?: FelsEntryWorkspace) {
+		if (!draft || !draft.ready || draft.busy) return;
+		if (sectorNode) {
+			const key = cragEditorState.getWorkspaceEntryPath(sectorNode);
+			if (cragEditorState.activeWorkspaceEntryPath !== key) {
+				await actions.selectObject({ type: 'entry', key });
+				if (cragEditorState.activeWorkspaceEntryPath !== key) return;
+			}
+		}
+		void goto(draft.href('topos/2d/editor'));
+	}
 </script>
 
 <div class="flex flex-col gap-3">
@@ -73,13 +88,28 @@
 		>
 	</div>
 	<div class="rounded-sm border border-black/10 bg-black/[0.02] p-2">
-		<div class="mb-2 flex items-center justify-between">
+		<div class="mb-2 flex items-center justify-between gap-2">
 			<div class="text-ui-label text-warm-gray-500">{$_('editor.crag_routes')}</div>
-			<button
-				class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-creator-blue hover:bg-creator-blue hover:text-white"
-				onclick={onAddParentRoute}
-				><i class="fa-solid fa-route mr-1"></i>{$_('editor.add_route')}
-			</button>
+			<div class="flex shrink-0 items-center gap-1">
+				{#if draft}
+					<button
+						type="button"
+						class="inline-flex items-center gap-1 rounded-sm border border-workspace-topo-2d/30 bg-workspace-topo-2d/10 px-2 py-1 text-micro-data font-bold whitespace-nowrap text-workspace-topo-2d hover:bg-workspace-topo-2d hover:text-white disabled:opacity-40"
+						disabled={!draft.ready || draft.busy}
+						title={$_('editor.open_2d_topo_for_entry')}
+						onclick={() => void open2DTopo()}
+						><i class="fa-solid fa-layer-group" aria-hidden="true"></i>{$_(
+							'editor.open_2d_topo'
+						)}</button
+					>
+				{/if}
+				<button
+					type="button"
+					class="inline-flex items-center gap-1 rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold whitespace-nowrap text-creator-blue hover:bg-creator-blue hover:text-white"
+					onclick={onAddParentRoute}
+					><i class="fa-solid fa-route" aria-hidden="true"></i>{$_('editor.add_route')}
+				</button>
+			</div>
 		</div>
 		{#if parentRoutes.length === 0}<p class="text-micro-data text-warm-gray-400">
 				{$_('editor.no_parent_routes')}
@@ -118,8 +148,8 @@
 						}
 					}}
 				>
-					<div class="flex items-center justify-between gap-2">
-						<div class="min-w-0">
+					<div class="flex items-start justify-between gap-2">
+						<div class="min-w-0 flex-1">
 							<div class="text-body-text font-bold truncate">
 								{sector.name || sector.id || $_('editor.unnamed_entry')}
 							</div>
@@ -127,35 +157,55 @@
 								{sector.id || 'missing-id'}
 							</div>
 						</div>
-						<div class="flex items-center gap-1">
-							<button
-								class="h-6 rounded-sm px-1.5 text-[10px] font-bold text-creator-blue"
-								title={$_('editor.add_route_to_this_sector')}
-								onclick={(e) => {
-									e.stopPropagation();
-									onAddSectorRoute(sector.id);
-								}}
-								><i class="fa-solid fa-route mr-1"></i>{$_('editor.add_route')}
-							</button>
+						<div class="flex shrink-0 items-center gap-0.5">
 							<button
 								onclick={(e) => {
 									e.stopPropagation();
 									onDuplicateSector(sector.id);
 								}}
-								class="h-6 w-6 text-warm-gray-400 hover:text-creator-blue"
+								class="flex h-6 w-6 items-center justify-center rounded-sm text-warm-gray-400 hover:bg-black/5 hover:text-creator-blue"
 								title={$_('editor.duplicate_sector')}
-								><i class="fa-solid fa-copy text-[10px]"></i></button
+								aria-label={$_('editor.duplicate_sector')}
+								><i class="fa-solid fa-copy text-[10px]" aria-hidden="true"></i></button
 							>
 							<button
 								onclick={(e) => {
 									e.stopPropagation();
 									onRemoveSector(sector.id);
 								}}
-								class="h-6 w-6 text-warm-gray-300 hover:text-rose-600"
+								class="flex h-6 w-6 items-center justify-center rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600"
 								title={$_('editor.delete_sector')}
-								><i class="fa-solid fa-trash-can text-[10px]"></i></button
+								aria-label={$_('editor.delete_sector')}
+								><i class="fa-solid fa-trash-can text-[10px]" aria-hidden="true"></i></button
 							>
 						</div>
+					</div>
+					<div class="mt-2 flex flex-wrap items-center gap-1.5">
+						{#if draft}
+							<button
+								type="button"
+								class="inline-flex h-6 items-center gap-1 rounded-sm border border-workspace-topo-2d/30 bg-workspace-topo-2d/10 px-2 text-[10px] font-bold whitespace-nowrap text-workspace-topo-2d hover:bg-workspace-topo-2d hover:text-white disabled:opacity-40"
+								disabled={!draft.ready || draft.busy}
+								title={$_('editor.open_2d_topo_for_entry')}
+								onclick={(e) => {
+									e.stopPropagation();
+									void open2DTopo(sectorNode);
+								}}
+								><i class="fa-solid fa-layer-group" aria-hidden="true"></i>{$_(
+									'editor.open_2d_topo'
+								)}</button
+							>
+						{/if}
+						<button
+							type="button"
+							class="inline-flex h-6 items-center gap-1 rounded-sm border border-black/15 bg-white px-2 text-[10px] font-bold whitespace-nowrap text-creator-blue hover:bg-creator-blue hover:text-white"
+							title={$_('editor.add_route_to_this_sector')}
+							onclick={(e) => {
+								e.stopPropagation();
+								onAddSectorRoute(sector.id);
+							}}
+							><i class="fa-solid fa-route" aria-hidden="true"></i>{$_('editor.add_route')}
+						</button>
 					</div>
 					{#if routes.length > 0}
 						<div class="mt-2 border-t border-black/10">

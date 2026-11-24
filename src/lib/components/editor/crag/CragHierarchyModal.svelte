@@ -2,6 +2,7 @@
 	import { _ } from 'svelte-i18n';
 	import { onMount } from 'svelte';
 	import { normalizePath } from '$lib/components/editor/crag/crag-editor-paths.ts';
+	import type { HierarchySuggestion } from './crag-hierarchy-suggestions.ts';
 	import TreeFolderSelector from './TreeFolderSelector.svelte';
 
 	type Props = {
@@ -9,6 +10,8 @@
 		cragSlug?: string;
 		knownFolders?: Set<string>;
 		hierarchyError?: string;
+		suggestions?: HierarchySuggestion[];
+		isSuggesting?: boolean;
 		onClose?: () => void;
 		onCancel?: () => void;
 	};
@@ -17,6 +20,8 @@
 		cragSlug = $bindable(''),
 		knownFolders = new Set(),
 		hierarchyError = '',
+		suggestions = [],
+		isSuggesting = false,
 		onClose,
 		onCancel = onClose
 	}: Props = $props();
@@ -117,6 +122,65 @@
 					{/if}
 				</div>
 			</div>
+
+			<!-- Location-based suggestions -->
+			{#if isSuggesting || suggestions.length > 0}
+				<div class="space-y-2 rounded-sm border border-black/10 bg-warm-white/80 p-2.5">
+					<div class="flex items-center justify-between gap-2">
+						<span class="text-ui-label flex items-center gap-1.5">
+							<i class="fa-solid fa-location-dot text-creator-blue" aria-hidden="true"></i>
+							{$_('editor.location_suggestions')}
+						</span>
+						{#if isSuggesting}
+							<i class="fa-solid fa-spinner fa-spin text-[10px] text-creator-blue" aria-hidden="true"
+							></i>
+						{/if}
+					</div>
+					{#if suggestions.length > 0}
+						<div class="flex flex-col gap-1.5">
+							{#each suggestions as suggestion}
+								{@const isSelected = normalizePath(parentPath) === normalizePath(suggestion.parentPath)}
+								<button
+									type="button"
+									onclick={() => (parentPath = suggestion.parentPath)}
+									class={`flex w-full items-center justify-between gap-2 rounded-sm border px-2.5 py-2 text-left transition-none ${
+										isSelected
+											? 'border-creator-blue bg-creator-blue/10'
+											: 'border-black/10 bg-white hover:border-creator-blue/40 hover:bg-creator-blue/[0.03]'
+									}`}
+								>
+									<div class="min-w-0 flex-1">
+										<p class="truncate text-body-text font-semibold text-near-black">
+											{suggestion.label}
+										</p>
+										<p class="truncate font-mono text-micro-data text-warm-gray-500">
+											{suggestion.parentPath}
+										</p>
+									</div>
+									<div class="flex shrink-0 items-center gap-1">
+										<span
+											class="rounded-sm bg-black/[0.05] px-1.5 py-0.5 text-[10px] font-semibold text-warm-gray-600"
+										>
+											{$_(
+												suggestion.source === 'polygon'
+													? 'editor.suggestion_source_polygon'
+													: 'editor.suggestion_source_geocoder'
+											)}
+										</span>
+										{#if suggestion.isNewFolder}
+											<span
+												class="rounded-sm bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800"
+											>
+												{$_('editor.new_folder_badge')}
+											</span>
+										{/if}
+									</div>
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			{/if}
 
 			<!-- Parent folder selector -->
 			<TreeFolderSelector {knownFolders} bind:selectedPath={parentPath} />

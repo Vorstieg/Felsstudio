@@ -23,6 +23,7 @@
 	import TagSelector from '$lib/components/ui/TagSelector.svelte';
 	import { fileUrl } from '$lib/api/felslager.ts';
 	import CragHierarchyPlacement from './CragHierarchyPlacement.svelte';
+	import { slugifyName } from './crag-editor-paths.ts';
 	const HIERARCHY_KINDS = ['country', 'region', 'area', 'crag', 'sector'];
 	import { getHierarchySourceRefs } from '$lib/assets/js/load-crag-editor-entry.ts';
 	import type { FelsEntryWorkspace } from '$lib/types/crag';
@@ -66,6 +67,28 @@
 	let pendingCragImages = $derived(activeEntry?.pendingImages || []);
 	let pendingCragImageCount = $derived(pendingCragImages.filter(Boolean).length);
 	let equipment = $derived((metadata.equipment || []) as EquipmentItem[]);
+	let advancedOpen = $state(false);
+
+	$effect(() => {
+		if (hierarchyError || (activeEntry && !activeEntry.sourcePath)) advancedOpen = true;
+	});
+
+	function handleNameInput(value: string) {
+		cragEditorState.setMetadataField('name', value);
+		if (!activeEntry || activeEntry.sourcePath || !isCurrentEntry) return;
+		const baseSlug = slugifyName(value);
+		if (!baseSlug) return;
+		const parent = activeEntry.path ? cragEditorState.getWorkspaceEntry(activeEntry.path) : null;
+		const takenIds = new Set(
+			(parent?.childEntries || [])
+				.filter((child) => child !== activeEntry)
+				.map((child) => String(child.entry?.properties.id || child.id || ''))
+		);
+		let nextId = baseSlug;
+		let suffix = 2;
+		while (takenIds.has(nextId)) nextId = `${baseSlug}-${suffix++}`;
+		setActiveMetadataId(nextId);
+	}
 
 	function selectEntry(entry: FelsEntryWorkspace) {
 		selectMetadataTarget(cragEditorState.getWorkspaceEntryPath(entry));
@@ -141,9 +164,6 @@
 				</button>
 			{/each}
 		</div>
-		{#if isCurrentEntry}
-			<CragHierarchyPlacement compact />
-		{/if}
 	</nav>
 	<div class="space-y-3">
 		<div class="space-y-0.5">
@@ -152,38 +172,23 @@
 				id="metadata-name"
 				type="text"
 				value={metadata.name}
-				oninput={(event) => cragEditorState.setMetadataField('name', event.currentTarget.value)}
+				oninput={(event) => handleNameInput(event.currentTarget.value)}
 				class="input-studio w-full"
 				placeholder={$_('editor.example_name')}
 			/>
 		</div>
-		<div class="grid grid-cols-2 gap-2">
-			<div class="space-y-0.5">
-				<label for="metadata-kind" class="text-ui-label block">{$_('editor.kind')}</label>
-				<select
-					id="metadata-kind"
-					value={metadata.kind}
-					onchange={(event) => cragEditorState.setMetadataField('kind', event.currentTarget.value)}
-					class="input-studio w-full appearance-none"
-				>
-					{#each HIERARCHY_KINDS as kind}<option value={kind}
-							>{$_('editor.hierarchy_' + kind)}</option
-						>{/each}
-				</select>
-			</div>
-			<div class="space-y-0.5">
-				<label for="metadata-id" class="text-ui-label block">ID</label>
-				<input
-					id="metadata-id"
-					value={metadata.id}
-					readonly={!isCurrentEntry}
-					onchange={(event) => {
-						setActiveMetadataId(event.currentTarget.value);
-						event.currentTarget.value = cragEditorState.getMetadataTarget()?.id || '';
-					}}
-					class="input-studio w-full font-mono read-only:bg-black/5 read-only:text-warm-gray-400"
-				/>
-			</div>
+		<div class="space-y-0.5">
+			<label for="metadata-kind" class="text-ui-label block">{$_('editor.kind')}</label>
+			<select
+				id="metadata-kind"
+				value={metadata.kind}
+				onchange={(event) => cragEditorState.setMetadataField('kind', event.currentTarget.value)}
+				class="input-studio w-full appearance-none"
+			>
+				{#each HIERARCHY_KINDS as kind}<option value={kind}
+						>{$_('editor.hierarchy_' + kind)}</option
+					>{/each}
+			</select>
 		</div>
 		{#if hierarchyError}<p
 				class="rounded-sm border border-rose-200 bg-rose-50 p-2 text-micro-data font-bold text-rose-700"
@@ -364,5 +369,21 @@
 				class="input-studio w-full resize-none"
 			></textarea>
 		</div>
+		{#if isCurrentEntry}
+			<details bind:open={advancedOpen} class="border-t border-black/15 pt-2">
+				<summary
+					class="text-ui-label flex cursor-pointer items-center justify-between gap-2 text-warm-gray-500 select-none hover:text-near-black"
+				>
+					<span>{$_('editor.advanced_settings')}</span>
+					<i
+						class={`fa-solid fa-chevron-right text-[9px] text-warm-gray-400 transition-transform ${advancedOpen ? 'rotate-90' : ''}`}
+						aria-hidden="true"
+					></i>
+				</summary>
+				<div class="mt-2.5">
+					<CragHierarchyPlacement />
+				</div>
+			</details>
+		{/if}
 	</div>
 </div>

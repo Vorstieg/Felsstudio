@@ -223,7 +223,6 @@ export class RouteTool {
 			points2D,
 			points: [],
 			grade: pitchNumber === 1 ? createGrade('5a') : null,
-			length: 0,
 			lineStyle: '',
 			type: 'pitch'
 		};

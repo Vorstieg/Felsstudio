@@ -74,6 +74,55 @@ describe('geometry editor overlay', () => {
 		expect(features.find((feature) => feature.properties.selected)?.properties.vertexIndex).toBe(1);
 	});
 
+	it('renders MultiPolygon shapes in both display and editable modes with per-polygon handles', () => {
+		const multiPolygon = {
+			type: 'MultiPolygon',
+			coordinates: [
+				[
+					[
+						[0, 0],
+						[2, 0],
+						[2, 2],
+						[0, 0]
+					]
+				],
+				[
+					[
+						[10, 10],
+						[12, 10],
+						[12, 12],
+						[10, 12],
+						[10, 10]
+					]
+				]
+			]
+		};
+
+		const displayFeatures = buildGeometryEditorFeatures(multiPolygon, null, false);
+		expect(displayFeatures.map((feature) => feature.properties.handle)).toEqual(['polygon']);
+		expect(displayFeatures[0].geometry).toEqual(multiPolygon);
+
+		const editableFeatures = buildGeometryEditorFeatures(
+			multiPolygon,
+			{ polygonIndex: 1, vertexIndex: 2 },
+			true
+		);
+		expect(
+			editableFeatures.filter((feature) => feature.properties.handle === 'polygon')
+		).toHaveLength(1);
+		expect(
+			editableFeatures.filter((feature) => feature.properties.handle === 'center')
+		).toHaveLength(1);
+		expect(
+			editableFeatures.filter((feature) => feature.properties.handle === 'vertex')
+		).toHaveLength(7);
+		expect(
+			editableFeatures.filter((feature) => feature.properties.handle === 'midpoint')
+		).toHaveLength(7);
+		const selected = editableFeatures.find((feature) => feature.properties.selected);
+		expect(selected?.properties).toMatchObject({ polygonIndex: 1, vertexIndex: 2 });
+	});
+
 	it('moves a geometry to the current map center without changing its shape', () => {
 		const geometry = {
 			type: 'Polygon',

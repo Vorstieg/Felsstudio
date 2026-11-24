@@ -46,4 +46,19 @@ describe('PitchComponent', () => {
 		expect(onFieldChange).toHaveBeenCalledWith('lineStyle', expect.any(String));
 		expect(pitch).toEqual(createPitch());
 	});
+
+	it('leaves unknown or zero route lengths empty instead of pre-filling 0', async () => {
+		const user = userEvent.setup();
+		const onFieldChange = vi.fn();
+		render(PitchComponentTestWrapper, {
+			pitch: { grade: null, length: 0, boltAmount: undefined, lineStyle: 'red', type: 'pitch' },
+			onFieldChange
+		});
+
+		const textboxes = screen.getAllByRole('textbox');
+		expect(textboxes[0]).toHaveValue('');
+		await user.type(textboxes[0], '24');
+		await user.tab();
+		expect(onFieldChange).toHaveBeenCalledWith('length', '24');
+	});
 });
