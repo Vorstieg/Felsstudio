@@ -1,5 +1,12 @@
 export const cragsPerPage = 50;
 
+export const felslagerUrl =
+	(import.meta.env.VITE_FELSLAGER_URL || '').trim() || 'https://lager.felsverzeichnis.at/api/fs';
+
+export const viaFerrataTilesUrl =
+	(import.meta.env.VITE_VIA_FERRATA_TILES_URL || '').trim() ||
+	new URL('../tiles/via-ferrata.pmtiles', felslagerUrl.replace(/\/$/, '') + '/').href;
+
 export const maptilerApiKey = (import.meta.env.VITE_MAPTILER_API_KEY || '').trim();
 
 export const types = [

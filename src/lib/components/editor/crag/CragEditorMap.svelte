@@ -4,6 +4,8 @@
 	import maplibregl from 'maplibre-gl';
 	import type { Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
+	import { registerCustomTiles, transformTileRequest } from '$lib/assets/js/custom-tiles.ts';
+	import { viaFerrataTilesUrl } from '$lib/config.ts';
 	import { loadMapStyle } from '$lib/map-style.ts';
 	import type { Point2D } from '@vorstieg/fels-types/types';
 
@@ -92,9 +94,11 @@
 				() => 'https://demotiles.maplibre.org/style.json'
 			);
 			if (disposed || !mapElement) return;
+			registerCustomTiles(maplibregl);
 			const currentMap = new maplibregl.Map({
 				container: mapElement,
 				style,
+				transformRequest: (url) => transformTileRequest(url, viaFerrataTilesUrl),
 				center: [coords[0], coords[1]],
 				zoom: 13,
 				bearing: 0,

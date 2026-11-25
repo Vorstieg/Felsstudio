@@ -2,6 +2,8 @@
 	import { onDestroy } from 'svelte';
 	import maplibregl from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
+	import { registerCustomTiles, transformTileRequest } from '$lib/assets/js/custom-tiles.ts';
+	import { viaFerrataTilesUrl } from '$lib/config.ts';
 	import { getTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte.ts';
 	import { loadMapStyle } from '$lib/map-style.ts';
 	const topoSession = getTopo2DEditorState();
@@ -29,9 +31,11 @@
 					.catch(() => 'https://demotiles.maplibre.org/style.json')
 					.then((style) => {
 						if (map || !mapContainer) return;
+						registerCustomTiles(maplibregl);
 						const currentMap = new maplibregl.Map({
 							container: mapContainer,
 							style,
+							transformRequest: (url) => transformTileRequest(url, viaFerrataTilesUrl),
 							center,
 							zoom: 18,
 							attributionControl: false

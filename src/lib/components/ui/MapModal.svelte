@@ -8,6 +8,8 @@
 		type StyleSpecification
 	} from 'maplibre-gl';
 	import * as THREE from 'three';
+	import { registerCustomTiles, transformTileRequest } from '$lib/assets/js/custom-tiles.ts';
+	import { viaFerrataTilesUrl } from '$lib/config.ts';
 	import { loadMapStyle } from '$lib/map-style.ts';
 
 	type Coordinates = [longitude: number, latitude: number];
@@ -169,9 +171,11 @@
 			style = 'https://demotiles.maplibre.org/style.json';
 		}
 
+		registerCustomTiles(maplibregl);
 		const activeMap = new maplibregl.Map({
 			container: mapContainer,
 			style: style,
+			transformRequest: (url) => transformTileRequest(url, viaFerrataTilesUrl),
 			center: initialCenter,
 			zoom: 18,
 			pitch: 45,
