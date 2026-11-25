@@ -41,13 +41,23 @@
 		saveStatus = 'idle'
 	}: Props = $props();
 
+	let registryCount = $derived.by(() => {
+		const active = cragEditorState.getActiveWorkspaceEntry();
+		const accessCount = (cragEditorState.getWorkspaceAccess()?.features || []).length;
+		const topoPathCount = [active, ...(active?.childEntries || [])].reduce(
+			(sum, node) => sum + (node?.topo?.paths?.features?.length || 0),
+			0
+		);
+		return accessCount + topoPathCount;
+	});
+
 	let tabs = $derived([
 		{ id: 'info', label: $_('editor.metadata'), icon: 'fa-circle-info' },
 		{
 			id: 'registry',
 			label: $_('editor.registry'),
 			icon: 'fa-layer-group',
-			count: (cragEditorState.getWorkspaceAccess()?.features || []).length
+			count: registryCount
 		},
 		{
 			id: 'sectors',

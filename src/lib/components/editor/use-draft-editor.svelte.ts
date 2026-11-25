@@ -18,8 +18,19 @@ import { loadCragEditorEntry } from '$lib/assets/js/load-crag-editor-entry';
 import { fileUrl } from '$lib/api/felslager';
 import { initializeIdCounters } from '$lib/assets/js/id-utils';
 import { loadGlbIntoEditorState } from '$lib/assets/js/gltf-loader';
+import { validateWorkspaceHierarchy } from '$lib/state/crag-session.svelte';
+import {
+	summarizeReviewSubmission,
+	type ReviewSubmissionPreview
+} from './review-submission-summary';
 import type { createTopo2DEditorState } from '$lib/state/topo-2d-editor-state.svelte';
 import type { FelsEntryWorkspace, CragEditorSession } from '$lib/types/crag';
+
+export type TrackReviewPreparation = {
+	autoFinalizedTrack: boolean;
+	blockedMessage?: string;
+	discardTrack?: () => void;
+};
 
 export type DraftAdapter = {
 	load(draft: SharedDraft): void | Promise<void>;
@@ -131,7 +142,8 @@ export function useDraftEditor({
 	entryPath,
 	resume = mode !== 'crag',
 	onReady,
-	beforeReview
+	beforeReview,
+	prepareTrackForReview
 }: {
 	mode: EditorMode;
 	adapter: DraftAdapter;
@@ -139,6 +151,7 @@ export function useDraftEditor({
 	resume?: boolean;
 	onReady?: () => void | Promise<void>;
 	beforeReview?: () => void;
+	prepareTrackForReview?: () => TrackReviewPreparation;
 }) {
 	let draft = $state<SharedDraft | null>(null);
 	let ready = $state(false);
@@ -217,6 +230,37 @@ export function useDraftEditor({
 		},
 		get reviewProductionSaved() {
 			return draft?.reviewProductionSaved || false;
+		},
+		async previewReview(): Promise<{
+			preview: ReviewSubmissionPreview;
+			discardTrack?: () => void;
+		}> {
+			if (!ready || !draft) throw new Error(get(_)('editor.error_draft_is_still_loading'));
+			const trackPrep = prepareTrackForReview?.() || { autoFinalizedTrack: false };
+			if (!trackPrep.blockedMessage) {
+				await flush();
+			} else {
+				adapter.capture(draft);
+			}
+			const stored = (await draftsState.get(draft.id)) || draft;
+			const hierarchyErrors = validateWorkspaceHierarchy(stored.workspace);
+			let actions: Awaited<
+				ReturnType<typeof import('$lib/assets/js/review-package').reviewActions>
+			> = [];
+			if (hierarchyErrors.length === 0 && !trackPrep.blockedMessage) {
+				const { reviewActions } = await import('$lib/assets/js/review-package');
+				actions = await reviewActions(stored);
+			}
+			return {
+				preview: summarizeReviewSubmission({
+					draft: stored,
+					actions,
+					hierarchyErrors,
+					autoFinalizedTrack: trackPrep.autoFinalizedTrack,
+					trackBlockedMessage: trackPrep.blockedMessage
+				}),
+				discardTrack: trackPrep.discardTrack
+			};
 		},
 		async submitReview() {
 			if (reviewing) return;

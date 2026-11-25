@@ -66,8 +66,8 @@ export function createCragTrackPersistence(
 					...existing?.properties,
 					kind: 'approach',
 					name:
-						existing?.properties?.name ||
 						name ||
+						existing?.properties?.name ||
 						`Approach ${features().filter((feature) => feature.properties?.kind === 'approach').length + 1}`
 				}
 			};

@@ -4,11 +4,26 @@
 	import type { FelsEntryWorkspace } from '$lib/types/crag';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.ts';
-	import type { CragSelection } from './crag-route-types.ts';
+	import { workspaceNodeDocumentPaths } from '$lib/assets/js/workspace-paths.ts';
+	import type { CragSelection, RoutePathRef } from './crag-route-types.ts';
+	import {
+		ROUTE_PATH_ROLES,
+		getPrimaryPathRole,
+		getRoutePathRoleMeta,
+		inferRoutePathRole,
+		nextRoutePathRole
+	} from './route-path-roles.ts';
+
 	type AccessKind = 'parking' | 'transit' | 'hut' | 'approach';
 	type AccessFeature = {
 		id: string;
-		properties: { kind: AccessKind; name?: string; mode?: 'bus' | 'train'; [key: string]: unknown };
+		properties: {
+			kind: AccessKind;
+			name?: string;
+			description?: string;
+			mode?: 'bus' | 'train';
+			[key: string]: unknown;
+		};
 	};
 	type DetectedAsset = {
 		id: string;
@@ -19,7 +34,7 @@
 		distance: number;
 	};
 	type SelectedObject = CragSelection;
-	type TopoEntry = { path: string; data: FelsTopoDocument };
+	type TopoEntry = { path: string; name: string; data: FelsTopoDocument };
 	type RegistryPathFeature = PathFeature & {
 		properties?: {
 			name?: string;
@@ -38,11 +53,17 @@
 	const cragEditorState = getCragEditorSession();
 	const { accessEditor, trackEditor, routeTool, actions } = getCragEditorTools();
 	const {
-		addRoutePath: onAddRoutePath,
+		assignExistingRoutePath: onAssignExistingRoutePath,
+		assignPathToAllRoutes: onAssignPathToAllRoutes,
+		assignAccessTrackToRoutes: onAssignAccessTrackToRoutes,
+		assignAccessTrackToAllRoutes: onAssignAccessTrackToAllRoutes,
+		moveTopoPathToCragApproach: onMoveTopoPathToCragApproach,
+		duplicateApproachTrack: onDuplicateApproachTrack,
+		updateRoutePath: onUpdateRoutePath,
+		removeRoutePath: onRemoveRoutePath,
 		editRoutePath: onEditRoutePath,
 		duplicateRoutePath: onDuplicateRoutePath,
 		deleteRoutePath: onDeleteRoutePath,
-		moveApproachTrackToTopoPaths: onMoveApproachTrackToTopoPaths,
 		updateRoutePathFeature: onUpdateRoutePathFeature
 	} = routeTool;
 	const {
@@ -51,7 +72,12 @@
 		addDetectedAsset: onAddDetectedAsset,
 		removeAccessFeature: onRemoveAccessFeature
 	} = accessEditor;
-	const { editTrack: onEditTrack, removeTrack: onRemoveTrack } = trackEditor;
+	const {
+		editTrack: onEditTrack,
+		removeTrack: onRemoveTrack,
+		startRoutingDraft: onStartRoutingDraft
+	} = trackEditor;
+
 	let activeWorkspace = $derived<FelsEntryWorkspace | null>(
 		cragEditorState.getActiveWorkspaceEntry()
 	);
@@ -60,7 +86,8 @@
 			node?.entry?.properties.id && node.topo
 				? [
 						{
-							path: `${node.path}/${node.entry.properties.id}/${node.entry.properties.id}-topo.json`,
+							path: workspaceNodeDocumentPaths(node).topo,
+							name: node.entry.properties.name || node.topo.name || node.entry.properties.id,
 							data: node.topo
 						}
 					]
@@ -74,6 +101,7 @@
 		isDetectionZoomLimited = false,
 		selectedObject = $bindable(null)
 	}: Props = $props();
+
 	let accessFeatures = $derived((activeWorkspace?.access?.features || []) as AccessFeature[]);
 	let transitFeatures = $derived(
 		accessFeatures.filter((feature) => feature.properties?.kind === 'transit')
@@ -87,6 +115,9 @@
 	let approachFeatures = $derived(
 		accessFeatures.filter((feature) => feature.properties?.kind === 'approach')
 	);
+	let accessPointCount = $derived(
+		transitFeatures.length + parkingFeatures.length + hutFeatures.length
+	);
 	let assignableAccessFeatures = $derived(
 		accessFeatures.filter((feature) => feature.properties?.kind !== 'approach')
 	);
@@ -96,6 +127,29 @@
 			0
 		)
 	);
+	let totalPathCount = $derived(approachFeatures.length + topoPathCount);
+	let allTopoRoutes = $derived(
+		topoEntries.flatMap((document) =>
+			(document.data?.routes || []).map((route) => ({ document, route }))
+		)
+	);
+
+	function updateAccessFeature(
+		featureId: string,
+		patch: Partial<AccessFeature['properties']>
+	): void {
+		if (!activeWorkspace) return;
+		const accessPath = workspaceNodeDocumentPaths(activeWorkspace).access;
+		cragEditorState.updateWorkspaceAccess(
+			accessPath,
+			(access) => {
+				const target = (access.features as AccessFeature[]).find((item) => item.id === featureId);
+				if (!target) return;
+				target.properties = { ...(target.properties || {}), ...patch } as AccessFeature['properties'];
+			},
+			cragEditorState.getWorkspaceEntryPath(activeWorkspace)
+		);
+	}
 
 	function topoPaths(document: TopoEntry): RegistryPathFeature[] {
 		return (document.data.paths?.features || []) as RegistryPathFeature[];
@@ -104,6 +158,24 @@
 	function assignedRoutes(document: TopoEntry, pathId: string | number | undefined): Route[] {
 		return (document.data?.routes || []).filter((route) =>
 			(route.pathRefs || []).some((ref) => String(ref.pathId) === String(pathId))
+		);
+	}
+
+	function assignedRouteEntries(
+		document: TopoEntry,
+		pathId: string | number | undefined
+	): Array<{ route: Route; ref: RoutePathRef }> {
+		const entries: Array<{ route: Route; ref: RoutePathRef }> = [];
+		for (const route of document.data?.routes || []) {
+			const ref = (route.pathRefs || []).find((item) => String(item.pathId) === String(pathId));
+			if (ref) entries.push({ route, ref });
+		}
+		return entries;
+	}
+
+	function unassignedRoutes(document: TopoEntry, pathId: string | number | undefined): Route[] {
+		return (document.data?.routes || []).filter(
+			(route) => !(route.pathRefs || []).some((ref) => String(ref.pathId) === String(pathId))
 		);
 	}
 
@@ -160,19 +232,24 @@
 			: `${kindLabel} ${feature?.id || ''}`;
 	}
 
-	function moveApproachTrack(
+	function assignCragApproachToRoute(
 		event: Event & { currentTarget: HTMLSelectElement },
 		track: AccessFeature
 	): void {
-		const documentPath = event.currentTarget.value;
-		if (!documentPath) return;
-		onMoveApproachTrackToTopoPaths(documentPath, track.id);
-		if (isSelectedApproach(track)) selectedObject = null;
+		const value = event.currentTarget.value;
+		if (!value) return;
+		const role = inferRoutePathRole(track.properties?.name, 'approach');
+		const sep = value.indexOf('::');
+		if (sep > 0) {
+			const documentPath = value.slice(0, sep);
+			const routeId = value.slice(sep + 2);
+			onAssignAccessTrackToRoutes(documentPath, track.id, [routeId], role);
+		}
 		event.currentTarget.value = '';
 	}
 </script>
 
-<div class="flex flex-col gap-2">
+<div class="flex flex-col gap-3">
 	{#if isDetectionLoading}
 		<div
 			class="flex items-center gap-2 rounded-sm border border-creator-blue/20 bg-creator-blue/5 p-2 text-ui-label text-creator-blue"
@@ -190,7 +267,7 @@
 		</div>
 	{/if}
 	{#if detectedAssets.length > 0}
-		<div class="bg-creator-blue/5 rounded-sm p-2 border border-creator-blue/20 space-y-1.5 mb-1">
+		<div class="bg-creator-blue/5 rounded-sm p-2 border border-creator-blue/20 space-y-1.5">
 			<div class="flex justify-between items-center">
 				<span class="text-ui-label text-creator-blue">{$_('ui.nearby_suggestions')}</span>
 				<button
@@ -234,227 +311,168 @@
 			</div>
 		</div>
 	{/if}
-	{#if accessFeatures.length === 0 && detectedAssets.length === 0}
-		<div class="bg-warm-white rounded-sm p-6 text-center border border-black/15 mt-2">
+
+	{#if accessPointCount === 0 && totalPathCount === 0 && detectedAssets.length === 0}
+		<div class="bg-warm-white rounded-sm p-6 text-center border border-black/15">
 			<i class="fa-solid fa-layer-group text-2xl text-warm-gray-300 mb-2 block"></i>
 			<p class="text-ui-label text-warm-gray-500">{$_('editor.inventory_empty')}</p>
 		</div>
 	{/if}
-	{#each transitFeatures as point}
-		<div class="panel-inner p-2 flex flex-col gap-2 border-black/10 hover:border-creator-blue">
-			<div class="flex justify-between items-center">
-				<div class="flex items-center gap-2">
-					<div
-						class="w-6 h-6 rounded-sm bg-black/5 text-warm-gray-500 flex items-center justify-center border border-black/10"
-					>
-						<i class="fa-solid fa-bus text-[10px]"></i>
+
+	{#if accessPointCount > 0}
+		<div class="space-y-1.5">
+			<div class="text-ui-label">{$_('editor.access_points')}</div>
+			{#each transitFeatures as point}
+				<div class="panel-inner p-2 flex flex-col gap-2 border-black/10 hover:border-creator-blue">
+					<div class="flex justify-between items-center">
+						<div class="flex items-center gap-2">
+							<div
+								class="w-6 h-6 rounded-sm bg-black/5 text-warm-gray-500 flex items-center justify-center border border-black/10"
+							>
+								<i class="fa-solid fa-bus text-[10px]"></i>
+							</div>
+							<span class="text-ui-label text-near-black !m-0">{$_('editor.transit_point')}</span>
+						</div>
+						<button
+							onclick={() => onRemoveAccessFeature(point.id)}
+							aria-label={$_('editor.remove_transit_point')}
+							class="w-6 h-6 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600"
+							><i class="fa-solid fa-trash-can text-[10px]"></i></button
+						>
 					</div>
-					<span class="text-ui-label text-near-black !m-0">{$_('editor.transit_point')}</span>
+					<div class="flex gap-1.5">
+						<select
+							value={point.properties.mode || 'bus'}
+							onchange={(event) =>
+								updateAccessFeature(point.id, {
+									mode: event.currentTarget.value as 'bus' | 'train'
+								})}
+							class="input-studio w-16 !px-1 appearance-none"
+						>
+							<option value="bus">{$_('editor.bus')}</option>
+							<option value="train">{$_('editor.train')}</option>
+						</select><input
+							type="text"
+							value={point.properties.name || ''}
+							onchange={(event) =>
+								updateAccessFeature(point.id, { name: event.currentTarget.value })}
+							class="input-studio flex-1"
+							placeholder={$_('editor.station_name')}
+						/>
+					</div>
 				</div>
-				<button
-					onclick={() => onRemoveAccessFeature(point.id)}
-					aria-label={$_('editor.remove_transit_point')}
-					class="w-6 h-6 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600"
-					><i class="fa-solid fa-trash-can text-[10px]"></i></button
-				>
-			</div>
-			<div class="flex gap-1.5">
-				<select bind:value={point.properties.mode} class="input-studio w-16 !px-1 appearance-none">
-					<option value="bus">{$_('editor.bus')}</option>
-					<option value="train">{$_('editor.train')}</option>
-				</select><input
-					type="text"
-					bind:value={point.properties.name}
-					class="input-studio flex-1"
-					placeholder={$_('editor.station_name')}
-				/>
-			</div>
-		</div>
-	{/each}
-	{#each parkingFeatures as point}
-		<div
-			class="panel-inner p-2 flex justify-between items-center border-black/10 hover:border-creator-blue"
-		>
-			<div class="flex items-center gap-2">
+			{/each}
+			{#each parkingFeatures as point}
 				<div
-					class="w-6 h-6 rounded-sm bg-black/5 flex items-center justify-center text-warm-gray-500 border border-black/10"
+					class="panel-inner p-2 flex justify-between items-center border-black/10 hover:border-creator-blue"
 				>
-					<i class="fa-solid fa-square-parking text-[10px]"></i>
-				</div>
-				<span class="text-ui-label text-near-black !m-0">{$_('editor.parking_space')}</span>
-			</div>
-			<button
-				onclick={() => onRemoveAccessFeature(point.id)}
-				aria-label={$_('editor.remove_parking_space')}
-				class="w-6 h-6 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600"
-				><i class="fa-solid fa-trash-can text-[10px]"></i></button
-			>
-		</div>
-	{/each}
-	{#each hutFeatures as hut}
-		<div class="panel-inner p-2 flex flex-col gap-2 border-black/10 hover:border-creator-blue">
-			<div class="flex justify-between items-center">
-				<div class="flex items-center gap-2">
-					<div
-						class="w-6 h-6 rounded-sm bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200"
-					>
-						<i class="fa-solid fa-house text-[10px]"></i>
+					<div class="flex items-center gap-2">
+						<div
+							class="w-6 h-6 rounded-sm bg-black/5 flex items-center justify-center text-warm-gray-500 border border-black/10"
+						>
+							<i class="fa-solid fa-square-parking text-[10px]"></i>
+						</div>
+						<span class="text-ui-label text-near-black !m-0">{$_('editor.parking_space')}</span>
 					</div>
-					<span class="text-ui-label text-near-black !m-0">{$_('editor.mountain_hut')}</span>
-				</div>
-				<button
-					onclick={() => onRemoveAccessFeature(hut.id)}
-					aria-label={$_('editor.remove_mountain_hut')}
-					class="w-6 h-6 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600"
-					><i class="fa-solid fa-trash-can text-[10px]"></i></button
-				>
-			</div>
-			<input
-				type="text"
-				bind:value={hut.properties.name}
-				class="input-studio w-full"
-				placeholder={$_('editor.hut_name')}
-			/>
-		</div>
-	{/each}
-	{#each approachFeatures as track}
-		<div
-			class="panel-inner p-2 flex flex-col gap-2 hover:border-creator-blue {isSelectedApproach(
-				track
-			)
-				? 'border-creator-blue bg-creator-blue/5 ring-1 ring-creator-blue/20'
-				: 'border-black/10'}"
-			onclick={() => selectApproach(track)}
-			role="button"
-			tabindex="0"
-			onkeydown={(event) => {
-				if (event.key === 'Enter' || event.key === ' ') selectApproach(track);
-			}}
-		>
-			<div class="flex justify-between items-center">
-				<div class="flex items-center gap-2">
-					<div
-						class="w-6 h-6 rounded-sm bg-black/5 text-warm-gray-500 flex items-center justify-center border border-black/10"
-					>
-						<i class="fa-solid fa-route text-[10px]"></i>
-					</div>
-					<span class="text-ui-label text-near-black !m-0">{$_('editor.approach_track')}</span>
-				</div>
-				<div class="flex items-center gap-1">
 					<button
-						onclick={(event) => {
-							event.stopPropagation();
-							selectApproach(track);
-							onEditTrack(track.id);
-						}}
-						class="w-6 h-6 text-warm-gray-400"
-						title={$_('editor.edit_approach_track')}
-					>
-						<i class="fa-solid fa-pen text-[10px]"></i></button
-					>
-					<button
-						onclick={(event) => {
-							event.stopPropagation();
-							onRemoveTrack(track.id);
-							if (isSelectedApproach(track)) selectedObject = null;
-						}}
-						class="w-6 h-6 text-warm-gray-300 hover:text-rose-600"
-						title={$_('editor.delete_approach_track')}
+						onclick={() => onRemoveAccessFeature(point.id)}
+						aria-label={$_('editor.remove_parking_space')}
+						class="w-6 h-6 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600"
 						><i class="fa-solid fa-trash-can text-[10px]"></i></button
 					>
 				</div>
-			</div>
-			<input
-				type="text"
-				bind:value={track.properties.name}
-				class="input-studio w-full"
-				placeholder={$_('editor.track_name')}
-			/>
-			{#if topoEntries.length > 0}
-				<select
-					class="input-studio w-full"
-					aria-label={$_('editor.move_approach_track_to_topo_paths')}
-					onchange={(event) => moveApproachTrack(event, track)}
-				>
-					<option value="" selected>{$_('editor.move_to_topo_paths')}</option>
-					{#each topoEntries as document}
-						<option value={document.path}>{document.path.split('/').at(-1)}</option>
-					{/each}
-				</select>
-			{:else}
-				<div class="text-micro-data text-warm-gray-500">
-					{$_('editor.add_a_route_first_to_create_a_topo_path_destination')}
-				</div>
-			{/if}
-		</div>
-	{/each}
-	<div class="mt-3 space-y-2 border-t border-black/10 pt-3">
-		<div class="flex items-center justify-between">
-			<div>
-				<div class="text-ui-label">{$_('editor.topo_paths')}</div>
-				<div class="text-micro-data text-warm-gray-500">
-					{$_('editor.path_count', { values: { count: topoPathCount } })}
-				</div>
-			</div>
-		</div>
-		{#each topoEntries as document}
-			<div class="space-y-2 rounded-sm border border-black/10 bg-white p-2.5 shadow-sm">
-				<div class="flex items-center justify-between gap-2 border-b border-black/5 pb-2">
-					<div class="min-w-0">
-						<div class="text-micro-data font-bold text-warm-gray-500">
-							{document.path.split('/').at(-1)}
+			{/each}
+			{#each hutFeatures as hut}
+				<div class="panel-inner p-2 flex flex-col gap-2 border-black/10 hover:border-creator-blue">
+					<div class="flex justify-between items-center">
+						<div class="flex items-center gap-2">
+							<div
+								class="w-6 h-6 rounded-sm bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200"
+							>
+								<i class="fa-solid fa-house text-[10px]"></i>
+							</div>
+							<span class="text-ui-label text-near-black !m-0">{$_('editor.mountain_hut')}</span>
 						</div>
-						<div class="text-micro-data text-warm-gray-400">{$_('editor.topo_source')}</div>
-					</div>
-					{#if document.data?.routes?.[0]}
 						<button
-							type="button"
-							class="inline-flex shrink-0 items-center gap-1 rounded-sm bg-creator-blue px-2 py-1 text-micro-data font-bold text-white hover:bg-creator-blue/90"
-							onclick={() => onAddRoutePath(document.path, document.data.routes[0].id)}
+							onclick={() => onRemoveAccessFeature(hut.id)}
+							aria-label={$_('editor.remove_mountain_hut')}
+							class="w-6 h-6 rounded-sm text-warm-gray-300 hover:bg-rose-50 hover:text-rose-600"
+							><i class="fa-solid fa-trash-can text-[10px]"></i></button
 						>
-							<i class="fa-solid fa-pen-ruler text-[10px]"></i>
-							{$_('editor.draw_path')}
-						</button>
-					{/if}
+					</div>
+					<input
+						type="text"
+						value={hut.properties.name || ''}
+						onchange={(event) => updateAccessFeature(hut.id, { name: event.currentTarget.value })}
+						class="input-studio w-full"
+						placeholder={$_('editor.hut_name')}
+					/>
 				</div>
-				{#each topoPaths(document) as feature, pathIndex}
-					{@const routes = assignedRoutes(document, feature.id)}
+			{/each}
+		</div>
+	{/if}
+
+	<div class="space-y-2 {accessPointCount > 0 ? 'border-t border-black/10 pt-3' : ''}">
+		<div class="flex items-center justify-between gap-2">
+			<div>
+				<div class="text-ui-label">{$_('editor.paths')}</div>
+				<div class="text-micro-data text-warm-gray-500">
+					{$_('editor.path_count', { values: { count: totalPathCount } })}
+				</div>
+			</div>
+			<button
+				type="button"
+				class="inline-flex shrink-0 items-center gap-1 rounded-sm bg-creator-blue px-2 py-1 text-micro-data font-bold text-white hover:bg-creator-blue/90"
+				onclick={() => trackEditor.requestLeave(onStartRoutingDraft)}
+			>
+				<i class="fa-solid fa-pen-ruler text-[10px]"></i>
+				{$_('editor.draw_path')}
+			</button>
+		</div>
+
+		{#if totalPathCount > 0}
+			<div class="flex flex-wrap items-center gap-1.5">
+				{#each ROUTE_PATH_ROLES as roleMeta}
+					<span
+						class={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold leading-none ${roleMeta.badgeClass}`}
+					>
+						<span class={`h-1.5 w-1.5 rounded-full ${roleMeta.dotClass}`} aria-hidden="true"></span>
+						{$_(roleMeta.shortLabelKey)}
+					</span>
+				{/each}
+			</div>
+
+			<div class="space-y-2">
+				{#each approachFeatures as track}
+					{@const approachMeta = getRoutePathRoleMeta('approach')}
+					{@const defaultRole = inferRoutePathRole(track.properties?.name, 'approach')}
 					<div
-						class="space-y-2 rounded-sm border p-2 {isSelectedPath(document, feature, pathIndex)
+						class="space-y-2 rounded-sm border p-2 transition-none {isSelectedApproach(track)
 							? 'border-creator-blue bg-creator-blue/5 ring-1 ring-creator-blue/20'
-							: 'border-black/10 bg-warm-white/40'}"
-						onclick={() => selectPath(document, feature, pathIndex)}
+							: 'border-black/10 bg-white'}"
+						onclick={() => selectApproach(track)}
 						role="button"
 						tabindex="0"
 						onkeydown={(event) => {
-							if (event.key === 'Enter' || event.key === ' ')
-								selectPath(document, feature, pathIndex);
+							if (event.key === 'Enter' || event.key === ' ') selectApproach(track);
 						}}
 					>
-						<div class="flex items-start justify-between gap-2">
+						<div class="flex items-center justify-between gap-1.5">
+							<span
+								class={`h-2.5 w-2.5 shrink-0 rounded-full ${approachMeta.dotClass}`}
+								aria-hidden="true"
+							></span>
 							<input
+								type="text"
+								value={track.properties?.name || ''}
 								class="path-name-input input-studio min-w-0 flex-1 !border-0 !bg-transparent !px-0 !py-0 text-body-text font-bold text-near-black focus:!ring-0"
-								value={feature.properties?.name || ''}
 								placeholder={$_('editor.unnamed_path')}
 								aria-label={$_('editor.path_name')}
-								onchange={(event) => {
-									onUpdateRoutePathFeature(document.path, feature.id, {
-										name: event.currentTarget.value
-									});
-								}}
+								onclick={(event) => event.stopPropagation()}
+								onchange={(event) =>
+									updateAccessFeature(track.id, { name: event.currentTarget.value })}
 							/>
-							<span
-								class="shrink-0 rounded-sm bg-black/5 px-1.5 py-0.5 text-micro-data text-warm-gray-500"
-								>{$_('editor.route_count', { values: { count: routes.length } })}</span
-							>
-						</div>
-						<div class="flex min-w-0 items-center gap-2 text-micro-data text-warm-gray-500">
-							{#if routes.length > 0}{$_('editor.used_by')}
-								{routes.map((route) => route.name || route.id).join(', ')}{:else}{$_(
-									'editor.not_assigned_to_a_route'
-								)}
-							{/if}
-							<span id="route-edit-buttons" class="ml-auto inline-flex shrink-0 items-center gap-1">
+							<span class="inline-flex shrink-0 items-center gap-0.5">
 								<button
 									type="button"
 									class="action-button text-creator-blue"
@@ -462,7 +480,8 @@
 									aria-label={$_('editor.edit_path')}
 									onclick={(event) => {
 										event.stopPropagation();
-										editPath(document, feature, pathIndex);
+										selectApproach(track);
+										onEditTrack(track.id);
 									}}
 								>
 									<i class="fa-solid fa-pen text-[10px]"></i>
@@ -474,7 +493,7 @@
 									aria-label={$_('editor.duplicate_path')}
 									onclick={(event) => {
 										event.stopPropagation();
-										duplicatePath(document, feature);
+										onDuplicateApproachTrack(track.id);
 									}}
 								>
 									<i class="fa-solid fa-copy text-[10px]"></i>
@@ -486,53 +505,337 @@
 									aria-label={$_('editor.delete_path')}
 									onclick={(event) => {
 										event.stopPropagation();
-										onDeleteRoutePath(document.path, feature.id, pathIndex);
-										if (isSelectedPath(document, feature, pathIndex)) selectedObject = null;
+										onRemoveTrack(track.id);
+										if (isSelectedApproach(track)) selectedObject = null;
 									}}
 								>
 									<i class="fa-solid fa-trash-can text-[10px]"></i>
 								</button>
 							</span>
 						</div>
-						<div class="space-y-1" onclick={(event) => event.stopPropagation()} role="presentation">
-							<label
-								class="text-micro-data font-bold uppercase tracking-wide text-warm-gray-400"
-								for={`path-description-${document.path}-${feature.id}`}
-								>{$_('editor.path_text')}</label
-							>
-							<textarea
-								id={`path-description-${document.path}-${feature.id}`}
-								class="input-studio w-full resize-none"
-								rows="3"
-								value={feature.properties?.description || ''}
-								placeholder={$_('editor.example_path')}
-								oninput={(event) =>
-									onUpdateRoutePathFeature(document.path, feature.id, {
-										description: event.currentTarget.value
-									})}
-							></textarea>
+
+						<div
+							class="space-y-1.5"
+							onclick={(event) => event.stopPropagation()}
+							role="presentation"
+						>
+							<div class="flex flex-wrap items-center gap-1">
+								<span
+									class="inline-flex items-center gap-1 rounded-sm border border-black/10 bg-warm-white px-1.5 py-0.5 text-[10px]"
+								>
+									<span class="font-semibold text-near-black">{$_('editor.whole_crag')}</span>
+									<span
+										class={`rounded-sm border px-1 py-0.5 text-[9px] font-bold leading-none ${approachMeta.badgeClass}`}
+									>
+										{$_(approachMeta.shortLabelKey)}
+									</span>
+								</span>
+							</div>
+							{#if allTopoRoutes.length > 0}
+								<div class="flex items-center gap-1">
+									<select
+										class="input-studio min-w-0 flex-1 bg-white text-[11px]"
+										aria-label={$_('editor.assign_route')}
+										onchange={(event) => assignCragApproachToRoute(event, track)}
+									>
+										<option value="" selected>+ {$_('editor.assign_route')}</option>
+										{#each allTopoRoutes as { document, route }}
+											<option value={`${document.path}::${route.id}`}>
+												{route.name || $_('editor.unnamed_route')}{route.grade
+													? ` (${route.grade})`
+													: ''}{topoEntries.length > 1 ? ` · ${document.name}` : ''}
+											</option>
+										{/each}
+									</select>
+									{#if allTopoRoutes.length > 1}
+										<button
+											type="button"
+											class="shrink-0 rounded-sm border border-black/15 bg-white px-2 py-1 text-[10px] font-bold text-creator-blue hover:bg-creator-blue/5"
+											title={$_('editor.assign_to_all_routes')}
+											onclick={() => onAssignAccessTrackToAllRoutes(track.id, defaultRole)}
+										>
+											{$_('editor.assign_all_routes')}
+										</button>
+									{/if}
+								</div>
+							{/if}
 						</div>
-						{#if assignableAccessFeatures.length > 0}
-							<select
-								class="input-studio w-full"
-								aria-label={$_('editor.assign_access_feature')}
-								value={feature.properties?.accessFeatureId || ''}
-								onclick={(event) => event.stopPropagation()}
-								onchange={(event) =>
-									onUpdateRoutePathFeature(document.path, feature.id, {
-										accessFeatureId: event.currentTarget.value
-									})}
-							>
-								<option value="">{$_('editor.no_access_feature')}</option>
-								{#each assignableAccessFeatures as accessFeature}
-									<option value={accessFeature.id}>{accessFeatureLabel(accessFeature)}</option>
-								{/each}
-							</select>
-						{/if}
+
+						<div
+							class="border-t border-black/5 pt-1.5"
+							onclick={(event) => event.stopPropagation()}
+							role="presentation"
+						>
+							<details>
+								<summary
+									class="flex cursor-pointer list-none items-center gap-1 text-[10px] font-medium text-warm-gray-400 hover:text-near-black"
+								>
+									<i class="fa-solid fa-chevron-right details-arrow text-[8px]" aria-hidden="true"
+									></i>
+									<span class="truncate">
+										{#if track.properties?.description}
+											{track.properties.description}
+										{:else}
+											{$_('editor.path_details')}
+										{/if}
+									</span>
+								</summary>
+								<div class="mt-1.5 space-y-1.5">
+									<textarea
+										class="input-studio w-full resize-none bg-white"
+										rows="2"
+										value={track.properties?.description || ''}
+										placeholder={$_('editor.example_path')}
+										aria-label={$_('editor.path_text')}
+										onchange={(event) =>
+											updateAccessFeature(track.id, { description: event.currentTarget.value })}
+									></textarea>
+								</div>
+							</details>
+						</div>
 					</div>
 				{/each}
+
+				{#each topoEntries as document}
+					{#each topoPaths(document) as feature, pathIndex}
+						{@const assignments = assignedRouteEntries(document, feature.id)}
+						{@const unassigned = unassignedRoutes(document, feature.id)}
+						{@const primaryRole = getPrimaryPathRole(document.data, feature)}
+						{@const primaryMeta = getRoutePathRoleMeta(primaryRole)}
+						{@const defaultAssignRole = inferRoutePathRole(feature.properties?.name, primaryRole)}
+						<div
+							class="space-y-2 rounded-sm border p-2 transition-none {isSelectedPath(
+								document,
+								feature,
+								pathIndex
+							)
+								? 'border-creator-blue bg-creator-blue/5 ring-1 ring-creator-blue/20'
+								: 'border-black/10 bg-white'}"
+							onclick={() => selectPath(document, feature, pathIndex)}
+							role="button"
+							tabindex="0"
+							onkeydown={(event) => {
+								if (event.key === 'Enter' || event.key === ' ')
+									selectPath(document, feature, pathIndex);
+							}}
+						>
+							<div class="flex items-center justify-between gap-1.5">
+								<span
+									class={`h-2.5 w-2.5 shrink-0 rounded-full ${primaryMeta.dotClass}`}
+									aria-hidden="true"
+								></span>
+								<input
+									class="path-name-input input-studio min-w-0 flex-1 !border-0 !bg-transparent !px-0 !py-0 text-body-text font-bold text-near-black focus:!ring-0"
+									value={feature.properties?.name || ''}
+									placeholder={$_('editor.unnamed_path')}
+									aria-label={$_('editor.path_name')}
+									onclick={(event) => event.stopPropagation()}
+									onchange={(event) => {
+										onUpdateRoutePathFeature(document.path, feature.id, {
+											name: event.currentTarget.value
+										});
+									}}
+								/>
+								<span class="inline-flex shrink-0 items-center gap-0.5">
+									<button
+										type="button"
+										class="action-button text-creator-blue"
+										title={$_('editor.edit_path')}
+										aria-label={$_('editor.edit_path')}
+										onclick={(event) => {
+											event.stopPropagation();
+											editPath(document, feature, pathIndex);
+										}}
+									>
+										<i class="fa-solid fa-pen text-[10px]"></i>
+									</button>
+									<button
+										type="button"
+										class="action-button text-warm-gray-500 hover:text-creator-blue"
+										title={$_('editor.duplicate_path')}
+										aria-label={$_('editor.duplicate_path')}
+										onclick={(event) => {
+											event.stopPropagation();
+											duplicatePath(document, feature);
+										}}
+									>
+										<i class="fa-solid fa-copy text-[10px]"></i>
+									</button>
+									<button
+										type="button"
+										class="action-button text-rose-600"
+										title={$_('editor.delete_path')}
+										aria-label={$_('editor.delete_path')}
+										onclick={(event) => {
+											event.stopPropagation();
+											onDeleteRoutePath(document.path, feature.id, pathIndex);
+											if (isSelectedPath(document, feature, pathIndex)) selectedObject = null;
+										}}
+									>
+										<i class="fa-solid fa-trash-can text-[10px]"></i>
+									</button>
+								</span>
+							</div>
+
+							<div
+								class="space-y-1.5"
+								onclick={(event) => event.stopPropagation()}
+								role="presentation"
+							>
+								{#if topoEntries.length > 1}
+									<div class="text-[10px] font-medium text-warm-gray-400">{document.name}</div>
+								{/if}
+								{#if assignments.length > 0}
+									<div class="flex flex-wrap gap-1">
+										{#each assignments as { route, ref }}
+											{@const meta = getRoutePathRoleMeta(ref.role)}
+											<span
+												class="inline-flex max-w-full items-center gap-1 rounded-sm border border-black/10 bg-warm-white px-1.5 py-0.5 text-[10px]"
+											>
+												<span class="truncate font-semibold text-near-black">
+													{route.name || route.id}
+												</span>
+												<button
+													type="button"
+													class={`shrink-0 rounded-sm border px-1 py-0.5 text-[9px] font-bold leading-none transition-none ${meta.badgeClass}`}
+													title={$_('editor.click_role_to_change')}
+													onclick={() =>
+														onUpdateRoutePath(document.path, route.id, feature.id, {
+															role: nextRoutePathRole(ref.role)
+														})}
+												>
+													{$_(meta.shortLabelKey)}
+												</button>
+												<button
+													type="button"
+													class="ml-0.5 shrink-0 text-warm-gray-400 hover:text-rose-600"
+													title={$_('editor.unassign_path')}
+													aria-label={$_('editor.unassign_path')}
+													onclick={() => onRemoveRoutePath(document.path, route.id, feature.id)}
+												>
+													<i class="fa-solid fa-xmark text-[9px]"></i>
+												</button>
+											</span>
+										{/each}
+									</div>
+								{:else}
+									<div class="flex items-center justify-between gap-2">
+										<span class="text-micro-data text-warm-gray-400">
+											{$_('editor.not_assigned_to_a_route')}
+										</span>
+										<button
+											type="button"
+											class="shrink-0 rounded-sm border border-teal-200 bg-teal-50 px-1.5 py-0.5 text-[10px] font-bold text-teal-800 hover:bg-teal-100"
+											onclick={() =>
+												onMoveTopoPathToCragApproach(document.path, feature.id, pathIndex)}
+										>
+											{$_('editor.use_for_whole_crag')}
+										</button>
+									</div>
+								{/if}
+								{#if unassigned.length > 0}
+									<div class="flex items-center gap-1">
+										<select
+											class="input-studio min-w-0 flex-1 bg-white text-[11px]"
+											aria-label={$_('editor.assign_route')}
+											onchange={(event) => {
+												const routeId = event.currentTarget.value;
+												if (routeId) {
+													onAssignExistingRoutePath(
+														document.path,
+														routeId,
+														feature.id,
+														defaultAssignRole,
+														''
+													);
+												}
+												event.currentTarget.value = '';
+											}}
+										>
+											<option value="" selected>+ {$_('editor.assign_route')}</option>
+											{#each unassigned as route}
+												<option value={route.id}>
+													{route.name || $_('editor.unnamed_route')}{route.grade
+														? ` (${route.grade})`
+														: ''}
+												</option>
+											{/each}
+										</select>
+										{#if (document.data?.routes?.length || 0) > 1}
+											<button
+												type="button"
+												class="shrink-0 rounded-sm border border-black/15 bg-white px-2 py-1 text-[10px] font-bold text-creator-blue hover:bg-creator-blue/5"
+												title={$_('editor.assign_to_all_routes')}
+												onclick={() =>
+													onAssignPathToAllRoutes(document.path, feature.id, defaultAssignRole)}
+											>
+												{$_('editor.assign_all_routes')}
+											</button>
+										{/if}
+									</div>
+								{/if}
+							</div>
+
+							<div
+								class="border-t border-black/5 pt-1.5"
+								onclick={(event) => event.stopPropagation()}
+								role="presentation"
+							>
+								<details>
+									<summary
+										class="flex cursor-pointer list-none items-center gap-1 text-[10px] font-medium text-warm-gray-400 hover:text-near-black"
+									>
+										<i class="fa-solid fa-chevron-right details-arrow text-[8px]" aria-hidden="true"
+										></i>
+										<span class="truncate">
+											{#if feature.properties?.description}
+												{feature.properties.description}
+											{:else}
+												{$_('editor.path_details')}
+											{/if}
+										</span>
+									</summary>
+									<div class="mt-1.5 space-y-1.5">
+										<textarea
+											id={`path-description-${document.path}-${feature.id}`}
+											class="input-studio w-full resize-none bg-white"
+											rows="2"
+											value={feature.properties?.description || ''}
+											placeholder={$_('editor.example_path')}
+											aria-label={$_('editor.path_text')}
+											oninput={(event) =>
+												onUpdateRoutePathFeature(document.path, feature.id, {
+													description: event.currentTarget.value
+												})}
+										></textarea>
+										{#if assignableAccessFeatures.length > 0}
+											<select
+												class="input-studio w-full bg-white"
+												aria-label={$_('editor.assign_access_feature')}
+												value={feature.properties?.accessFeatureId || ''}
+												onchange={(event) =>
+													onUpdateRoutePathFeature(document.path, feature.id, {
+														accessFeatureId: event.currentTarget.value
+													})}
+											>
+												<option value="">{$_('editor.no_access_feature')}</option>
+												{#each assignableAccessFeatures as accessFeature}
+													<option value={accessFeature.id}
+														>{accessFeatureLabel(accessFeature)}</option
+													>
+												{/each}
+											</select>
+										{/if}
+									</div>
+								</details>
+							</div>
+						</div>
+					{/each}
+				{/each}
 			</div>
-		{/each}
+		{:else if accessPointCount > 0}
+			<p class="text-micro-data text-warm-gray-400">{$_('editor.no_paths_yet')}</p>
+		{/if}
 	</div>
 </div>
 
@@ -560,5 +863,13 @@
 
 	.action-button:hover {
 		background: rgb(0 0 0 / 0.05);
+	}
+
+	details[open] .details-arrow {
+		transform: rotate(90deg);
+	}
+
+	summary::-webkit-details-marker {
+		display: none;
 	}
 </style>

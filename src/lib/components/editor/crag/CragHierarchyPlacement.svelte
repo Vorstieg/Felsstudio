@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { _ } from 'svelte-i18n';
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, type Snippet } from 'svelte';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 	import { getDraftEditor } from '../use-draft-editor.svelte';
 	const cragEditorState = getCragEditorSession();
@@ -20,7 +20,10 @@
 	} from './crag-hierarchy-suggestions.ts';
 	import type { ApiListEntry } from '$lib/types/api';
 
-	let { compact = false }: { compact?: boolean } = $props();
+	let {
+		compact = false,
+		breadcrumbs
+	}: { compact?: boolean; breadcrumbs?: Snippet } = $props();
 	let knownFolders = $state<Set<string>>(new Set());
 	let foldersLoaded = $state(false);
 	let manifestEntries = $state<HierarchyManifestEntry[]>([]);
@@ -286,16 +289,81 @@
 	}
 </script>
 
+{#snippet statusNotices()}
+	{#if isSuggesting}
+		<p class="flex items-center gap-1.5 text-micro-data text-warm-gray-500">
+			<i class="fa-solid fa-spinner fa-spin text-[10px] text-creator-blue" aria-hidden="true"></i>
+			<span>{$_('editor.suggesting_from_location')}</span>
+		</p>
+	{:else if autoSuggested && normalizePath(autoSuggested.parentPath) === parentPath}
+		<p class="flex flex-wrap items-center gap-1.5 text-micro-data text-warm-gray-500">
+			<span
+				class="inline-flex items-center gap-1 rounded-sm bg-creator-blue/10 px-1.5 py-0.5 text-[10px] font-semibold text-creator-blue"
+			>
+				<i class="fa-solid fa-location-dot text-[9px]" aria-hidden="true"></i>
+				{$_('editor.suggested_from_location')}
+			</span>
+			<span class="truncate">{autoSuggested.label}</span>
+		</p>
+	{:else if canApplyTopSuggestion && topSuggestion}
+		<div
+			class="flex items-center justify-between gap-2 rounded-sm border border-creator-blue/20 bg-creator-blue/5 px-2 py-1.5"
+		>
+			<div class="min-w-0 flex-1">
+				<p class="text-[10px] font-semibold text-near-black truncate">
+					<i class="fa-solid fa-location-dot mr-1 text-creator-blue" aria-hidden="true"></i>
+					{topSuggestion.label}
+				</p>
+				<p class="font-mono text-[10px] text-warm-gray-500 truncate">
+					{topSuggestion.parentPath}
+				</p>
+			</div>
+			<button
+				type="button"
+				onclick={() => applySuggestedParent(topSuggestion, { manual: true })}
+				class="shrink-0 rounded-sm border border-creator-blue/30 bg-white px-2 py-1 text-[10px] font-bold whitespace-nowrap text-creator-blue hover:bg-creator-blue hover:text-white"
+			>
+				{$_('editor.apply_location_suggestion')}
+			</button>
+		</div>
+	{/if}
+
+	{#if hierarchyError}
+		<p class="text-[10px] text-amber-600 font-bold">{hierarchyError}</p>
+	{/if}
+{/snippet}
+
 {#if compact}
-	<button
-		type="button"
-		onclick={openModal}
-		class="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-creator-blue transition-none hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-creator-blue"
-		title={$_('editor.edit_hierarchy_placement')}
-		aria-label={$_('editor.edit_hierarchy')}
-	>
-		<i class="fa-solid fa-pen text-[9px]" aria-hidden="true"></i>
-	</button>
+	<div class="space-y-1.5">
+		{#if breadcrumbs}
+			<nav
+				class="flex items-center justify-between gap-1.5 rounded-sm border border-black/10 bg-black/[0.03] px-2 py-1.5"
+				aria-label={$_('editor.metadata_hierarchy')}
+			>
+				{@render breadcrumbs()}
+				<button
+					type="button"
+					onclick={openModal}
+					class="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-creator-blue transition-none hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-creator-blue"
+					title={$_('editor.edit_hierarchy_placement')}
+					aria-label={$_('editor.edit_hierarchy')}
+				>
+					<i class="fa-solid fa-pen text-[9px]" aria-hidden="true"></i>
+				</button>
+			</nav>
+		{:else}
+			<button
+				type="button"
+				onclick={openModal}
+				class="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-creator-blue transition-none hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-creator-blue"
+				title={$_('editor.edit_hierarchy_placement')}
+				aria-label={$_('editor.edit_hierarchy')}
+			>
+				<i class="fa-solid fa-pen text-[9px]" aria-hidden="true"></i>
+			</button>
+		{/if}
+		{@render statusNotices()}
+	</div>
 {:else}
 	<div class="space-y-2 rounded-sm border border-black/10 bg-black/[0.03] p-2">
 		<div class="flex items-start justify-between gap-2">
@@ -341,47 +409,7 @@
 			</div>
 		</button>
 
-		{#if isSuggesting}
-			<p class="flex items-center gap-1.5 text-micro-data text-warm-gray-500">
-				<i class="fa-solid fa-spinner fa-spin text-[10px] text-creator-blue" aria-hidden="true"></i>
-				<span>{$_('editor.suggesting_from_location')}</span>
-			</p>
-		{:else if autoSuggested && normalizePath(autoSuggested.parentPath) === parentPath}
-			<p class="flex flex-wrap items-center gap-1.5 text-micro-data text-warm-gray-500">
-				<span
-					class="inline-flex items-center gap-1 rounded-sm bg-creator-blue/10 px-1.5 py-0.5 text-[10px] font-semibold text-creator-blue"
-				>
-					<i class="fa-solid fa-location-dot text-[9px]" aria-hidden="true"></i>
-					{$_('editor.suggested_from_location')}
-				</span>
-				<span class="truncate">{autoSuggested.label}</span>
-			</p>
-		{:else if canApplyTopSuggestion && topSuggestion}
-			<div
-				class="flex items-center justify-between gap-2 rounded-sm border border-creator-blue/20 bg-creator-blue/5 px-2 py-1.5"
-			>
-				<div class="min-w-0 flex-1">
-					<p class="text-[10px] font-semibold text-near-black truncate">
-						<i class="fa-solid fa-location-dot mr-1 text-creator-blue" aria-hidden="true"></i>
-						{topSuggestion.label}
-					</p>
-					<p class="font-mono text-[10px] text-warm-gray-500 truncate">
-						{topSuggestion.parentPath}
-					</p>
-				</div>
-				<button
-					type="button"
-					onclick={() => applySuggestedParent(topSuggestion, { manual: true })}
-					class="shrink-0 rounded-sm border border-creator-blue/30 bg-white px-2 py-1 text-[10px] font-bold whitespace-nowrap text-creator-blue hover:bg-creator-blue hover:text-white"
-				>
-					{$_('editor.apply_location_suggestion')}
-				</button>
-			</div>
-		{/if}
-
-		{#if hierarchyError}
-			<p class="text-[10px] text-amber-600 font-bold">{hierarchyError}</p>
-		{/if}
+		{@render statusNotices()}
 	</div>
 {/if}
 

@@ -564,7 +564,7 @@ export function ensureCragEditorLayers(map: MapLibreMap): void {
 			filter: ['==', ['get', 'state'], 'saved'],
 			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: {
-				'line-color': ['case', ['==', ['get', 'selected'], true], '#0075de', '#31302e'],
+				'line-color': ['case', ['==', ['get', 'selected'], true], '#e11d48', '#0d9488'],
 				'line-width': ['case', ['==', ['get', 'selected'], true], 6, 4]
 			}
 		});
@@ -598,9 +598,26 @@ export function ensureCragEditorLayers(map: MapLibreMap): void {
 			filter: ['==', ['get', 'feature'], 'route-path'],
 			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: {
-				'line-color': ['case', ['==', ['get', 'selected'], true], '#f59e0b', '#7c3aed'],
-				'line-width': ['case', ['==', ['get', 'selected'], true], 6, 3],
-				'line-dasharray': [1, 1]
+				'line-color': [
+					'case',
+					['==', ['get', 'selected'], true],
+					'#e11d48',
+					[
+						'match',
+						['get', 'role'],
+						'approach',
+						'#0d9488',
+						'main',
+						'#0075de',
+						'descent',
+						'#d97706',
+						'variant',
+						'#7c3aed',
+						'#0075de'
+					]
+				],
+				'line-width': ['case', ['==', ['get', 'selected'], true], 6, 3.5],
+				'line-dasharray': [2, 1.2]
 			}
 		});
 	if (!map.getLayer('tracks-points-drawing'))

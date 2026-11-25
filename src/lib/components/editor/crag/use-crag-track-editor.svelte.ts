@@ -88,6 +88,9 @@ export function useCragTrackEditor(options: CragTrackEditorOptions) {
 	let isRoutingTrack = $state(false);
 	let importSegments = $state<GpxSegment[]>([]);
 	let importName = '';
+	let gpxImportActive = $state(false);
+	let gpxImportRevision = $state(0);
+	let gpxApplyHandler: (() => boolean) | null = null;
 	let requestVersion = 0;
 	let routeAbort: AbortController | null = null;
 	let routeQueue: Promise<void> = Promise.resolve();
@@ -143,6 +146,7 @@ export function useCragTrackEditor(options: CragTrackEditorOptions) {
 		redoHistory = [];
 		clearTrackSelection();
 		importSegments = [];
+		gpxImportActive = false;
 		message = '';
 	}
 	function begin(
@@ -184,7 +188,9 @@ export function useCragTrackEditor(options: CragTrackEditorOptions) {
 					options.onTransitionBlocked?.();
 					return false;
 				}
-				if (!finalizeTrack()) return false;
+				if (gpxImportActive && gpxApplyHandler) {
+					if (!gpxApplyHandler()) return false;
+				} else if (!finalizeTrack()) return false;
 			} else cancelTrackEdit();
 		}
 		action();
@@ -614,29 +620,72 @@ export function useCragTrackEditor(options: CragTrackEditorOptions) {
 				: { top: 100, left: 350, right: 350, bottom: 60 }
 		});
 	}
-	async function handleGpxUpload(event: Event) {
-		const input = event.currentTarget as HTMLInputElement,
-			file = input.files?.[0];
-		if (!file) return;
+	function previewSimplifyCount(toleranceMeters: number): number {
+		const tolerance = Math.max(1, Number(toleranceMeters) || 1);
+		if (points.length < 3) return points.length;
+		return simplifyTrackCoordinates(points, tolerance).length;
+	}
+	function setTrackName(value: string) {
+		name = value;
+	}
+	function dismissGpxImportPrompt() {
+		gpxImportActive = false;
+	}
+	function setGpxApplyHandler(handler: (() => boolean) | null) {
+		gpxApplyHandler = handler;
+	}
+	function finalizeAsRoutePath(
+		saveToRoute: (coordinates: Point2D[], trackName: string, extraSegments?: Point2D[][]) => boolean
+	): boolean {
+		if (
+			points.length < 2 ||
+			tails.some((tail) => tail.length < 2) ||
+			queuedPoints ||
+			operation.kind !== 'idle' ||
+			importSegments.length ||
+			failedPoint
+		)
+			return false;
+		const resolvedName = name.startsWith('track.') ? '' : name;
+		const extraSegments = tails.map(clone);
+		const saved = saveToRoute(clone(points), resolvedName, extraSegments);
+		if (!saved) {
+			message = 'track.saveFailed';
+			options.onTransitionBlocked?.();
+			return false;
+		}
+		finishSession();
+		return true;
+	}
+	async function importGpxFile(file: File | null | undefined): Promise<boolean> {
+		if (!file) return false;
 		const version = requestVersion,
 			importTarget = getRoutePathTarget();
 		try {
 			const segments = parseGpxSegments(await file.text());
-			if (version !== requestVersion || !requestLeave(() => {})) return;
-			{
-				const target = importTarget;
-				begin(
-					[],
-					target ? { kind: 'route-path', ...target } : null,
-					file.name.replace(/\.gpx$/i, ''),
-					'select'
-				);
-				importName = file.name.replace(/\.gpx$/i, '');
-				if (segments.length === 1) importSegment(segments[0]);
-				else importSegments = segments;
-			}
+			if (version !== requestVersion || !requestLeave(() => {})) return false;
+			const baseName = file.name.replace(/\.gpx$/i, '').trim();
+			begin(
+				[],
+				importTarget ? { kind: 'route-path', ...importTarget } : null,
+				baseName || 'track.new',
+				'select'
+			);
+			importName = baseName;
+			if (segments.length === 1) importSegment(segments[0]);
+			else importSegments = segments;
+			return true;
 		} catch {
 			message = 'track.invalidGpx';
+			options.onShowOptions?.();
+			return false;
+		}
+	}
+	async function handleGpxUpload(event: Event) {
+		const input = event.currentTarget as HTMLInputElement,
+			file = input.files?.[0];
+		try {
+			await importGpxFile(file);
 		} finally {
 			input.value = '';
 		}
@@ -644,8 +693,14 @@ export function useCragTrackEditor(options: CragTrackEditorOptions) {
 	function importSegment(segment: GpxSegment) {
 		points = clone(segment.points);
 		originalPoints = [];
-		name = importName;
+		const rawSegmentName = String(segment.name || '').trim();
+		const segmentName =
+			importSegments.length <= 1 ? rawSegmentName.replace(/\s*·\s*1$/, '') : rawSegmentName;
+		const isGenericSegmentName = /^(Track|Route|Segment)\s+\d+$/i.test(segmentName);
+		name = (!isGenericSegmentName && segmentName) || importName || segmentName || 'track.approach';
 		importSegments = [];
+		gpxImportActive = true;
+		gpxImportRevision += 1;
 		mode = 'select';
 		fitTrackBounds();
 	}
@@ -788,6 +843,9 @@ export function useCragTrackEditor(options: CragTrackEditorOptions) {
 			!failedPoint
 		);
 	}
+	function applyActiveTrack(): boolean {
+		return gpxImportActive && gpxApplyHandler ? gpxApplyHandler() : finalizeTrack();
+	}
 	function primaryAction() {
 		if (!sessionActive) return null;
 		let label: string, disabled: boolean;
@@ -816,7 +874,7 @@ export function useCragTrackEditor(options: CragTrackEditorOptions) {
 			label,
 			disabled,
 			placement: operation.kind === 'join' ? 'panel' : 'toolbar',
-			run: operation.kind === 'idle' ? finalizeTrack : confirmOperation
+			run: operation.kind === 'idle' ? applyActiveTrack : confirmOperation
 		};
 	}
 	function handleKeyDown(event: KeyboardEvent) {
@@ -967,6 +1025,18 @@ export function useCragTrackEditor(options: CragTrackEditorOptions) {
 		get importSegments() {
 			return importSegments;
 		},
+		get gpxImportActive() {
+			return gpxImportActive;
+		},
+		get gpxImportRevision() {
+			return gpxImportRevision;
+		},
+		setTrackName,
+		setGpxApplyHandler,
+		previewSimplifyCount,
+		dismissGpxImportPrompt,
+		finalizeAsRoutePath,
+		importGpxFile,
 		requestLeave,
 		handleMapClick,
 		handleKeyDown,

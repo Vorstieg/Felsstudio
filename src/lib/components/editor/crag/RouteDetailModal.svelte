@@ -8,6 +8,12 @@
 	import { generateId } from '$lib/assets/js/id-utils.ts';
 	import { getCragEditorSession } from '$lib/state/crag-session.svelte.ts';
 	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.ts';
+	import {
+		ROUTE_PATH_ROLES,
+		getRoutePathRoleMeta,
+		inferRoutePathRole,
+		type RoutePathRole
+	} from './route-path-roles.ts';
 
 	type EditableRoute = Route;
 	type ModalPathFeature = PathFeature & {
@@ -41,6 +47,21 @@
 
 	let route = $derived(routeEntry?.route ?? null);
 	let document = $derived(routeEntry?.document ?? null);
+	let documentDisplayName = $derived(
+		document?.node?.entry?.properties?.name ||
+			document?.data?.name ||
+			document?.path.split('/').at(-1) ||
+			''
+	);
+	let attachSelection = $state('');
+	let attachRole = $state<RoutePathRole>('approach');
+
+	$effect(() => {
+		void document?.path;
+		void route?.id;
+		attachSelection = '';
+		attachRole = 'approach';
+	});
 
 	function paths() {
 		return (route?.pathRefs || []).map((ref) => ({
@@ -61,6 +82,38 @@
 			(feature) =>
 				feature.properties?.kind === 'approach' && (feature.geometry?.coordinates?.length ?? 0) > 1
 		);
+	}
+
+	function handleAttachSelectionChange(value: string): void {
+		attachSelection = value;
+		if (value.startsWith('topo::')) {
+			const pathId = value.slice('topo::'.length);
+			const feature = availablePaths().find((item) => String(item.id) === pathId);
+			attachRole = inferRoutePathRole(feature?.properties?.name, 'main');
+		} else if (value.startsWith('access::')) {
+			const accessId = value.slice('access::'.length);
+			const feature = availableAccessPaths().find((item) => String(item.id) === accessId);
+			attachRole = inferRoutePathRole(feature?.properties?.name, 'approach');
+		}
+	}
+
+	function attachSelectedPath(): void {
+		if (!document || !route || !attachSelection) return;
+		if (attachSelection.startsWith('topo::')) {
+			const pathId = attachSelection.slice('topo::'.length);
+			onAssignExistingRoutePath(document.path, route.id, pathId, attachRole, '');
+		} else if (attachSelection.startsWith('access::')) {
+			const accessId = attachSelection.slice('access::'.length);
+			onCreateRoutePathFromAccess(document.path, route.id, accessId, attachRole);
+		}
+		attachSelection = '';
+	}
+
+	function effectiveNote(label: string | undefined, pathName: string | undefined): string {
+		const trimmed = String(label || '').trim();
+		if (!trimmed) return '';
+		if (pathName && trimmed === String(pathName).trim()) return '';
+		return trimmed;
 	}
 
 	function addPitch(): void {
@@ -283,119 +336,142 @@
 					></textarea>
 				</div>
 
-				<div class="space-y-1 border-t border-black/10 pt-3">
+				<div class="space-y-2 border-t border-black/10 pt-3">
 					<div class="flex items-center justify-between gap-2">
 						<span class="text-ui-label">{$_('editor.paths')}</span>
 						<button
 							type="button"
-							class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-creator-blue"
+							class="rounded-sm border border-black/15 bg-white px-2 py-1 text-micro-data font-bold text-creator-blue hover:bg-creator-blue/5"
 							onclick={() => onAddRoutePath(document.path, route.id)}
 						>
 							<i class="fa-solid fa-plus mr-1"></i>{$_('editor.add_path')}
 						</button>
 					</div>
-					{#if availablePaths().length > 0}
-						<div class="flex items-center gap-1">
+					{#if availablePaths().length > 0 || availableAccessPaths().length > 0}
+						<div class="grid grid-cols-[1fr_7.5rem_auto] items-center gap-1.5">
 							<select
-								class="input-studio min-w-0 flex-1"
-								aria-label={$_('editor.assign_existing_path')}
-								onchange={(event) => {
-									const pathId = event.currentTarget.value;
-									if (pathId) onAssignExistingRoutePath(document.path, route.id, pathId);
-									event.currentTarget.value = '';
-								}}
+								class="input-studio min-w-0"
+								aria-label={$_('editor.attach_path_to_route')}
+								value={attachSelection}
+								onchange={(event) => handleAttachSelectionChange(event.currentTarget.value)}
 							>
-								<option value="" disabled selected
-									>{$_('editor.assign_existing_path_ellipsis')}</option
-								>
+								<option value="">{$_('editor.attach_path_to_route')}</option>
 								{#each availablePaths() as feature}
-									<option value={feature.id}>{feature.properties?.name || feature.id}</option>
+									<option value={`topo::${feature.id}`}>
+										{feature.properties?.name || feature.id}
+									</option>
+								{/each}
+								{#each availableAccessPaths() as feature}
+									<option value={`access::${feature.id}`}>
+										{feature.properties?.name || feature.id} · {$_('editor.whole_crag')}
+									</option>
 								{/each}
 							</select>
+							<select
+								class="input-studio min-w-0"
+								aria-label={$_('editor.path_role')}
+								bind:value={attachRole}
+							>
+								{#each ROUTE_PATH_ROLES as roleMeta}
+									<option value={roleMeta.id}>{$_(roleMeta.labelKey)}</option>
+								{/each}
+							</select>
+							<button
+								type="button"
+								class="rounded-sm bg-creator-blue px-2.5 py-1.5 text-micro-data font-bold text-white hover:bg-creator-blue-active disabled:cursor-not-allowed disabled:opacity-40"
+								disabled={!attachSelection}
+								onclick={attachSelectedPath}
+							>
+								{$_('editor.add')}
+							</button>
 						</div>
-					{/if}
-					{#if availableAccessPaths().length > 0}
-						<select
-							class="input-studio min-w-0"
-							aria-label={$_('editor.create_route_path_from_access_path')}
-							onchange={(event) => {
-								const accessId = event.currentTarget.value;
-								if (accessId) onCreateRoutePathFromAccess(document.path, route.id, accessId);
-								event.currentTarget.value = '';
-							}}
-						>
-							<option value="" disabled selected>{$_('editor.copy_access_path')}</option>
-							{#each availableAccessPaths() as feature}
-								<option value={feature.id}>{feature.properties?.name || feature.id}</option>
-							{/each}
-						</select>
 					{/if}
 					{#if paths().length === 0}
 						<p class="text-micro-data text-warm-gray-500">{$_('editor.no_paths_attached')}</p>
 					{:else}
-						{#each paths() as pathAsset}
-							<div
-								class="grid grid-cols-[7rem_1fr_7rem_1.5rem_1.5rem_1.5rem] gap-1 rounded-sm border border-black/10 bg-white p-1"
-							>
-								<select
-									class="input-studio min-w-0"
-									value={pathAsset.role || 'main'}
-									onchange={(event) =>
-										onUpdateRoutePath(document.path, route.id, pathAsset.pathId, {
-											role: event.currentTarget.value
-										})}
-								>
-									<option value="approach">{$_('editor.approach')}</option>
-									<option value="main">{$_('editor.main')}</option>
-									<option value="descent">{$_('editor.descent')}</option>
-									<option value="variant">{$_('editor.variant')}</option>
-								</select>
-								<input
-									class="input-studio min-w-0"
-									value={pathAsset.label || ''}
-									placeholder={$_('editor.label')}
-									onchange={(event) =>
-										onUpdateRoutePath(document.path, route.id, pathAsset.pathId, {
-											label: event.currentTarget.value
-										})}
-								/>
-								<span class="px-1 text-micro-data text-warm-gray-500"
-									>{pathAsset.feature?.properties?.name || pathAsset.pathId}</span
-								>
-								<button
-									type="button"
-									class="text-warm-gray-400 hover:text-creator-blue"
-									title={$_('editor.edit_path')}
-									onclick={() => onEditRoutePath(document.path, route.id, pathAsset.pathId)}
-									><i class="fa-solid fa-pencil text-[10px]"></i></button
-								>
-								<button
-									type="button"
-									class="text-warm-gray-400 hover:text-creator-blue"
-									title={$_('editor.duplicate_path')}
-									onclick={() => onDuplicateRoutePath(document.path, pathAsset.pathId)}
-									><i class="fa-solid fa-copy text-[10px]"></i></button
-								>
-								<button
-									type="button"
-									class="text-warm-gray-300 hover:text-rose-600"
-									title={$_('editor.unassign_path')}
-									onclick={() => onRemoveRoutePath(document.path, route.id, pathAsset.pathId)}
-									><i class="fa-solid fa-xmark text-[10px]"></i></button
-								>
-								<button
-									type="button"
-									class="text-warm-gray-300 hover:text-rose-600"
-									title={$_('editor.delete_shared_path')}
-									onclick={() => onDeleteRoutePath(document.path, pathAsset.pathId)}
-									><i class="fa-solid fa-trash text-[10px]"></i></button
-								>
-							</div>
-						{/each}
+						<div class="space-y-1.5">
+							{#each paths() as pathAsset}
+								{@const roleMeta = getRoutePathRoleMeta(pathAsset.role)}
+								{@const pathDisplayName = pathAsset.feature?.properties?.name || pathAsset.pathId}
+								<div class="space-y-1.5 rounded-sm border border-black/10 bg-warm-white/40 p-2">
+									<div class="flex items-center gap-2">
+										<span
+											class={`h-2.5 w-2.5 shrink-0 rounded-full ${roleMeta.dotClass}`}
+											aria-hidden="true"
+										></span>
+										<select
+											class={`shrink-0 rounded-sm border px-1.5 py-1 text-[11px] font-semibold leading-tight focus:outline-none ${roleMeta.badgeClass}`}
+											aria-label={$_('editor.path_role')}
+											value={roleMeta.id}
+											onchange={(event) =>
+												onUpdateRoutePath(document.path, route.id, pathAsset.pathId, {
+													role: event.currentTarget.value
+												})}
+										>
+											{#each ROUTE_PATH_ROLES as option}
+												<option value={option.id} class="bg-white text-near-black"
+													>{$_(option.labelKey)}</option
+												>
+											{/each}
+										</select>
+										<span
+											class="min-w-0 flex-1 truncate text-xs font-bold text-near-black"
+											title={String(pathDisplayName)}
+										>
+											{pathDisplayName}
+										</span>
+										<div class="inline-flex shrink-0 items-center gap-0.5">
+											<button
+												type="button"
+												class="inline-flex h-6 w-6 items-center justify-center rounded-sm text-warm-gray-400 hover:bg-black/5 hover:text-creator-blue"
+												title={$_('editor.edit_path')}
+												aria-label={$_('editor.edit_path')}
+												onclick={() => onEditRoutePath(document.path, route.id, pathAsset.pathId)}
+												><i class="fa-solid fa-pencil text-[10px]"></i></button
+											>
+											<button
+												type="button"
+												class="inline-flex h-6 w-6 items-center justify-center rounded-sm text-warm-gray-400 hover:bg-black/5 hover:text-creator-blue"
+												title={$_('editor.duplicate_path')}
+												aria-label={$_('editor.duplicate_path')}
+												onclick={() => onDuplicateRoutePath(document.path, pathAsset.pathId)}
+												><i class="fa-solid fa-copy text-[10px]"></i></button
+											>
+											<button
+												type="button"
+												class="inline-flex h-6 w-6 items-center justify-center rounded-sm text-warm-gray-400 hover:bg-rose-50 hover:text-rose-600"
+												title={$_('editor.unassign_path')}
+												aria-label={$_('editor.unassign_path')}
+												onclick={() => onRemoveRoutePath(document.path, route.id, pathAsset.pathId)}
+												><i class="fa-solid fa-xmark text-[11px]"></i></button
+											>
+											<button
+												type="button"
+												class="inline-flex h-6 w-6 items-center justify-center rounded-sm text-warm-gray-400 hover:bg-rose-50 hover:text-rose-600"
+												title={$_('editor.delete_shared_path')}
+												aria-label={$_('editor.delete_shared_path')}
+												onclick={() => onDeleteRoutePath(document.path, pathAsset.pathId)}
+												><i class="fa-solid fa-trash-can text-[10px]"></i></button
+											>
+										</div>
+									</div>
+									<input
+										class="input-studio w-full bg-white text-[11px]"
+										value={effectiveNote(pathAsset.label, pathAsset.feature?.properties?.name)}
+										aria-label={$_('editor.label')}
+										placeholder={$_('editor.optional_route_note')}
+										onchange={(event) =>
+											onUpdateRoutePath(document.path, route.id, pathAsset.pathId, {
+												label: event.currentTarget.value
+											})}
+									/>
+								</div>
+							{/each}
+						</div>
 					{/if}
-					<p class="text-micro-data text-warm-gray-500">
+					<p class="text-micro-data text-warm-gray-400">
 						{$_('editor.stored_in')}
-						{document.path.split('/').at(-1)}
+						{documentDisplayName}
 					</p>
 				</div>
 			</div>

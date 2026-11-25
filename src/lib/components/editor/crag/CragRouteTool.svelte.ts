@@ -1,4 +1,5 @@
 import { generateId, generateRouteId } from '$lib/assets/js/id-utils.ts';
+import { createAccessCollection, createAccessId } from '$lib/assets/js/access-geojson.ts';
 import {
 	workspaceDocumentPaths,
 	workspaceNodeDocumentPaths
@@ -22,7 +23,7 @@ import type {
 type Id = string | number;
 type AccessFeature = {
 	id?: string;
-	properties?: { kind?: string; name?: string };
+	properties?: { kind?: string; name?: string; description?: string; [key: string]: unknown };
 	geometry?: { coordinates?: number[][] };
 };
 
@@ -216,33 +217,334 @@ export function createCragRouteTool({
 		return assigned;
 	}
 
-	function createRoutePathFromAccess(documentPath: string, routeId: Id, accessFeatureId: string) {
+	function createRoutePathFromAccess(
+		documentPath: string,
+		routeId: Id,
+		accessFeatureId: string,
+		role = 'approach'
+	) {
 		const document = documentAt(documentPath);
 		const access = ((state.getWorkspaceAccess()?.features || []) as AccessFeature[]).find(
 			(feature) => feature.id === accessFeatureId && feature.properties?.kind === 'approach'
 		);
 		const coordinates = access?.geometry?.coordinates;
 		if (!document || !access || !coordinates?.length) return false;
+		return saveTrackAsRoutePath(documentPath, routeId, {
+			coordinates: coordinates.map(([lng, lat]): Point2D => [lng, lat]),
+			name: access.properties?.name || 'Copied access path',
+			description: access.properties?.description,
+			role: role || 'approach'
+		});
+	}
+
+	function saveTrackAsRoutePaths(
+		documentPath: string,
+		routeIds: Id[] | 'all',
+		{
+			coordinates,
+			name,
+			description,
+			role = 'approach',
+			extraSegments = []
+		}: {
+			coordinates: Point2D[];
+			name: string;
+			description?: string;
+			role?: string;
+			extraSegments?: Point2D[][];
+		}
+	) {
+		const document = documentAt(documentPath);
+		const segments = [coordinates, ...extraSegments];
+		if (!document || segments.some((segment) => !segment?.length || segment.length < 2))
+			return false;
+		const routes = document.data.routes || [];
+		const targetRouteIds =
+			routeIds === 'all'
+				? routes.map((route) => route.id)
+				: routeIds.filter((id) => routes.some((route) => String(route.id) === String(id)));
+		if (targetRouteIds.length === 0) return false;
+		const pathName = String(name || '').trim() || 'GPX track';
+		updateDocument(documentPath, (data) => {
+			data.paths = data.paths || { type: 'FeatureCollection', features: [] };
+			const createdIds: string[] = [];
+			for (const [index, segment] of segments.entries()) {
+				let pathId: string;
+				do {
+					pathId = generateId('path');
+				} while (
+					data.paths.features.some((feature) => String(feature.id) === pathId) ||
+					createdIds.includes(pathId)
+				);
+				createdIds.push(pathId);
+				const featureMeta: Record<string, unknown> = {
+					name: index === 0 ? pathName : `${pathName} · ${index + 1}`
+				};
+				if (description) featureMeta.description = description;
+				data.paths.features = [
+					...data.paths.features,
+					createPathFeature(segment, featureMeta, pathId) as NonNullable<
+						FelsTopoDocument['paths']
+					>['features'][number]
+				];
+				for (const routeId of targetRouteIds) {
+					assignTopoPath(data, routeId, pathId, {
+						role: role || 'approach',
+						label: ''
+					});
+				}
+			}
+		});
+		return true;
+	}
+
+	function saveTrackAsRoutePath(
+		documentPath: string,
+		routeId: Id,
+		options: {
+			coordinates: Point2D[];
+			name: string;
+			description?: string;
+			role?: string;
+			extraSegments?: Point2D[][];
+		}
+	) {
+		return saveTrackAsRoutePaths(documentPath, [routeId], options);
+	}
+
+	function assignPathToAllRoutes(documentPath: string, pathId: Id, role = 'approach') {
+		const document = documentAt(documentPath);
+		if (!document || !findTopoPath(document.data, pathId)) return false;
+		const unassigned = (document.data.routes || []).filter(
+			(route) => !(route.pathRefs || []).some((ref) => String(ref.pathId) === String(pathId))
+		);
+		if (unassigned.length === 0) return false;
+		state.commit('Assign route path to all routes', () => {
+			for (const route of unassigned) {
+				assignTopoPath(document.data, route.id, pathId, { role, label: '' });
+			}
+			markDirty(documentPath);
+		});
+		return true;
+	}
+
+	function assignAccessTrackToRoutes(
+		documentPath: string,
+		accessFeatureId: string,
+		routeIds: Id[] | 'all',
+		role = 'approach'
+	) {
+		const document = documentAt(documentPath);
+		const accessNode = state.getActiveWorkspaceEntry();
+		const accessDocument = state.getWorkspaceAccess();
+		const access = ((accessDocument?.features || []) as AccessFeature[]).find(
+			(feature) => feature.id === accessFeatureId && feature.properties?.kind === 'approach'
+		);
+		const coordinates = access?.geometry?.coordinates;
+		if (!document || !accessNode?.entry || !access || !coordinates || coordinates.length < 2)
+			return false;
+		const routes = document.data.routes || [];
+		const targetRouteIds =
+			routeIds === 'all'
+				? routes.map((route) => route.id)
+				: routeIds.filter((id) => routes.some((route) => String(route.id) === String(id)));
+		if (targetRouteIds.length === 0) return false;
+
 		let pathId: string;
 		do {
 			pathId = generateId('path');
 		} while (document.data.paths?.features?.some((feature) => String(feature.id) === pathId));
-		updateDocument(documentPath, (data) => {
-			data.paths = data.paths || { type: 'FeatureCollection', features: [] };
-			data.paths.features = [
-				...data.paths.features,
-				createPathFeature(
-					coordinates,
-					{ name: access.properties?.name || 'Copied access path' },
-					pathId
-				) as NonNullable<FelsTopoDocument['paths']>['features'][number]
+
+		state.commit('Assign approach track to routes', () => {
+			document.data.paths = document.data.paths || { type: 'FeatureCollection', features: [] };
+			const featureMeta: Record<string, unknown> = {
+				name: access.properties?.name || 'Approach track'
+			};
+			if (access.properties?.description) featureMeta.description = access.properties.description;
+			document.data.paths.features = [
+				...document.data.paths.features,
+				createPathFeature(coordinates, featureMeta, pathId) as NonNullable<
+					FelsTopoDocument['paths']
+				>['features'][number]
 			];
-			assignTopoPath(data, routeId, pathId, {
-				role: 'approach',
-				label: access.properties?.name || ''
+			for (const routeId of targetRouteIds) {
+				assignTopoPath(document.data, routeId, pathId, { role: role || 'approach', label: '' });
+			}
+			markDirty(documentPath);
+			accessDocument!.features = (accessDocument!.features as AccessFeature[]).filter(
+				(feature) => feature.id !== accessFeatureId
+			);
+			state.markWorkspaceDirty(
+				workspaceNodeDocumentPaths(accessNode).access,
+				state.getWorkspaceEntryPath(accessNode)
+			);
+		});
+		const selection = getSelection();
+		if (selection?.type === 'approach' && selection.id === accessFeatureId) {
+			selectObject({ type: 'route-path', documentPath, pathId: String(pathId) });
+		}
+		return true;
+	}
+
+	function assignAccessTrackToAllRoutes(accessFeatureId: string, role = 'approach') {
+		const accessNode = state.getActiveWorkspaceEntry();
+		const accessDocument = state.getWorkspaceAccess();
+		const access = ((accessDocument?.features || []) as AccessFeature[]).find(
+			(feature) => feature.id === accessFeatureId && feature.properties?.kind === 'approach'
+		);
+		const coordinates = access?.geometry?.coordinates;
+		const targetDocuments = documents().filter((doc) => (doc.data.routes || []).length > 0);
+		if (
+			!accessNode?.entry ||
+			!access ||
+			!coordinates ||
+			coordinates.length < 2 ||
+			targetDocuments.length === 0
+		)
+			return false;
+
+		let firstTarget: { documentPath: string; pathId: string } | null = null;
+		state.commit('Assign approach track to all routes', () => {
+			const featureMeta: Record<string, unknown> = {
+				name: access.properties?.name || 'Approach track'
+			};
+			if (access.properties?.description) featureMeta.description = access.properties.description;
+			for (const document of targetDocuments) {
+				document.data.paths = document.data.paths || { type: 'FeatureCollection', features: [] };
+				let pathId: string;
+				do {
+					pathId = generateId('path');
+				} while (document.data.paths.features.some((feature) => String(feature.id) === pathId));
+				document.data.paths.features = [
+					...document.data.paths.features,
+					createPathFeature(coordinates, featureMeta, pathId) as NonNullable<
+						FelsTopoDocument['paths']
+					>['features'][number]
+				];
+				for (const route of document.data.routes || []) {
+					assignTopoPath(document.data, route.id, pathId, { role: role || 'approach', label: '' });
+				}
+				markDirty(document.path);
+				if (!firstTarget) firstTarget = { documentPath: document.path, pathId };
+			}
+			accessDocument!.features = (accessDocument!.features as AccessFeature[]).filter(
+				(feature) => feature.id !== accessFeatureId
+			);
+			state.markWorkspaceDirty(
+				workspaceNodeDocumentPaths(accessNode).access,
+				state.getWorkspaceEntryPath(accessNode)
+			);
+		});
+		const selection = getSelection();
+		if (selection?.type === 'approach' && selection.id === accessFeatureId && firstTarget) {
+			const target = firstTarget as { documentPath: string; pathId: string };
+			selectObject({
+				type: 'route-path',
+				documentPath: target.documentPath,
+				pathId: String(target.pathId)
 			});
+		}
+		return true;
+	}
+
+	function moveTopoPathToCragApproach(
+		documentPath: string,
+		pathId: Id | undefined,
+		pathIndex: number | null = null
+	) {
+		if (pathId == null) return false;
+		const document = documentAt(documentPath);
+		const accessNode = state.getActiveWorkspaceEntry();
+		const features = document?.data.paths?.features || [];
+		const resolvedIndex =
+			pathIndex !== null && Number.isInteger(pathIndex)
+				? pathIndex
+				: features.findIndex((item) => String(item.id) === String(pathId));
+		const feature = features[resolvedIndex];
+		const coordinates = feature?.geometry?.coordinates;
+		if (!document || !accessNode?.entry || !feature || !coordinates || coordinates.length < 2)
+			return false;
+
+		const newAccessId = createAccessId('approach');
+		const props = (feature.properties || {}) as { name?: string; description?: string };
+		const nextAccessFeature = {
+			type: 'Feature' as const,
+			id: newAccessId,
+			properties: {
+				kind: 'approach',
+				name: props.name || 'Approach track',
+				...(props.description ? { description: props.description } : {})
+			},
+			geometry: {
+				type: 'LineString' as const,
+				coordinates: coordinates.map(([lng, lat]) => [lng, lat])
+			}
+		};
+
+		state.commit('Use path for whole crag', () => {
+			document.data.paths?.features.splice(resolvedIndex, 1);
+			if (!document.data.paths?.features.some((item) => String(item.id) === String(pathId))) {
+				for (const route of document.data.routes || []) {
+					route.pathRefs = (route.pathRefs || []).filter(
+						(ref) => String(ref.pathId) !== String(pathId)
+					);
+				}
+			}
+			markDirty(documentPath);
+			if (!accessNode.access) accessNode.access = createAccessCollection();
+			accessNode.access.features = [...accessNode.access.features, nextAccessFeature];
+			state.markWorkspaceDirty(
+				workspaceNodeDocumentPaths(accessNode).access,
+				state.getWorkspaceEntryPath(accessNode)
+			);
+		});
+		const selection = getSelection();
+		if (
+			selection?.type === 'route-path' &&
+			selection.documentPath === documentPath &&
+			String(selection.pathId) === String(pathId)
+		) {
+			selectObject({ type: 'approach', id: newAccessId });
+		}
+		return true;
+	}
+
+	function duplicateApproachTrack(accessFeatureId: string) {
+		const accessNode = state.getActiveWorkspaceEntry();
+		const accessDocument = state.getWorkspaceAccess();
+		const access = ((accessDocument?.features || []) as AccessFeature[]).find(
+			(feature) => feature.id === accessFeatureId && feature.properties?.kind === 'approach'
+		);
+		if (!accessNode?.entry || !accessDocument || !access) return false;
+		const copy = JSON.parse(JSON.stringify(access)) as AccessFeature;
+		copy.id = createAccessId('approach');
+		copy.properties = {
+			...(copy.properties || {}),
+			kind: 'approach',
+			name: copy.properties?.name ? `${copy.properties.name} copy` : 'Approach track copy'
+		};
+		state.commit('Duplicate approach track', () => {
+			accessDocument.features = [...accessDocument.features, copy];
+			state.markWorkspaceDirty(
+				workspaceNodeDocumentPaths(accessNode).access,
+				state.getWorkspaceEntryPath(accessNode)
+			);
 		});
 		return true;
+	}
+
+	function listAssignableRoutes() {
+		return documents().flatMap((document) => {
+			const sectorName =
+				document.node.entry?.properties.name || document.node.entry?.properties.id || '';
+			return (document.data.routes || []).map((route) => ({
+				documentPath: document.path,
+				sectorName,
+				routeId: route.id,
+				routeName: route.name || String(route.id),
+				grade: route.grade || ''
+			}));
+		});
 	}
 
 	function moveApproachTrackToTopoPaths(documentPath: string, accessFeatureId: string) {
@@ -593,8 +895,16 @@ export function createCragRouteTool({
 		updateRoute,
 		addRoutePath,
 		assignExistingRoutePath,
+		assignPathToAllRoutes,
+		assignAccessTrackToRoutes,
+		assignAccessTrackToAllRoutes,
 		createRoutePathFromAccess,
+		saveTrackAsRoutePath,
+		saveTrackAsRoutePaths,
+		listAssignableRoutes,
 		moveApproachTrackToTopoPaths,
+		moveTopoPathToCragApproach,
+		duplicateApproachTrack,
 		saveRoutePathCoordinates,
 		saveRouteSegments,
 		editRoutePath,

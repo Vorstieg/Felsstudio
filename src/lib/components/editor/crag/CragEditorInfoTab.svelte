@@ -67,11 +67,6 @@
 	let pendingCragImages = $derived(activeEntry?.pendingImages || []);
 	let pendingCragImageCount = $derived(pendingCragImages.filter(Boolean).length);
 	let equipment = $derived((metadata.equipment || []) as EquipmentItem[]);
-	let advancedOpen = $state(false);
-
-	$effect(() => {
-		if (hierarchyError || (activeEntry && !activeEntry.sourcePath)) advancedOpen = true;
-	});
 
 	function handleNameInput(value: string) {
 		cragEditorState.setMetadataField('name', value);
@@ -133,38 +128,46 @@
 	}
 </script>
 
+{#snippet breadcrumbLinks()}
+	<div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-0.5 leading-tight">
+		{#each breadcrumbs as breadcrumb, i}
+			{@const entryName =
+				breadcrumb.entry?.entry?.properties.name ||
+				breadcrumb.entry?.entry?.properties.id ||
+				breadcrumb.source.id}
+			{@const entryKind = $_(
+				'editor.hierarchy_' + (breadcrumb.entry?.entry?.properties.kind || 'area')
+			)}
+			{#if i > 0}<i
+					class="fa-solid fa-chevron-right text-[8px] text-warm-gray-300"
+					aria-hidden="true"
+				></i>{/if}
+			<button
+				type="button"
+				onclick={() => selectBreadcrumb(breadcrumb)}
+				title={`${entryName} (${entryKind})`}
+				class="rounded-sm px-1 py-0.5 text-[10px] leading-tight transition-none {activeEntry ===
+				breadcrumb.entry
+					? 'bg-white font-bold text-creator-blue shadow-xs'
+					: 'text-warm-gray-500 hover:bg-white hover:text-near-black'}"
+			>
+				{entryName}
+			</button>
+		{/each}
+	</div>
+{/snippet}
+
 <div class="space-y-3">
-	<nav
-		class="flex items-start justify-between gap-1.5 rounded-sm border border-black/10 bg-black/[0.03] px-2 py-1.5"
-		aria-label={$_('editor.metadata_hierarchy')}
-	>
-		<div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-0.5 leading-tight">
-			{#each breadcrumbs as breadcrumb, i}
-				{@const entryName =
-					breadcrumb.entry?.entry?.properties.name ||
-					breadcrumb.entry?.entry?.properties.id ||
-					breadcrumb.source.id}
-				{@const entryKind = $_(
-					'editor.hierarchy_' + (breadcrumb.entry?.entry?.properties.kind || 'area')
-				)}
-				{#if i > 0}<i
-						class="fa-solid fa-chevron-right text-[8px] text-warm-gray-300"
-						aria-hidden="true"
-					></i>{/if}
-				<button
-					type="button"
-					onclick={() => selectBreadcrumb(breadcrumb)}
-					title={`${entryName} (${entryKind})`}
-					class="rounded-sm px-1 py-0.5 text-[10px] leading-tight transition-none {activeEntry ===
-					breadcrumb.entry
-						? 'bg-white font-bold text-creator-blue shadow-xs'
-						: 'text-warm-gray-500 hover:bg-white hover:text-near-black'}"
-				>
-					{entryName}
-				</button>
-			{/each}
-		</div>
-	</nav>
+	{#if isCurrentEntry}
+		<CragHierarchyPlacement compact={true} breadcrumbs={breadcrumbLinks} />
+	{:else}
+		<nav
+			class="flex items-center justify-between gap-1.5 rounded-sm border border-black/10 bg-black/[0.03] px-2 py-1.5"
+			aria-label={$_('editor.metadata_hierarchy')}
+		>
+			{@render breadcrumbLinks()}
+		</nav>
+	{/if}
 	<div class="space-y-3">
 		<div class="space-y-0.5">
 			<label for="metadata-name" class="text-ui-label block">{$_('editor.name')}</label>
@@ -369,21 +372,5 @@
 				class="input-studio w-full resize-none"
 			></textarea>
 		</div>
-		{#if isCurrentEntry}
-			<details bind:open={advancedOpen} class="border-t border-black/15 pt-2">
-				<summary
-					class="text-ui-label flex cursor-pointer items-center justify-between gap-2 text-warm-gray-500 select-none hover:text-near-black"
-				>
-					<span>{$_('editor.advanced_settings')}</span>
-					<i
-						class={`fa-solid fa-chevron-right text-[9px] text-warm-gray-400 transition-transform ${advancedOpen ? 'rotate-90' : ''}`}
-						aria-hidden="true"
-					></i>
-				</summary>
-				<div class="mt-2.5">
-					<CragHierarchyPlacement />
-				</div>
-			</details>
-		{/if}
 	</div>
 </div>

@@ -2,6 +2,7 @@
 	import { _ } from 'svelte-i18n';
 	import type { Route } from '@vorstieg/fels-types/types';
 	import type { CragSelection, RouteDocument, RouteEntry } from './crag-route-types.ts';
+	import { getRoutePathRoleMeta } from './route-path-roles.ts';
 	type Selection = CragSelection | null;
 	type Props = {
 		routes?: RouteEntry[];
@@ -21,7 +22,7 @@
 		return `${document.path}:${route.id}`;
 	}
 
-	function routePathCount(document: RouteDocument, route: Route) {
+	function routePathRefs(document: RouteDocument, route: Route) {
 		const features = new Set(
 			(document.data?.paths?.features || [])
 				.filter(
@@ -30,7 +31,7 @@
 				)
 				.map((feature) => String(feature.id))
 		);
-		return (route.pathRefs || []).filter((ref) => features.has(String(ref.pathId))).length;
+		return (route.pathRefs || []).filter((ref) => features.has(String(ref.pathId)));
 	}
 </script>
 
@@ -45,6 +46,7 @@
 	</thead>
 	<tbody>
 		{#each routes.slice(0, collapsed ? 3 : routes.length) as { document, route }}
+			{@const refs = routePathRefs(document, route)}
 			<tr
 				class="border-t border-black/10 {selectedObject?.type === 'route' &&
 				selectedObject.key === routeKey(document, route)
@@ -62,8 +64,25 @@
 						{route.name || $_('editor.unnamed_route')}
 					</button>
 				</td>
-				<td>{route.type ? $_('types.' + route.type) : $_('editor.route_label')}</td>
-				<td>{routePathCount(document, route)}</td>
+				<td class="pr-1.5">{route.type ? $_('types.' + route.type) : $_('editor.route_label')}</td>
+				<td class="py-1 pr-1">
+					{#if refs.length === 0}
+						<span class="text-warm-gray-300">–</span>
+					{:else}
+						<div class="flex flex-wrap gap-1">
+							{#each refs as ref}
+								{@const meta = getRoutePathRoleMeta(ref.role)}
+								<span
+									class={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[9px] font-bold leading-none ${meta.badgeClass}`}
+								>
+									<span class={`h-1.5 w-1.5 rounded-full ${meta.dotClass}`} aria-hidden="true"
+									></span>
+									{$_(meta.shortLabelKey)}
+								</span>
+							{/each}
+						</div>
+					{/if}
+				</td>
 				<td>
 					<button
 						class="text-warm-gray-300 hover:text-rose-600"

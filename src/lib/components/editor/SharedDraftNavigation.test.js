@@ -10,8 +10,8 @@ beforeEach(() => {
 	goto.mockReset();
 	addMessages('en', {
 		draft: { editors: 'Draft editors', save_failed: 'Could not save draft' },
-		ui: { crag_studio: 'Crag Studio', '2d_studio': '2D Studio', '3d_studio': '3D Studio' },
-		editor: { studio_tab_crag: 'Crag', studio_tab_2d: '2D Topo', studio_tab_3d: '3D Topo' }
+		ui: { crag_studio: 'Map Editor', '2d_studio': 'Topo Studio', '3d_studio': '3D Studio' },
+		editor: { studio_tab_crag: 'Map Editor', studio_tab_2d: 'Topo', studio_tab_3d: '3D Topo' }
 	});
 	init({ fallbackLocale: 'en', initialLocale: 'en' });
 });
@@ -26,7 +26,7 @@ it('only renders controller state and routes editor selection through it', async
 	};
 	mocks.draft = draft;
 	const view = render(SharedDraftNavigation, { onNavigate });
-	const activeTab = view.getByRole('button', { name: '2D Topo' });
+	const activeTab = view.getByRole('button', { name: 'Topo' });
 	const targetTab = view.getByRole('button', { name: '3D Topo' });
 	expect(activeTab).toBeDisabled();
 	expect(activeTab).toHaveAttribute('aria-current', 'page');

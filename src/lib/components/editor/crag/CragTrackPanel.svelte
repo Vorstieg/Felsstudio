@@ -1,22 +1,25 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import type { Map as MapLibreMap } from 'maplibre-gl';
 	import ToolOptions from '$lib/components/editor/tools/ToolOptions.svelte';
 	import { getCragEditorTools } from '$lib/state/crag-controller-context.svelte.ts';
+	import { ROUTE_PATH_ROLES, inferRoutePathRole, type RoutePathRole } from './route-path-roles.ts';
 
 	let {
 		map = null,
 		isExpanded = true,
 		open = $bindable(true)
 	}: { map?: MapLibreMap | null; isExpanded?: boolean; open?: boolean } = $props();
-	const { trackEditor: editor } = getCragEditorTools();
+	const { trackEditor: editor, routeTool } = getCragEditorTools();
 	let tolerance = $state(10);
 	let radius = $state(5);
 	let minimum = $state(30);
 	let summary = $state('');
 	let revision = $state(0);
 	let segmentIndex = $state(0);
+	let selectedTarget = $state('crag');
+	let selectedRouteRole = $state<RoutePathRole>('approach');
 	const button =
 		'rounded-sm border border-black/15 bg-white px-2 py-1 text-ui-label text-warm-gray-500 transition-none hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40';
 	let busy = $derived(editor.isRoutingTrack || editor.importSegments.length > 0);
@@ -24,6 +27,88 @@
 	let boundary = $derived(editor.selectedTrackPointIndex);
 	let extending = $derived(editor.trackDraftMode !== 'select');
 	let instruction = $derived(editor.instructionKey(isExpanded));
+	let assignableRoutes = $derived(routeTool?.listAssignableRoutes?.() ?? []);
+	let assignableDocuments = $derived.by(() => {
+		const map = new Map<string, { documentPath: string; sectorName: string; count: number }>();
+		for (const item of assignableRoutes) {
+			const existing = map.get(item.documentPath);
+			if (existing) existing.count += 1;
+			else
+				map.set(item.documentPath, {
+					documentPath: item.documentPath,
+					sectorName: item.sectorName,
+					count: 1
+				});
+		}
+		return Array.from(map.values());
+	});
+	let canChooseDestination = $derived(
+		editor.activeTrackTarget?.kind !== 'route-path' && assignableRoutes.length > 0
+	);
+	let simplifiedPreviewCount = $derived(
+		editor.gpxImportActive && editor.draftPoints.length >= 3
+			? editor.previewSimplifyCount(tolerance)
+			: editor.draftPoints.length
+	);
+	let editableTrackName = $derived(
+		editor.trackName.startsWith('track.') ? '' : editor.trackName
+	);
+
+	$effect(() => {
+		const active = editor.gpxImportActive;
+		void editor.gpxImportRevision;
+		if (active) {
+			selectedTarget = 'crag';
+			selectedRouteRole = inferRoutePathRole(
+				untrack(() => editableTrackName),
+				'approach'
+			);
+		}
+	});
+
+	$effect(() => {
+		if (!editor.gpxImportActive) {
+			editor.setGpxApplyHandler?.(null);
+			return;
+		}
+		editor.setGpxApplyHandler?.(applyImportedTrack);
+		return () => {
+			editor.setGpxApplyHandler?.(null);
+		};
+	});
+
+	function applyImportedTrack(): boolean {
+		if (selectedTarget !== 'crag' && canChooseDestination) {
+			if (selectedTarget.startsWith('__all__::') && routeTool?.saveTrackAsRoutePaths) {
+				const documentPath = selectedTarget.slice('__all__::'.length);
+				return editor.finalizeAsRoutePath((coordinates, trackName, extraSegments) =>
+					routeTool.saveTrackAsRoutePaths(documentPath, 'all', {
+						coordinates,
+						name: trackName,
+						role: selectedRouteRole,
+						...(extraSegments?.length ? { extraSegments } : {})
+					})
+				);
+			}
+			if (selectedTarget.startsWith('route::') && routeTool?.saveTrackAsRoutePath) {
+				const key = selectedTarget.slice('route::'.length);
+				const match = assignableRoutes.find(
+					(item) => `${item.documentPath}::${item.routeId}` === key
+				);
+				if (match) {
+					return editor.finalizeAsRoutePath((coordinates, trackName, extraSegments) =>
+						routeTool.saveTrackAsRoutePath(match.documentPath, match.routeId, {
+							coordinates,
+							name: trackName,
+							role: selectedRouteRole,
+							...(extraSegments?.length ? { extraSegments } : {})
+						})
+					);
+				}
+			}
+		}
+		return editor.finalizeTrack();
+	}
 	function project(coordinate: [number, number]) {
 		if (!map) return null;
 		const point = map.project(coordinate);
@@ -152,6 +237,139 @@
 						>{$_(tool.label)}</button
 					>
 				{/each}
+			</div>
+		{/if}
+		{#if !pending && !busy}
+			<div class="flex flex-col gap-1">
+				<label
+					class="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-sm border border-creator-blue/30 bg-creator-blue/[0.06] px-3 text-[10px] font-bold uppercase tracking-widest text-creator-blue hover:bg-creator-blue/10"
+					><i class="fa-solid fa-file-import text-xs" aria-hidden="true"></i>{$_(
+						'ui.import_gpx'
+					)}<input
+						type="file"
+						accept=".gpx,application/gpx+xml"
+						class="hidden"
+						onchange={editor.handleGpxUpload}
+					/></label
+				>
+				<p class="text-center text-[10px] text-warm-gray-400">{$_('track.gpxDropMicroHint')}</p>
+			</div>
+		{/if}
+		{#if editor.gpxImportActive && editor.draftPoints.length >= 2 && !pending && !busy}
+			<div
+				class="flex flex-col gap-2 rounded-sm border border-creator-blue/25 bg-creator-blue/[0.03] p-2.5"
+			>
+				<div class="flex items-center justify-between gap-2">
+					<span class="text-ui-label text-creator-blue">
+						<i class="fa-solid fa-check-circle mr-1" aria-hidden="true"></i>{$_(
+							'track.gpxImported'
+						)}
+					</span>
+					<span class="text-[10px] font-mono text-warm-gray-500">
+						{editor.draftPoints.length}
+						{$_('track.points')}
+					</span>
+				</div>
+				<div class="flex flex-col gap-1">
+					<label for="gpx-import-name" class="text-[10px] font-semibold text-warm-gray-500"
+						>{$_('track.trackNameLabel')}</label
+					>
+					<input
+						id="gpx-import-name"
+						type="text"
+						class="input-studio w-full bg-white"
+						value={editableTrackName}
+						placeholder={$_('track.trackNamePlaceholder')}
+						oninput={(event) => editor.setTrackName(event.currentTarget.value)}
+					/>
+				</div>
+				{#if canChooseDestination}
+					<div class="flex flex-col gap-1">
+						<label
+							for="gpx-import-destination"
+							class="text-[10px] font-semibold text-warm-gray-500">{$_('track.assignTarget')}</label
+						>
+						<select
+							id="gpx-import-destination"
+							class="input-studio w-full bg-white"
+							bind:value={selectedTarget}
+						>
+							<option value="crag">{$_('track.assignAsCragApproach')}</option>
+							{#each assignableDocuments.filter((doc) => doc.count > 1) as doc}
+								<option value={`__all__::${doc.documentPath}`}>
+									{$_('editor.assign_all_routes_count', { values: { count: doc.count } })}{doc.sectorName
+										? ` · ${doc.sectorName}`
+										: ''}
+								</option>
+							{/each}
+							{#each assignableRoutes as item}
+								<option value={`route::${item.documentPath}::${item.routeId}`}>
+									{item.routeName}{item.grade ? ` (${item.grade})` : ''}{item.sectorName
+										? ` · ${item.sectorName}`
+										: ''}
+								</option>
+							{/each}
+						</select>
+					</div>
+					{#if selectedTarget !== 'crag'}
+						<div class="flex flex-col gap-0.5">
+							<label for="gpx-import-role" class="text-[10px] font-semibold text-warm-gray-500"
+								>{$_('track.selectRole')}</label
+							>
+							<select
+								id="gpx-import-role"
+								class="input-studio w-full bg-white"
+								bind:value={selectedRouteRole}
+							>
+								{#each ROUTE_PATH_ROLES as roleMeta}
+									<option value={roleMeta.id}>{$_(roleMeta.labelKey)}</option>
+								{/each}
+							</select>
+						</div>
+					{/if}
+				{/if}
+				{#if simplifiedPreviewCount < editor.draftPoints.length}
+					<div class="flex items-center gap-1.5">
+						<button
+							type="button"
+							class={`${button} flex-1 !border-creator-blue/30 !text-creator-blue`}
+							onclick={() => {
+								editor.clearTrackSelection();
+								simplify();
+							}}
+						>
+							<i class="fa-solid fa-wand-magic-sparkles mr-1 text-[10px]" aria-hidden="true"></i>
+							{$_('track.simplifyPreview', {
+								values: { before: editor.draftPoints.length, after: simplifiedPreviewCount }
+							})}
+						</button>
+						<input
+							aria-label={$_('track.tolerance')}
+							title={$_('track.tolerance')}
+							class="input-studio w-14 bg-white text-center font-mono"
+							type="number"
+							min="1"
+							bind:value={tolerance}
+						/>
+					</div>
+				{/if}
+				<div class="flex flex-col gap-1 pt-1">
+					<button
+						type="button"
+						class="btn-pill h-8 w-full justify-center gap-1.5 text-[11px]"
+						onclick={applyImportedTrack}
+					>
+						<i class="fa-solid fa-check" aria-hidden="true"></i>
+						{$_('track.applyTrack')}
+					</button>
+					<button
+						type="button"
+						class={`${button} w-full`}
+						onclick={editor.dismissGpxImportPrompt}
+					>
+						{$_('track.editPointsInstead')}
+					</button>
+				</div>
 			</div>
 		{/if}
 		<p class="text-[10px] text-warm-gray-400" aria-live="polite">{$_(instruction)}</p>
@@ -366,17 +584,6 @@
 						class={button}
 						onclick={() => editor.fitTrackBounds()}
 						disabled={!editor.draftPoints.length}>{$_('track.fit')}</button
-					>
-					<label
-						class="flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-sm border border-black/15 bg-warm-white px-3 text-[10px] font-bold uppercase tracking-widest text-creator-blue hover:bg-black/5"
-						><i class="fa-solid fa-file-import text-xs" aria-hidden="true"></i>{$_(
-							'ui.import_gpx'
-						)}<input
-							type="file"
-							accept=".gpx,application/gpx+xml"
-							class="hidden"
-							onchange={editor.handleGpxUpload}
-						/></label
 					>
 					{#if editor.activeTrackTarget?.kind !== 'route-path'}<button
 							class={button}

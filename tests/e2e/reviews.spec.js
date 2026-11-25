@@ -110,7 +110,12 @@ test('anonymous submission opens as a separate reviewer draft and retries cleanu
 	await expect(page.getByRole('dialog')).not.toBeVisible();
 	expect(writes).toEqual([]);
 	await page.getByRole('button', { name: 'Submit for review', exact: true }).click();
-	await expect(page.getByRole('status')).toContainText('Submitted for review.');
+	const submitDialog = page.getByRole('dialog');
+	await expect(submitDialog).toBeVisible();
+	await submitDialog.getByRole('button', { name: 'Submit now', exact: true }).click();
+	await expect(submitDialog.getByRole('status')).toContainText('Submitted for review.');
+	await submitDialog.getByRole('button', { name: 'Continue editing', exact: true }).click();
+	await expect(submitDialog).not.toBeVisible();
 	expect(writes).toEqual([]);
 	const zip = await JSZip.loadAsync(archive);
 	const manifest = JSON.parse(await zip.file('review.json').async('string'));

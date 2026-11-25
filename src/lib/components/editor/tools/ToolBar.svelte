@@ -197,7 +197,10 @@
 			{#if save}
 				{#if draft}
 					<ReviewActions
-						disabled={Boolean(finish && !finish.disabled) || save.status === 'saving'}
+						disabled={save.status === 'saving'}
+						onBeforeSubmit={finish && !finish.disabled && draft.mode !== 'crag'
+							? () => finish?.run?.()
+							: undefined}
 						onSave={() => runAction(save, { finish, cancel })}
 						saveDisabled={save.disabled || save.status === 'saving'}
 						saveStatus={save.status}

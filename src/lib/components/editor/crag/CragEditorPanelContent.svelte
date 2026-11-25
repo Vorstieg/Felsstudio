@@ -52,6 +52,14 @@
 		geometry: activeWorkspace?.entry?.geometry
 	});
 	let isPolygonEntry = $derived(activeWorkspace?.entry?.geometry?.type === 'Polygon');
+	let registryCount = $derived.by(() => {
+		const accessCount = cragEditorState.getWorkspaceAccess()?.features?.length || 0;
+		const topoPathCount = [activeWorkspace, ...(activeWorkspace?.childEntries || [])].reduce(
+			(sum, node) => sum + (node?.topo?.paths?.features?.length || 0),
+			0
+		);
+		return accessCount + topoPathCount;
+	});
 </script>
 
 {#if showTabs}
@@ -77,9 +85,7 @@
 		>
 			<i class="fa-solid fa-layer-group mr-1.5"></i>
 			{$_('editor.registry')}
-			<span class="ml-1 text-micro-data"
-				>{cragEditorState.getWorkspaceAccess()?.features?.length || 0}</span
-			>
+			<span class="ml-1 text-micro-data">{registryCount}</span>
 		</button>
 		<button
 			class="flex-1 px-2 py-1.5 rounded-sm text-ui-label transition-none {activeTab === 'sectors'

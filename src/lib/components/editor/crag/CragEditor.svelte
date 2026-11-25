@@ -55,6 +55,7 @@
 	} from '$lib/components/editor/crag/crag-editor-map.ts';
 	import type { FlightPlan } from '$lib/assets/js/flight-plan-types.ts';
 	import { buildEditorFeatureCollection } from '$lib/components/editor/crag/crag-editor-data.ts';
+	import { getPrimaryPathRole } from '$lib/components/editor/crag/route-path-roles.ts';
 	import { getMapHitRadius, getMapMarkerSize } from '$lib/assets/js/mobile-utils.ts';
 	import { createRouteEditController } from './route-editing.ts';
 	import { getGeometryCenter } from '$lib/assets/js/sector-utils.ts';
@@ -289,6 +290,22 @@
 		mode: 'crag',
 		entryPath: untrack(() => entryPath),
 		adapter: cragDraftAdapter(cragEditorState),
+		prepareTrackForReview: () => {
+			if (!trackEditor.sessionActive) return { autoFinalizedTrack: false };
+			const hadValidChanges = trackEditor.isDirty && trackEditor.currentTrackPoints.length >= 2;
+			if (trackEditor.requestLeave(() => {})) {
+				return { autoFinalizedTrack: hadValidChanges };
+			}
+			return {
+				autoFinalizedTrack: false,
+				blockedMessage: trackEditor.message
+					? $_(trackEditor.message)
+					: $_('track.completeOperation'),
+				discardTrack: () => {
+					trackEditor.cancelTrackEdit();
+				}
+			};
+		},
 		beforeReview: () => {
 			if (!trackEditor.requestLeave(() => {})) throw new Error($_(trackEditor.message));
 			if (cragEditorState.hierarchyErrors.length)
@@ -506,6 +523,7 @@
 						documentPath: document.path,
 						pathIndex,
 						feature,
+						role: getPrimaryPathRole(document.data, feature),
 						assignedRouteIds: (document.data?.routes || [])
 							.filter((route) =>
 								(route.pathRefs || []).some((ref) => String(ref.pathId) === String(feature.id))
@@ -696,6 +714,7 @@
 		initialCoordinates={$state.snapshot(getGeometryCenter(activeEntry?.geometry) || [0, 0])}
 		onStyleLoad={initMarkersAndLayers}
 		onMapClick={handleMapClick}
+		onGpxFileDrop={(file) => void trackEditor.importGpxFile(file)}
 	/>
 
 	<CragEditorLayout

@@ -15,6 +15,7 @@ type RoutePathItem = {
 	pathIndex: number;
 	feature: PathFeature;
 	assignedRouteIds?: Array<string | number>;
+	role?: string;
 };
 
 type EditorFeatureProperties = Record<string, unknown>;
@@ -75,36 +76,39 @@ export function buildEditorFeatureCollection({
 				}
 			});
 		});
-	routePaths.forEach(({ documentPath, pathIndex, feature, assignedRouteIds = [] }) => {
-		if (
-			editingRoutePath?.documentPath === documentPath &&
-			editingRoutePath?.pathId === String(feature.id)
-		)
-			return;
-		if (
-			!feature?.geometry ||
-			feature.geometry.type !== 'LineString' ||
-			feature.geometry.coordinates?.length < 2
-		)
-			return;
-		features.push({
-			type: 'Feature',
-			geometry: feature.geometry as Geometry,
-			properties: {
-				feature: 'route-path',
-				documentPath,
-				pathId: String(feature.id),
-				pathIndex,
-				assignedRouteIds,
-				name: (feature.properties as { name?: string } | undefined)?.name || 'Route path',
-				selected:
-					selectedObject?.type === 'route-path' &&
-					selectedObject.documentPath === documentPath &&
-					String(selectedObject.pathId) === String(feature.id) &&
-					(selectedObject.pathIndex == null || Number(selectedObject.pathIndex) === pathIndex)
-			}
-		});
-	});
+	routePaths.forEach(
+		({ documentPath, pathIndex, feature, assignedRouteIds = [], role = 'main' }) => {
+			if (
+				editingRoutePath?.documentPath === documentPath &&
+				editingRoutePath?.pathId === String(feature.id)
+			)
+				return;
+			if (
+				!feature?.geometry ||
+				feature.geometry.type !== 'LineString' ||
+				feature.geometry.coordinates?.length < 2
+			)
+				return;
+			features.push({
+				type: 'Feature',
+				geometry: feature.geometry as Geometry,
+				properties: {
+					feature: 'route-path',
+					documentPath,
+					pathId: String(feature.id),
+					pathIndex,
+					assignedRouteIds,
+					role: role || 'main',
+					name: (feature.properties as { name?: string } | undefined)?.name || 'Route path',
+					selected:
+						selectedObject?.type === 'route-path' &&
+						selectedObject.documentPath === documentPath &&
+						String(selectedObject.pathId) === String(feature.id) &&
+						(selectedObject.pathIndex == null || Number(selectedObject.pathIndex) === pathIndex)
+				}
+			});
+		}
+	);
 	if (joinPreview) {
 		features.push({
 			type: 'Feature',

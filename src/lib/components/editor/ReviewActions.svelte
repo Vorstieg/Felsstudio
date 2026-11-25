@@ -2,18 +2,22 @@
 	import { base } from '$app/paths';
 	import { _ } from 'svelte-i18n';
 	import SharedDraftNavigation from './SharedDraftNavigation.svelte';
+	import ReviewSubmitModal from './ReviewSubmitModal.svelte';
+	import type { ReviewSubmissionPreview } from './review-submission-summary';
 	import SaveStatus from '$lib/components/ui/SaveStatus.svelte';
 	import LanguageSwitcher from '$lib/components/ui/LanguageSwitcher.svelte';
 	import { getDraftEditor } from './use-draft-editor.svelte';
 	import { authState } from '$lib/api/auth.svelte';
 	let {
 		disabled = false,
+		onBeforeSubmit,
 		onSave,
 		saveDisabled = false,
 		saveStatus = 'idle',
 		saveError = ''
 	}: {
 		disabled?: boolean;
+		onBeforeSubmit?: () => void;
 		onSave?: () => void;
 		saveDisabled?: boolean;
 		saveStatus?: 'idle' | 'saving' | 'success' | 'error';
@@ -31,6 +35,14 @@
 	const draft = getDraftEditor();
 	let error = $state('');
 	let message = $state('');
+	let modalOpen = $state(false);
+	let modalLoading = $state(false);
+	let modalSubmitted = $state(false);
+	let modalError = $state('');
+	let modalPreview = $state<ReviewSubmissionPreview | null>(null);
+	let discardPendingTrack = $state<(() => void) | null>(null);
+	let previewRequestId = 0;
+
 	$effect(() => {
 		if (!message) return;
 		const timeout = setTimeout(() => {
@@ -46,6 +58,62 @@
 	function showReviewPopover(node: HTMLElement) {
 		node.showPopover();
 	}
+	async function loadSubmissionPreview() {
+		if (!draft) return;
+		const requestId = ++previewRequestId;
+		modalLoading = true;
+		modalError = '';
+		discardPendingTrack = null;
+		try {
+			const { preview, discardTrack } = await draft.previewReview();
+			if (requestId !== previewRequestId || !modalOpen) return;
+			modalPreview = preview;
+			discardPendingTrack = discardTrack || null;
+		} catch (cause) {
+			if (requestId !== previewRequestId || !modalOpen) return;
+			modalPreview = null;
+			modalError = cause instanceof Error ? cause.message : String(cause);
+		} finally {
+			if (requestId === previewRequestId) {
+				modalLoading = false;
+			}
+		}
+	}
+	async function openSubmitModal() {
+		if (!draft || draft.busy) return;
+		onBeforeSubmit?.();
+		error = '';
+		message = '';
+		modalSubmitted = false;
+		modalOpen = true;
+		await loadSubmissionPreview();
+	}
+	function closeSubmitModal() {
+		if (draft?.busy) return;
+		previewRequestId += 1;
+		modalOpen = false;
+		modalLoading = false;
+		modalSubmitted = false;
+		modalError = '';
+		modalPreview = null;
+		discardPendingTrack = null;
+	}
+	async function handleDiscardTrack() {
+		discardPendingTrack?.();
+		await loadSubmissionPreview();
+	}
+	async function confirmSubmission() {
+		if (!draft || draft.busy) return;
+		modalError = '';
+		try {
+			const result = await draft.submitReview();
+			if (result) {
+				modalSubmitted = true;
+			}
+		} catch (cause) {
+			modalError = cause instanceof Error ? cause.message : String(cause);
+		}
+	}
 	async function run(publish = false) {
 		if (!draft || draft.busy) return;
 		if (publish && !authState.requireAuth()) return;
@@ -53,13 +121,11 @@
 		message = '';
 		try {
 			if (publish) {
+				if (!draft.reviewProductionSaved) onBeforeSubmit?.();
 				const done = await draft.publishReview();
 				if (done) message = $_('editor.review_published');
 			} else {
-				const result = await draft.submitReview();
-				if (result) {
-					message = $_('editor.submitted_for_review');
-				}
+				await openSubmitModal();
 			}
 		} catch (cause) {
 			error = cause instanceof Error ? cause.message : String(cause);
@@ -281,5 +347,16 @@
 				</footer>
 			</section>
 		{/if}
+		<ReviewSubmitModal
+			open={modalOpen}
+			loading={modalLoading}
+			submitting={draft.busy}
+			submitted={modalSubmitted}
+			preview={modalPreview}
+			error={modalError}
+			onConfirm={confirmSubmission}
+			onCancel={closeSubmitModal}
+			onDiscardTrack={discardPendingTrack ? handleDiscardTrack : null}
+		/>
 	</div>
 {/if}
