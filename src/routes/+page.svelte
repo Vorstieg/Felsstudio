@@ -3,6 +3,7 @@
 	import { _ } from 'svelte-i18n';
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
+	import { authState } from '$lib/api/auth.svelte.ts';
 	import { draftsState, type DraftMetadata } from '$lib/state/drafts.svelte.ts';
 	import LanguageSwitcher from '$lib/components/ui/LanguageSwitcher.svelte';
 	import SessionInfo from '$lib/components/ui/SessionInfo.svelte';
@@ -172,35 +173,39 @@
 			</div>
 		</section>
 
-		<section class="mt-8" aria-label={$_('editor.workflows')}>
-			<p class="text-ui-label mb-3">{$_('editor.workflows')}</p>
-			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-				{#each workflows as workflow}
-					<a
-						href={`${base}/${workflow.href}`}
-						class="panel group flex items-center gap-4 p-4 text-left transition-colors hover:border-creator-blue/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-creator-blue"
-					>
-						<div
-							class="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border border-black/10 bg-warm-white text-warm-gray-600 transition-none group-hover:border-creator-blue/30 group-hover:bg-creator-blue/10 group-hover:text-creator-blue"
+		{#if authState.user}
+			<section class="mt-8" aria-label={$_('editor.workflows')}>
+				<p class="text-ui-label mb-3">{$_('editor.workflows')}</p>
+				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+					{#each workflows as workflow}
+						<a
+							href={`${base}/${workflow.href}`}
+							class="panel group flex items-center gap-4 p-4 text-left transition-colors hover:border-creator-blue/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-creator-blue"
 						>
-							<i class="fa-solid {workflow.icon}" aria-hidden="true"></i>
-						</div>
-						<div class="min-w-0 flex-1">
-							<h3 class="text-body-text font-semibold text-near-black group-hover:text-creator-blue">
-								{$_(workflow.name)}
-							</h3>
-							<p class="text-micro-data text-warm-gray-500 mt-0.5 leading-snug">
-								{$_(workflow.description)}
-							</p>
-						</div>
-						<i
-							class="fa-solid fa-chevron-right text-xs text-warm-gray-300 transition-colors group-hover:text-creator-blue"
-							aria-hidden="true"
-						></i>
-					</a>
-				{/each}
-			</div>
-		</section>
+							<div
+								class="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border border-black/10 bg-warm-white text-warm-gray-600 transition-none group-hover:border-creator-blue/30 group-hover:bg-creator-blue/10 group-hover:text-creator-blue"
+							>
+								<i class="fa-solid {workflow.icon}" aria-hidden="true"></i>
+							</div>
+							<div class="min-w-0 flex-1">
+								<h3
+									class="text-body-text font-semibold text-near-black group-hover:text-creator-blue"
+								>
+									{$_(workflow.name)}
+								</h3>
+								<p class="text-micro-data text-warm-gray-500 mt-0.5 leading-snug">
+									{$_(workflow.description)}
+								</p>
+							</div>
+							<i
+								class="fa-solid fa-chevron-right text-xs text-warm-gray-300 transition-colors group-hover:text-creator-blue"
+								aria-hidden="true"
+							></i>
+						</a>
+					{/each}
+				</div>
+			</section>
+		{/if}
 
 		{#if draftsState.drafts.length > 0}
 			<section class="mt-10 border-t border-black/10 pt-8" aria-label={$_('ui.resume_sessions')}>

@@ -399,6 +399,82 @@ export function useCragGeometryEditor({
 		});
 	}
 
+	function handleMapClick(event: MapMouseEvent) {
+		if (getActiveTool() !== 'geometry') return false;
+		const coordinate = eventCoordinate(event);
+		if (!coordinate || !coordinate.every(Number.isFinite)) return false;
+		const target = activeTarget();
+		const geometry = activeGeometry();
+		if (!geometry || geometry.type === 'Point') {
+			state.commitGeometry(
+				target,
+				{ type: 'Point', coordinates: coordinate },
+				'Move point geometry'
+			);
+			selectedVertex = null;
+			syncDrawing();
+			return true;
+		}
+		if (isAreaGeometry(geometry) && selectedVertex) {
+			selectedVertex = null;
+			syncDrawing();
+			return true;
+		}
+		return false;
+	}
+
+	function beginTranslateDrag() {
+		const target = activeTarget();
+		const geometry = activeGeometry();
+		if (!geometry) return false;
+		dragState = {
+			target,
+			geometry: cloneGeoJsonGeometry(geometry),
+			kind: geometry.type === 'Point' ? 'point' : 'center',
+			polygonIndex: 0,
+			vertexIndex: -1
+		};
+		previewGeometry = dragState.geometry;
+		syncDrawing();
+		return true;
+	}
+
+	function updateTranslateDrag(coordinate: Point2D) {
+		if (!dragState || !coordinate.every(Number.isFinite)) return;
+		previewGeometry = translateGeometryTo(dragState.geometry, coordinate);
+		syncDrawing();
+	}
+
+	function commitTranslateDrag(coordinate: Point2D) {
+		if (!dragState) {
+			const target = activeTarget();
+			const geometry = activeGeometry();
+			if (!geometry || !coordinate.every(Number.isFinite)) return false;
+			state.commitGeometry(
+				target,
+				translateGeometryTo(geometry, coordinate),
+				geometry.type === 'Point' ? 'Move point geometry' : 'Translate polygon geometry'
+			);
+			syncDrawing();
+			return true;
+		}
+		if (coordinate.every(Number.isFinite)) {
+			previewGeometry = translateGeometryTo(dragState.geometry, coordinate);
+		}
+		commitPreview();
+		previewGeometry = null;
+		dragState = null;
+		syncDrawing();
+		return true;
+	}
+
+	function cancelTranslateDrag() {
+		if (!dragState) return;
+		previewGeometry = null;
+		dragState = null;
+		syncDrawing();
+	}
+
 	function deleteSelectedVertex() {
 		const target = activeTarget();
 		if (getActiveTool() !== 'geometry' || !selectedVertex) return false;
@@ -469,6 +545,11 @@ export function useCragGeometryEditor({
 		ensureMapLayers,
 		initHandlers,
 		syncDrawing,
+		handleMapClick,
+		beginTranslateDrag,
+		updateTranslateDrag,
+		commitTranslateDrag,
+		cancelTranslateDrag,
 		deleteSelectedVertex,
 		clearSelection,
 		focusTarget,

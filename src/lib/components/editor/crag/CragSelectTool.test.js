@@ -19,6 +19,7 @@ function fixture(features, overrides = {}) {
 		setActiveTab: vi.fn(),
 		onEditTrack: vi.fn(),
 		onEditRoutePath: vi.fn(),
+		onEditGeometry: vi.fn(),
 		...overrides
 	};
 	return { tool: createCragSelectTool(options), ...options };
@@ -105,22 +106,45 @@ describe('global Select tool track editing', () => {
 		expect(selectObject).toHaveBeenCalledOnce();
 	});
 
-	it('continues to select sectors without entering track editing', () => {
-		const { tool, selectObject, setActiveTab, onEditTrack, onEditRoutePath } = fixture([
-			{ properties: { feature: 'child-entry', path: 'crags/sector' } }
-		]);
+	it('selects sectors and enters geometry editing without entering track editing', () => {
+		const { tool, selectObject, setActiveTab, onEditTrack, onEditRoutePath, onEditGeometry } =
+			fixture([{ properties: { feature: 'child-entry', path: 'crags/sector' } }]);
 		tool.handleMapClick(event);
 		expect(selectObject).toHaveBeenCalledWith({ type: 'entry', key: 'crags/sector' });
 		expect(setActiveTab).toHaveBeenCalledWith('info');
+		expect(onEditGeometry).toHaveBeenCalledWith('crags/sector');
 		expect(onEditTrack).not.toHaveBeenCalled();
 		expect(onEditRoutePath).not.toHaveBeenCalled();
 	});
 
+	it('enters geometry editing when clicking the active crag polygon or display point', () => {
+		for (const handle of ['polygon', 'display-point']) {
+			const { tool, selectObject, setActiveTab, onEditGeometry } = fixture([
+				{ properties: { handle } }
+			]);
+			expect(tool.handleMapClick(event)).toBe(true);
+			expect(selectObject).not.toHaveBeenCalled();
+			expect(setActiveTab).toHaveBeenCalledWith('info');
+			expect(onEditGeometry).toHaveBeenCalledOnce();
+		}
+	});
+
+	it('prefers a child sector over the parent crag polygon', () => {
+		const { tool, selectObject, onEditGeometry } = fixture([
+			{ properties: { handle: 'polygon' } },
+			{ properties: { feature: 'child-entry', path: 'crags/sector' } }
+		]);
+		tool.handleMapClick(event);
+		expect(selectObject).toHaveBeenCalledWith({ type: 'entry', key: 'crags/sector' });
+		expect(onEditGeometry).toHaveBeenCalledWith('crags/sector');
+	});
+
 	it('clears selection on empty map space without starting an edit', () => {
-		const { tool, selectObject, onEditTrack, onEditRoutePath } = fixture([]);
+		const { tool, selectObject, onEditTrack, onEditRoutePath, onEditGeometry } = fixture([]);
 		tool.handleMapClick(event);
 		expect(selectObject).toHaveBeenCalledWith(null);
 		expect(onEditTrack).not.toHaveBeenCalled();
 		expect(onEditRoutePath).not.toHaveBeenCalled();
+		expect(onEditGeometry).not.toHaveBeenCalled();
 	});
 });

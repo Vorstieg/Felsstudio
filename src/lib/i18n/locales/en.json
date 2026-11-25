@@ -943,6 +943,8 @@
 		"move_this_geometry_to_the_current_center_of_the_map": "Move this geometry to the current center of the map",
 		"move_to_map_center": "Move to map center",
 		"pan_to_the_destination_then_move_the_entire_geometry_there": "Pan to the destination, then move the entire geometry there.",
+		"click_map_or_drag_pin_to_place": "Click on the map or drag the pin to set the position directly.",
+		"drag_handles_or_pin_to_adjust_area": "Drag vertices, midpoints, or the center pin to adjust the area.",
 		"longitude": "Longitude",
 		"latitude": "Latitude",
 		"delete_selected_vertex": "Delete selected vertex",

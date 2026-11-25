@@ -302,4 +302,77 @@ describe('geometry editor overlay', () => {
 		expect(map.getSource).toHaveBeenCalledTimes(1);
 		vi.unstubAllGlobals();
 	});
+
+	it('places a point geometry directly on map click in geometry mode', () => {
+		let activeTool = 'select';
+		const state = {
+			activeMetadataTarget: 'austria/test-crag',
+			getMetadataTarget: () => ({ geometry: { type: 'Point', coordinates: [16.37, 48.21] } }),
+			commitGeometry: vi.fn()
+		};
+		const editor = useCragGeometryEditor({
+			state,
+			getMap: () => null,
+			getActiveTool: () => activeTool
+		});
+
+		expect(editor.handleMapClick({ lngLat: { lng: 11.4, lat: 47.26 } })).toBe(false);
+		expect(state.commitGeometry).not.toHaveBeenCalled();
+
+		activeTool = 'geometry';
+		expect(editor.handleMapClick({ lngLat: { lng: 11.4, lat: 47.26 } })).toBe(true);
+		expect(state.commitGeometry).toHaveBeenCalledWith(
+			'austria/test-crag',
+			{ type: 'Point', coordinates: [11.4, 47.26] },
+			'Move point geometry'
+		);
+	});
+
+	it('does not teleport a polygon on map click and supports translating via marker drag', () => {
+		const polygon = {
+			type: 'Polygon',
+			coordinates: [
+				[
+					[10, 20],
+					[12, 20],
+					[12, 22],
+					[10, 22],
+					[10, 20]
+				]
+			]
+		};
+		const state = {
+			activeMetadataTarget: 'austria/test-area',
+			getMetadataTarget: () => ({ geometry: polygon }),
+			commitGeometry: vi.fn()
+		};
+		const editor = useCragGeometryEditor({
+			state,
+			getMap: () => null,
+			getActiveTool: () => 'geometry'
+		});
+
+		expect(editor.handleMapClick({ lngLat: { lng: 15, lat: 25 } })).toBe(false);
+		expect(state.commitGeometry).not.toHaveBeenCalled();
+
+		expect(editor.beginTranslateDrag()).toBe(true);
+		editor.updateTranslateDrag([15, 25]);
+		expect(editor.commitTranslateDrag([16, 26])).toBe(true);
+		expect(state.commitGeometry).toHaveBeenCalledWith(
+			'austria/test-area',
+			{
+				type: 'Polygon',
+				coordinates: [
+					[
+						[15, 25],
+						[17, 25],
+						[17, 27],
+						[15, 27],
+						[15, 25]
+					]
+				]
+			},
+			'Translate polygon geometry'
+		);
+	});
 });

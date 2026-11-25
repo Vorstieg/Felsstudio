@@ -13,6 +13,7 @@
 		isMapLoaded?: boolean;
 		mapStyle?: MapStyle;
 		initialCoordinates?: Point2D;
+		pointPlacementMode?: boolean;
 		onStyleLoad?: (_map: MapLibreMap) => void;
 		onMapClick?: (_event: MapMouseEvent) => void;
 		onGpxFileDrop?: (_file: File) => void;
@@ -23,6 +24,7 @@
 		isMapLoaded = $bindable(false),
 		mapStyle = 'terrain',
 		initialCoordinates = [0, 0] as Point2D,
+		pointPlacementMode = false,
 		onStyleLoad = () => {},
 		onMapClick = () => {},
 		onGpxFileDrop
@@ -129,7 +131,7 @@
 </script>
 
 <div
-	class="h-screen w-screen absolute overflow-hidden bg-warm-white"
+	class={`h-screen w-screen absolute overflow-hidden bg-warm-white ${pointPlacementMode ? 'point-placement-mode' : ''}`}
 	role="region"
 	aria-label={$_('editor.map_canvas')}
 	ondragenter={handleDragEnter}
@@ -157,3 +159,9 @@
 		</div>
 	{/if}
 </div>
+
+<style>
+	.point-placement-mode :global(.maplibregl-canvas-container.maplibregl-interactive) {
+		cursor: crosshair;
+	}
+</style>

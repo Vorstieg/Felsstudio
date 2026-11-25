@@ -89,7 +89,11 @@
 			</button>
 		</div>
 		<p class="mt-1 text-micro-data text-warm-gray-400">
-			{$_('editor.pan_to_the_destination_then_move_the_entire_geometry_there')}
+			{$_(
+				isArea
+					? 'editor.drag_handles_or_pin_to_adjust_area'
+					: 'editor.click_map_or_drag_pin_to_place'
+			)}
 		</p>
 		<div class="mt-2 grid grid-cols-2 gap-2">
 			<div>

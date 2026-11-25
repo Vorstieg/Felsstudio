@@ -944,6 +944,8 @@
 		"move_this_geometry_to_the_current_center_of_the_map": "Diese Lage zum aktuellen Kartenmittelpunkt verschieben",
 		"move_to_map_center": "Zum Kartenmittelpunkt verschieben",
 		"pan_to_the_destination_then_move_the_entire_geometry_there": "Verschiebe die Karte zum Ziel und versetze dann die gesamte Geometrie dorthin.",
+		"click_map_or_drag_pin_to_place": "Klicke auf die Karte oder ziehe den Marker, um die Position direkt zu setzen.",
+		"drag_handles_or_pin_to_adjust_area": "Ziehe Eckpunkte, Mittelpunkte oder den Marker, um die Fläche anzupassen.",
 		"longitude": "Längengrad",
 		"latitude": "Breitengrad",
 		"delete_selected_vertex": "Ausgewählten Eckpunkt löschen",

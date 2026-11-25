@@ -20,6 +20,7 @@ type CragSelectToolOptions = {
 		pathIndex?: number
 	) => void;
 	onEditTrack?: (featureId: string) => void;
+	onEditGeometry?: (path?: string) => void;
 };
 
 /** Owns crag-object hit testing and selection changes. */
@@ -29,7 +30,8 @@ export function createCragSelectTool({
 	setActiveTab,
 	getRouteDocuments,
 	onEditRoutePath,
-	onEditTrack
+	onEditTrack,
+	onEditGeometry
 }: CragSelectToolOptions) {
 	function querySelectableFeatures(event: MapMouseEvent, pathsOnly = false): SelectableFeature[] {
 		return queryCragFeatures(getMap(), event.point, pathsOnly);
@@ -41,11 +43,15 @@ export function createCragSelectTool({
 			return props?.feature === 'route-path' || props?.kind === 'approach';
 		});
 		if (pathFeature || pathsOnly) return pathFeature;
-		return (
-			features.find(
-				({ properties }) => (properties as SelectableProperties | null)?.feature === 'child-entry'
-			) || features[0]
+		const childFeature = features.find(
+			({ properties }) => (properties as SelectableProperties | null)?.feature === 'child-entry'
 		);
+		if (childFeature) return childFeature;
+		const geometryFeature = features.find(({ properties }) => {
+			const handle = (properties as SelectableProperties | null)?.handle;
+			return handle === 'display-point' || handle === 'polygon';
+		});
+		return geometryFeature || features[0];
 	}
 
 	function routeForPath(documentPath: string, pathId: string | number) {
@@ -94,6 +100,12 @@ export function createCragSelectTool({
 		if (properties.feature === 'child-entry' && properties.path) {
 			selectObject({ type: 'entry', key: properties.path });
 			setActiveTab?.('info');
+			onEditGeometry?.(properties.path);
+			return true;
+		}
+		if (properties.handle === 'polygon' || properties.handle === 'display-point') {
+			setActiveTab?.('info');
+			onEditGeometry?.();
 			return true;
 		}
 		return false;

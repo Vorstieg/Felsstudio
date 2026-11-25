@@ -120,6 +120,8 @@
 	let routeEditDraft = $state<RoutePathDraft | null>(null);
 	let areTrackViewportSyncHandlersReady = false;
 	let suppressNextMapClick = false;
+	let cragMarkerDragging = false;
+	let cragMarkerDragged = false;
 
 	const trackEditor = useCragTrackEditor({
 		persistence: createCragTrackPersistence(cragEditorState, {
@@ -193,6 +195,12 @@
 		routeEditController.selectObject(value);
 	}
 
+	function enterGeometryTool() {
+		geometryEditor?.clearSelection();
+		activeTool = 'geometry';
+		toolOptionsOpen = true;
+	}
+
 	async function selectMetadataTarget(
 		target: string | null,
 		{ focus = true, edit = false }: { focus?: boolean; edit?: boolean } = {}
@@ -200,7 +208,10 @@
 		if (!target) return;
 		await selectObject({ type: 'entry', key: target });
 		geometryEditor?.clearSelection();
-		if (edit) activeTool = 'geometry';
+		if (edit) {
+			activeTool = 'geometry';
+			toolOptionsOpen = true;
+		}
 		if (focus) geometryEditor?.focusTarget(target);
 	}
 
@@ -258,7 +269,8 @@
 		getMap: () => map,
 		getSelection: () => selectedObject,
 		selectObject,
-		setActiveTab: (value) => (activeTab = value)
+		setActiveTab: (value) => (activeTab = value),
+		onEditGeometry: enterGeometryTool
 	});
 	const syncSectorMarkers = () => sectorMarkers.sync();
 
@@ -283,7 +295,8 @@
 		setActiveTab: (value) => (activeTab = value),
 		getRouteDocuments: () => workspaceTopos,
 		onEditRoutePath: (path, routeId, pathId) => routeTool.editRoutePath(path, routeId, pathId),
-		onEditTrack: editTrack
+		onEditTrack: editTrack,
+		onEditGeometry: enterGeometryTool
 	});
 
 	const draft = useDraftEditor({
@@ -313,6 +326,11 @@
 		},
 		onReady: () => {
 			selectedObject = { type: 'entry', key: cragEditorState.activeWorkspaceEntryPath! };
+			const workspace = cragEditorState.getActiveWorkspaceEntry();
+			if (!entryPath && !workspace?.sourcePath && !workspace?.entry?.properties?.name) {
+				activeTool = 'geometry';
+				toolOptionsOpen = isExpanded;
+			}
 		}
 	});
 
@@ -357,6 +375,11 @@
 
 		if (activeTool === 'select') {
 			selectTool.handleMapClick(e);
+			return;
+		}
+
+		if (activeTool === 'geometry') {
+			geometryEditor.handleMapClick(e);
 			return;
 		}
 
@@ -418,11 +441,16 @@
 		syncEditorData();
 		JSON.stringify(cragEditorState.activeMetadataTarget);
 		JSON.stringify(cragEditorState.getMetadataTarget()?.geometry || null);
-		activeTool;
+		const tool = activeTool;
 		untrack(() => {
 			geometryEditor.syncDrawing();
 			const currentCenter = getGeometryCenter(activeEntry?.geometry);
-			if (cragMarker && currentCenter) cragMarker.setLngLat(currentCenter);
+			if (cragMarker) {
+				if (currentCenter && !cragMarkerDragging) cragMarker.setLngLat(currentCenter);
+				cragMarker.setDraggable(tool === 'geometry');
+				cragMarker.getElement().classList.toggle('cursor-grab', tool === 'geometry');
+				cragMarker.getElement().classList.toggle('cursor-pointer', tool !== 'geometry');
+			}
 		});
 	});
 
@@ -482,18 +510,45 @@
 		if (cragMarker) cragMarker.remove();
 		cragMarker = new maplibregl.Marker({
 			element: createIconMarkerElement({
-				className: 'crag-marker cursor-pointer',
+				className: `crag-marker ${activeTool === 'geometry' ? 'cursor-grab' : 'cursor-pointer'}`,
 				iconUrl: `${base}/icons/sports-climbing.png`,
 				size: getMapMarkerSize(32)
 			}),
-			draggable: false
+			draggable: activeTool === 'geometry'
 		})
 			.setLngLat(markerPos)
 			.addTo(loadedMap);
+		cragMarker.on('dragstart', () => {
+			cragMarkerDragging = true;
+			cragMarkerDragged = true;
+			geometryEditor.beginTranslateDrag();
+		});
+		cragMarker.on('drag', () => {
+			if (!cragMarker) return;
+			const pos = cragMarker.getLngLat();
+			geometryEditor.updateTranslateDrag([pos.lng, pos.lat]);
+		});
+		cragMarker.on('dragend', () => {
+			if (!cragMarker) return;
+			const pos = cragMarker.getLngLat();
+			geometryEditor.commitTranslateDrag([pos.lng, pos.lat]);
+			suppressNextMapClick = true;
+			cragMarkerDragging = false;
+			setTimeout(() => {
+				cragMarkerDragged = false;
+			}, 0);
+		});
 		cragMarker.getElement().addEventListener('click', (event) => {
 			event.stopPropagation();
+			if (cragMarkerDragged) {
+				cragMarkerDragged = false;
+				return;
+			}
 			if (cragEditorState.activeWorkspaceEntryPath)
-				selectMetadataTarget(cragEditorState.activeWorkspaceEntryPath, { focus: false });
+				void selectMetadataTarget(cragEditorState.activeWorkspaceEntryPath, {
+					focus: false,
+					edit: true
+				});
 		});
 
 		syncSectorMarkers();
@@ -712,6 +767,8 @@
 		bind:isMapLoaded
 		{mapStyle}
 		initialCoordinates={$state.snapshot(getGeometryCenter(activeEntry?.geometry) || [0, 0])}
+		pointPlacementMode={activeTool === 'geometry' &&
+			(!activeEntry?.geometry || activeEntry.geometry.type === 'Point')}
 		onStyleLoad={initMarkersAndLayers}
 		onMapClick={handleMapClick}
 		onGpxFileDrop={(file) => void trackEditor.importGpxFile(file)}

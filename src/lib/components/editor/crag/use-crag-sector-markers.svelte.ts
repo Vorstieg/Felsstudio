@@ -10,6 +10,7 @@ type SectorMarkerOptions = {
 	getSelection: () => CragSelection | null;
 	selectObject: (selection: CragSelection | null) => void;
 	setActiveTab: (tab: string) => void;
+	onEditGeometry?: () => void;
 };
 
 export function useCragSectorMarkers({
@@ -17,7 +18,8 @@ export function useCragSectorMarkers({
 	getMap,
 	getSelection,
 	selectObject,
-	setActiveTab
+	setActiveTab,
+	onEditGeometry
 }: SectorMarkerOptions) {
 	let markers: Marker[] = [];
 
@@ -42,6 +44,7 @@ export function useCragSectorMarkers({
 				event.stopPropagation();
 				selectObject({ type: 'entry', key: path });
 				setActiveTab('info');
+				onEditGeometry?.();
 			});
 			markers.push(
 				new maplibregl.Marker({ element, draggable: false }).setLngLat(coordinates).addTo(map)

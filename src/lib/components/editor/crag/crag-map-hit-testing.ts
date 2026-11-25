@@ -5,6 +5,7 @@ export { trackHitRadius } from '../track/track-interactions.ts';
 
 export type CragMapProperties = {
 	feature?: string;
+	handle?: string;
 	kind?: string;
 	documentPath?: string;
 	pathId?: string | number;
@@ -22,7 +23,15 @@ export function queryCragFeatures(
 	const layers = [
 		'route-paths-line',
 		'tracks-line-saved',
-		...(pathsOnly ? [] : ['sector-polygons-fill', 'sector-polygons-outline'])
+		...(pathsOnly
+			? []
+			: [
+					'sector-polygons-fill',
+					'sector-polygons-outline',
+					'geometry-editor-display-point',
+					'geometry-editor-fill',
+					'geometry-editor-line'
+				])
 	].filter((layer) => map.getLayer(layer));
 	return layers.length
 		? map.queryRenderedFeatures(
