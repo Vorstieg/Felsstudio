@@ -2,6 +2,7 @@ import { createCragTrackPersistence } from './create-crag-track-persistence.ts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createCragRouteTool } from './CragRouteTool.svelte.ts';
 import { useCragTrackEditor } from './use-crag-track-editor.svelte.ts';
+import { resetRoutingProfileCache } from '$lib/components/editor/track/track-drawing.ts';
 import { createCragEditorSession, createFelsEntry } from '$lib/state/crag-session.svelte.ts';
 
 vi.hoisted(() => {
@@ -109,6 +110,7 @@ function fixture() {
 	};
 }
 afterEach(() => {
+	resetRoutingProfileCache();
 	vi.unstubAllGlobals();
 	document.body.replaceChildren();
 });
@@ -464,24 +466,27 @@ describe('routing and GPX import', () => {
 		vi.stubGlobal(
 			'fetch',
 			vi.fn((url) => {
+				if (String(url).endsWith('/profile')) {
+					return Promise.resolve({ ok: true, json: async () => ({ profileid: 'custom_test' }) });
+				}
 				requests.push(url);
 				return new Promise((done) => {
 					resolve = () =>
 						done({
 							ok: true,
 							json: async () => ({
-								routes: [
+								features: [
 									{
 										geometry: {
 											coordinates:
 												requests.length === 1
 													? [
-															[0, 0],
-															[1, 0]
+															[0, 0, 500],
+															[1, 0, 600]
 														]
 													: [
-															[1, 0],
-															[2, 0]
+															[1, 0, 600],
+															[2, 0, 700]
 														]
 										}
 									}
@@ -519,19 +524,22 @@ describe('routing and GPX import', () => {
 		let resolve, signal;
 		vi.stubGlobal(
 			'fetch',
-			vi.fn((_, options) => {
+			vi.fn((url, options) => {
+				if (String(url).endsWith('/profile')) {
+					return Promise.resolve({ ok: true, json: async () => ({ profileid: 'custom_test' }) });
+				}
 				signal = options.signal;
 				return new Promise((done) => {
 					resolve = () =>
 						done({
 							ok: true,
 							json: async () => ({
-								routes: [
+								features: [
 									{
 										geometry: {
 											coordinates: [
-												[0, 0],
-												[1, 0]
+												[0, 0, 500],
+												[1, 0, 600]
 											]
 										}
 									}

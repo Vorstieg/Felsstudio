@@ -1,6 +1,12 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
-import { nearestWayPoint, snapToNearestWay, TRACK_SNAP_LAYER_ID } from './track-snapping.ts';
+import {
+	HIKING_DIFFICULTY_SNAP_LAYER_ID,
+	nearestWayPoint,
+	snapToNearestWay,
+	TRACK_SNAP_LAYER_ID,
+	VIA_FERRATA_SNAP_LAYER_ID
+} from './track-snapping.ts';
 
 const line = (coordinates) => ({ geometry: { type: 'LineString', coordinates } });
 const original = [0, 0.0001];
@@ -125,6 +131,27 @@ describe('map snapping integration', () => {
 				[120, 220]
 			],
 			{ layers: ['Path', TRACK_SNAP_LAYER_ID] }
+		);
+		expect(result[1]).toBeCloseTo(0, 8);
+	});
+	it('snaps to via ferrata and hiking difficulty overlay layers when present', () => {
+		const available = ['Via ferrata', VIA_FERRATA_SNAP_LAYER_ID, HIKING_DIFFICULTY_SNAP_LAYER_ID];
+		const map = {
+			getLayer: (id) => (available.includes(id) ? {} : undefined),
+			queryRenderedFeatures: vi.fn(() => [
+				line([
+					[-0.001, 0],
+					[0.001, 0]
+				])
+			])
+		};
+		const result = snapToNearestWay(map, screenPoint, original);
+		expect(map.queryRenderedFeatures).toHaveBeenCalledWith(
+			[
+				[80, 180],
+				[120, 220]
+			],
+			{ layers: available }
 		);
 		expect(result[1]).toBeCloseTo(0, 8);
 	});

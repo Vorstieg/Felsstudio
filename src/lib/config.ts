@@ -7,6 +7,12 @@ export const viaFerrataTilesUrl =
 	(import.meta.env.VITE_VIA_FERRATA_TILES_URL || '').trim() ||
 	new URL('../tiles/via-ferrata.pmtiles', felslagerUrl.replace(/\/$/, '') + '/').href;
 
+export const routingUrl = (
+	(import.meta.env.VITE_ROUTING_URL || '').trim() || 'https://brouter.de/brouter'
+).replace(/\/+$/, '');
+
+export const routingProfile = (import.meta.env.VITE_ROUTING_PROFILE || '').trim();
+
 export const maptilerApiKey = (import.meta.env.VITE_MAPTILER_API_KEY || '').trim();
 
 export const types = [

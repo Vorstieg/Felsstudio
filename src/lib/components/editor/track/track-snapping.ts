@@ -5,6 +5,8 @@ import type { Point2D } from '@vorstieg/fels-types/types';
 import type { ScreenPoint } from './track-interactions.ts';
 
 export const TRACK_SNAP_LAYER_ID = 'snap-helper';
+export const VIA_FERRATA_SNAP_LAYER_ID = 'snap-helper-via-ferrata';
+export const HIKING_DIFFICULTY_SNAP_LAYER_ID = 'snap-helper-hiking-difficulty';
 const DEFAULT_WAY_LAYERS = [
 	'Path',
 	'Track',
@@ -13,7 +15,10 @@ const DEFAULT_WAY_LAYERS = [
 	'Main road',
 	'Highway',
 	'Road construction',
-	TRACK_SNAP_LAYER_ID
+	'Via ferrata',
+	TRACK_SNAP_LAYER_ID,
+	VIA_FERRATA_SNAP_LAYER_ID,
+	HIKING_DIFFICULTY_SNAP_LAYER_ID
 ];
 type WayFeature = { geometry: Geometry | null };
 type SnapMap = Pick<MapLibreMap, 'getLayer' | 'queryRenderedFeatures'>;

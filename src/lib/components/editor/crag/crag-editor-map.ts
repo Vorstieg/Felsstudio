@@ -1,4 +1,8 @@
-import { TRACK_SNAP_LAYER_ID } from '../track/track-snapping.ts';
+import {
+	HIKING_DIFFICULTY_SNAP_LAYER_ID,
+	TRACK_SNAP_LAYER_ID,
+	VIA_FERRATA_SNAP_LAYER_ID
+} from '../track/track-snapping.ts';
 import { getMapHitRadius, getTouchTargetSize } from '$lib/assets/js/mobile-utils.ts';
 import { maptilerTilesUrl } from '$lib/map-style.ts';
 import { PathLayer, ScatterplotLayer } from '@deck.gl/layers';
@@ -528,6 +532,24 @@ export function ensureCragEditorLayers(map: MapLibreMap): void {
 			type: 'line',
 			source: 'maptiler_planet',
 			'source-layer': 'transportation',
+			paint: { 'line-opacity': 0 },
+			layout: { visibility: 'visible' }
+		});
+	if (map.getSource('viaFerrataTiles') && !map.getLayer(VIA_FERRATA_SNAP_LAYER_ID))
+		map.addLayer({
+			id: VIA_FERRATA_SNAP_LAYER_ID,
+			type: 'line',
+			source: 'viaFerrataTiles',
+			'source-layer': 'via_ferrata',
+			paint: { 'line-opacity': 0 },
+			layout: { visibility: 'visible' }
+		});
+	if (map.getSource('viaFerrataTiles') && !map.getLayer(HIKING_DIFFICULTY_SNAP_LAYER_ID))
+		map.addLayer({
+			id: HIKING_DIFFICULTY_SNAP_LAYER_ID,
+			type: 'line',
+			source: 'viaFerrataTiles',
+			'source-layer': 'hiking_difficulty',
 			paint: { 'line-opacity': 0 },
 			layout: { visibility: 'visible' }
 		});
