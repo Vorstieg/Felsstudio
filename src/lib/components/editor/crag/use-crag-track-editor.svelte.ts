@@ -90,7 +90,8 @@ export function useCragTrackEditor(options: CragTrackEditorOptions) {
 	let importName = '';
 	let gpxImportActive = $state(false);
 	let gpxImportRevision = $state(0);
-	let gpxApplyHandler: (() => boolean) | null = null;
+	let draftRevision = $state(0);
+	let applyHandler: (() => boolean) | null = null;
 	let requestVersion = 0;
 	let routeAbort: AbortController | null = null;
 	let routeQueue: Promise<void> = Promise.resolve();
@@ -163,6 +164,7 @@ export function useCragTrackEditor(options: CragTrackEditorOptions) {
 		name = label;
 		mode = nextMode;
 		multiSelect = false;
+		draftRevision += 1;
 		setActiveTool('track');
 		options.onShowOptions?.();
 	}
@@ -188,8 +190,8 @@ export function useCragTrackEditor(options: CragTrackEditorOptions) {
 					options.onTransitionBlocked?.();
 					return false;
 				}
-				if (gpxImportActive && gpxApplyHandler) {
-					if (!gpxApplyHandler()) return false;
+				if (!activeTrackTarget && applyHandler) {
+					if (!applyHandler()) return false;
 				} else if (!finalizeTrack()) return false;
 			} else cancelTrackEdit();
 		}
@@ -631,8 +633,8 @@ export function useCragTrackEditor(options: CragTrackEditorOptions) {
 	function dismissGpxImportPrompt() {
 		gpxImportActive = false;
 	}
-	function setGpxApplyHandler(handler: (() => boolean) | null) {
-		gpxApplyHandler = handler;
+	function setApplyHandler(handler: (() => boolean) | null) {
+		applyHandler = handler;
 	}
 	function finalizeAsRoutePath(
 		saveToRoute: (coordinates: Point2D[], trackName: string, extraSegments?: Point2D[][]) => boolean
@@ -701,6 +703,7 @@ export function useCragTrackEditor(options: CragTrackEditorOptions) {
 		importSegments = [];
 		gpxImportActive = true;
 		gpxImportRevision += 1;
+		draftRevision += 1;
 		mode = 'select';
 		fitTrackBounds();
 	}
@@ -844,7 +847,7 @@ export function useCragTrackEditor(options: CragTrackEditorOptions) {
 		);
 	}
 	function applyActiveTrack(): boolean {
-		return gpxImportActive && gpxApplyHandler ? gpxApplyHandler() : finalizeTrack();
+		return !activeTrackTarget && applyHandler ? applyHandler() : finalizeTrack();
 	}
 	function primaryAction() {
 		if (!sessionActive) return null;
@@ -1031,8 +1034,11 @@ export function useCragTrackEditor(options: CragTrackEditorOptions) {
 		get gpxImportRevision() {
 			return gpxImportRevision;
 		},
+		get draftRevision() {
+			return draftRevision;
+		},
 		setTrackName,
-		setGpxApplyHandler,
+		setApplyHandler,
 		previewSimplifyCount,
 		dismissGpxImportPrompt,
 		finalizeAsRoutePath,

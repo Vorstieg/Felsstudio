@@ -235,4 +235,143 @@ describe('track options workflow', () => {
 			})
 		);
 	});
+	it('shows route assignment shortcut while drawing a new track and applies to the chosen route', async () => {
+		context.editor.cancelTrackEdit();
+		context.editor.startRoutingDraft();
+		render(CragTrackPanel);
+
+		expect(screen.getByLabelText('Track name')).toHaveValue('');
+		expect(screen.getByLabelText('Applies to')).toHaveValue('crag');
+		expect(screen.queryByRole('button', { name: 'Save & apply' })).not.toBeInTheDocument();
+
+		// Pick route and role before drawing points
+		const routeTarget = 'route::europe/austria/tyrol/roter-ofen/roter-ofen-topo.json::route-1';
+		await fireEvent.change(screen.getByLabelText('Applies to'), { target: { value: routeTarget } });
+		await tick();
+		await fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'main' } });
+		await fireEvent.input(screen.getByLabelText('Track name'), {
+			target: { value: 'Klettersteig Hauptlinie' }
+		});
+
+		// Draw 2 straight-line points
+		context.editor.setTrackDraftMode('editing');
+		await context.editor.addTrackPoint([16.0, 48.0]);
+		await tick();
+		expect(screen.queryByRole('button', { name: 'Save & apply' })).not.toBeInTheDocument();
+		await context.editor.addTrackPoint([16.01, 48.01]);
+		await tick();
+
+		const saveButton = screen.getByRole('button', { name: 'Save & apply' });
+		expect(saveButton).toBeEnabled();
+		await fireEvent.click(saveButton);
+
+		expect(context.routeTool.saveTrackAsRoutePath).toHaveBeenCalledWith(
+			'europe/austria/tyrol/roter-ofen/roter-ofen-topo.json',
+			'route-1',
+			expect.objectContaining({
+				name: 'Klettersteig Hauptlinie',
+				role: 'main',
+				coordinates: [
+					[16.0, 48.0],
+					[16.01, 48.01]
+				]
+			})
+		);
+		expect(context.editor.sessionActive).toBe(false);
+	});
+	it('infers role from drawn track name, supports assigning all routes via leave/Enter, and resets on next draft', async () => {
+		const docPath = 'europe/austria/tyrol/roter-ofen/roter-ofen-topo.json';
+		context.routeTool.listAssignableRoutes = () => [
+			{
+				documentPath: docPath,
+				sectorName: 'Roter Ofen',
+				routeId: 'route-1',
+				routeName: 'Sonnenriss',
+				grade: '6a'
+			},
+			{
+				documentPath: docPath,
+				sectorName: 'Roter Ofen',
+				routeId: 'route-2',
+				routeName: 'Westkante',
+				grade: '6b'
+			}
+		];
+		context.editor.cancelTrackEdit();
+		context.editor.startRoutingDraft();
+		render(CragTrackPanel);
+
+		context.editor.setTrackDraftMode('editing');
+		await context.editor.addTrackPoint([16.0, 48.0]);
+		await context.editor.addTrackPoint([16.02, 48.02]);
+		await tick();
+
+		await fireEvent.input(screen.getByLabelText('Track name'), {
+			target: { value: 'Abstieg Nord' }
+		});
+		await fireEvent.change(screen.getByLabelText('Applies to'), {
+			target: { value: `__all__::${docPath}` }
+		});
+		await tick();
+
+		expect(screen.getByLabelText('Role')).toHaveValue('descent');
+
+		// Drawing another track commits the current one via requestLeave and resets destination
+		expect(context.editor.requestLeave(context.editor.startRoutingDraft)).toBe(true);
+		await tick();
+
+		expect(context.routeTool.saveTrackAsRoutePaths).toHaveBeenCalledWith(
+			docPath,
+			'all',
+			expect.objectContaining({
+				name: 'Abstieg Nord',
+				role: 'descent',
+				coordinates: [
+					[16.0, 48.0],
+					[16.02, 48.02]
+				]
+			})
+		);
+		expect(context.editor.sessionActive).toBe(true);
+		expect(screen.getByLabelText('Applies to')).toHaveValue('crag');
+		expect(screen.getByLabelText('Track name')).toHaveValue('');
+	});
+	it('preserves route assignment after clicking Keep editing points on an imported GPX track', async () => {
+		render(CragTrackPanel);
+		const gpxContent = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1"><trk><name>Parkplatz Zustieg</name><trkseg>
+<trkpt lat="48.0000" lon="16.0000"></trkpt>
+<trkpt lat="48.0050" lon="16.0050"></trkpt>
+</trkseg></trk></gpx>`;
+		await context.editor.importGpxFile({ name: 'zustieg.gpx', text: async () => gpxContent });
+		await tick();
+
+		const routeTarget = 'route::europe/austria/tyrol/roter-ofen/roter-ofen-topo.json::route-1';
+		await fireEvent.change(screen.getByLabelText('Applies to'), { target: { value: routeTarget } });
+		await tick();
+		await fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'descent' } });
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Keep editing points' }));
+		await tick();
+
+		expect(screen.getByLabelText('Applies to')).toHaveValue(routeTarget);
+		expect(screen.getByLabelText('Role')).toHaveValue('descent');
+
+		expect(context.editor.primaryAction?.run()).toBe(true);
+		expect(context.routeTool.saveTrackAsRoutePath).toHaveBeenCalledWith(
+			'europe/austria/tyrol/roter-ofen/roter-ofen-topo.json',
+			'route-1',
+			expect.objectContaining({
+				name: 'Parkplatz Zustieg',
+				role: 'descent'
+			})
+		);
+	});
+	it('does not show the new-track route destination selector when editing an existing track', async () => {
+		render(CragTrackPanel);
+		expect(screen.queryByLabelText('Applies to')).not.toBeInTheDocument();
+		expect(screen.queryByLabelText('Track name')).not.toBeInTheDocument();
+		expect(context.editor.primaryAction?.run()).toBe(true);
+		expect(context.routeTool.saveTrackAsRoutePath).not.toHaveBeenCalled();
+	});
 });

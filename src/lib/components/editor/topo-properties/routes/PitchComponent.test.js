@@ -61,4 +61,48 @@ describe('PitchComponent', () => {
 		await user.tab();
 		expect(onFieldChange).toHaveBeenCalledWith('length', '24');
 	});
+
+	it('adapts grade systems for array-typed via-ferrata and alpine-tour routes and updates grades when switching scale', async () => {
+		const user = userEvent.setup();
+		const onFieldChange = vi.fn();
+		const { rerender } = render(PitchComponentTestWrapper, {
+			pitch: { grade: null, lineStyle: 'red', type: ['via-ferrata'] },
+			onFieldChange
+		});
+
+		const selects = screen.getAllByRole('combobox');
+		expect(Array.from(selects[0].options).map((option) => option.value)).toEqual([
+			'schall',
+			'huelser'
+		]);
+		expect(Array.from(selects[1].options).map((option) => option.value)).toContain('C/D');
+
+		// Switching scale before selecting a grade updates the available grade options and saves with the new scale
+		await user.selectOptions(selects[0], 'huelser');
+		expect(Array.from(selects[1].options).map((option) => option.value)).toContain('K3');
+		await user.selectOptions(selects[1], 'K3');
+		expect(onFieldChange).toHaveBeenCalledWith('grade', {
+			scale: 'huelser',
+			value: 'K3',
+			standardizedValue: 'K3'
+		});
+
+		await rerender({
+			pitch: {
+				grade: { scale: 'uiaa', value: 'V', standardizedValue: '5a' },
+				lineStyle: 'red',
+				type: ['via-ferrata']
+			},
+			onFieldChange
+		});
+		expect(selects[0]).toHaveValue('schall');
+		expect(selects[1]).toHaveValue('');
+
+		await rerender({
+			pitch: { grade: null, lineStyle: 'red', type: ['alpine-tour'] },
+			onFieldChange
+		});
+		expect(Array.from(selects[0].options).map((option) => option.value)).toEqual(['sac', 'uiaa']);
+		expect(Array.from(selects[1].options).map((option) => option.value)).toContain('AD');
+	});
 });

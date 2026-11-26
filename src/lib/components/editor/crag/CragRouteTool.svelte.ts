@@ -264,7 +264,7 @@ export function createCragRouteTool({
 				? routes.map((route) => route.id)
 				: routeIds.filter((id) => routes.some((route) => String(route.id) === String(id)));
 		if (targetRouteIds.length === 0) return false;
-		const pathName = String(name || '').trim() || 'GPX track';
+		const pathName = String(name || '').trim() || 'Route path';
 		updateDocument(documentPath, (data) => {
 			data.paths = data.paths || { type: 'FeatureCollection', features: [] };
 			const createdIds: string[] = [];

@@ -70,11 +70,16 @@ export const gradeSystems = {
 export type GradeSystem = keyof typeof gradeSystems;
 
 export function getAvailableGradeSystems(routeType: unknown): readonly GradeSystem[] {
-	if (routeType === 'alpine-tour') {
-		return ['sac', 'uiaa'];
-	} else if (routeType === 'via-ferrata') {
+	const types = Array.isArray(routeType)
+		? routeType
+		: typeof routeType === 'string' && routeType
+			? [routeType]
+			: [];
+	if (types.includes('via-ferrata')) {
 		return ['schall', 'huelser'];
-	} else {
-		return ['uiaa', 'french'];
 	}
+	if (types.includes('alpine-tour')) {
+		return ['sac', 'uiaa'];
+	}
+	return ['uiaa', 'french'];
 }

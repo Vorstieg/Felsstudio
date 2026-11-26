@@ -20,6 +20,7 @@
 	let segmentIndex = $state(0);
 	let selectedTarget = $state('crag');
 	let selectedRouteRole = $state<RoutePathRole>('approach');
+	let roleTouched = $state(false);
 	const button =
 		'rounded-sm border border-black/15 bg-white px-2 py-1 text-ui-label text-warm-gray-500 transition-none hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40';
 	let busy = $derived(editor.isRoutingTrack || editor.importSegments.length > 0);
@@ -42,8 +43,16 @@
 		}
 		return Array.from(map.values());
 	});
-	let canChooseDestination = $derived(
-		editor.activeTrackTarget?.kind !== 'route-path' && assignableRoutes.length > 0
+	let isUnassignedNewTrack = $derived(!editor.activeTrackTarget);
+	let canChooseDestination = $derived(isUnassignedNewTrack && assignableRoutes.length > 0);
+	let showGpxImportCard = $derived(
+		editor.gpxImportActive &&
+			editor.draftPoints.length >= 2 &&
+			!pending &&
+			!editor.importSegments.length
+	);
+	let showDraftDetailsCard = $derived(
+		(isUnassignedNewTrack || showGpxImportCard) && !pending && !editor.importSegments.length
 	);
 	let simplifiedPreviewCount = $derived(
 		editor.gpxImportActive && editor.draftPoints.length >= 3
@@ -55,29 +64,36 @@
 	);
 
 	$effect(() => {
-		const active = editor.gpxImportActive;
+		void editor.draftRevision;
 		void editor.gpxImportRevision;
-		if (active) {
-			selectedTarget = 'crag';
-			selectedRouteRole = inferRoutePathRole(
-				untrack(() => editableTrackName),
-				'approach'
-			);
-		}
+		selectedTarget = 'crag';
+		roleTouched = false;
+		selectedRouteRole = inferRoutePathRole(
+			untrack(() => editableTrackName),
+			'approach'
+		);
 	});
 
 	$effect(() => {
-		if (!editor.gpxImportActive) {
-			editor.setGpxApplyHandler?.(null);
+		if (!isUnassignedNewTrack) {
+			editor.setApplyHandler?.(null);
 			return;
 		}
-		editor.setGpxApplyHandler?.(applyImportedTrack);
+		editor.setApplyHandler?.(applyDraftTrack);
 		return () => {
-			editor.setGpxApplyHandler?.(null);
+			editor.setApplyHandler?.(null);
 		};
 	});
 
-	function applyImportedTrack(): boolean {
+	function handleTrackNameInput(event: Event & { currentTarget: HTMLInputElement }) {
+		const value = event.currentTarget.value;
+		editor.setTrackName(value);
+		if (!roleTouched) {
+			selectedRouteRole = inferRoutePathRole(value, 'approach');
+		}
+	}
+
+	function applyDraftTrack(): boolean {
 		if (selectedTarget !== 'crag' && canChooseDestination) {
 			if (selectedTarget.startsWith('__all__::') && routeTool?.saveTrackAsRoutePaths) {
 				const documentPath = selectedTarget.slice('__all__::'.length);
@@ -207,7 +223,11 @@
 <ToolOptions title={$_('ui.track_tool_options')} {open} onClose={() => (open = false)}>
 	<div class="flex flex-col gap-2">
 		<div class="text-xs font-medium text-warm-gray-600">
-			{editor.trackName.startsWith('track.') ? $_(editor.trackName) : editor.trackName}
+			{editor.trackName
+				? editor.trackName.startsWith('track.')
+					? $_(editor.trackName)
+					: editor.trackName
+				: $_('track.new')}
 		</div>
 		<div class="grid grid-cols-2 gap-1">
 			{#each [{ extend: false, label: 'track.edit', icon: 'fa-arrow-pointer' }, { extend: true, label: 'track.extend', icon: 'fa-pen-to-square' }] as tool}
@@ -239,58 +259,69 @@
 				{/each}
 			</div>
 		{/if}
-		{#if !pending && !busy}
+		{#if !pending && !editor.importSegments.length}
 			<div class="flex flex-col gap-1">
 				<label
-					class="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-sm border border-creator-blue/30 bg-creator-blue/[0.06] px-3 text-[10px] font-bold uppercase tracking-widest text-creator-blue hover:bg-creator-blue/10"
+					class={`flex h-9 items-center justify-center gap-1.5 rounded-sm border border-creator-blue/30 bg-creator-blue/[0.06] px-3 text-[10px] font-bold uppercase tracking-widest text-creator-blue hover:bg-creator-blue/10 ${editor.isRoutingTrack ? 'pointer-events-none opacity-40' : 'cursor-pointer'}`}
 					><i class="fa-solid fa-file-import text-xs" aria-hidden="true"></i>{$_(
 						'ui.import_gpx'
 					)}<input
 						type="file"
 						accept=".gpx,application/gpx+xml"
 						class="hidden"
+						disabled={editor.isRoutingTrack}
 						onchange={editor.handleGpxUpload}
 					/></label
 				>
 				<p class="text-center text-[10px] text-warm-gray-400">{$_('track.gpxDropMicroHint')}</p>
 			</div>
 		{/if}
-		{#if editor.gpxImportActive && editor.draftPoints.length >= 2 && !pending && !busy}
+		{#if showDraftDetailsCard}
 			<div
-				class="flex flex-col gap-2 rounded-sm border border-creator-blue/25 bg-creator-blue/[0.03] p-2.5"
+				class={`flex flex-col gap-2 rounded-sm border p-2.5 ${showGpxImportCard ? 'border-creator-blue/25 bg-creator-blue/[0.03]' : 'border-black/10 bg-black/[0.02]'}`}
 			>
-				<div class="flex items-center justify-between gap-2">
-					<span class="text-ui-label text-creator-blue">
-						<i class="fa-solid fa-check-circle mr-1" aria-hidden="true"></i>{$_(
-							'track.gpxImported'
-						)}
-					</span>
-					<span class="text-[10px] font-mono text-warm-gray-500">
-						{editor.draftPoints.length}
-						{$_('track.points')}
-					</span>
-				</div>
+				{#if showGpxImportCard}
+					<div class="flex items-center justify-between gap-2">
+						<span class="text-ui-label text-creator-blue">
+							<i class="fa-solid fa-check-circle mr-1" aria-hidden="true"></i>{$_(
+								'track.gpxImported'
+							)}
+						</span>
+						<span class="text-[10px] font-mono text-warm-gray-500">
+							{editor.draftPoints.length}
+							{$_('track.points')}
+						</span>
+					</div>
+				{/if}
 				<div class="flex flex-col gap-1">
-					<label for="gpx-import-name" class="text-[10px] font-semibold text-warm-gray-500"
-						>{$_('track.trackNameLabel')}</label
-					>
+					<div class="flex items-center justify-between gap-2">
+						<label for="track-draft-name" class="text-[10px] font-semibold text-warm-gray-500"
+							>{$_('track.trackNameLabel')}</label
+						>
+						{#if !showGpxImportCard && editor.draftPoints.length > 0}
+							<span class="text-[10px] font-mono text-warm-gray-500">
+								{editor.draftPoints.length}
+								{$_('track.points')}
+							</span>
+						{/if}
+					</div>
 					<input
-						id="gpx-import-name"
+						id="track-draft-name"
 						type="text"
 						class="input-studio w-full bg-white"
 						value={editableTrackName}
 						placeholder={$_('track.trackNamePlaceholder')}
-						oninput={(event) => editor.setTrackName(event.currentTarget.value)}
+						oninput={handleTrackNameInput}
 					/>
 				</div>
 				{#if canChooseDestination}
 					<div class="flex flex-col gap-1">
 						<label
-							for="gpx-import-destination"
+							for="track-draft-destination"
 							class="text-[10px] font-semibold text-warm-gray-500">{$_('track.assignTarget')}</label
 						>
 						<select
-							id="gpx-import-destination"
+							id="track-draft-destination"
 							class="input-studio w-full bg-white"
 							bind:value={selectedTarget}
 						>
@@ -313,13 +344,14 @@
 					</div>
 					{#if selectedTarget !== 'crag'}
 						<div class="flex flex-col gap-0.5">
-							<label for="gpx-import-role" class="text-[10px] font-semibold text-warm-gray-500"
+							<label for="track-draft-role" class="text-[10px] font-semibold text-warm-gray-500"
 								>{$_('track.selectRole')}</label
 							>
 							<select
-								id="gpx-import-role"
+								id="track-draft-role"
 								class="input-studio w-full bg-white"
 								bind:value={selectedRouteRole}
+								onchange={() => (roleTouched = true)}
 							>
 								{#each ROUTE_PATH_ROLES as roleMeta}
 									<option value={roleMeta.id}>{$_(roleMeta.labelKey)}</option>
@@ -328,7 +360,7 @@
 						</div>
 					{/if}
 				{/if}
-				{#if simplifiedPreviewCount < editor.draftPoints.length}
+				{#if showGpxImportCard && simplifiedPreviewCount < editor.draftPoints.length}
 					<div class="flex items-center gap-1.5">
 						<button
 							type="button"
@@ -353,23 +385,28 @@
 						/>
 					</div>
 				{/if}
-				<div class="flex flex-col gap-1 pt-1">
-					<button
-						type="button"
-						class="btn-pill h-8 w-full justify-center gap-1.5 text-[11px]"
-						onclick={applyImportedTrack}
-					>
-						<i class="fa-solid fa-check" aria-hidden="true"></i>
-						{$_('track.applyTrack')}
-					</button>
-					<button
-						type="button"
-						class={`${button} w-full`}
-						onclick={editor.dismissGpxImportPrompt}
-					>
-						{$_('track.editPointsInstead')}
-					</button>
-				</div>
+				{#if editor.draftPoints.length >= 2}
+					<div class="flex flex-col gap-1 pt-1">
+						<button
+							type="button"
+							class="btn-pill h-8 w-full justify-center gap-1.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-40"
+							disabled={!editor.canApply}
+							onclick={applyDraftTrack}
+						>
+							<i class="fa-solid fa-check" aria-hidden="true"></i>
+							{$_('track.applyTrack')}
+						</button>
+						{#if showGpxImportCard}
+							<button
+								type="button"
+								class={`${button} w-full`}
+								onclick={editor.dismissGpxImportPrompt}
+							>
+								{$_('track.editPointsInstead')}
+							</button>
+						{/if}
+					</div>
+				{/if}
 			</div>
 		{/if}
 		<p class="text-[10px] text-warm-gray-400" aria-live="polite">{$_(instruction)}</p>
